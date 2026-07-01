@@ -73,6 +73,7 @@ export interface Calc {
   holeVol: number;
   hasPlatform: boolean;
   platformVol: number;
+  firingStepOn: boolean;
   sumpOn: boolean;
   sumpCount: number;
   sumpVol: number;
@@ -117,10 +118,14 @@ function computeCalc(raw: Inputs): Calc {
 
   const revet = revetments[raw.revetment] ?? revetments['none']!;
 
-  const count = clamp(Math.round(finite(raw.count, 1)), 1, 999);
-  const teamSize = clamp(Math.round(finite(raw.teamSize, 1)), 1, 50);
-  const clampedCount = count !== raw.count;
-  const clampedTeam = teamSize !== raw.teamSize;
+  const roundedCount = Math.round(finite(raw.count, 1));
+  const roundedTeam = Math.round(finite(raw.teamSize, 1));
+  const count = clamp(roundedCount, 1, 999);
+  const teamSize = clamp(roundedTeam, 1, 50);
+  // Advisory fires only on genuine out-of-range clamping, never on mere fractional
+  // rounding: compare the clamp result against the rounded value, not the raw input.
+  const clampedCount = count !== roundedCount;
+  const clampedTeam = teamSize !== roundedTeam;
 
   const inputs: Inputs = { ...raw, count, teamSize };
 
@@ -148,11 +153,15 @@ function computeCalc(raw: Inputs): Calc {
   const parapetRing = (outerL * outerW - holeL * holeW) * parapetH;
 
   const holeVol = holeL * holeW * depthOfCut;
-  const hasPlatform = position.firingPlatform !== undefined && inputs.firingStep;
-  const platformVol =
-    hasPlatform && position.firingPlatform
-      ? position.firingPlatform.L.value * position.firingPlatform.W.value * position.firingPlatform.depthBelowHole.value
-      : 0;
+  // §9 literal: platformVol keys purely on whether the POSITION has a firing platform
+  // (a structural feature of crew-served positions), NOT on the firingStep input toggle.
+  const hasPlatform = position.firingPlatform !== undefined;
+  const platformVol = position.firingPlatform
+    ? position.firingPlatform.L.value * position.firingPlatform.W.value * position.firingPlatform.depthBelowHole.value
+    : 0;
+  // The firingStep input drives the section-drawing firing-step ledge (§10) — a minor cut
+  // §9 folds into holeVol. It adds no fabricated volume or labor of its own.
+  const firingStepOn = inputs.firingStep;
 
   const sumpOn = inputs.sump;
   const sumpCount = sumpOn ? position.grenadeSumps : 0;
@@ -190,7 +199,7 @@ function computeCalc(raw: Inputs): Calc {
     excavBank * baseLabor.perVolMH * machineFactor +
     (buildsEarthRoof ? baseLabor.overheadAdd : 0) +
     (revet.buildsFace ? baseLabor.revetAdd : 0) +
-    (sumpOn ? baseLabor.sumpAdd : 0) +
+    (sumpCount > 0 ? baseLabor.sumpAdd : 0) +
     (inputs.camouflage ? baseLabor.camoAdd : 0);
   const mhPerPos = round1(mh);
   const mhTotal = round1(mhPerPos * count);
@@ -229,6 +238,7 @@ function computeCalc(raw: Inputs): Calc {
     holeVol,
     hasPlatform,
     platformVol,
+    firingStepOn,
     sumpOn,
     sumpCount,
     sumpVol,

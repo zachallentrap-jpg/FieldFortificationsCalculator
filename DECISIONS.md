@@ -81,6 +81,28 @@ option, implement it, and log it here.
   cover thickness, no cover BOM, no stringers, and no overhead labor. For every non-engineered
   covered case the two readings are identical.
 
+- **D13 — Three adversarial-audit findings fixed (audit vs §9).** A background adversarial
+  audit of the engine against the §9 contract confirmed three items, all now fixed in
+  `compute.ts` and locked by `test/engine-audit-fixes.test.ts`:
+  1. **Clamp advisory misfire (nit).** `COUNT_CLAMPED`/`TEAM_CLAMPED` compared the
+     rounded+clamped value against the *raw* input, so a fractional-but-in-range value
+     (e.g. count 3.4) tripped a "clamped to range" advisory though nothing was clamped.
+     Fix: compare the clamp result against the *rounded* value — rounding is now silent,
+     only true out-of-range raises the advisory.
+  2. **Fabricated sump labor (deviation).** The sump labor adder was gated on the raw
+     `sump` boolean while volume/BOM/geometry were `sumpCount`-driven, so a zero-sump
+     position (mortar_pit, vehicle defilades — `grenadeSumps:0`) added 0.5 mh for a sump
+     never dug. Fix: gate on `sumpCount > 0`, mirroring the earth-roof labor gate (D11).
+     This is the same "don't fabricate labor for work not built" principle as §2.7.
+  3. **`platformVol` coupled to `firingStep` (undisclosed §9 deviation).** §9 pins
+     `platformVol = firingPlatform ? … : 0` — purely the position's structural platform.
+     The code also required the `firingStep` input, so a crew-served position with the
+     toggle off silently dropped platform excavation + its labor. Fix: `platformVol` keys
+     only on `position.firingPlatform` (§9-literal). The `firingStep` input now drives only
+     the section-drawing firing-step ledge (§10) — a minor cut §9 folds into `holeVol` —
+     adding no fabricated volume or labor. `firingStepOn` is threaded through `Calc` for
+     the renderer.
+
 ## Render / layout / state
 
 - **D12 — The reference drawing is authored, and renderer + reference share one registry.**
