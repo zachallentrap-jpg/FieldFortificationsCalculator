@@ -41,7 +41,30 @@ option, implement it, and log it here.
 
 ## Engine / doctrine
 
-_(logged as stages land)_
+- **D6 — Exact physical constants are not placeholders.** Unit-conversion factors in
+  `doctrine/units.ts` (`M_PER_FT = 0.3048`, etc.) are exact physical facts, not doctrinal
+  magnitudes to confirm against a pub. They are plain consts — **not** wrapped in `P()` and
+  **not** registered — so they never inflate the placeholder count or keep the banner lit
+  after all doctrine is filled. The number-free-engine gate (§2.4) targets `engine/render/
+  state/ui`, so plain math constants living in `doctrine/` are fine.
+
+- **D7 — Provenance wraps quantitative magnitudes + safety-critical values; qualitative
+  structure stays plain.** Every geometry dimension (feet), multiplier, labor rate, shielding
+  thickness, standoff, and span limit is `P()`-wrapped. Definitional structure — a position's
+  `shape`, `crewSize`, `grenadeSumps`/`elbowHoles` counts, a revetment's `kind`/`buildsFace`,
+  labels/notes — is plain. Rationale: those aren't "confirm-against-a-pub" numbers you fill
+  in; they define what the position *is*. This keeps the "fill the values, clear the banner"
+  workflow about real doctrinal quantities. The doctrine-integrity test encodes this policy.
+
+- **D8 — Frozen structure, mutable leaves.** `doctrine/index.ts` deep-freezes every table's
+  structure (can't add/remove keys) but stops at `Provenance` leaves, leaving them mutable so
+  a validated doctrine import (`io.ts`) can update `value`/`status`/`source` in place. The
+  registry holds references to the same leaf objects, so `counts()` — and thus the banner —
+  recomputes immediately after an import. Import is the *only* sanctioned doctrine mutation.
+
+- **D9 — `RoofPath` duplicated as a local union in `doctrine/protection.ts`.** So doctrine
+  depends on nothing upstream (engine binds to doctrine, never the reverse). The union is
+  structurally identical to `engine/types` `RoofPath`; a test asserts both stay in lockstep.
 
 ## Render / layout / state
 
