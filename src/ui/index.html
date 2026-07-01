@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en" data-theme="day">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="SAP-1 — deterministic, offline planner for doctrinal survivability positions. Illustrative placeholder data; not for field use." />
+    <title>SAP-1 — Survivability Position Planner</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#app">Skip to planner</a>
+    <div id="root">
+      <div id="app" aria-live="polite"></div>
+    </div>
+    <div id="overlay" class="overlay" hidden>
+      <div class="overlay-card" role="dialog" aria-modal="true" aria-label="Detail">
+        <button type="button" class="overlay-close" data-action="overlay-close" aria-label="Close">Close</button>
+        <div id="overlay-body"></div>
+      </div>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
