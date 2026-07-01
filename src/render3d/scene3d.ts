@@ -98,13 +98,23 @@ export function buildScene3D(result: Result): Scene3DModel {
     // A ramp descending from grade to full depth, built as a stepped "staircase" of plain
     // boxes — the same proven box primitive every other part uses (a single continuously
     // sloped/rotated extrude turned out fragile: see DECISIONS D20). Cartoon-appropriate too.
+    //
+    // A vehicle-defilade cut is doctrinally SHALLOW relative to how WIDE it is (a few feet of
+    // depth across a footprint tens of feet wide) — rendered at true scale under a camera framed
+    // to fit that width, the relief all but disappears. RELIEF_EXAGGERATION is a display-only
+    // convention (the same idea as vertical exaggeration on a terrain-relief model): it multiplies
+    // the STAIRCASE'S visual depth only, purely inside this 3D descriptor. It never touches
+    // depthOfCut itself, so every real number (BOM, labor, the 2D plan/section) is unaffected —
+    // this view alone is allowed to be honest about shape at the cost of being literal about scale.
+    const RELIEF_EXAGGERATION = 3;
+    const depthEx = s.depthOfCut * RELIEF_EXAGGERATION;
     const steps = 6;
     const stepLen = runLen / steps;
-    const base = -(s.depthOfCut + 1); // shared floor so consecutive treads never gap
+    const base = -(depthEx + 1); // shared floor so consecutive treads never gap
     for (let i = 0; i < steps; i++) {
-      // i=0's top sits flush with grade (0); the LAST tread reaches full depth — no gap at
-      // the entry and the deepest point matches depthOfCut exactly.
-      const topY = -(i / (steps - 1)) * s.depthOfCut;
+      // i=0's top sits flush with grade (0); the LAST tread reaches the (exaggerated) full
+      // depth — no gap at the entry, and the deepest point still reads clearly as a real cut.
+      const topY = -(i / (steps - 1)) * depthEx;
       const zNear = -i * stepLen; // nearer the entry (grade)
       const zFar = -(i + 1) * stepLen; // nearer the parked end (full depth)
       parts.push({
@@ -118,8 +128,9 @@ export function buildScene3D(result: Result): Scene3DModel {
         role: 'bayFloor',
       });
     }
-    parts.push({ kind: 'box', x: -(halfL + p.parapetW / 2), y: p.parapetW * 0.15, z: -runLen / 4, w: p.parapetW, h: Math.max(1, p.parapetW * 0.5), d: runLen, role: 'rampBerm' });
-    parts.push({ kind: 'box', x: halfL + p.parapetW / 2, y: p.parapetW * 0.15, z: -runLen / 4, w: p.parapetW, h: Math.max(1, p.parapetW * 0.5), d: runLen, role: 'rampBerm' });
+    const bermH = Math.max(1, p.parapetW * 0.5) * RELIEF_EXAGGERATION;
+    parts.push({ kind: 'box', x: -(halfL + p.parapetW / 2), y: bermH / 2, z: -runLen / 4, w: p.parapetW, h: bermH, d: runLen, role: 'rampBerm' });
+    parts.push({ kind: 'box', x: halfL + p.parapetW / 2, y: bermH / 2, z: -runLen / 4, w: p.parapetW, h: bermH, d: runLen, role: 'rampBerm' });
   } else {
     // rect, rect_roofed, inverted_t, l_shape all start from a rectangular ring + bay.
     parts.push({ kind: 'box', x: 0, y: -0.02, z: 0, w: p.outerL + 4, h: 0.05, d: p.outerW + 4, role: 'ground' });
