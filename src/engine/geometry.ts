@@ -46,6 +46,8 @@ export interface GeometryModel {
     stringers: number;
     hasPlatform: boolean;
     platformDepth: number;
+    firingStepOn: boolean;
+    sump: boolean;
   };
   dims: DimSpec[];
 }
@@ -127,6 +129,8 @@ export function buildGeometry(calc: Calc): GeometryModel {
       stringers: calc.stringers,
       hasPlatform: calc.hasPlatform,
       platformDepth: calc.hasPlatform && calc.position.firingPlatform ? calc.position.firingPlatform.depthBelowHole.value : 0,
+      firingStepOn: calc.firingStepOn,
+      sump: calc.sumpCount > 0,
     },
     dims,
   };
