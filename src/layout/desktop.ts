@@ -5,7 +5,7 @@ export function arrangeDesktop(p: Parts): string {
   return (
     '<main class="app-body layout-desktop">' +
     '<aside class="region controls-region">' + p.controls + '</aside>' +
-    '<section class="region drawings-region">' + p.plan + p.section + p.iso + '</section>' +
+    '<section class="region drawings-region">' + p.plan + p.section + p.three + '</section>' +
     '<aside class="region rail">' + p.specs + p.bom + p.labor + p.validation + '</aside>' +
     '</main>'
   );

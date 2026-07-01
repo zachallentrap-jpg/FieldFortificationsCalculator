@@ -48,6 +48,40 @@ body {
   min-height: 34px; padding: 5px 8px; border: 1px solid var(--border); border-radius: var(--r-sm);
   background: var(--surface); color: var(--ink); font: inherit;
 }
+.ov-label { font-size: 11px; color: var(--ink-soft); margin-right: 4px; }
+
+/* ── Dropdown menus (Tools / Save & print) — plain <details>, keyboard + SR friendly ────── */
+.menu { position: relative; }
+.menu-summary { list-style: none; cursor: pointer; }
+.menu-summary::-webkit-details-marker { display: none; }
+.menu-summary::after { content: ' ▾'; font-size: 10px; opacity: 0.7; }
+.menu[open] .menu-summary { background: var(--surface-2); }
+.menu-panel {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 25; min-width: 260px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18); padding: 6px; display: flex; flex-direction: column; gap: 2px;
+}
+.menu-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px; text-align: left;
+  min-height: 44px; padding: 6px 10px; border: 0; border-radius: var(--r-sm); background: none; color: var(--ink);
+  font: inherit; cursor: pointer;
+}
+.menu-item:hover, .menu-item:focus-visible { background: var(--surface-2); }
+.mi-label { font-size: 13px; font-weight: 600; }
+.mi-hint { font-size: 11px; color: var(--ink-soft); }
+
+/* ── 3D model card ──────────────────────────────────────────────────────────── */
+.three-card { margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+.three-header {
+  display: flex; justify-content: space-between; align-items: center; padding: 9px 12px;
+  background: var(--ink); color: var(--surface); font-size: 13px; font-weight: 700; letter-spacing: 1px;
+}
+.three-hint-text { font-size: 10.5px; font-weight: 400; letter-spacing: normal; opacity: 0.85; text-transform: none; }
+.three-socket { position: relative; width: 100%; aspect-ratio: 760 / 560; background: var(--surface); touch-action: none; }
+.three-socket canvas { display: block; }
+.three-socket-fallback svg { display: block; width: 100%; height: 100%; }
+.three-controls { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); }
+.three-hint { font-size: 11px; color: var(--ink-soft); }
 
 /* ── Body layouts ───────────────────────────────────────────────────────────── */
 .app-body { padding: 12px; gap: 12px; }
@@ -75,8 +109,9 @@ body {
 .ctrl { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; }
 .ctrl-label { font-size: 12px; color: var(--ink-soft); }
 .ctrl-hint { font-size: 11px; color: var(--ink-soft); opacity: 0.8; }
-.ctrl.toggle { flex-direction: row; align-items: center; gap: 8px; min-height: var(--tap-min); }
-.ctrl.toggle input { width: 20px; height: 20px; }
+.ctrl.toggle { gap: 2px; }
+.toggle-row { display: flex; align-items: center; gap: 8px; min-height: var(--tap-min); }
+.ctrl.toggle input { width: 20px; height: 20px; flex: none; }
 .ctrl.toggle .ctrl-label { font-size: 13px; color: var(--ink); }
 .controls select, .controls input[type="number"] { width: 100%; }
 

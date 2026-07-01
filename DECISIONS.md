@@ -125,3 +125,107 @@ option, implement it, and log it here.
   `render-intuitive` (header bar, callout↔legend consistency, orientation, PH flags, min font,
   pattern redundancy, dim-label non-collision), `fuzz` (3000 seeded inputs — never throws/NaN,
   never fabricates an engineered thickness).
+
+## Threat model / state / UI / packaging
+
+- **D16 — Threat = class → specific caliber (operator-requested).** The threat's SIZE is the
+  dominant protection variable, so a threat is a specific munition (5.56 → 155mm → RPG), not a
+  coarse bucket. Each caliber carries its own placeholder shielding thickness, standoff, roof
+  call, and cover material, so size moves the cover thickness, setback, and BOM. `Inputs.threat`
+  stays a single munition id (no schema change); the UI class select derives from the catalog and
+  filters the caliber select. Setback became `max(munitionStandoff, setbackDepthFrac × depth)`.
+  SAFETY held: every direct-fire AT + large VBIED → `engineered_required`, thickness 0, no
+  fabricated number; all magnitudes remain PLACEHOLDER. Lock: bigger caliber ⇒ ≥ cover + standoff.
+
+- **D17 — Framework-free UI; unit is display-only.** The store is a ~50-line observer; all
+  interaction is delegated (`data-field` edits, `data-action` commands, `data-trace` opens a
+  derivation); renders batch via `requestAnimationFrame`. Layout/theme live in store, never in
+  `inputs`, and switching unit imperial↔metric never changes the computed feet-space result (a
+  test guards this, §2.8). Exports (print job sheet / CSV / JSON) are user-initiated in-app
+  downloads. Scenario ids are supplied by the caller (`crypto.randomUUID`, Date fallback) so
+  `state/scenarios.ts` stays pure/testable; every load re-validates through the import schema.
+
+- **D18 — Single-file inlining + PWA shape.** `dist/sap1.html` inlines the bundled JS as an
+  INLINE `<script type="module">` (inline module scripts run from `file://` — CORS only bites
+  fetched module resources, of which there are none) plus inline `<style>`. The service worker is
+  shipped as plain `public/sw.js` (copied verbatim to `dist/sw.js`) rather than `src/sw.ts`, so it
+  registers reliably at the app scope root without a second build entry — a deliberate deviation
+  from the §6 file map (a working offline SW is the requirement). Deploy is Replit **static**
+  (`.replit`: build `npm ci && npm run build`, publicDir `dist`).
+
+- **D19 — Test-gate scoping.** The number-free gate (§2.4) scans the engine's *math* modules for
+  bare DECIMAL literals (the shape a doctrinal magnitude takes), allowing only `0.5` and
+  scientific epsilons — presentation/infra integers in render/state/ui are out of scope by design.
+  The `offline` test scans the pure layers (engine/render/state/doctrine/layout/theme) for network
+  primitives + external URLs (W3C namespace URIs excepted). `compute.snapshot` pins the default +
+  engineered + count-scaling baselines; regenerate deliberately when a constant legitimately moves.
+
+## Interactive 3D viewer, language pass, menu (post-launch refinement)
+
+- **D20 — `three` is an explicit, authorized, narrowly-scoped dependency.** The operator asked
+  for genuine drag-to-rotate 3D models, not another flat schematic, and explicitly authorized
+  adding whatever tooling that needs. `three` (+ its bundled `OrbitControls` addon) is added to
+  `dependencies` and used ONLY from `src/ui/three-viewer.ts` — it is a UI-layer rendering
+  consumer, exactly like `render/*.ts` is for SVG, and does not touch `doctrine/ engine/ state/`
+  (those stay zero-runtime-dep per §5). Architecture mirrors the existing 2D split precisely:
+  `src/render3d/scene3d.ts` is a **pure, framework-agnostic** geometry descriptor built from the
+  same `Result`/`GeometryModel` the SVG renderers consume (no Three.js import there — it stays
+  unit-testable under `node:test`, see `test/scene3d.test.ts`, which mirrors `render-nan.test.ts`:
+  every position × threat produces finite numbers, and engineered munitions never get a
+  fabricated cover box, exactly the §2.7 honesty invariant carried into 3D). `three-viewer.ts` is
+  the ONLY place that turns that descriptor into meshes. The flat isometric SVG (`drawIso`) is
+  kept as-is for the no-WebGL fallback and stays covered by its existing render tests — nothing
+  about it changed.
+
+- **D21 — Persistent canvas + a hard-won `preserveDrawingBuffer` lesson.** The app re-renders its
+  whole shell as an HTML string on every input change, which would destroy a `<canvas>` and its
+  WebGL context every keystroke. The viewer is created ONCE; `attach(container)` re-parents the
+  same canvas node into the freshly rendered `#three-socket` div after every render (detach/
+  reattach preserves the context, camera angle, and zoom — rotating the model never resets just
+  because the operator toggled a checkbox). Framing (the initial camera position) only happens
+  once, guarded by a `framed` flag, for the same reason. **Real bug found and fixed during
+  verification**: the renderer defaulted to `preserveDrawingBuffer:false`, so the WebGL drawing
+  buffer could read back blank/black whenever anything queried it outside the exact
+  `requestAnimationFrame` tick — confirmed by forcing a synchronous render-then-read (171 valid
+  colors) versus reading the buffer from a separate call after the fact (pure black). This isn't
+  just a test-tooling artifact: a throttled or backgrounded tab is subject to the exact same gap,
+  so a real user could see a blank 3D card. Fixed by setting `preserveDrawingBuffer:true`.
+
+- **D22 — Two real 3D geometry bugs found and fixed against the live render, not just the type
+  checker.** (1) The circular position's parapet ring was first approximated as 8 separate boxes
+  arranged around the circle; adjacent boxes each got their own outline shell, and the seams
+  between them read as dark clutter — replaced with a single smooth extruded annulus (`Ring3` /
+  `buildRing`, a `THREE.Shape` with a hole, extruded once). (2) The vehicle-defilade ramp was
+  first modeled as a thin (0.15 ft) tilted box; viewed at a shallow angle it read as a stray
+  black diagonal line because its black outline shell (uniformly scaled 1.035×) visually
+  dominated the nearly edge-on, paper-thin colored face. Root-caused via a synchronous forced
+  render + `gl.readPixels` comparison (which also incidentally surfaced the real, structural bug
+  below) and fixed by replacing the single tilted card with a stepped "staircase" of ordinary
+  boxes — the same box primitive every other part already uses successfully, ground plane
+  re-centered on the ramp's own footprint so it's never partially unsupported. (3) **The
+  structural root cause underneath both**: `addToonMesh` created the colored mesh and its black
+  outline shell as two independent siblings, and callers repositioned only the returned mesh —
+  the outline silently stayed at its default (0,0,0) transform. This was invisible for symmetric,
+  origin-centered shapes but a real, general bug for anything positioned away from origin.
+  Fixed by having `addToonMesh` return a `THREE.Group` wrapping both mesh and outline, so a
+  caller positions ONE object and the pair can never drift apart — a whole bug class closed by
+  construction rather than by remembering to keep two objects in sync.
+
+- **D23 — Plain-language pass, technical term kept alongside, not replaced.** The master spec
+  pins a fixed vocabulary (parapet, revetment, sump, standard, Mission BOM...) that must still
+  appear in the UI and docs. Per the operator's ask ("military terms only when you have to"),
+  every control and legend label now leads with plain language and keeps the technical term
+  parenthetically (e.g. "Dirt wall up front (parapet)", "Grenade catch-pit (sump)", "Roof support
+  beams (stringers)") rather than replacing it outright — satisfying both constraints at once.
+  `Sectors of fire` is the one label left untouched: it's asserted verbatim by
+  `test/render-intuitive.test.ts` (an exact `aria-label` match) and is already reasonably plain.
+  Every generated control (`layout/controls.ts`) now carries a one-line hint explaining *why* the
+  field matters, not just what it's called.
+
+- **D24 — Topbar restructured into two grouped `<details>` menus.** Fourteen flat, often
+  abbreviated buttons ("Diag", "CSV", "JSON", "Mission") became: primary single-purpose actions
+  stay as plain buttons with full words ("Start over", "Status"); the four scenario/analysis
+  tools collapse into a **Tools** menu; the three export paths collapse into a **Save & print**
+  menu. `<details>/<summary>` was chosen over a hand-rolled dropdown because it's keyboard- and
+  screen-reader-operable with zero extra JS; `main.ts` adds only the polish native `<details>`
+  lacks — closing on outside-click, on Escape, and automatically after an item is chosen.

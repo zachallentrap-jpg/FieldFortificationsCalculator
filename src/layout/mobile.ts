@@ -7,7 +7,7 @@ export function arrangeMobile(p: Parts): string {
   return (
     '<main class="app-body layout-mobile">' +
     p.summary +
-    '<section class="region drawings-region">' + p.plan + p.section + p.iso + '</section>' +
+    '<section class="region drawings-region">' + p.plan + p.section + p.three + '</section>' +
     '<section class="region rail">' + p.specs + p.bom + p.labor + p.validation + '</section>' +
     '<button class="fab" type="button" data-action="sheet-toggle" aria-expanded="false">Edit inputs</button>' +
     '<div class="bottom-sheet" data-open="false" aria-hidden="true"><div class="sheet-handle" aria-hidden="true"></div>' +

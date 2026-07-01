@@ -68,7 +68,7 @@ export function bomPanel(result: Result): string {
     )
     .join('');
   return (
-    '<section class="panel"><h2>Bill of materials</h2><table class="bom">' +
+    '<section class="panel"><h2>Materials list (Bill of Materials)</h2><table class="bom">' +
     '<thead><tr><th>Item</th><th>Per position</th><th>Total</th><th>Unit</th></tr></thead>' +
     '<tbody>' + rows + '</tbody></table></section>'
   );
@@ -80,7 +80,7 @@ export function laborPanel(result: Result): string {
     ? '<ul class="assumptions">' + lab.assumptions.map((a) => '<li>' + esc(a) + '</li>').join('') + '</ul>'
     : '';
   return (
-    '<section class="panel"><h2>Labor</h2>' +
+    '<section class="panel"><h2>Time & people needed (Labor)</h2>' +
     specRow('Man-hours / position', val(num(lab.manHoursPerPosition), 'manHoursPerPosition')) +
     specRow('Man-hours total', val(num(lab.manHoursTotal), 'manHoursTotal')) +
     specRow('Elapsed (team of ' + result.inputs.teamSize + ')', val(num(lab.elapsedHours) + ' hr', 'elapsed')) +
@@ -96,7 +96,7 @@ export function validationPanel(result: Result): string {
   const items = result.validation
     .map((v) => '<li class="issue ' + v.severity + '"><span class="sev">' + SEV_LABEL[v.severity] + '</span>' + esc(v.message) + '</li>')
     .join('');
-  return '<section class="panel validation"><h2>Checks</h2><ul>' + items + '</ul></section>';
+  return '<section class="panel validation"><h2>Things to double-check</h2><ul>' + items + '</ul></section>';
 }
 
 // Sticky summary (mobile) — the four numbers worth a glance.

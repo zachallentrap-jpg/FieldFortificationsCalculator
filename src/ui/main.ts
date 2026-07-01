@@ -23,6 +23,7 @@ import { ScenarioStore, makeScenario } from '../state/scenarios';
 import { createStorageAdapter } from '../state/persistence';
 import { aggregateMission } from '../engine/mission';
 import { planForTime, type PlanResult } from '../engine/plan';
+import { isWebGLAvailable, createThreeViewer } from './three-viewer';
 import type { Inputs, Result } from '../engine/types';
 
 const app = document.getElementById('app')!;
@@ -41,6 +42,13 @@ let sheetOpen = false;
 let planHours = 8;
 let planTeam = 2;
 let lastPlan: PlanResult | null = null;
+
+// The 3D canvas is created ONCE and re-parented into the fresh markup after every render (a
+// <canvas> can't survive an innerHTML replace, but detach/reattach keeps its WebGL context,
+// camera angle, and zoom — so rotating the model never gets reset by an unrelated input edit).
+const webglOk = isWebGLAvailable();
+const threeViewer = webglOk ? createThreeViewer() : null;
+threeViewer?.setTheme(store.getState().theme);
 
 function newId(): string {
   try {
@@ -109,7 +117,14 @@ function render(): void {
   const c = safeCompute(state.inputs);
   if (c.ok) {
     lastResult = c.value;
-    app.innerHTML = renderApp(state, c.value);
+    app.innerHTML = renderApp(state, c.value, webglOk);
+    if (threeViewer) {
+      const socket = document.getElementById('three-socket');
+      if (socket) {
+        threeViewer.attach(socket);
+        threeViewer.update(c.value);
+      }
+    }
   } else {
     store.setState({ lastError: c.error });
     app.innerHTML = errorCardHtml(c.error);
@@ -224,7 +239,21 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'plan-apply': { const opt = lastPlan?.feasible[Number(actionEl.dataset['idx'])]; if (opt) { store.replaceInputs(opt.inputs); history.push(opt.inputs); hideOverlay(); } break; }
+    // ── 3D viewer ──
+    case 'three-reset': threeViewer?.resetView(); if (lastResult) threeViewer?.update(lastResult); break;
     default: break;
+  }
+  // Auto-close a dropdown menu after picking an item from it (native <details> stays open
+  // otherwise), but never for the "reset view" button which lives outside a menu.
+  const openMenu = actionEl.closest<HTMLDetailsElement>('details.menu');
+  if (openMenu && action !== undefined) openMenu.open = false;
+});
+
+// Close any open dropdown menu on outside click or Escape (native <details> doesn't do this).
+document.addEventListener('click', (e) => {
+  const t = e.target as HTMLElement;
+  for (const d of document.querySelectorAll<HTMLDetailsElement>('details.menu[open]')) {
+    if (!d.contains(t)) d.open = false;
   }
 });
 
@@ -236,7 +265,12 @@ function applyInputs(inputs: Inputs | null): void {
 document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); applyInputs(history.undo()); }
   else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); applyInputs(history.redo()); }
-  else if (e.key === 'Escape') { if (!overlay.hidden) hideOverlay(); else if (sheetOpen) { sheetOpen = false; applySheet(); } }
+  else if (e.key === 'Escape') {
+    const openMenu = document.querySelector<HTMLDetailsElement>('details.menu[open]');
+    if (!overlay.hidden) hideOverlay();
+    else if (openMenu) openMenu.open = false;
+    else if (sheetOpen) { sheetOpen = false; applySheet(); }
+  }
 });
 
 // ── Theme ────────────────────────────────────────────────────────────────────
@@ -244,6 +278,7 @@ function toggleTheme(): void {
   const next: Theme = store.getState().theme === 'day' ? 'night' : 'day';
   applyTheme(next);
   persistTheme(next);
+  threeViewer?.setTheme(next);
   store.setState({ theme: next });
 }
 
@@ -265,7 +300,10 @@ function openTrace(key: string): void {
 }
 function showDiagnostics(): void {
   const d = collectDiagnostics(store.getState().lastError);
-  showOverlay('<div class="diagnostics"><h2>Diagnostics</h2><pre>' + escapeHtml(diagnosticsText(d)) + '</pre></div>');
+  showOverlay(
+    '<div class="diagnostics"><h2>Status</h2><p class="tool-note">Version, offline status, and how many practice values still need a real number.</p><pre>' +
+      escapeHtml(diagnosticsText(d)) + '</pre></div>',
+  );
 }
 
 // ── Mobile bottom-sheet ──────────────────────────────────────────────────────

@@ -50,17 +50,21 @@ export interface CalloutDef {
   n: number;
   label: string;
 }
+// Labels are PLAIN LANGUAGE FIRST, with the military/engineering term kept in parentheses
+// (the master vocabulary still appears, satisfying the fixed-vocabulary + docs requirement,
+// but nobody has to already know the jargon to read the legend). 'Sectors of fire' is pinned
+// by test/render-intuitive.test.ts (exact aria-label match) — do not reword it.
 export const CALLOUTS: Record<string, CalloutDef> = {
-  grade: { n: 1, label: 'Existing grade' },
-  spoil: { n: 2, label: 'Spoil / parapet fill' },
-  parapet: { n: 3, label: 'Parapet (frontal cover)' },
-  bay: { n: 4, label: 'Fighting bay' },
-  overhead: { n: 5, label: 'Overhead cover' },
-  sump: { n: 6, label: 'Grenade sump' },
-  stringers: { n: 7, label: 'Stringers' },
-  firing_step: { n: 8, label: 'Firing step / platform' },
-  setback: { n: 9, label: 'Roof setback' },
-  engineered: { n: 10, label: 'Engineered roof — see engineer' },
+  grade: { n: 1, label: 'Ground level (existing grade)' },
+  spoil: { n: 2, label: 'Dug-out dirt (spoil)' },
+  parapet: { n: 3, label: 'Dirt wall up front (parapet)' },
+  bay: { n: 4, label: 'Where you stand and fight (the bay)' },
+  overhead: { n: 5, label: 'Roof overhead (overhead cover)' },
+  sump: { n: 6, label: 'Grenade catch-pit (sump)' },
+  stringers: { n: 7, label: 'Roof support beams (stringers)' },
+  firing_step: { n: 8, label: 'Step up to shoot (firing step)' },
+  setback: { n: 9, label: 'Safety gap under the roof (setback)' },
+  engineered: { n: 10, label: 'Needs an engineer’s design (no roof shown)' },
   sectors: { n: 11, label: 'Sectors of fire' },
   enemy: { n: 12, label: 'Enemy direction' },
 };
