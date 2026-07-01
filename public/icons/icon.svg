@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="SAP-1">
+  <rect width="512" height="512" rx="96" fill="#16130d"/>
+  <!-- parapet ring + fighting bay (plan symbol) -->
+  <rect x="140" y="188" width="232" height="176" rx="10" fill="#d9b877" stroke="#f4f2ec" stroke-width="10"/>
+  <rect x="196" y="236" width="120" height="80" fill="#f3efe6" stroke="#16130d" stroke-width="8"/>
+  <!-- enemy arrow -->
+  <g stroke="#c0561e" stroke-width="16" fill="#c0561e" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="256" y1="176" x2="256" y2="96"/>
+    <path d="M256 84 L236 120 L276 120 Z"/>
+  </g>
+  <text x="256" y="428" text-anchor="middle" font-family="ui-monospace, monospace" font-size="60" font-weight="700" fill="#f4f2ec" letter-spacing="4">SAP-1</text>
+</svg>

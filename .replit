@@ -1,0 +1,18 @@
+# Replit config for SAP-1. Static deployment: Vite builds to dist/, which is served as a
+# fully static, offline-capable PWA (zero server, zero external requests). The single-file
+# dist/sap1.html is also produced for air-gapped use.
+run = "npm run dev -- --host 0.0.0.0 --port 5000"
+entrypoint = "src/ui/index.html"
+modules = ["nodejs-20"]
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+deploymentTarget = "static"
+publicDir = "dist"
+build = ["sh", "-c", "npm ci && npm run build"]
+
+[[ports]]
+localPort = 5000
+externalPort = 80

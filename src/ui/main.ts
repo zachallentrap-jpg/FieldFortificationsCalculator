@@ -228,5 +228,14 @@ if (typeof matchMedia !== 'undefined') {
   matchMedia('(pointer: coarse)').addEventListener?.('change', recomputeLayout);
 }
 
+// ── PWA: register the service worker when served over http(s) (never from file://) ──
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {
+      /* offline still works from cache / standalone; registration failure is non-fatal */
+    });
+  });
+}
+
 // ── First paint ──────────────────────────────────────────────────────────────
 render();
