@@ -66,6 +66,29 @@ option, implement it, and log it here.
   depends on nothing upstream (engine binds to doctrine, never the reverse). The union is
   structurally identical to `engine/types` `RoofPath`; a test asserts both stay in lockstep.
 
+- **D10 — Sump volume/gravel scale with the position's sump count.** §9 writes
+  `sumpVol = sump ? sump.L×W×D : 0` and `gravelVol = sump ? gravelFt3 : 0` (a single sump).
+  The implementation multiplies both by `position.grenadeSumps` when the sump toggle is on.
+  For a one-sump position it is identical to the literal formula; for multi-sump positions
+  (two-man = 2, etc.) it is the faithful generalization — undercounting gravel for a 2-sump
+  position would be a real field error. Determinism/purity unaffected.
+
+- **D11 — The overhead-cover labor adder is gated on an actually-built earth roof.** §9 writes
+  `+ (coverOn ? overheadAdd : 0)`. The implementation uses `roofPath === 'earth_on_stringers'`
+  instead. Rationale: when the roof is `engineered_required` (contact-burst / shaped-charge),
+  §2.7 forbids fabricating cover numbers — and fabricating *build labor* for a roof we are
+  explicitly NOT designing is the same fabrication. So an engineered roof contributes no
+  cover thickness, no cover BOM, no stringers, and no overhead labor. For every non-engineered
+  covered case the two readings are identical.
+
+## Render / layout / state
+
+- **D12 — The reference drawing is authored, and renderer + reference share one registry.**
+  Per D2, `public/SAP-1_drawing_reference.svg` is authored from §10. To guarantee the shipped
+  renderer matches it, both are generated from the same numbered-callout + legend registry
+  (`render/svg.ts` `callout()` + the legend builder), so a callout number and its legend name
+  can never drift between the reference and the live drawings.
+
 ## Render / layout / state
 
 _(logged as stages land)_
