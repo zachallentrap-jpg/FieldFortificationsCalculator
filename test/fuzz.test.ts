@@ -11,7 +11,7 @@ import { positions } from '../src/doctrine/positions';
 import { soils } from '../src/doctrine/soils';
 import { standards } from '../src/doctrine/standards';
 import { revetments } from '../src/doctrine/materials';
-import { threats } from '../src/doctrine/protection';
+import { threats, roofPathFor } from '../src/doctrine/protection';
 import type { Inputs } from '../src/engine/types';
 
 function mulberry32(seed: number): () => number {
@@ -26,7 +26,8 @@ function mulberry32(seed: number): () => number {
 }
 
 const BAD = /NaN|Infinity|undefined/;
-const ENGINEERED = new Set(['direct_fire_he', 'shaped_charge']);
+// Derived from the catalog — every munition whose roof is engineered must never get a thickness.
+const ENGINEERED = new Set(Object.keys(threats).filter((id) => roofPathFor(id) === 'engineered_required'));
 
 const posKeys = Object.keys(positions);
 const soilKeys = Object.keys(soils);

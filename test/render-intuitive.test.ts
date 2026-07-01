@@ -101,7 +101,7 @@ test('section carries header, standing figure + scale, single-accent PH dims, co
 });
 
 test('engineered roof is drawn honestly (hazard block, no fabricated earth cover)', () => {
-  const section = drawSection(compute(defaultInputs({ positionType: 'bunker_op_cp', threat: 'direct_fire_he' })));
+  const section = drawSection(compute(defaultInputs({ positionType: 'bunker_op_cp', threat: 'at-he-contact' })));
   assert.ok(section.includes('ENGINEERED ROOF — SEE ENGINEER'), 'engineered hazard label');
   assert.ok(section.includes('url(#pat-engineered)'), 'engineered hazard pattern');
   assert.ok(!section.includes('url(#pat-cover)'), 'no earth-cover slab for an engineered roof');

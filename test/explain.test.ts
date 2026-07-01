@@ -41,7 +41,7 @@ test('doctrine-backed operands expose placeholder status + source (§12 trace)',
 });
 
 test('engineered roof derivation reports 0 with an explicit note, never a fabricated number (§2.7)', () => {
-  const d = byKey(compute(defaultInputs({ threat: 'direct_fire_he', overheadCover: true })).derivations);
+  const d = byKey(compute(defaultInputs({ threat: 'at-he-contact', overheadCover: true })).derivations);
   const cover = d['coverThickness'];
   assert.ok(cover, 'a coverThickness derivation exists when cover is requested');
   assert.equal(cover.result, 0);

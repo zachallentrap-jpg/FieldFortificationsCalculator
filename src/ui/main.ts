@@ -13,6 +13,7 @@ import { renderApp } from '../layout/shell';
 import { traceHtml } from '../layout/panels';
 import { helpHtml } from '../layout/help';
 import { resolveLayout } from '../layout/resolve';
+import { munitionsByClass, type ThreatClass } from '../doctrine/protection';
 import { initialTheme, applyTheme, persistTheme, type Theme } from '../theme/theme';
 import { collectDiagnostics, diagnosticsText } from '../layout/diagnostics';
 import { jobSheet } from '../render/jobSheet';
@@ -97,6 +98,14 @@ document.addEventListener('change', (e) => {
   if (el instanceof HTMLSelectElement && el.dataset['action'] === 'layout-override') {
     store.setState({ layoutOverride: el.value as 'auto' | 'mobile' | 'tablet' | 'desktop' });
     recomputeLayout();
+  }
+  // Threat class picked → jump to the first caliber in that class (or clear the threat).
+  if (el instanceof HTMLSelectElement && el.dataset['action'] === 'threat-class') {
+    if (el.value === 'none') commit({ threat: 'none' });
+    else {
+      const first = munitionsByClass(el.value as ThreatClass)[0];
+      if (first) commit({ threat: first.id });
+    }
   }
 });
 

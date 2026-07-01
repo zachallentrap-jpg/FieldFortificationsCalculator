@@ -16,8 +16,8 @@ test('each validation code is reachable', () => {
     { standard: '___' as unknown as Inputs['standard'] }, // INVALID_STANDARD
     { threat: '___' }, // INVALID_THREAT
     { soil: 'sand', revetment: 'none' }, // REVET_REQUIRED_SOIL
-    { threat: 'direct_fire_he', overheadCover: true }, // ROOF_ENGINEERED
-    { threat: 'shaped_charge', overheadCover: true, standard: 'hasty' }, // + ROOF_ENGINEERED_HASTY
+    { threat: 'at-he-contact', overheadCover: true }, // ROOF_ENGINEERED
+    { threat: 'at-rpg', overheadCover: true, standard: 'hasty' }, // + ROOF_ENGINEERED_HASTY
     { soil: 'rock', machineAssist: false }, // EXCAV_HAND_HEAVY
     { count: 5000 }, // COUNT_CLAMPED
     { teamSize: 999 }, // TEAM_CLAMPED
@@ -35,7 +35,7 @@ test('REVET_REQUIRED_SOIL is an error and clears when a revetment is chosen', ()
 });
 
 test('validation ordering: errors before warnings before advisories', () => {
-  const v = compute(defaultInputs({ positionType: '___', threat: 'direct_fire_he', overheadCover: true, count: 5000 }))
+  const v = compute(defaultInputs({ positionType: '___', threat: 'at-he-contact', overheadCover: true, count: 5000 }))
     .validation;
   const rank = { error: 0, warning: 1, advisory: 2 };
   for (let i = 1; i < v.length; i++) {
@@ -44,6 +44,6 @@ test('validation ordering: errors before warnings before advisories', () => {
 });
 
 test('clean deliberate build with a valid revetment has no errors', () => {
-  const v = compute(defaultInputs({ threat: 'small_arms', soil: 'loam', revetment: 'none' })).validation;
+  const v = compute(defaultInputs({ threat: 'sa-556', soil: 'loam', revetment: 'none' })).validation;
   assert.ok(!v.some((i) => i.severity === 'error'), 'no errors on a valid config');
 });

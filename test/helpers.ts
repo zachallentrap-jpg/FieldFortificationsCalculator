@@ -7,7 +7,7 @@ export function defaultInputs(over: Partial<Inputs> = {}): Inputs {
     positionType: 'two_man',
     standard: 'deliberate',
     soil: 'loam',
-    threat: 'fragmentation',
+    threat: 'ind-mtr-81',
     overheadCover: true,
     revetment: 'none',
     sump: true,
@@ -24,10 +24,10 @@ export function defaultInputs(over: Partial<Inputs> = {}): Inputs {
 // A spread of representative fixtures for determinism / fuzz-adjacent coverage.
 export const FIXTURES: Inputs[] = [
   defaultInputs(),
-  defaultInputs({ positionType: 'one_man', threat: 'small_arms', overheadCover: false, sump: false }),
+  defaultInputs({ positionType: 'one_man', threat: 'sa-556', overheadCover: false, sump: false }),
   defaultInputs({ positionType: 'mg_crew', firingStep: true, camouflage: true, standard: 'reinforced' }),
-  defaultInputs({ positionType: 'bunker_op_cp', threat: 'direct_fire_he', standard: 'hasty' }),
+  defaultInputs({ positionType: 'bunker_op_cp', threat: 'at-he-contact', standard: 'hasty' }),
   defaultInputs({ positionType: 'fifty_cal', soil: 'sand', revetment: 'sandbag_facing', machineAssist: true }),
-  defaultInputs({ positionType: 'mortar_pit', threat: 'shaped_charge', unit: 'metric', count: 6, teamSize: 4 }),
+  defaultInputs({ positionType: 'mortar_pit', threat: 'at-rpg', unit: 'metric', count: 6, teamSize: 4 }),
   defaultInputs({ positionType: 'vehicle_hull_defilade', threat: 'none', overheadCover: false, soil: 'rock' }),
 ];

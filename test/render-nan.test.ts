@@ -37,7 +37,7 @@ test('toggle-heavy and metric configs also render clean', () => {
   const combos = [
     defaultInputs({ sump: true, camouflage: true, firingStep: true, revetment: 'pickets_wire', unit: 'metric' }),
     defaultInputs({ positionType: 'mg_crew', machineAssist: true, revetment: 'timber_plywood' }),
-    defaultInputs({ positionType: 'mortar_pit', sump: true, threat: 'shaped_charge' }),
+    defaultInputs({ positionType: 'mortar_pit', sump: true, threat: 'at-rpg' }),
     defaultInputs({ count: 999, teamSize: 50, soil: 'rock' }),
   ];
   for (const inp of combos) {

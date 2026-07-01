@@ -7,7 +7,7 @@ import { positions } from '../doctrine/positions';
 import { soils } from '../doctrine/soils';
 import { standards } from '../doctrine/standards';
 import { revetments } from '../doctrine/materials';
-import { threats } from '../doctrine/protection';
+import { threatClasses, munitionsByClass, threatClassOf } from '../doctrine/protection';
 import type { Inputs } from '../engine/types';
 
 function esc(s: string): string {
@@ -54,8 +54,32 @@ function numberCtrl(field: keyof Inputs, label: string, value: number, min: numb
   );
 }
 
-const THREAT_OPTS: Opt[] = [{ value: 'none', label: 'None' }, ...optionsFrom(threats)];
 const UNIT_OPTS: Opt[] = [{ value: 'imperial', label: 'Imperial (ft-in)' }, { value: 'metric', label: 'Metric (m)' }];
+
+// Two-level threat: class → specific caliber/round. The class select (data-action) filters
+// the caliber select (data-field="threat"); only the munition id is stored in inputs.
+function threatCtrl(inputs: Inputs): string {
+  const cls = threatClassOf(inputs.threat);
+  const classOpts: Opt[] = [{ value: 'none', label: 'None' }, ...threatClasses.map((c) => ({ value: c.id, label: c.label }))];
+  const classOptions = classOpts
+    .map((o) => '<option value="' + esc(o.value) + '"' + (o.value === cls ? ' selected' : '') + '>' + esc(o.label) + '</option>')
+    .join('');
+  const classSelect =
+    '<label class="ctrl" for="f-threat-class"><span class="ctrl-label">Threat class</span>' +
+    '<select id="f-threat-class" data-action="threat-class">' + classOptions + '</select></label>';
+
+  const disabled = cls === 'none';
+  const munOptions = disabled
+    ? '<option>— none —</option>'
+    : munitionsByClass(cls)
+        .map((m) => '<option value="' + esc(m.id) + '"' + (m.id === inputs.threat ? ' selected' : '') + '>' + esc(m.label) + '</option>')
+        .join('');
+  const munSelect =
+    '<label class="ctrl" for="f-threat"><span class="ctrl-label">Caliber / round</span>' +
+    '<select id="f-threat" data-field="threat"' + (disabled ? ' disabled' : '') + '>' + munOptions + '</select>' +
+    '<span class="ctrl-hint">Size drives cover thickness, standoff &amp; roof.</span></label>';
+  return classSelect + munSelect;
+}
 
 export function controlsHtml(inputs: Inputs): string {
   return (
@@ -64,7 +88,7 @@ export function controlsHtml(inputs: Inputs): string {
     selectCtrl('positionType', 'Type', optionsFrom(positions), inputs.positionType) +
     selectCtrl('standard', 'Standard', optionsFrom(standards), inputs.standard, 'Hasty → deliberate → reinforced') +
     selectCtrl('soil', 'Soil', optionsFrom(soils), inputs.soil) +
-    selectCtrl('threat', 'Threat', THREAT_OPTS, inputs.threat) +
+    threatCtrl(inputs) +
     selectCtrl('revetment', 'Revetment', optionsFrom(revetments), inputs.revetment) +
     '</fieldset>' +
     '<fieldset><legend>Features</legend>' +

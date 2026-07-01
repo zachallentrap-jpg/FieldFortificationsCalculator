@@ -12,7 +12,7 @@ export const DEFAULT_INPUTS: Inputs = {
   positionType: 'one_man',
   standard: 'hasty',
   soil: 'loam',
-  threat: 'small_arms',
+  threat: 'sa-556',
   overheadCover: false,
   revetment: 'none',
   sump: false,

@@ -44,8 +44,9 @@ test('every cover-material default resolves to a real shield material', () => {
 });
 
 test('contact-burst and shaped-charge always resolve to engineered_required (§2.7)', () => {
-  assert.equal(roofPathFor('direct_fire_he'), 'engineered_required');
-  assert.equal(roofPathFor('shaped_charge'), 'engineered_required');
+  for (const id of ['at-rpg', 'at-recoilless', 'at-tank', 'at-he-contact', 'blast-vbied']) {
+    assert.equal(roofPathFor(id), 'engineered_required', id + ' must be engineered');
+  }
   // Unknown threats fail safe, never fabricate a covered roof.
   assert.equal(roofPathFor('___nonsense___'), 'engineered_required');
 });

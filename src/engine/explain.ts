@@ -40,9 +40,9 @@ export function buildDerivations(calc: Calc): Derivation[] {
   d.push({
     key: 'setback',
     label: 'Roof setback',
-    formula: 'max(setbackMin, setbackDepthFrac × depthOfCut)',
+    formula: 'max(munitionStandoff, setbackDepthFrac × depthOfCut)',
     operands: [
-      op('setbackMin', overhead.setbackMin.value, 'ft', overhead.setbackMin),
+      op('munitionStandoff', calc.standoffMin, 'ft', calc.standoffLeaf ?? overhead.setbackMin),
       op('setbackDepthFrac', overhead.setbackDepthFrac.value, '×', overhead.setbackDepthFrac),
       op('depthOfCut', calc.depthOfCut, 'ft'),
     ],

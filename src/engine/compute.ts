@@ -9,7 +9,7 @@ import { positions } from '../doctrine/positions';
 import { soils } from '../doctrine/soils';
 import { standards } from '../doctrine/standards';
 import { sandbag, revetments, camo, sump, excavation, machine } from '../doctrine/materials';
-import { parapet, overhead, threats } from '../doctrine/protection';
+import { parapet, overhead, threats, standoffMinFor, standoffLeafFor } from '../doctrine/protection';
 import { counts } from '../doctrine/registry';
 import type { PositionRow } from '../doctrine/positions';
 import type { SoilRow } from '../doctrine/soils';
@@ -52,6 +52,8 @@ export interface Calc {
   holeD: number;
   depthOfCut: number;
   setback: number;
+  standoffMin: number;
+  standoffLeaf: Provenance<number> | undefined;
   parapetW: number;
   parapetH: number;
   outerL: number;
@@ -136,9 +138,12 @@ function computeCalc(raw: Inputs): Calc {
 
   const depthOfCut = holeD * standard.depthMul.value;
 
-  const setbackMin = overhead.setbackMin.value;
+  // Setback/standoff scales with the specific munition (bigger round → more standoff);
+  // 'none'/unknown falls back to the global minimum.
   const setbackDepthFrac = overhead.setbackDepthFrac.value;
-  const setback = Math.max(setbackMin, setbackDepthFrac * depthOfCut);
+  const standoffMin = standoffMinFor(threat);
+  const standoffLeaf = standoffLeafFor(threat);
+  const setback = Math.max(standoffMin, setbackDepthFrac * depthOfCut);
 
   const coverOn = inputs.overheadCover && threat !== 'none';
   const cover = resolveCover(threat, coverOn, standard.coverMul.value);
@@ -221,6 +226,8 @@ function computeCalc(raw: Inputs): Calc {
     holeD,
     depthOfCut,
     setback,
+    standoffMin,
+    standoffLeaf,
     parapetW,
     parapetH,
     outerL,

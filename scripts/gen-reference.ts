@@ -12,7 +12,7 @@ import { DAY_TOKENS_CSS } from '../src/render/print-tokens';
 import type { Inputs } from '../src/engine/types';
 
 const canonical: Inputs = {
-  schemaVersion: 1, positionType: 'two_man', standard: 'deliberate', soil: 'loam', threat: 'fragmentation',
+  schemaVersion: 1, positionType: 'two_man', standard: 'deliberate', soil: 'loam', threat: 'ind-mtr-81',
   overheadCover: true, revetment: 'sandbag_facing', sump: true, firingStep: false, camouflage: true,
   machineAssist: false, count: 4, teamSize: 2, unit: 'imperial', sectorAzimuths: { leftDeg: -40, rightDeg: 40 },
 };

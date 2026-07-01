@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { positions } from '../src/doctrine/positions';
 import { standards } from '../src/doctrine/standards';
 import { sandbag, excavation, sump as sumpMat } from '../src/doctrine/materials';
-import { parapet, overhead, shielding, coverMaterialDefault } from '../src/doctrine/protection';
+import { parapet, overhead, shielding, coverMaterialDefault, threats } from '../src/doctrine/protection';
 import { labor } from '../src/doctrine/labor';
 import { compute } from '../src/engine/compute';
 import { defaultInputs } from './helpers';
@@ -24,10 +24,10 @@ test('§9 chain: two-man / deliberate / loam / fragmentation matches an independ
   const holeW = pos.hole.W.value;
   const holeD = pos.hole.D.value;
   const depthOfCut = holeD * std.depthMul.value;
-  const setback = Math.max(overhead.setbackMin.value, overhead.setbackDepthFrac.value * depthOfCut);
+  const setback = Math.max(threats['ind-mtr-81']!.standoffMin.value, overhead.setbackDepthFrac.value * depthOfCut);
 
-  const coverMat = coverMaterialDefault['fragmentation']!;
-  const coverT = shielding['fragmentation']![coverMat].value * std.coverMul.value;
+  const coverMat = coverMaterialDefault['ind-mtr-81']!;
+  const coverT = shielding['ind-mtr-81']![coverMat].value * std.coverMul.value;
 
   const parapetW = parapet.W.value;
   const parapetH = parapet.H.value;

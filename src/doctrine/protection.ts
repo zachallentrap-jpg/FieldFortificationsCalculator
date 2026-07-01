@@ -7,9 +7,10 @@
 // covered by the NOT FOR FIELD USE banner. A qualified user supplies real, verified
 // values offline via doctrine import (io.ts).
 //
-// HARD SAFETY INVARIANT (§2.7): contact-burst (direct_fire_he) and shaped_charge roofs
-// resolve to 'engineered_required'. The engine emits NO fabricated cover thickness for
-// them, ever — enforced by roofPathFor() below plus engine.protection + fuzz tests.
+// HARD SAFETY INVARIANT (§2.7): every direct-fire AT munition (shaped charge / contact HE)
+// and large-IED overpressure resolves to 'engineered_required'. The engine emits NO fabricated
+// cover thickness for them, ever — enforced by each munition's roof:'engineered_required',
+// roofPathFor() below, plus engine.protection + fuzz tests.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { P } from './types';
@@ -19,16 +20,22 @@ import type { Provenance } from './types';
 // identical to engine/types RoofPath.
 export type RoofPath = 'none' | 'earth_on_stringers' | 'engineered_required';
 
-export const threats: Record<string, { label: string }> = {
-  small_arms: { label: 'Small arms' },
-  fragmentation: { label: 'Fragmentation' },
-  indirect_light: { label: 'Indirect fire (light)' },
-  indirect_heavy: { label: 'Indirect fire (heavy)' },
-  direct_fire_he: { label: 'Direct-fire HE (contact burst)' },
-  shaped_charge: { label: 'Shaped charge' },
-  blast_overpressure: { label: 'Blast overpressure' },
-  nuclear_thermal: { label: 'Nuclear / thermal' },
-};
+// ── Threat model: class → specific munition/caliber ──────────────────────────────
+// The threat's SIZE is the dominant protection variable, so a threat is a SPECIFIC round,
+// not a coarse bucket. Each munition carries its own shielding thickness (per material),
+// standoff, roof call, and cover material — so switching 82mm → 155mm actually moves the
+// cover thickness, standoff, and BOM. Every magnitude is an ILLUSTRATIVE PLACEHOLDER; the
+// caliber (mm) is a definitional identifier, not a doctrinal number to confirm.
+// Direct-fire AT (shaped charge / contact HE) and large-IED overpressure route to
+// 'engineered_required' — the engine never fabricates a thickness for them (§2.7).
+export type ThreatClass = 'small_arms' | 'indirect' | 'direct_fire' | 'blast';
+
+export const threatClasses: { id: ThreatClass; label: string }[] = [
+  { id: 'small_arms', label: 'Small arms / HMG' },
+  { id: 'indirect', label: 'Indirect (mortar / artillery)' },
+  { id: 'direct_fire', label: 'Direct-fire AT' },
+  { id: 'blast', label: 'Blast / overpressure' },
+];
 
 export const shieldMaterials = [
   'soil',
@@ -46,17 +53,42 @@ export type ShieldMaterial = (typeof shieldMaterials)[number];
 const sc = (v: number, note: string): Provenance<number> =>
   P(v, { unit: 'ft', safetyCritical: true, source: 'TODO: confirm against current pub', note });
 
-// Illustrative reference thicknesses (feet). threatBase × materialFactor, rounded.
-// Purely so the planner produces a drawing; NOT protective guidance.
-const threatBase: Record<string, number> = {
-  small_arms: 0.5,
-  fragmentation: 1.0,
-  indirect_light: 1.5,
-  indirect_heavy: 2.5,
-  direct_fire_he: 3.0,
-  shaped_charge: 3.5,
-  blast_overpressure: 2.0,
-  nuclear_thermal: 1.0,
+export interface ThreatDef {
+  label: string;
+  class: ThreatClass;
+  caliberMm?: number; // definitional identifier — NOT a magnitude to confirm
+  base: number; // illustrative base shielding-thickness seed (ft) — placeholder, monotone by severity
+  coverMaterial: ShieldMaterial;
+  roof: RoofPath;
+  standoffMin: Provenance<number>; // SAFETY-CRITICAL placeholder standoff (ft)
+  note?: string;
+}
+
+// Every `base` and `standoffMin` here is ILLUSTRATIVE PLACEHOLDER data. The relative ordering
+// (bigger caliber → more cover/standoff) is deliberate structure; the actual values are TODO.
+export const threats: Record<string, ThreatDef> = {
+  // Small arms / HMG (kinetic) — earth-on-stringers when covered.
+  'sa-556': { label: '5.56mm', class: 'small_arms', caliberMm: 5.56, base: 0.4, coverMaterial: 'soil', roof: 'earth_on_stringers', standoffMin: sc(1.0, 'illustrative standoff') },
+  'sa-762': { label: '7.62mm', class: 'small_arms', caliberMm: 7.62, base: 0.5, coverMaterial: 'soil', roof: 'earth_on_stringers', standoffMin: sc(1.0, 'illustrative standoff') },
+  'sa-127': { label: '12.7mm (.50 cal)', class: 'small_arms', caliberMm: 12.7, base: 0.7, coverMaterial: 'sandbagged_soil', roof: 'earth_on_stringers', standoffMin: sc(1.0, 'illustrative standoff') },
+  'sa-145': { label: '14.5mm HMG', class: 'small_arms', caliberMm: 14.5, base: 0.9, coverMaterial: 'sandbagged_soil', roof: 'earth_on_stringers', standoffMin: sc(1.0, 'illustrative standoff') },
+  // Indirect — mortar.
+  'ind-mtr-60': { label: '60mm mortar', class: 'indirect', caliberMm: 60, base: 1.0, coverMaterial: 'sandbagged_soil', roof: 'earth_on_stringers', standoffMin: sc(1.0, 'illustrative standoff') },
+  'ind-mtr-81': { label: '81/82mm mortar', class: 'indirect', caliberMm: 81, base: 1.3, coverMaterial: 'sandbagged_soil', roof: 'earth_on_stringers', standoffMin: sc(1.25, 'illustrative standoff') },
+  'ind-mtr-120': { label: '120mm mortar', class: 'indirect', caliberMm: 120, base: 1.8, coverMaterial: 'soil', roof: 'earth_on_stringers', standoffMin: sc(1.5, 'illustrative standoff') },
+  // Indirect — artillery.
+  'ind-art-105': { label: '105mm artillery', class: 'indirect', caliberMm: 105, base: 2.0, coverMaterial: 'soil', roof: 'earth_on_stringers', standoffMin: sc(1.5, 'illustrative standoff') },
+  'ind-art-122': { label: '122mm artillery', class: 'indirect', caliberMm: 122, base: 2.3, coverMaterial: 'soil', roof: 'earth_on_stringers', standoffMin: sc(1.75, 'illustrative standoff') },
+  'ind-art-152': { label: '152mm artillery', class: 'indirect', caliberMm: 152, base: 2.7, coverMaterial: 'soil', roof: 'earth_on_stringers', standoffMin: sc(2.0, 'illustrative standoff') },
+  'ind-art-155': { label: '155mm artillery', class: 'indirect', caliberMm: 155, base: 2.8, coverMaterial: 'soil', roof: 'earth_on_stringers', standoffMin: sc(2.0, 'illustrative standoff') },
+  // Direct-fire AT — shaped charge / contact HE → ENGINEERED (never a fabricated thickness, §2.7).
+  'at-rpg': { label: 'RPG (shaped charge)', class: 'direct_fire', base: 3.5, coverMaterial: 'soil', roof: 'engineered_required', standoffMin: sc(2.0, 'illustrative standoff — engineered roof') },
+  'at-recoilless': { label: 'Recoilless rifle', class: 'direct_fire', base: 3.5, coverMaterial: 'soil', roof: 'engineered_required', standoffMin: sc(2.0, 'illustrative standoff — engineered roof') },
+  'at-tank': { label: 'Tank main gun', class: 'direct_fire', base: 4.0, coverMaterial: 'soil', roof: 'engineered_required', standoffMin: sc(2.5, 'illustrative standoff — engineered roof') },
+  'at-he-contact': { label: 'Direct-fire HE (contact burst)', class: 'direct_fire', base: 3.0, coverMaterial: 'soil', roof: 'engineered_required', standoffMin: sc(2.0, 'illustrative standoff — engineered roof') },
+  // Blast / overpressure — scaled by charge, not caliber.
+  'blast-demo': { label: 'Demolition / small IED', class: 'blast', base: 1.5, coverMaterial: 'soil', roof: 'earth_on_stringers', standoffMin: sc(2.0, 'illustrative standoff') },
+  'blast-vbied': { label: 'Vehicle-borne IED (large)', class: 'blast', base: 3.0, coverMaterial: 'soil', roof: 'engineered_required', standoffMin: sc(4.0, 'illustrative standoff — engineered roof') },
 };
 const materialFactor: Record<ShieldMaterial, number> = {
   soil: 1.0,
@@ -72,11 +104,10 @@ const materialFactor: Record<ShieldMaterial, number> = {
 
 function buildShielding(): Record<string, Record<ShieldMaterial, Provenance<number>>> {
   const out: Record<string, Record<ShieldMaterial, Provenance<number>>> = {};
-  for (const threat of Object.keys(threatBase)) {
+  for (const [threat, def] of Object.entries(threats)) {
     const row = {} as Record<ShieldMaterial, Provenance<number>>;
     for (const mat of shieldMaterials) {
-      const base = threatBase[threat] ?? 1;
-      const val = Math.round(base * materialFactor[mat] * 100) / 100;
+      const val = Math.round(def.base * materialFactor[mat] * 100) / 100;
       row[mat] = sc(val, 'illustrative shielding thickness — confirm against current pub');
     }
     out[threat] = row;
@@ -98,38 +129,38 @@ export const radiationHalving: Record<ShieldMaterial, Provenance<number>> = {
   snow_ice: sc(1.5, 'illustrative halving thickness'),
 };
 
-// Default overhead-cover material per threat (qualitative selection of a shieldMaterial).
-export const coverMaterialDefault: Record<string, ShieldMaterial> = {
-  small_arms: 'soil',
-  fragmentation: 'sandbagged_soil',
-  indirect_light: 'sandbagged_soil',
-  indirect_heavy: 'soil',
-  blast_overpressure: 'soil',
-  nuclear_thermal: 'soil',
-  direct_fire_he: 'soil', // unused — roof is engineered_required
-  shaped_charge: 'soil', // unused — roof is engineered_required
-};
+// Default overhead-cover material and roof path per munition — DERIVED from the catalog so
+// they can never drift from the threat definitions.
+export const coverMaterialDefault: Record<string, ShieldMaterial> = Object.fromEntries(
+  Object.entries(threats).map(([id, t]) => [id, t.coverMaterial]),
+) as Record<string, ShieldMaterial>;
 
-// Roof selector (qualitative doctrine logic). frag/small-arms/indirect/blast/nuclear →
-// earth on stringers; contact-burst and shaped-charge → engineered by a qualified
-// designer (never an app-fabricated thickness).
-export const roofSelector: Record<string, RoofPath> = {
-  small_arms: 'earth_on_stringers',
-  fragmentation: 'earth_on_stringers',
-  indirect_light: 'earth_on_stringers',
-  indirect_heavy: 'earth_on_stringers',
-  blast_overpressure: 'earth_on_stringers',
-  nuclear_thermal: 'earth_on_stringers',
-  direct_fire_he: 'engineered_required',
-  shaped_charge: 'engineered_required',
-};
+export const roofSelector: Record<string, RoofPath> = Object.fromEntries(
+  Object.entries(threats).map(([id, t]) => [id, t.roof]),
+) as Record<string, RoofPath>;
 
-// The single, test-backed authority for roof path. Unknown threats fail safe to
-// 'engineered_required' rather than fabricating a covered roof.
+// The single, test-backed authority for roof path. Unknown munitions fail safe to
+// 'engineered_required' rather than fabricating a covered roof (§2.7).
 export function roofPathFor(threat: string): RoofPath {
-  if (threat === 'direct_fire_he' || threat === 'shaped_charge') return 'engineered_required';
-  const sel = roofSelector[threat];
-  return sel ?? 'engineered_required';
+  return threats[threat]?.roof ?? 'engineered_required';
+}
+
+// Munition standoff (§9 setback). Falls back to the global minimum for 'none'/unknown.
+export function standoffMinFor(threat: string): number {
+  return threats[threat]?.standoffMin.value ?? overhead.setbackMin.value;
+}
+export function standoffLeafFor(threat: string): Provenance<number> | undefined {
+  return threats[threat]?.standoffMin;
+}
+
+// UI helpers for the class → caliber picker.
+export function munitionsByClass(cls: ThreatClass): { id: string; label: string }[] {
+  return Object.entries(threats)
+    .filter(([, t]) => t.class === cls)
+    .map(([id, t]) => ({ id, label: t.label }));
+}
+export function threatClassOf(threat: string): ThreatClass | 'none' {
+  return threats[threat]?.class ?? 'none';
 }
 
 // Parapet default (frontal/flank cover). W (thickness) is protective → safety-critical.
