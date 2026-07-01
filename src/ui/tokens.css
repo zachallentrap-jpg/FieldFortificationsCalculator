@@ -1,0 +1,102 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Design tokens. ALL color, line-weight, and pattern values live here as custom
+   properties — no component CSS or SVG code carries a hardcoded hex or magic weight
+   (§12). Two themes: Day (default, sunlight-readable, high contrast) and Night
+   (red/amber on near-black for light discipline). Both meet WCAG AA (§12).
+   The drawing "visual system" (§10) is driven entirely by these tokens so drawings
+   stay legible in Night theme, in monochrome print, and under color-vision deficiency
+   (patterns provide redundancy beyond hue — see print.css / drawing hatch defs).
+   ───────────────────────────────────────────────────────────────────────────── */
+
+:root,
+:root[data-theme='day'] {
+  color-scheme: light;
+
+  /* Surfaces & text */
+  --bg: #f4f2ec;
+  --surface: #ffffff;
+  --surface-2: #e9e6dd;
+  --ink: #16130d; /* near-black object outlines & body text */
+  --ink-soft: #4b4740;
+  --border: #cfc9bb;
+  --focus: #0b57d0;
+
+  /* Drawing fills — coded, high-contrast (§10) */
+  --draw-outline: #16130d; /* heaviest: section-cut / object outlines */
+  --draw-earth: #b98a4b; /* hatched earth (overhead cover) base */
+  --draw-parapet: #d9b877; /* solid tan — parapet / spoil */
+  --draw-bay: #f3efe6; /* light — fighting bay */
+  --draw-timber: #3a2c1a; /* dark — timber / stringers */
+  --draw-engineered: #a11; /* engineered-roof hazard block */
+  --draw-hidden: #8a8477; /* dashed hidden edges */
+
+  /* Dimensions — one strong accent so measurements read as a separate layer (§10) */
+  --dim: #c0561e; /* burnt-orange */
+  --dim-text: #8f3d12;
+
+  /* Orientation */
+  --enemy: #a11; /* ENEMY arrow / sectors of fire */
+
+  /* Callout disc */
+  --callout-fill: #16130d;
+  --callout-text: #ffffff;
+
+  /* Banner */
+  --banner-bg: #7a1212;
+  --banner-text: #fff4f0;
+
+  /* Line-weight hierarchy (tokens, not magic numbers) */
+  --w-outline: 2.4;
+  --w-cut: 3.2;
+  --w-dim: 1.4;
+  --w-hidden: 1.1;
+  --w-thin: 0.9;
+
+  /* Legibility floors (§10) */
+  --disc-min-px: 16;
+  --label-min-px: 11;
+
+  /* Radii / spacing */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --tap-min: 44px;
+}
+
+:root[data-theme='night'] {
+  color-scheme: dark;
+
+  --bg: #0a0605;
+  --surface: #140c0a;
+  --surface-2: #1e100d;
+  --ink: #ff9d73; /* amber ink */
+  --ink-soft: #c76a45;
+  --border: #3a1e16;
+  --focus: #ffb37a;
+
+  --draw-outline: #ff9d73;
+  --draw-earth: #7a3a1c;
+  --draw-parapet: #b5622f;
+  --draw-bay: #1e100d;
+  --draw-timber: #d9743e;
+  --draw-engineered: #ff5a4d;
+  --draw-hidden: #7a3a1c;
+
+  --dim: #ff7a4d;
+  --dim-text: #ffb37a;
+
+  --enemy: #ff5a4d;
+
+  --callout-fill: #ff9d73;
+  --callout-text: #0a0605;
+
+  --banner-bg: #4d0f0a;
+  --banner-text: #ffd7c7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

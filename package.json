@@ -1,0 +1,26 @@
+{
+  "name": "sap1",
+  "version": "1.0.0",
+  "description": "SAP-1 — Survivability Position Planner. Deterministic, offline, parametric planner for doctrinal combat-engineer survivability positions. Illustrative placeholder data; NOT FOR FIELD USE.",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test \"test/**/*.test.ts\"",
+    "verify": "npm run typecheck && npm run test && npm run check:offline",
+    "build": "vite build && node --import tsx scripts/build-standalone.ts && npm run check:offline",
+    "build:standalone": "node --import tsx scripts/build-standalone.ts",
+    "check:offline": "node --import tsx scripts/check-offline.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7"
+  }
+}
