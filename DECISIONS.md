@@ -111,6 +111,17 @@ option, implement it, and log it here.
   (`render/svg.ts` `callout()` + the legend builder), so a callout number and its legend name
   can never drift between the reference and the live drawings.
 
-## Render / layout / state
+- **D14 — Print tokens are a bounded, deliberate duplication.** `render/print-tokens.ts`
+  inlines the Day-theme palette as a string so the standalone job sheet and the generated
+  reference SVG render self-contained on `file://` (print is always on white — Night never
+  applies on paper). It mirrors the Day block in `ui/tokens.css`; the duplication is accepted
+  because a printed artifact must carry its own colors.
 
-_(logged as stages land)_
+- **D15 — Render outputs complete (Stage 6/7).** `drawIso` is a deliberately schematic 2.5D
+  cuboid (orientation only — the plan/section govern measurement, so it carries no
+  dimensions). `csv.ts` is RFC-4180 (CRLF, quoted-only-when-needed, '.' decimals, no
+  grouping) with a `Placeholder` column. `jobSheet.ts` is a page-break-safe print document
+  embedding the same plan+section. Render tests: `render-nan` (position×threat×toggle matrix),
+  `render-intuitive` (header bar, callout↔legend consistency, orientation, PH flags, min font,
+  pattern redundancy, dim-label non-collision), `fuzz` (3000 seeded inputs — never throws/NaN,
+  never fabricates an engineered thickness).

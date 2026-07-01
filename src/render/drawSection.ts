@@ -125,6 +125,7 @@ export function drawSection(result: Result): string {
 
     parts.push(hDim(px(-halfBay, 0)[0], slabX1, slabTopY - 14, dl('setback'), dph('setback')));
     used.add('setback');
+    parts.push(callout('setback', (px(-halfBay, 0)[0] + slabX1) / 2, gradeY - 6, used));
     parts.push(vDim(slabTopY, slabBottomY, slabX2 + 16, dl('cover_t'), dph('cover_t')));
   } else if (engineered) {
     const hzTL = px(-(halfBay + s.parapetW * 0.5), -(s.parapetH + 1.4));
