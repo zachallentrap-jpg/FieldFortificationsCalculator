@@ -144,6 +144,8 @@ Where the plan and section are precise measured drawings, the third view is a re
 
 It carries **no dimensions** on purpose — the plan and section still govern measurement. If your device has no WebGL (rare), SAP-1 automatically falls back to a flat 2.5D schematic instead — nothing breaks, it just draws differently.
 
+**The materials you see are the materials in the bill of materials — nothing is decoration.** The parapet and any earthen roof are always shown as stacked sandbags, because that's what they actually are per doctrine. The dug-out walls show whatever you picked for Revetment: sandbag facing tiles the same way as the parapet, Pickets & wire shows visibly open posts and wire (not a solid wall), and Corrugated metal / Timber & plywood each get their own distinct texture. Pick **Revetment: None** and the wall goes back to bare, sloped earth — how steep the slope looks depends on the Soil you picked (sand and gravel slope hard and require a revetment; clay and rock barely slope at all).
+
 Configure nothing and each view shows a prompt ("Configure a position to see the plan view.") rather than a blank box.
 
 ---

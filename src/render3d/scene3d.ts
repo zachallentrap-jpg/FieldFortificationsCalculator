@@ -8,9 +8,24 @@
 //
 // Every position SHAPE gets a distinct footprint (not one generic box) so "each design" reads
 // differently in 3D: rect, inverted_t, l_shape, circular, vehicle_ramp, rect_roofed.
+//
+// Materials are honest, not decorative: what the BOM actually specifies is what you SEE.
+// Parapet + overhead cover are always sandbag construction per doctrine (bagsParapet/bagsCover
+// are computed unconditionally in engine/materials.ts) — they're tagged 'sandbag' unconditionally.
+// The excavation face reflects the operator's actual revetment choice (sandbag / pickets & wire /
+// corrugated metal / timber-plywood), or — when revetment is 'none' — bare, sloped earth, with the
+// slope driven by the SOIL's real wallSlopeRatio (steeper for sand/gravel, nearly vertical for
+// clay/rock), exactly like the doctrine table says. src/ui/three-viewer.ts reads `finish` to
+// decide HOW to build the mesh (sandbag tiling, picket+wire, a textured panel, or a tapered
+// earthen face) — this file only decides WHICH finish applies, from the same doctrine tables the
+// 2D renderer and BOM already consult.
 
+import { soils } from '../doctrine/soils';
+import { revetments } from '../doctrine/materials';
 import type { GeometryModel } from '../engine/geometry';
 import type { Result } from '../engine/types';
+
+export type WallFinish = 'earth' | 'sandbag' | 'picket' | 'corrugated' | 'timber';
 
 export interface Box3 {
   kind: 'box';
@@ -18,11 +33,19 @@ export interface Box3 {
   w: number; h: number; d: number; // size, feet
   role: BoxRole;
   label?: string;
+  finish?: WallFinish; // only meaningful for 'bayWall' (and implicitly 'ground'/'bayFloor' = earth)
+  picketSpacing?: number; // feet between posts — only when finish === 'picket'
+  // Vertex taper for a sloped earthen face: the face on `taperSign` side of `taperAxis` (0=x,
+  // 2=z) flares outward by `taperAmount` (feet) from bottom (unchanged) to top (full amount).
+  taperAxis?: 0 | 2;
+  taperSign?: 1 | -1;
+  taperAmount?: number;
 }
 export interface Cyl3 {
   kind: 'cyl';
   x: number; y: number; z: number; // center, feet
   radius: number; height: number;
+  radiusTop?: number; // present + different from radius ⇒ a frustum (sloped circular pit wall)
   role: BoxRole;
   label?: string;
 }
@@ -66,6 +89,18 @@ function finite(n: number): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+// What the excavation FACE is actually built from, straight from the operator's own revetment
+// choice — the same doctrine row the BOM already reads. 'panel' covers two distinct doctrinal
+// systems (corrugated metal, timber/plywood) that the engine's BOM treats identically; the 3D
+// view still tells them apart visually since the operator picked a specific one.
+function wallFinishFor(result: Result): WallFinish {
+  const revet = revetments[result.inputs.revetment] ?? revetments['none']!;
+  if (revet.kind === 'bag') return 'sandbag';
+  if (revet.kind === 'picket') return 'picket';
+  if (revet.kind === 'panel') return result.inputs.revetment === 'corrugated_metal' ? 'corrugated' : 'timber';
+  return 'earth'; // kind 'none' — bare earth, sloped per soil below
+}
+
 export function buildScene3D(result: Result): Scene3DModel {
   const geo = result.geometry as GeometryModel;
   if (!geo.hasAnything) {
@@ -79,6 +114,11 @@ export function buildScene3D(result: Result): Scene3DModel {
   const halfW = p.holeW / 2;
   const wallT = Math.max(0.3, p.parapetW * 0.35); // visual wall thickness for the excavation sides
 
+  const finish = wallFinishFor(result);
+  const soilRow = soils[result.inputs.soil];
+  const slopeRatio = finish === 'earth' ? (soilRow ? soilRow.wallSlopeRatio.value : 0) : 0;
+  const picketSpacing = revetments[result.inputs.revetment]?.spacing?.value ?? 2;
+
   // ── Footprint by shape (§ each design gets a distinct silhouette) ────────────
   if (geo.shape === 'circular') {
     const rOuter = Math.max(p.outerL, p.outerW) / 2;
@@ -87,7 +127,10 @@ export function buildScene3D(result: Result): Scene3DModel {
     // A single smooth extruded annulus — no segment seams (a prior 8-box approximation left
     // visible outline clutter at every seam and read as a dark, broken-looking ring).
     parts.push({ kind: 'ring', x: 0, z: 0, outerR: rHole + p.parapetW, innerR: rHole, height: 1.2, role: 'parapet' });
-    parts.push({ kind: 'cyl', x: 0, y: -s.depthOfCut / 2, z: 0, radius: rHole, height: s.depthOfCut, role: 'bayFloor' });
+    // A sloped soil pit is wider at the mouth than at the floor — CylinderGeometry natively
+    // supports distinct top/bottom radii, so this needs no custom vertex work at all.
+    const rTop = Math.min(rHole + Math.min(slopeRatio * s.depthOfCut, p.parapetW * 0.9), rOuter - 0.2);
+    parts.push({ kind: 'cyl', x: 0, y: -s.depthOfCut / 2, z: 0, radius: rHole, radiusTop: rTop, height: s.depthOfCut, role: 'bayFloor' });
   } else if (geo.shape === 'vehicle_ramp') {
     const runLen = p.holeW;
     // Ground is centered on the RAMP's own z-center (not world origin) so its footprint always
@@ -126,16 +169,17 @@ export function buildScene3D(result: Result): Scene3DModel {
         h: topY - base,
         d: stepLen + 0.05, // tiny overlap so treads never show a hairline gap
         role: 'bayFloor',
+        finish: 'earth',
       });
     }
     const bermH = Math.max(1, p.parapetW * 0.5) * RELIEF_EXAGGERATION;
-    parts.push({ kind: 'box', x: -(halfL + p.parapetW / 2), y: bermH / 2, z: -runLen / 4, w: p.parapetW, h: bermH, d: runLen, role: 'rampBerm' });
-    parts.push({ kind: 'box', x: halfL + p.parapetW / 2, y: bermH / 2, z: -runLen / 4, w: p.parapetW, h: bermH, d: runLen, role: 'rampBerm' });
+    parts.push({ kind: 'box', x: -(halfL + p.parapetW / 2), y: bermH / 2, z: -runLen / 4, w: p.parapetW, h: bermH, d: runLen, role: 'rampBerm', finish: 'earth' });
+    parts.push({ kind: 'box', x: halfL + p.parapetW / 2, y: bermH / 2, z: -runLen / 4, w: p.parapetW, h: bermH, d: runLen, role: 'rampBerm', finish: 'earth' });
   } else {
     // rect, rect_roofed, inverted_t, l_shape all start from a rectangular ring + bay.
     parts.push({ kind: 'box', x: 0, y: -0.02, z: 0, w: p.outerL + 4, h: 0.05, d: p.outerW + 4, role: 'ground' });
     pushRing(parts, 0, 0, p.holeL, p.holeW, p.parapetW, 1.1);
-    pushBayBox(parts, 0, 0, p.holeL, p.holeW, s.depthOfCut, wallT);
+    pushBayBox(parts, 0, 0, p.holeL, p.holeW, s.depthOfCut, wallT, finish, slopeRatio, picketSpacing, p.parapetW);
 
     if (geo.shape === 'inverted_t') {
       // A narrower trench extends toward the rear from the bay's center (inverted-T).
@@ -143,7 +187,7 @@ export function buildScene3D(result: Result): Scene3DModel {
       const stemLen = p.holeW * 1.1;
       const stemZ = halfW + stemLen / 2;
       pushRing(parts, 0, stemZ, stemW, stemLen, p.parapetW * 0.7, 1.0);
-      pushBayBox(parts, 0, stemZ, stemW, stemLen, s.depthOfCut * 0.85, wallT * 0.8);
+      pushBayBox(parts, 0, stemZ, stemW, stemLen, s.depthOfCut * 0.85, wallT * 0.8, finish, slopeRatio, picketSpacing, p.parapetW * 0.7);
     } else if (geo.shape === 'l_shape') {
       // A perpendicular arm attached at one end (crew/ammo alcove) forming an L.
       const armW = p.holeW * 0.9;
@@ -151,16 +195,19 @@ export function buildScene3D(result: Result): Scene3DModel {
       const armX = halfL + armLen / 2;
       const armZ = halfW - armW / 2;
       pushRing(parts, armX, armZ, armLen, armW, p.parapetW * 0.7, 1.0);
-      pushBayBox(parts, armX, armZ, armLen, armW, s.depthOfCut * 0.85, wallT * 0.8);
+      pushBayBox(parts, armX, armZ, armLen, armW, s.depthOfCut * 0.85, wallT * 0.8, finish, slopeRatio, picketSpacing, p.parapetW * 0.7);
     }
   }
 
   // ── Overhead cover — earth slab, OR the honest engineered hazard marker (§2.7) ──
+  // Overhead cover is ALSO always sandbag construction per doctrine (bagsCover is computed
+  // unconditionally whenever the roof is earth_on_stringers) — tagged 'sandbag' unconditionally,
+  // matching the parapet.
   const earthRoof = s.coverOn && s.roofPath === 'earth_on_stringers';
   const engineeredRoof = s.roofPath === 'engineered_required';
   if (earthRoof && geo.shape !== 'vehicle_ramp') {
     const coverY = p.parapetW * 0 + s.coverT / 2 + 0.15;
-    parts.push({ kind: 'box', x: 0, y: coverY, z: 0, w: p.holeL + 2, h: s.coverT, d: p.holeW + 2, role: 'cover', label: 'Roof cover' });
+    parts.push({ kind: 'box', x: 0, y: coverY, z: 0, w: p.holeL + 2, h: s.coverT, d: p.holeW + 2, role: 'cover', label: 'Roof cover', finish: 'sandbag' });
     const n = Math.max(1, Math.min(s.stringers, 8));
     for (let i = 0; i < n; i++) {
       const frac = n === 1 ? 0.5 : i / (n - 1);
@@ -204,6 +251,7 @@ export function buildScene3D(result: Result): Scene3DModel {
 }
 
 // A rectangular ring of 4 walls (front/rear/left/right) around a hole — used for the parapet.
+// Always 'parapet' role: the renderer treats that role as unconditionally sandbag-built.
 function pushRing(parts: Part3[], cx: number, cz: number, l: number, w: number, thick: number, height: number): void {
   const hl = l / 2;
   const hw = w / 2;
@@ -213,14 +261,50 @@ function pushRing(parts: Part3[], cx: number, cz: number, l: number, w: number, 
   parts.push({ kind: 'box', x: cx + hl + thick / 2, y: height / 2, z: cz, w: thick, h: height, d: w, role: 'parapet' }); // right
 }
 
-// The excavated bay: a floor + 4 thin walls so the depth reads clearly from any angle.
-function pushBayBox(parts: Part3[], cx: number, cz: number, l: number, w: number, depth: number, wallT: number): void {
-  parts.push({ kind: 'box', x: cx, y: -depth - 0.05, z: cz, w: l, h: 0.1, d: w, role: 'bayFloor' });
+// The excavated bay: a floor (always bare earth — it's never revetted) + 4 walls whose finish
+// matches the operator's actual revetment choice. When finish is 'earth' (no revetment) and the
+// soil calls for a slope, each wall's OUTER face (away from the hole) flares out from bottom
+// (unchanged, matching the floor) to top (wider, matching a real excavation's wider mouth) —
+// clamped to stay within the parapet's own footprint so it never pokes out past the ground plane.
+function pushBayBox(
+  parts: Part3[],
+  cx: number,
+  cz: number,
+  l: number,
+  w: number,
+  depth: number,
+  wallT: number,
+  finish: WallFinish,
+  slopeRatio: number,
+  picketSpacing: number,
+  parapetW: number,
+): void {
+  parts.push({ kind: 'box', x: cx, y: -depth - 0.05, z: cz, w: l, h: 0.1, d: w, role: 'bayFloor', finish: 'earth' });
   const hl = l / 2;
   const hw = w / 2;
-  const h = depth;
-  parts.push({ kind: 'box', x: cx, y: -depth / 2, z: cz - hw + wallT / 2, w: l, h, d: wallT, role: 'bayWall' });
-  parts.push({ kind: 'box', x: cx, y: -depth / 2, z: cz + hw - wallT / 2, w: l, h, d: wallT, role: 'bayWall' });
-  parts.push({ kind: 'box', x: cx - hl + wallT / 2, y: -depth / 2, z: cz, w: wallT, h, d: w, role: 'bayWall' });
-  parts.push({ kind: 'box', x: cx + hl - wallT / 2, y: -depth / 2, z: cz, w: wallT, h, d: w, role: 'bayWall' });
+  // Walls run a touch ABOVE grade (not stopping exactly at y=0) — the ground plane is a solid
+  // slab with no real cutout, so a wall ending precisely at grade lets a shallow enough viewing
+  // angle skim over its top and see a sliver of the ground's surface beyond it, right in the
+  // middle of what should read as a recessed hole. A small margin above grade closes that gap
+  // for any normal viewing angle without changing the excavation's real depth.
+  const gradeMargin = 0.25;
+  const h = depth + gradeMargin;
+  const taperAmount = finish === 'earth' ? Math.min(slopeRatio * depth, parapetW * 0.9) : 0;
+  const wall = (x: number, z: number, w2: number, d2: number, taperAxis: 0 | 2, taperSign: 1 | -1): Box3 => ({
+    kind: 'box',
+    x,
+    y: -depth / 2 + gradeMargin / 2,
+    z,
+    w: w2,
+    h,
+    d: d2,
+    role: 'bayWall',
+    finish,
+    picketSpacing,
+    ...(taperAmount > 0 ? { taperAxis, taperSign, taperAmount } : {}),
+  });
+  parts.push(wall(cx, cz - hw + wallT / 2, l, wallT, 2, -1)); // front — outer face is -z
+  parts.push(wall(cx, cz + hw - wallT / 2, l, wallT, 2, 1)); // rear — outer face is +z
+  parts.push(wall(cx - hl + wallT / 2, cz, wallT, w, 0, -1)); // left — outer face is -x
+  parts.push(wall(cx + hl - wallT / 2, cz, wallT, w, 0, 1)); // right — outer face is +x
 }

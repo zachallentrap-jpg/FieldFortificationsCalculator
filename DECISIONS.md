@@ -229,3 +229,37 @@ option, implement it, and log it here.
   menu. `<details>/<summary>` was chosen over a hand-rolled dropdown because it's keyboard- and
   screen-reader-operable with zero extra JS; `main.ts` adds only the polish native `<details>`
   lacks — closing on outside-click, on Escape, and automatically after an item is chosen.
+
+- **D25 — 3D materials are honest, not decorative: what the BOM says is what you see.** Parapet
+  and overhead cover are ALWAYS sandbag construction per doctrine (`bagsParapet`/`bagsCover` are
+  computed unconditionally in `engine/materials.ts`) — tagged sandbag unconditionally in 3D too,
+  tiled as small boxes (one shared outline, no per-bag outline — outlining every tiny bag looked
+  cluttered) rather than one flat slab. The excavation face reflects the operator's ACTUAL
+  revetment choice, read from the same doctrine tables the BOM already consults
+  (`doctrine/soils.ts` wallSlopeRatio, `doctrine/materials.ts` revetments): sandbag facing tiles
+  the same way as the parapet; pickets & wire renders as visibly open posts + wire (the clearest
+  possible contrast against a solid face); corrugated metal and timber/plywood each get their own
+  canvas-drawn texture (vertical ridges vs horizontal planks) even though the engine's BOM treats
+  both as the same 'panel' kind — the operator picked a specific one, so the 3D view still tells
+  them apart. Unrevetted walls are bare, sloped earth, with the batter driven by the soil's real
+  `wallSlopeRatio` (steeper for sand/gravel, nearly vertical for clay/rock/frozen) — locked by a
+  monotonic test (`rock < loam < sand` taper).
+
+- **D26 — Sloped walls: direct vertex manipulation, not a shear matrix or a rotated extrude.**
+  Only the excavation's OUTER-face vertices (away from the hole) move, flaring from unchanged at
+  the floor to `min(slopeRatio × depth, parapetW × 0.9)` further out at grade — the inner face
+  (matching the floor) never moves, and the clamp keeps the flare from poking past the parapet's
+  own footprint into open ground. Chosen over a shear matrix specifically because a shear moves
+  EVERY vertex at a given height by the same amount (both faces together, preserving thickness —
+  not what a wider-at-the-top excavation needs); direct position-buffer iteration lets exactly one
+  side move, and is easy to verify vertex-by-vertex rather than reasoning through composed
+  rotate+translate matrices (the exact class of math that produced the ring/ramp bugs — see D22).
+
+- **D27 — A wall's grade-level top now sits 0.25 ft ABOVE y=0, not exactly at it.** Found while
+  verifying the sandbag revetment: the ground plane is a solid slab with no true cutout (the
+  "hole" is an illusion of layering, not a boolean subtraction), so a wall ending precisely at
+  grade let a shallow-enough viewing angle skim over its top and see a sliver of the ground's own
+  surface right in the middle of what should read as a recessed bay. This margin isn't a new
+  concept introduced by the materials work — it's a small, targeted patch on a limitation that
+  predates it; extending every wall a quarter-foot above grade closes the gap for any ordinary
+  viewing angle without changing the excavation's real depth.

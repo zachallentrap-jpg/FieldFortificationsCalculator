@@ -15,6 +15,13 @@ import { buildScene3D } from '../render3d/scene3d';
 import type { Part3, BoxRole } from '../render3d/scene3d';
 import type { Result } from '../engine/types';
 
+// Textures created ONCE and reused across every update() (the toon gradient + the 3 material
+// textures below) — tracked here so disposeObject() never destroys them. update() disposes the
+// whole parts group every render; without this a shared texture would work once, then break on
+// the very next input edit (its GPU resource destroyed while the JS object — and the cache
+// variable holding it — still looked valid).
+const sharedTextures = new Set<THREE.Texture>();
+
 export function isWebGLAvailable(): boolean {
   try {
     const c = document.createElement('canvas');
@@ -41,6 +48,83 @@ function toonGradient(): THREE.Texture {
   tex.minFilter = THREE.NearestFilter;
   tex.magFilter = THREE.NearestFilter;
   gradientMapCache = tex;
+  sharedTextures.add(tex);
+  return tex;
+}
+
+// ── Material textures — honest, at-a-glance materials (§ "if sandbags are used, show sandbags") ──
+// Each is a small canvas-drawn, tiling pattern created once and cached (deterministic — no
+// Math.random, so the same doctrine combination always looks identical).
+let dirtTexCache: THREE.Texture | null = null;
+function dirtTexture(): THREE.Texture {
+  if (dirtTexCache) return dirtTexCache;
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 64;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#8a6a3c';
+  ctx.fillRect(0, 0, 64, 64);
+  for (let i = 0; i < 220; i++) {
+    const sx = (i * 37) % 64;
+    const sy = (i * 53) % 64;
+    ctx.fillStyle = i % 3 === 0 ? '#6e5330' : i % 3 === 1 ? '#a8875a' : '#7a5e34';
+    ctx.fillRect(sx, sy, 2, 2);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(3, 3);
+  dirtTexCache = tex;
+  sharedTextures.add(tex);
+  return tex;
+}
+
+let corrugatedTexCache: THREE.Texture | null = null;
+function corrugatedTexture(): THREE.Texture {
+  if (corrugatedTexCache) return corrugatedTexCache;
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 64;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#9199a1';
+  ctx.fillRect(0, 0, 64, 64);
+  ctx.strokeStyle = '#5c636b';
+  ctx.lineWidth = 3;
+  for (let x = 3; x < 64; x += 8) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, 64);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(3, 2);
+  corrugatedTexCache = tex;
+  sharedTextures.add(tex);
+  return tex;
+}
+
+let timberTexCache: THREE.Texture | null = null;
+function timberTexture(): THREE.Texture {
+  if (timberTexCache) return timberTexCache;
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 64;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#7a5a35';
+  ctx.fillRect(0, 0, 64, 64);
+  ctx.strokeStyle = '#5c4227';
+  ctx.lineWidth = 3;
+  for (let y = 8; y < 64; y += 16) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(64, y);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, 3);
+  timberTexCache = tex;
+  sharedTextures.add(tex);
   return tex;
 }
 
@@ -65,7 +149,11 @@ function disposeObject(obj: THREE.Object3D): void {
       child.geometry?.dispose?.();
       const mats = Array.isArray(child.material) ? child.material : [child.material];
       for (const m of mats) {
-        if (m && 'map' in m && (m as THREE.MeshBasicMaterial).map) (m as THREE.MeshBasicMaterial).map!.dispose();
+        const map = m && 'map' in m ? (m as THREE.MeshBasicMaterial).map : null;
+        // Never dispose a SHARED texture (the toon gradient, dirt/corrugated/timber) — those are
+        // cached module-level and reused across every re-render; disposing one here would work
+        // once, then leave every later use of that material broken.
+        if (map && !sharedTextures.has(map)) map.dispose();
         m?.dispose?.();
       }
     }
@@ -76,12 +164,13 @@ function disposeObject(obj: THREE.Object3D): void {
 // Both live inside one returned Group so a caller positions/rotates ONE object and the outline
 // can never drift from its mesh — positioning the mesh alone (leaving a sibling outline at its
 // default transform) was the exact bug behind the vehicle-ramp render (see DECISIONS D20).
-function addToonMesh(parent: THREE.Group, geometry: THREE.BufferGeometry, colorHex: number, opts?: { opacity?: number }): THREE.Group {
+function addToonMesh(parent: THREE.Group, geometry: THREE.BufferGeometry, colorHex: number, opts?: { opacity?: number; map?: THREE.Texture }): THREE.Group {
   const mat = new THREE.MeshToonMaterial({ color: colorHex, gradientMap: toonGradient() });
   if (opts?.opacity !== undefined) {
     mat.transparent = true;
     mat.opacity = opts.opacity;
   }
+  if (opts?.map) mat.map = opts.map;
   const mesh = new THREE.Mesh(geometry, mat);
   const wrapper = new THREE.Group();
   if (!opts?.opacity) {
@@ -212,11 +301,115 @@ function buildRing(group: THREE.Group, x: number, z: number, outerR: number, inn
   addToonMesh(group, geo, colorHex);
 }
 
+// A sloped earthen excavation face: the vertices on the OUTER side (away from the hole, along
+// `axis`/`sign`) flare from unchanged at the bottom to `amount` feet further out at the top —
+// a real excavation is wider at the mouth than at the floor. Direct vertex manipulation (not a
+// shear matrix or a rotated extrude) so it's easy to reason about exactly: only the outer-face
+// vertices move, the inner face (matching the floor) never does, and the geometry stays a
+// simple, watertight box the whole time.
+function taperOuterFace(geometry: THREE.BufferGeometry, axis: 0 | 2, sign: 1 | -1, amount: number): void {
+  const pos = geometry.getAttribute('position') as THREE.BufferAttribute;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const span = Math.max(1e-6, maxY - minY);
+  for (let i = 0; i < pos.count; i++) {
+    const v = pos.getComponent(i, axis);
+    if (Math.sign(v) === sign) {
+      const heightFrac = (pos.getY(i) - minY) / span; // 0 at bottom (unchanged), 1 at top
+      pos.setComponent(i, axis, v + sign * amount * heightFrac);
+    }
+  }
+  pos.needsUpdate = true;
+  geometry.computeVertexNormals();
+}
+
+// Parapet and overhead cover are ALWAYS sandbag construction per doctrine (§ engine/materials.ts
+// bagsParapet/bagsCover) — this tiles small boxes across the footprint instead of one flat slab,
+// so "if sandbags are used, it shows sandbags." One shared outline keeps the cartoon silhouette
+// clean; the individual bags skip their own outline (outlining every tiny bag would look busy).
+function buildSandbagWall(group: THREE.Group, x: number, y: number, z: number, w: number, h: number, d: number, colorHex: number): void {
+  const outline = new THREE.Mesh(
+    new THREE.BoxGeometry(Math.max(0.05, w), Math.max(0.05, h), Math.max(0.05, d)),
+    new THREE.MeshBasicMaterial({ color: 0x16130d, side: THREE.BackSide }),
+  );
+  outline.scale.multiplyScalar(1.035);
+  outline.position.set(x, y, z);
+  group.add(outline);
+
+  const targetBagL = 1.25; // doctrine sandbag length (ft) — a tile size, not a literal bag model
+  const targetBagH = 0.35;
+  const cols = Math.max(1, Math.round(w / targetBagL));
+  const rows = Math.max(1, Math.round(h / targetBagH));
+  const cellW = w / cols;
+  const cellH = h / rows;
+  const mat = new THREE.MeshToonMaterial({ color: colorHex, gradientMap: toonGradient() });
+  const bagGeo = new THREE.BoxGeometry(Math.max(0.05, cellW - 0.04), Math.max(0.05, cellH - 0.04), Math.max(0.05, d - 0.02));
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const bx = x - w / 2 + (c + 0.5) * cellW;
+      const by = y - h / 2 + (r + 0.5) * cellH;
+      const mesh = new THREE.Mesh(bagGeo, mat);
+      mesh.position.set(bx, by, z);
+      group.add(mesh);
+    }
+  }
+}
+
+// Pickets & wire: an open lattice (vertical posts + two horizontal wire lines), visibly NOT a
+// solid wall — the clearest possible contrast against sandbags/dirt/panel facings.
+function buildPicketWall(group: THREE.Group, x: number, y: number, z: number, w: number, h: number, d: number, spacing: number): void {
+  const alongX = w >= d; // front/rear walls run along X; left/right walls run along Z
+  const length = alongX ? w : d;
+  const count = Math.max(2, Math.round(length / Math.max(0.5, spacing)) + 1);
+  const postR = Math.max(0.04, Math.min(0.1, h / 20));
+  const postMat = new THREE.MeshToonMaterial({ color: 0x4a3a22, gradientMap: toonGradient() });
+  for (let i = 0; i < count; i++) {
+    const frac = count === 1 ? 0.5 : i / (count - 1);
+    const offset = (frac - 0.5) * length;
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(postR, postR, h, 8), postMat);
+    post.position.set(alongX ? x + offset : x, y, alongX ? z : z + offset);
+    group.add(post);
+  }
+  const wireMat = new THREE.MeshBasicMaterial({ color: 0x55524a });
+  for (const frac of [0.28, 0.72]) {
+    const wy = y - h / 2 + h * frac;
+    const wireGeo = alongX ? new THREE.BoxGeometry(length, 0.035, 0.035) : new THREE.BoxGeometry(0.035, 0.035, length);
+    const wire = new THREE.Mesh(wireGeo, wireMat);
+    wire.position.set(x, wy, z);
+    group.add(wire);
+  }
+}
+
 function buildPart(group: THREE.Group, part: Part3): void {
   switch (part.kind) {
     case 'box': {
-      const wrapper = addToonMesh(group, new THREE.BoxGeometry(Math.max(0.05, part.w), Math.max(0.05, part.h), Math.max(0.05, part.d)), ROLE_COLOR[part.role], part.role === 'camoNet' ? { opacity: 0.4 } : undefined);
-      wrapper.position.set(part.x, part.y, part.z);
+      // Parapet + overhead cover are ALWAYS sandbag construction per doctrine — tiled regardless
+      // of `finish`. A revetted excavation face gets its own distinct material; an unrevetted one
+      // is bare (sloped, if part.taperAmount is set) or plain earth.
+      if (part.role === 'parapet' || part.role === 'cover') {
+        buildSandbagWall(group, part.x, part.y, part.z, part.w, part.h, part.d, ROLE_COLOR[part.role]);
+      } else if (part.role === 'bayWall' && part.finish === 'sandbag') {
+        buildSandbagWall(group, part.x, part.y, part.z, part.w, part.h, part.d, ROLE_COLOR.bayWall);
+      } else if (part.role === 'bayWall' && part.finish === 'picket') {
+        buildPicketWall(group, part.x, part.y, part.z, part.w, part.h, part.d, part.picketSpacing ?? 2);
+      } else {
+        const geometry = new THREE.BoxGeometry(Math.max(0.05, part.w), Math.max(0.05, part.h), Math.max(0.05, part.d));
+        if (part.role === 'bayWall' && part.taperAmount) {
+          taperOuterFace(geometry, part.taperAxis ?? 2, part.taperSign ?? 1, part.taperAmount);
+        }
+        let map: THREE.Texture | undefined;
+        if (part.role === 'bayWall' && part.finish === 'corrugated') map = corrugatedTexture();
+        else if (part.role === 'bayWall' && part.finish === 'timber') map = timberTexture();
+        else if (part.role === 'ground' || part.role === 'bayFloor' || part.role === 'rampBerm' || (part.role === 'bayWall' && part.finish === 'earth')) map = dirtTexture();
+        const opts = part.role === 'camoNet' ? { opacity: 0.4 } : map ? { map } : undefined;
+        const wrapper = addToonMesh(group, geometry, ROLE_COLOR[part.role], opts);
+        wrapper.position.set(part.x, part.y, part.z);
+      }
       if (part.label) {
         const label = labelSprite(part.label);
         label.position.set(part.x, part.y + part.h / 2 + 0.6, part.z);
@@ -225,7 +418,11 @@ function buildPart(group: THREE.Group, part: Part3): void {
       break;
     }
     case 'cyl': {
-      const wrapper = addToonMesh(group, new THREE.CylinderGeometry(Math.max(0.05, part.radius), Math.max(0.05, part.radius), Math.max(0.05, part.height), 16), ROLE_COLOR[part.role]);
+      const radiusBottom = Math.max(0.05, part.radius);
+      const radiusTop = Math.max(0.05, part.radiusTop ?? part.radius);
+      const geometry = new THREE.CylinderGeometry(radiusTop, radiusBottom, Math.max(0.05, part.height), 24);
+      const map = part.role === 'bayFloor' ? dirtTexture() : undefined;
+      const wrapper = addToonMesh(group, geometry, ROLE_COLOR[part.role], map ? { map } : undefined);
       wrapper.position.set(part.x, part.y, part.z);
       if (part.label) {
         const label = labelSprite(part.label);
