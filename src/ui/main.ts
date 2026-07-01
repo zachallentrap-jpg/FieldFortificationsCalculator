@@ -18,6 +18,11 @@ import { initialTheme, applyTheme, persistTheme, type Theme } from '../theme/the
 import { collectDiagnostics, diagnosticsText } from '../layout/diagnostics';
 import { jobSheet } from '../render/jobSheet';
 import { toCsv } from '../render/csv';
+import { scenariosOverlay, missionOverlay, compareOverlay, planOverlay } from '../layout/tools';
+import { ScenarioStore, makeScenario } from '../state/scenarios';
+import { createStorageAdapter } from '../state/persistence';
+import { aggregateMission } from '../engine/mission';
+import { planForTime, type PlanResult } from '../engine/plan';
 import type { Inputs, Result } from '../engine/types';
 
 const app = document.getElementById('app')!;
@@ -29,8 +34,50 @@ applyTheme(theme);
 
 const store = createStore({ theme, layoutMode: currentLayout('auto') });
 const history = createHistory(store.getState().inputs);
+const scenarioStore = new ScenarioStore(createStorageAdapter());
+const onHand: Record<string, number> = {};
 let lastResult: Result | null = null;
 let sheetOpen = false;
+let planHours = 8;
+let planTeam = 2;
+let lastPlan: PlanResult | null = null;
+
+function newId(): string {
+  try {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  } catch {
+    /* fall through */
+  }
+  return 'scn-' + Date.now().toString(36);
+}
+function pickFile(cb: (text: string) => void): void {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/json,.json';
+  input.addEventListener('change', () => {
+    const f = input.files?.[0];
+    if (f) f.text().then(cb).catch(() => undefined);
+  });
+  input.click();
+}
+function openScenarios(): void {
+  scenarioStore.list().then((list) => showOverlay(scenariosOverlay(list, store.getState().activeScenarioId)));
+}
+function openMission(): void {
+  const set = store.getState().missionSet;
+  showOverlay(missionOverlay(aggregateMission(set, { onHand }), set.length));
+}
+function openCompare(): void {
+  const results: Result[] = [];
+  for (const i of store.getState().comparisonSet) {
+    const c = safeCompute(i);
+    if (c.ok) results.push(c.value);
+  }
+  showOverlay(compareOverlay(results));
+}
+function openPlan(): void {
+  showOverlay(planOverlay(lastPlan, planHours, planTeam));
+}
 
 document.documentElement.setAttribute('data-layout', store.getState().layoutMode);
 
@@ -90,6 +137,11 @@ function commit(patch: Partial<Inputs>): void {
 document.addEventListener('change', (e) => {
   const el = e.target;
   if (!(el instanceof HTMLInputElement) && !(el instanceof HTMLSelectElement)) return;
+  if (el instanceof HTMLInputElement && el.dataset['onhand']) {
+    onHand[el.dataset['onhand']] = Math.max(0, parseInt(el.value, 10) || 0);
+    openMission();
+    return;
+  }
   const field = el.dataset['field'] as keyof Inputs | undefined;
   if (field) {
     commit(coerce(field, el));
@@ -132,6 +184,46 @@ document.addEventListener('click', (e) => {
     case 'diagnostics': showDiagnostics(); break;
     case 'sheet-toggle': sheetOpen = !sheetOpen; applySheet(); break;
     case 'overlay-close': hideOverlay(); break;
+    // ── Scenarios ──
+    case 'scenarios': openScenarios(); break;
+    case 'scenario-save': {
+      const name = window.prompt('Scenario name:');
+      if (name !== null) {
+        scenarioStore
+          .save(makeScenario(newId(), name.trim() || 'Untitled', store.getState().inputs, new Date().toISOString()))
+          .then(openScenarios);
+      }
+      break;
+    }
+    case 'scenario-load': {
+      const id = actionEl.dataset['id'];
+      if (id) scenarioStore.load(id).then((s) => { if (s) { store.replaceInputs(s.inputs); history.reset(s.inputs); store.setState({ activeScenarioId: id }); hideOverlay(); } });
+      break;
+    }
+    case 'scenario-delete': { const id = actionEl.dataset['id']; if (id) scenarioStore.remove(id).then(openScenarios); break; }
+    case 'scenario-export': scenarioStore.list().then((list) => download('sap1-scenarios.json', JSON.stringify(list, null, 2), 'application/json')); break;
+    case 'scenario-import': pickFile((text) => { const r = scenarioStore.parseImport(text); if (r.ok) scenarioStore.save(r.value).then(openScenarios); else window.alert('Import failed: ' + r.error); }); break;
+    // ── Mission BOM ──
+    case 'mission': openMission(); break;
+    case 'mission-add': store.setState({ missionSet: [...store.getState().missionSet, { inputs: { ...store.getState().inputs } }] }); openMission(); break;
+    case 'mission-clear': store.setState({ missionSet: [] }); openMission(); break;
+    // ── Compare ──
+    case 'compare': openCompare(); break;
+    case 'compare-add': { const set = store.getState().comparisonSet; if (set.length < 3) store.setState({ comparisonSet: [...set, { ...store.getState().inputs }] }); openCompare(); break; }
+    case 'compare-remove': { const idx = Number(actionEl.dataset['idx']); const set = store.getState().comparisonSet.slice(); if (idx >= 0 && idx < set.length) { set.splice(idx, 1); store.setState({ comparisonSet: set }); } openCompare(); break; }
+    case 'compare-clear': store.setState({ comparisonSet: [] }); openCompare(); break;
+    // ── Time-available planning ──
+    case 'plan': openPlan(); break;
+    case 'plan-run': {
+      const h = document.getElementById('plan-hours') as HTMLInputElement | null;
+      const t = document.getElementById('plan-team') as HTMLInputElement | null;
+      planHours = h ? Math.max(1, parseInt(h.value, 10) || planHours) : planHours;
+      planTeam = t ? Math.max(1, parseInt(t.value, 10) || planTeam) : planTeam;
+      lastPlan = planForTime({ availableHours: planHours, teamSize: planTeam, base: store.getState().inputs });
+      openPlan();
+      break;
+    }
+    case 'plan-apply': { const opt = lastPlan?.feasible[Number(actionEl.dataset['idx'])]; if (opt) { store.replaceInputs(opt.inputs); history.push(opt.inputs); hideOverlay(); } break; }
     default: break;
   }
 });

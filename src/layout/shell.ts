@@ -49,6 +49,8 @@ function topbar(state: AppState, result: Result): string {
     '<div class="actions">' +
     btn('undo', 'Undo', 'Undo (Ctrl+Z)') + btn('redo', 'Redo', 'Redo (Ctrl+Y)') + btn('reset', 'Reset', 'Reset inputs') +
     btn('theme', themeLabel, 'Toggle theme') +
+    btn('scenarios', 'Scenarios', 'Save / load scenarios') + btn('mission', 'Mission', 'Mission BOM rollup') +
+    btn('compare', 'Compare', 'Compare configurations') + btn('plan', 'Plan', 'Time-available planning') +
     btn('print', 'Print', 'Print job sheet') + btn('csv', 'CSV', 'Export CSV') + btn('export', 'JSON', 'Export scenario JSON') +
     btn('help', 'Help', 'Help') + btn('diagnostics', 'Diag', 'Diagnostics') +
     '<label class="layout-override"><span class="sr-only">Layout</span>' +
