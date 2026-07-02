@@ -41,6 +41,9 @@ export interface LaborResult {
   manHoursPerPosition: number;
   manHoursTotal: number;
   elapsedHours: number;
+  // Blade/excavator hours — a separate axis from man-hours, present when machine assist is on.
+  machineHoursPerPosition?: number;
+  machineHoursTotal?: number;
   assumptions: string[];
 }
 
@@ -64,6 +67,9 @@ export interface Derivation {
 
 export interface Result {
   inputs: Inputs;
+  // Model-fidelity statements — the structural analogue of the placeholder flag: which
+  // volume/labor model produced these numbers, always shown, never implied to be doctrinal.
+  fidelity: { volume: string; labor: string };
   resolved: {
     holeL: number;
     holeW: number;

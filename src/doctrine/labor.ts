@@ -6,6 +6,7 @@ import { P } from './types';
 export const labor = {
   baseMH: P(4.0, { unit: 'man-hours', note: 'base per-position labor (illustrative)' }),
   perVolMH: P(0.08, { unit: 'man-hours/ft³', note: 'excavation labor per bank ft³ (illustrative)' }),
+  machinePerVolMH: P(0.004, { unit: 'machine-hours/ft³', note: 'blade/excavator hours per bank ft³ (illustrative)' }),
   overheadAdd: P(3.0, { unit: 'man-hours', note: 'overhead-cover build adder (illustrative)' }),
   revetAdd: P(2.0, { unit: 'man-hours', note: 'revetment build adder (illustrative)' }),
   sumpAdd: P(0.5, { unit: 'man-hours', note: 'grenade-sump adder (illustrative)' }),

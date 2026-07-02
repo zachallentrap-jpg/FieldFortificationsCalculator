@@ -21,12 +21,17 @@ test('default fixture (two-man / deliberate / loam / 81mm mortar) snapshot', () 
     grenade_sumps: 2,
     sandbags_parapet: 168,
     sandbags_cover: 157,
-    stringers: 3,
+    // Phase 1 (DECISIONS D29): stringers now count along the LONG axis (7 ft frontage → 8),
+    // spanning the 2 ft short axis — the pre-Phase-1 count keyed on the short axis (3) and
+    // implied stringers spanning the frontage, teaching wrong assembly.
+    stringers: 8,
     gravel_sump: 2,
   });
-  assert.equal(r.placeholderReport.total, 275);
-  assert.equal(r.placeholderReport.remaining, 275);
-  assert.equal(r.placeholderReport.safetyCriticalRemaining, 187);
+  // Phase 1 added 4 doctrine leaves (berm W+H, machine blade-hour rate, vehicle ramp slope);
+  // one (berm thickness) is safety-critical. 275→279 total, 187→188 safety-critical.
+  assert.equal(r.placeholderReport.total, 279);
+  assert.equal(r.placeholderReport.remaining, 279);
+  assert.equal(r.placeholderReport.safetyCriticalRemaining, 188);
 });
 
 test('engineered fixture never carries a fabricated cover thickness', () => {

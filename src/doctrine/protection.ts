@@ -169,6 +169,14 @@ export const parapet = {
   H: P(0.5, { unit: 'ft', note: 'parapet height above grade (illustrative)' }),
 };
 
+// Protective spoil berm — the frontal protection for VEHICLE defilade positions. A dozed
+// berm of the position's own spoil, not a sandbag parapet (the pre-Phase-1 BOM billed ~450
+// sandbags nobody would ever fill for a hull-down). Thickness is protective → safety-critical.
+export const berm = {
+  W: P(4.0, { unit: 'ft', safetyCritical: true, note: 'spoil-berm thickness at protective height (illustrative)' }),
+  H: P(2.0, { unit: 'ft', note: 'spoil-berm height above grade (illustrative)' }),
+};
+
 // Overhead-cover chain constants (§8, §9). setbackMin / setbackDepthFrac are standoff
 // (safety-critical). bearingEachEnd and stringerSpacing drive cover geometry + counts.
 export const overhead = {

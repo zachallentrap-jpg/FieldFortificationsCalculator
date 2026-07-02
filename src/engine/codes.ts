@@ -32,6 +32,41 @@ export const CODES = {
     'warning',
     'An engineered roof is required while the standard is hasty — reassess time and resources.',
   ),
+  ROOF_SPAN_EXCEEDED: def(
+    'ROOF_SPAN_EXCEEDED',
+    'warning',
+    'The roof opening is wider than the stringer table covers — the roof must be engineered (no stringer size or cover thickness is estimated).',
+  ),
+  CUT_DEPTH_SHORING: def(
+    'CUT_DEPTH_SHORING',
+    'warning',
+    'The cut is deeper than an unengineered wall may stand — bench the walls or get a shoring design.',
+  ),
+  MACHINE_REQUIRED_VEHICLE: def(
+    'MACHINE_REQUIRED_VEHICLE',
+    'warning',
+    'A vehicle position is machine work — hand-digging this volume is not a realistic plan.',
+  ),
+  SPOIL_SHORT: def(
+    'SPOIL_SHORT',
+    'warning',
+    'The dig does not yield enough spoil to build the front protection — plan to haul fill in.',
+  ),
+  SPOIL_EXCESS_VEHICLE: def(
+    'SPOIL_EXCESS_VEHICLE',
+    'advisory',
+    'Spoil beyond what the berm needs must be spread or hauled so it does not signpost the position.',
+  ),
+  DRAINAGE_WET_SOIL: def(
+    'DRAINAGE_WET_SOIL',
+    'advisory',
+    'This soil holds water — plan drainage (sump, floor slope) or the position floods.',
+  ),
+  COVER_NO_THREAT: def(
+    'COVER_NO_THREAT',
+    'advisory',
+    'Roof overhead is on but no threat is selected — pick a caliber so the cover can be sized (none is added yet).',
+  ),
   EXCAV_HAND_HEAVY: def(
     'EXCAV_HAND_HEAVY',
     'advisory',

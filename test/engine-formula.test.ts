@@ -46,7 +46,8 @@ test('§9 chain: two-man / deliberate / loam / fragmentation matches an independ
   const coverL = holeL + 2 * bearing;
   const coverW = holeW + 2 * bearing;
   const coverVol = coverL * coverW * coverT;
-  const stringers = ceil(holeW / overhead.stringerSpacing.value) + 1;
+  // Stringers span the SHORT axis, laid out along the LONG axis at doctrine spacing.
+  const stringers = ceil(Math.max(holeL, holeW) / overhead.stringerSpacing.value) + 1;
 
   const bagVol = sandbag.L.value * sandbag.W.value * sandbag.H.value;
   const waste = sandbag.wasteFactor.value;

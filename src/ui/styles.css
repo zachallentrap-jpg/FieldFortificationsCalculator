@@ -225,3 +225,9 @@ table.bom td.n { text-align: right; font-variant-numeric: tabular-nums; }
 }
 
 .btn[disabled] { opacity: 0.45; cursor: default; }
+
+/* Model-fidelity statement (Phase 1) — formulas get the same honesty as constants. */
+.fidelity-note {
+  margin: 8px 0 0; padding-top: 6px; border-top: 1px dashed var(--border);
+  font-size: 11px; color: var(--ink-soft); line-height: 1.4;
+}

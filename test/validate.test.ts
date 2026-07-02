@@ -21,6 +21,13 @@ test('each validation code is reachable', () => {
     { soil: 'rock', machineAssist: false }, // EXCAV_HAND_HEAVY
     { count: 5000 }, // COUNT_CLAMPED
     { teamSize: 999 }, // TEAM_CLAMPED
+    { positionType: 'vehicle_hull_defilade', threat: 'sa-556', overheadCover: true, machineAssist: true }, // ROOF_SPAN_EXCEEDED (12 ft span > table)
+    { positionType: 'bunker_op_cp', standard: 'reinforced' }, // CUT_DEPTH_SHORING (deep cut)
+    { positionType: 'vehicle_turret_defilade', machineAssist: false }, // MACHINE_REQUIRED_VEHICLE
+    { positionType: 'one_man', standard: 'hasty' }, // SPOIL_SHORT (big parapet ring, tiny hasty dig)
+    { positionType: 'vehicle_hull_defilade', machineAssist: true }, // SPOIL_EXCESS_VEHICLE
+    { soil: 'silt' }, // DRAINAGE_WET_SOIL
+    { threat: 'none', overheadCover: true }, // COVER_NO_THREAT
   ];
   for (const s of scenarios) for (const c of codesFor(s)) fired.add(c);
 

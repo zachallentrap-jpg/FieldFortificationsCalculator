@@ -2,11 +2,14 @@
 // catalog. Ordering is deterministic (errors, then warnings, then advisories, stable within
 // a tier). Every code in codes.ts is reachable from here (asserted by the validate test).
 
+import { retainingWall } from '../doctrine/protection';
 import { CODES, issue } from './codes';
+import { round1 } from './round';
 import type { ValidationIssue } from './types';
 import type { Calc } from './compute';
 
 const HEAVY_SOILS = new Set(['rock', 'frozen', 'clay']);
+const WET_SOILS = new Set(['silt', 'clay']);
 
 export function runValidation(calc: Calc): ValidationIssue[] {
   const errors: ValidationIssue[] = [];
@@ -24,14 +27,48 @@ export function runValidation(calc: Calc): ValidationIssue[] {
     errors.push(issue(CODES.REVET_REQUIRED_SOIL));
   }
 
-  // Engineered roof required.
+  // Engineered roof required — by the threat, or by a span beyond the stringer table
+  // (both resolve through the single authority in engine/protection.ts).
   if (calc.roofPath === 'engineered_required') {
     warnings.push(issue(CODES.ROOF_ENGINEERED));
+    if (calc.coverReason === 'span') {
+      warnings.push(issue(CODES.ROOF_SPAN_EXCEEDED, '(clear span ' + round1(calc.stringerSpan) + ' ft)'));
+    }
     if (calc.inputs.standard === 'hasty') warnings.push(issue(CODES.ROOF_ENGINEERED_HASTY));
   }
 
-  // Hand-digging heavy/hard ground.
-  if (!calc.inputs.machineAssist && HEAVY_SOILS.has(calc.inputs.soil)) {
+  // Cut depth beyond the unengineered retaining-wall limit (the doctrine leaf was registered
+  // but dead pre-Phase-1 — an 8-ft bunker cut passed silently).
+  if (calc.depthOfCut > retainingWall.maxHeight.value) {
+    warnings.push(issue(CODES.CUT_DEPTH_SHORING, '(cut ' + round1(calc.depthOfCut) + ' ft, limit ' + round1(retainingWall.maxHeight.value) + ' ft)'));
+  }
+
+  // Vehicle positions are machine work.
+  if (calc.isVehicle && !calc.inputs.machineAssist) {
+    warnings.push(issue(CODES.MACHINE_REQUIRED_VEHICLE));
+  }
+
+  // Spoil balance: front protection fill vs what the dig yields.
+  if (calc.spoilShortBy > 0) {
+    warnings.push(issue(CODES.SPOIL_SHORT, '(about ' + round1(calc.spoilShortBy) + ' ft³ short)'));
+  }
+  if (calc.spoilExcess > 0) {
+    advisories.push(issue(CODES.SPOIL_EXCESS_VEHICLE, '(about ' + round1(calc.spoilExcess) + ' ft³ left over)'));
+  }
+
+  // Wet-holding soils need a drainage plan.
+  if (WET_SOILS.has(calc.inputs.soil)) {
+    advisories.push(issue(CODES.DRAINAGE_WET_SOIL));
+  }
+
+  // Overhead cover requested with no threat: the request is silently a no-op in the engine —
+  // say so instead of letting the operator believe cover was added.
+  if (calc.inputs.overheadCover && calc.threat === 'none') {
+    advisories.push(issue(CODES.COVER_NO_THREAT));
+  }
+
+  // Hand-digging heavy/hard ground (vehicle positions get the stronger warning above).
+  if (!calc.inputs.machineAssist && HEAVY_SOILS.has(calc.inputs.soil) && !calc.isVehicle) {
     advisories.push(issue(CODES.EXCAV_HAND_HEAVY));
   }
 

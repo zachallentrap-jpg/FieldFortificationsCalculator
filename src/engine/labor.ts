@@ -11,9 +11,12 @@ export function buildLabor(calc: Calc): LaborResult {
   assumptions.push('Soil: ' + calc.soil.label + ' (dig ×' + calc.soil.digFactor.value + ').');
   assumptions.push(
     calc.inputs.machineAssist
-      ? 'Machine-assisted excavation applied.'
+      ? 'Machine-assisted excavation applied (blade-hours reported separately).'
       : 'Hand excavation assumed (no machine assist).',
   );
+  if (calc.isVehicle && !calc.inputs.machineAssist) {
+    assumptions.push('Vehicle positions are machine work — hand-dig hours shown are not a realistic plan.');
+  }
   if (calc.coverOn && calc.roofPath === 'earth_on_stringers') assumptions.push('Includes overhead-cover build labor.');
   if (calc.roofPath === 'engineered_required') {
     assumptions.push('Overhead roof is engineered by others — its labor is NOT included.');
@@ -26,6 +29,9 @@ export function buildLabor(calc: Calc): LaborResult {
     manHoursPerPosition: calc.mhPerPos,
     manHoursTotal: calc.mhTotal,
     elapsedHours: calc.elapsed,
+    ...(calc.machineHrsPerPos > 0
+      ? { machineHoursPerPosition: calc.machineHrsPerPos, machineHoursTotal: calc.machineHrsTotal }
+      : {}),
     assumptions,
   };
 }

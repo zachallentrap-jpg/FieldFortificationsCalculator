@@ -55,14 +55,29 @@ export function specsPanel(result: Result): string {
       ? specRow('Overhead roof', '<span class="val engineered">Engineered — see engineer</span>')
       : '';
 
-  return '<section class="panel"><h2>' + esc(posLabel) + '</h2>' + rows + engineered + '</section>';
+  // Model-fidelity statement — formulas get the same honesty as constants: this says which
+  // volume model produced the dimensions, so "approximate" is never mistaken for doctrinal.
+  const fidelity =
+    '<p class="fidelity-note">Volume model: ' + esc(result.fidelity.volume) + '. Labor model: ' + esc(result.fidelity.labor) + '.</p>';
+
+  return '<section class="panel"><h2>' + esc(posLabel) + '</h2>' + rows + engineered + fidelity + '</section>';
 }
 
-// BOM lines whose quantity is explained by a derivation get a trace link.
+// BOM lines whose quantity is explained by a derivation get a trace link. Every BOM line that
+// carries a magnitude now has one (Phase 1: no tappable number dead-ends).
 const BOM_TRACE: Record<string, string> = {
   excavation_loose: 'excavLoose',
   sandbags_parapet: 'sandbagsParapet',
+  berm_fill: 'bermFill',
+  sandbags_cover: 'sandbagsCover',
+  cover_soil_fill: 'coverSoilFill',
+  sandbags_revet: 'sandbagsRevet',
+  revet_panels: 'revetPanels',
+  pickets: 'pickets',
+  revet_wire: 'revetWire',
   stringers: 'stringers',
+  gravel_sump: 'gravelSump',
+  camo_net: 'camoNet',
 };
 
 export function bomPanel(result: Result): string {
@@ -87,11 +102,17 @@ export function laborPanel(result: Result): string {
   const assumptions = lab.assumptions.length
     ? '<ul class="assumptions">' + lab.assumptions.map((a) => '<li>' + esc(a) + '</li>').join('') + '</ul>'
     : '';
+  const machine =
+    lab.machineHoursPerPosition !== undefined
+      ? specRow('Machine (blade) hours / position', val(num(lab.machineHoursPerPosition) + ' hr', 'machineHours')) +
+        specRow('Machine hours total', val(num(lab.machineHoursTotal ?? 0) + ' hr'))
+      : '';
   return (
     '<section class="panel"><h2>Time & people needed (Labor)</h2>' +
     specRow('Man-hours / position', val(num(lab.manHoursPerPosition), 'manHoursPerPosition')) +
     specRow('Man-hours total', val(num(lab.manHoursTotal), 'manHoursTotal')) +
     specRow('Elapsed (team of ' + result.inputs.teamSize + ')', val(num(lab.elapsedHours) + ' hr', 'elapsed')) +
+    machine +
     assumptions +
     '</section>'
   );

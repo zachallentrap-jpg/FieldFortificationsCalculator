@@ -24,6 +24,11 @@ export interface FiringPlatform {
 export interface PositionRow {
   label: string;
   shape: ShapeId;
+  // Which volume model the engine runs for this position (qualitative structure, not a
+  // magnitude): 'prism' = rectangular prism, 'cylinder' = circular pit (π/4 factor),
+  // 'prism_ramp' = box cut plus the access-ramp wedge. Surfaced to the user as the
+  // model-fidelity statement — formulas get the same honesty treatment as constants.
+  volumeModel: 'prism' | 'cylinder' | 'prism_ramp';
   hole: { L: Provenance<number>; W: Provenance<number>; D: Provenance<number> }; // feet
   firingPlatform?: FiringPlatform;
   grenadeSumps: number; // count
@@ -35,10 +40,18 @@ export interface PositionRow {
 
 const ft = (v: number, note: string): Provenance<number> => P(v, { unit: 'ft', note });
 
+// Vehicle-defilade excavation doctrine (shared by the vehicle_ramp shape family). The access
+// ramp is the dominant excavation volume of a defilade — omitting it was falsifiable by any
+// equipment operator in minutes (EXECUTION_PLAN Phase 1).
+export const vehicleRamp = {
+  slopeRatio: P(5.0, { unit: 'ratio', note: 'access-ramp run per foot of cut depth (illustrative)' }),
+};
+
 export const positions: Record<string, PositionRow> = {
   one_man: {
     label: 'One-man fighting position',
     shape: 'rect',
+    volumeModel: 'prism',
     hole: { L: ft(4.0, 'frontage (illustrative)'), W: ft(2.0, 'front-to-back'), D: ft(4.0, 'armpit-deep') },
     grenadeSumps: 1,
     elbowHoles: 2,
@@ -49,6 +62,7 @@ export const positions: Record<string, PositionRow> = {
   two_man: {
     label: 'Two-man fighting position',
     shape: 'rect',
+    volumeModel: 'prism',
     hole: { L: ft(7.0, 'frontage'), W: ft(2.0, 'front-to-back'), D: ft(4.0, 'armpit-deep') },
     grenadeSumps: 2,
     elbowHoles: 4,
@@ -59,6 +73,7 @@ export const positions: Record<string, PositionRow> = {
   mg_crew: {
     label: 'Machine-gun position (inverted-T)',
     shape: 'inverted_t',
+    volumeModel: 'prism',
     hole: { L: ft(8.0, 'trench frontage'), W: ft(2.0, 'trench width'), D: ft(4.0, 'depth') },
     firingPlatform: {
       L: ft(3.0, 'platform length'),
@@ -74,6 +89,7 @@ export const positions: Record<string, PositionRow> = {
   fifty_cal: {
     label: '.50 cal position (L-shape)',
     shape: 'l_shape',
+    volumeModel: 'prism',
     hole: { L: ft(9.0, 'frontage'), W: ft(2.0, 'width'), D: ft(4.0, 'depth') },
     firingPlatform: {
       L: ft(4.0, 'platform length'),
@@ -89,6 +105,7 @@ export const positions: Record<string, PositionRow> = {
   mortar_pit: {
     label: 'Mortar pit',
     shape: 'circular',
+    volumeModel: 'cylinder',
     hole: { L: ft(8.0, 'pit diameter'), W: ft(8.0, 'pit diameter'), D: ft(4.5, 'pit depth') },
     grenadeSumps: 0,
     elbowHoles: 0,
@@ -99,6 +116,7 @@ export const positions: Record<string, PositionRow> = {
   vehicle_hull_defilade: {
     label: 'Vehicle hull-defilade',
     shape: 'vehicle_ramp',
+    volumeModel: 'prism_ramp',
     hole: { L: ft(22.0, 'position length'), W: ft(12.0, 'position width'), D: ft(3.5, 'hull-down depth') },
     grenadeSumps: 0,
     elbowHoles: 0,
@@ -109,6 +127,7 @@ export const positions: Record<string, PositionRow> = {
   vehicle_turret_defilade: {
     label: 'Vehicle turret-defilade',
     shape: 'vehicle_ramp',
+    volumeModel: 'prism_ramp',
     hole: { L: ft(22.0, 'position length'), W: ft(12.0, 'position width'), D: ft(6.0, 'turret-down depth') },
     grenadeSumps: 0,
     elbowHoles: 0,
@@ -119,6 +138,7 @@ export const positions: Record<string, PositionRow> = {
   bunker_op_cp: {
     label: 'Bunker / OP-CP',
     shape: 'rect_roofed',
+    volumeModel: 'prism',
     hole: { L: ft(10.0, 'interior length'), W: ft(8.0, 'interior width'), D: ft(6.5, 'standing depth') },
     grenadeSumps: 1,
     elbowHoles: 0,

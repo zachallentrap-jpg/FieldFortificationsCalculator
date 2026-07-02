@@ -282,3 +282,35 @@ option, implement it, and log it here.
   cells track the doctrine bag's laid proportions and the fallback box tiles the same cells —
   a wall's envelope can never differ between the fallback and the loaded prop, and a thick
   parapet reads as multiple bags deep instead of one bag stretched to the wall's depth.
+
+- **D29 — Phase 1 formula honesty: the model must survive expert falsification.** An NCO who
+  knows the manuals could falsify SAP-1's vehicle and mortar math in minutes — placeholder data
+  excuses wrong *constants*, never wrong *structure*. Fixed in the engine, each behind a test
+  that re-derives the number independently:
+  - **Stringer axis.** Stringers now count along the LONG axis and span the SHORT one
+    (`ceil(max(L,W)/spacing)+1`); the pre-fix count keyed on the short axis, implying stringers
+    that span the frontage — wrong assembly. The BOM/trace label the doctrine stringer size.
+    This flips the default two-man snapshot stringers 3→8 (regenerated here, deliberately).
+  - **Span fail-safe.** A roof clear-span beyond the stringer table resolves to
+    `engineered_required` through the *single authority* (`resolveCover`), not a bolted-on
+    warning around a still-fabricated thickness — an extension of the §2.7 fail-safe invariant.
+  - **Vehicle defilade.** Adds the access-ramp wedge (the dominant excavation volume), replaces
+    the ~450-sandbag phantom parapet with a dozed spoil **berm**, requires/warns machine assist,
+    and reports **blade-hours** on their own axis (a dozer hour is not a man-hour).
+  - **Circular mortar pit.** π/4 volume + circumference perimeter (was a 27% square-for-circle
+    overestimate).
+  - **Revetment materials.** Panel revetments emit a facing-area line; picket revetments quantify
+    tie wire — labor is never charged without a material line again. Loose-soil cover is billed
+    as fill volume, not phantom sandbags.
+  - **Advisories.** Cut-depth-vs-shoring, wet-soil drainage, spoil balance (short/excess), and
+    "overhead cover requested with no threat" (previously a silent no-op).
+  - **Model-fidelity statement.** Every position declares its volume + labor model as
+    `approximate` in the specs panel and job sheet — the structural analogue of the (PH) flag,
+    extending the honesty regime from constants to formulas.
+  - **SME checkpoint (open item).** The ramp geometry, berm sizing, spoil-balance model, and
+    blade-hour rate are newly *invented in-repo* — exactly the wrong-in-kind failure mode this
+    phase exists to fix. They ship as placeholder-wrapped and fidelity-flagged `approximate`,
+    but a qualified reviewer must still confirm the STRUCTURE (not just the constants) before any
+    of it is trusted. Tracked as the Phase 1 acceptance debt in `docs/EXECUTION_PLAN.md`.
+  Four new doctrine leaves (berm W/H, blade-hour rate, ramp slope) move the placeholder count
+  275→279 (188 safety-critical); all remain PLACEHOLDER, banner unaffected.

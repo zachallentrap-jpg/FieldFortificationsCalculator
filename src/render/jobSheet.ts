@@ -60,7 +60,7 @@ export function jobSheet(result: Result, meta: JobSheetMeta): string {
     specRow('Team size', String(result.inputs.teamSize));
 
   const specRows =
-    specRow('Depth of cut', fmtLength(r.holeD, unit)) +
+    specRow('Depth of cut', fmtLength(r.depthOfCut, unit)) +
     specRow('Frontage', fmtLength(r.holeL, unit)) +
     specRow('Front-to-back', fmtLength(r.holeW, unit)) +
     specRow('Overall (L×W)', fmtLength(r.outerL, unit) + ' × ' + fmtLength(r.outerW, unit)) +
@@ -70,7 +70,8 @@ export function jobSheet(result: Result, meta: JobSheetMeta): string {
       ? specRow('Overhead cover', fmtLength(result.cover.thickness, unit) + ' ' + result.cover.material, true)
       : result.cover.roofPath === 'engineered_required'
         ? '<tr><td>Overhead roof</td><td class="n ph">ENGINEERED — see engineer</td></tr>'
-        : specRow('Overhead cover', 'none'));
+        : specRow('Overhead cover', 'none')) +
+    '<tr><td>Volume model</td><td class="n">' + esc(result.fidelity.volume) + '</td></tr>';
 
   const bomRows = result.bom
     .map(

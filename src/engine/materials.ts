@@ -4,7 +4,7 @@
 // UI flags those quantities and the CSV records the flag.
 
 import { sandbag, excavation, camo, sump as sumpMat, revetments } from '../doctrine/materials';
-import { parapet } from '../doctrine/protection';
+import { parapet, berm } from '../doctrine/protection';
 import type { BomLine } from './types';
 import type { Calc } from './compute';
 
@@ -56,17 +56,33 @@ export function buildBom(calc: Calc): BomLine[] {
     'sandbags_parapet',
     'Sandbags — parapet',
     'ea',
-    calc.bagsParapet,
+    calc.bagsParapet, // 0 for vehicle positions — the berm line below replaces it
     20,
     isPh(parapet.W.status, parapet.H.status, sandbag.wasteFactor.status) || dimsPh,
+  );
+  add(
+    'berm_fill',
+    'Spoil berm — dozed fill',
+    'ft³',
+    calc.bermFill,
+    21,
+    isPh(berm.W.status, berm.H.status) || dimsPh,
   );
   add(
     'sandbags_cover',
     'Sandbags — overhead cover',
     'ea',
-    calc.bagsCover,
+    calc.bagsCover, // only when the doctrine cover material is sandbagged soil
     30,
     isPh(sandbag.wasteFactor.status, calc.standard.coverMul.status) || (calc.coverLeaf ? isPh(calc.coverLeaf.status) : true),
+  );
+  add(
+    'cover_soil_fill',
+    'Overhead cover — ' + (calc.coverMaterial || 'soil') + ' fill',
+    'ft³',
+    calc.coverFill, // loose-fill cover priced as what it is, not phantom bags
+    31,
+    isPh(calc.standard.coverMul.status) || (calc.coverLeaf ? isPh(calc.coverLeaf.status) : true),
   );
   add(
     'sandbags_revet',
@@ -76,9 +92,24 @@ export function buildBom(calc: Calc): BomLine[] {
     40,
     isPh(sandbag.wasteFactor.status) || dimsPh,
   );
+  // Panel revetments (corrugated / timber-plywood) emit their facing as face AREA — an honest
+  // quantity from the model with no fabricated sheet size. Labor is never charged without a
+  // material line again.
+  if (calc.revet.kind === 'panel') {
+    add('revet_panels', calc.revet.label + ' — facing area', 'ft²', calc.faceArea, 45, isPh(calc.standard.depthMul.status) || dimsPh);
+  }
   const picketPh = calc.revet.spacing ? isPh(calc.revet.spacing.status) : true;
   add('pickets', revetments['pickets_wire']?.label ?? 'U-pickets', 'ea', calc.pickets, 50, picketPh || dimsPh);
-  add('stringers', 'Overhead stringers', 'ea', calc.stringers, 60, dimsPh);
+  const wirePh = calc.revet.wirePerPicket ? isPh(calc.revet.wirePerPicket.status) : true;
+  add('revet_wire', 'Tie wire', 'ft', calc.wireFt, 51, wirePh || picketPh || dimsPh);
+  add(
+    'stringers',
+    'Overhead stringers' + (calc.stringerSize && calc.stringerSize !== 'engineered' ? ' (' + calc.stringerSize + ')' : ''),
+    'ea',
+    calc.stringers,
+    60,
+    dimsPh,
+  );
   add('gravel_sump', 'Sump gravel', 'ft³', calc.gravelVol, 70, isPh(sumpMat.gravelFt3.status));
   add('camo_net', 'Camouflage net', 'ft²', calc.camoArea, 80, isPh(camo.drapeFactor.status) || dimsPh);
 
