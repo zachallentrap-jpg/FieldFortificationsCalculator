@@ -19,8 +19,9 @@ import { collectDiagnostics, diagnosticsText } from '../layout/diagnostics';
 import { jobSheet } from '../render/jobSheet';
 import { toCsv } from '../render/csv';
 import { scenariosOverlay, missionOverlay, compareOverlay, planOverlay } from '../layout/tools';
-import { ScenarioStore, makeScenario } from '../state/scenarios';
+import { ScenarioStore, makeScenario, duplicateScenario } from '../state/scenarios';
 import { createStorageAdapter } from '../state/persistence';
+import { saveSession, restoreSession } from '../state/session';
 import { aggregateMission } from '../engine/mission';
 import { planForTime, type PlanResult } from '../engine/plan';
 import { isWebGLAvailable, createThreeViewer } from './three-viewer';
@@ -33,10 +34,48 @@ const overlayBody = document.getElementById('overlay-body')!;
 const theme = initialTheme();
 applyTheme(theme);
 
-const store = createStore({ theme, layoutMode: currentLayout('auto') });
+// Restore the working session (inputs, mission/compare sets, on-hand) so a tab eviction or
+// reload never wipes a plan — everything re-validates through schema.ts on the way back in.
+const sessionStorage_ = typeof localStorage !== 'undefined' ? localStorage : null;
+const restored = sessionStorage_ ? restoreSession(sessionStorage_) : null;
+
+const store = createStore({
+  theme,
+  layoutMode: currentLayout('auto'),
+  ...(restored ? { inputs: restored.inputs, missionSet: restored.missionSet, comparisonSet: restored.comparisonSet } : {}),
+});
 const history = createHistory(store.getState().inputs);
 const scenarioStore = new ScenarioStore(createStorageAdapter());
-const onHand: Record<string, number> = {};
+const onHand: Record<string, number> = { ...(restored?.onHand ?? {}) };
+
+function persistSession(): void {
+  if (!sessionStorage_) return;
+  const s = store.getState();
+  saveSession(sessionStorage_, { inputs: s.inputs, missionSet: s.missionSet, comparisonSet: s.comparisonSet, onHand });
+}
+
+// Topbar undo/redo buttons disable when there is nothing to undo/redo — refreshed after every
+// history operation (setState triggers the re-render that repaints the buttons).
+function syncHistory(): void {
+  store.setState({ canUndo: history.canUndo(), canRedo: history.canRedo() });
+}
+
+// Transient confirmation toast — lives OUTSIDE #app so the full-shell re-render never eats it.
+let toastTimer = 0;
+function showToast(msg: string): void {
+  let t = document.getElementById('toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.className = 'toast';
+    t.setAttribute('role', 'status');
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => t!.classList.remove('show'), 2600);
+}
 let lastResult: Result | null = null;
 let sheetOpen = false;
 let planHours = 8;
@@ -112,9 +151,22 @@ function scheduleRender(): void {
     render();
   });
 }
+// The whole shell re-renders as an HTML string, which destroys focus. Remember which control
+// held focus (by its data-field / data-action binding) and restore it after the swap — a
+// keyboard or screen-reader user changing a dropdown must not be dumped back to <body>.
+function focusKey(): string | null {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement) || !app.contains(active)) return null;
+  if (active.dataset['field']) return '[data-field="' + active.dataset['field'] + '"]';
+  if (active.dataset['action']) return '[data-action="' + active.dataset['action'] + '"]';
+  if (active.id) return '#' + active.id;
+  return null;
+}
+
 function render(): void {
   const state = store.getState();
   const c = safeCompute(state.inputs);
+  const refocus = focusKey();
   if (c.ok) {
     lastResult = c.value;
     app.innerHTML = renderApp(state, c.value, webglOk);
@@ -125,14 +177,28 @@ function render(): void {
         threeViewer.update(c.value);
       }
     }
+    announce(c.value);
   } else {
     store.setState({ lastError: c.error });
     app.innerHTML = errorCardHtml(c.error);
   }
+  if (refocus) app.querySelector<HTMLElement>(refocus)?.focus();
   applySheet();
 }
 
+// Screen-reader announcement: a terse summary into a dedicated polite live region, replacing
+// the old aria-live on #app (which re-announced the ENTIRE page on every input change).
+function announce(result: Result): void {
+  const el = document.getElementById('sr-status');
+  if (!el) return;
+  const text =
+    'Updated. ' + result.labor.manHoursPerPosition + ' man-hours per position, ' +
+    result.labor.elapsedHours + ' hours elapsed with this team.';
+  if (el.textContent !== text) el.textContent = text;
+}
+
 store.subscribe(scheduleRender);
+store.subscribe(persistSession);
 
 // ── Input edits ──────────────────────────────────────────────────────────────
 function coerce(field: keyof Inputs, el: HTMLInputElement | HTMLSelectElement): Partial<Inputs> {
@@ -147,6 +213,7 @@ function coerce(field: keyof Inputs, el: HTMLInputElement | HTMLSelectElement): 
 function commit(patch: Partial<Inputs>): void {
   store.setInputs(patch);
   history.push(store.getState().inputs);
+  syncHistory();
 }
 
 document.addEventListener('change', (e) => {
@@ -154,6 +221,7 @@ document.addEventListener('change', (e) => {
   if (!(el instanceof HTMLInputElement) && !(el instanceof HTMLSelectElement)) return;
   if (el instanceof HTMLInputElement && el.dataset['onhand']) {
     onHand[el.dataset['onhand']] = Math.max(0, parseInt(el.value, 10) || 0);
+    persistSession(); // onHand lives outside the store, so the subscriber won't catch this
     openMission();
     return;
   }
@@ -188,9 +256,9 @@ document.addEventListener('click', (e) => {
   if (!actionEl) return;
   const action = actionEl.dataset['action'];
   switch (action) {
-    case 'undo': applyInputs(history.undo()); break;
-    case 'redo': applyInputs(history.redo()); break;
-    case 'reset': store.replaceInputs(DEFAULT_INPUTS); history.reset(DEFAULT_INPUTS); break;
+    case 'undo': applyInputs(history.undo()); syncHistory(); break;
+    case 'redo': applyInputs(history.redo()); syncHistory(); break;
+    case 'reset': store.replaceInputs(DEFAULT_INPUTS); history.reset(DEFAULT_INPUTS); store.setState({ activeScenarioId: null, activeScenarioName: null }); syncHistory(); break;
     case 'theme': toggleTheme(); break;
     case 'print': doPrint(); break;
     case 'csv': doCsv(); break;
@@ -204,20 +272,54 @@ document.addEventListener('click', (e) => {
     case 'scenario-save': {
       const name = window.prompt('Scenario name:');
       if (name !== null) {
+        const id = newId();
+        const finalName = name.trim() || 'Untitled';
         scenarioStore
-          .save(makeScenario(newId(), name.trim() || 'Untitled', store.getState().inputs, new Date().toISOString()))
-          .then(openScenarios);
+          .save(makeScenario(id, finalName, store.getState().inputs, new Date().toISOString()))
+          .then(() => {
+            store.setState({ activeScenarioId: id, activeScenarioName: finalName });
+            showToast('Saved "' + finalName + '" on this device.');
+            openScenarios();
+          })
+          .catch((e: unknown) => {
+            store.setState({ lastError: 'Scenario save failed: ' + String(e) });
+            showToast('Save FAILED — device storage unavailable. Export a settings file instead.');
+          });
       }
       break;
     }
     case 'scenario-load': {
       const id = actionEl.dataset['id'];
-      if (id) scenarioStore.load(id).then((s) => { if (s) { store.replaceInputs(s.inputs); history.reset(s.inputs); store.setState({ activeScenarioId: id }); hideOverlay(); } });
+      if (id) scenarioStore.load(id).then((s) => { if (s) { store.replaceInputs(s.inputs); history.reset(s.inputs); syncHistory(); store.setState({ activeScenarioId: id, activeScenarioName: s.name }); hideOverlay(); } });
       break;
     }
-    case 'scenario-delete': { const id = actionEl.dataset['id']; if (id) scenarioStore.remove(id).then(openScenarios); break; }
-    case 'scenario-export': scenarioStore.list().then((list) => download('sap1-scenarios.json', JSON.stringify(list, null, 2), 'application/json')); break;
-    case 'scenario-import': pickFile((text) => { const r = scenarioStore.parseImport(text); if (r.ok) scenarioStore.save(r.value).then(openScenarios); else window.alert('Import failed: ' + r.error); }); break;
+    case 'scenario-duplicate': {
+      const id = actionEl.dataset['id'];
+      if (id) scenarioStore.load(id).then((s) => {
+        if (s) scenarioStore.save(duplicateScenario(s, newId(), s.name + ' (copy)', new Date().toISOString())).then(openScenarios);
+      });
+      break;
+    }
+    case 'scenario-delete': {
+      const id = actionEl.dataset['id'];
+      const name = actionEl.dataset['name'] ?? 'this scenario';
+      if (id && window.confirm('Delete "' + name + '"? This cannot be undone.')) {
+        scenarioStore.remove(id).then(() => {
+          if (store.getState().activeScenarioId === id) store.setState({ activeScenarioId: null, activeScenarioName: null });
+          openScenarios();
+        });
+      }
+      break;
+    }
+    case 'scenario-export': scenarioStore.list().then((list) => { download('sap1-scenarios.json', JSON.stringify(list, null, 2), 'application/json'); showToast(list.length + ' scenario(s) exported as a file.'); }); break;
+    case 'scenario-import': pickFile((text) => {
+      const r = scenarioStore.parseImportMany(text);
+      if (!r.ok) { window.alert('Import failed: ' + r.error); return; }
+      Promise.all(r.value.map((s) => scenarioStore.save(s))).then(() => {
+        showToast(r.value.length + ' scenario(s) imported.');
+        openScenarios();
+      });
+    }); break;
     // ── Mission BOM ──
     case 'mission': openMission(); break;
     case 'mission-add': store.setState({ missionSet: [...store.getState().missionSet, { inputs: { ...store.getState().inputs } }] }); openMission(); break;
@@ -238,7 +340,7 @@ document.addEventListener('click', (e) => {
       openPlan();
       break;
     }
-    case 'plan-apply': { const opt = lastPlan?.feasible[Number(actionEl.dataset['idx'])]; if (opt) { store.replaceInputs(opt.inputs); history.push(opt.inputs); hideOverlay(); } break; }
+    case 'plan-apply': { const opt = lastPlan?.feasible[Number(actionEl.dataset['idx'])]; if (opt) { store.replaceInputs(opt.inputs); history.push(opt.inputs); syncHistory(); hideOverlay(); } break; }
     // ── 3D viewer ──
     case 'three-reset': threeViewer?.resetView(); if (lastResult) threeViewer?.update(lastResult); break;
     default: break;
@@ -319,8 +421,10 @@ function applySheet(): void {
 }
 
 // ── Exports (local; the user clicks to download) ─────────────────────────────
+// The job sheet / CSV header carries the REAL scenario name when one is active — an unsaved
+// setup is labeled as exactly that, never a stand-in that looks like a saved plan.
 function meta() {
-  return { scenario: 'Working position', date: new Date().toISOString().slice(0, 10) };
+  return { scenario: store.getState().activeScenarioName ?? 'Unsaved setup', date: new Date().toISOString().slice(0, 10) };
 }
 function download(name: string, text: string, mime: string): void {
   const blob = new Blob([text], { type: mime });
@@ -332,15 +436,28 @@ function download(name: string, text: string, mime: string): void {
   URL.revokeObjectURL(url);
 }
 function doCsv(): void {
-  if (lastResult) download('sap1-bom.csv', toCsv(lastResult, meta()), 'text/csv;charset=utf-8');
+  if (!lastResult) return;
+  download('sap1-bom.csv', toCsv(lastResult, meta()), 'text/csv;charset=utf-8');
+  showToast('Materials list downloaded (sap1-bom.csv).');
 }
 function doExportJson(): void {
-  if (lastResult) download('sap1-scenario.json', JSON.stringify(lastResult.inputs, null, 2), 'application/json');
+  if (!lastResult) return;
+  // Export a VALID scenario file (id + name + inputs) — the old export wrote bare inputs,
+  // which the importer rightly rejected: the app couldn't re-open its own file.
+  const s = makeScenario(newId(), meta().scenario, lastResult.inputs, new Date().toISOString());
+  download('sap1-scenario.json', scenarioStore.exportJson(s), 'application/json');
+  showToast('Settings file downloaded (sap1-scenario.json).');
 }
 function doPrint(): void {
   if (!lastResult) return;
   const w = window.open('', '_blank');
-  if (!w) return;
+  if (!w) {
+    // Pop-up blocked (common on locked-down phones): deliver the job sheet as a file instead
+    // of failing silently — the user still walks away with the printable document.
+    download('sap1-job-sheet.html', jobSheet(lastResult, meta()), 'text/html;charset=utf-8');
+    showToast('Pop-up blocked — job sheet saved as an HTML file. Open it and print from there.');
+    return;
+  }
   w.document.write(jobSheet(lastResult, meta()));
   w.document.close();
   w.focus();

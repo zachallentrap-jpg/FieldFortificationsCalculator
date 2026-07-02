@@ -36,7 +36,7 @@ Threat is a **specific caliber, not a coarse bucket** — class → round: small
 
 ## Placeholder regime
 
-Every doctrinal constant is wrapped in `Provenance<T> = { value, unit?, status, source, safetyCritical?, note? }`. The helper `P(value, opts)` defaults `status` to `"PLACEHOLDER"` and `source` to `"TODO: confirm against current pub"`. A qualified user fills real values **offline** with `exportDoctrine` / `importDoctrine` (`src/doctrine/io.ts`): export serializes every provenance leaf, you edit it off-device, and import validates strictly (rejects prototype-pollution keys and file versions newer than the app), then flips matching leaves to `status: "DOCTRINE"` in place. The banner recomputes from those statuses. The test suite enforces the regime (doctrine integrity, banner unlock, and more).
+Every doctrinal constant is wrapped in `Provenance<T> = { value, unit?, status, source, safetyCritical?, note? }`. The helper `P(value, opts)` defaults `status` to `"PLACEHOLDER"` and `source` to `"TODO: confirm against current pub"`. A qualified user fills real values **offline** with `exportDoctrine` / `importDoctrine` (`src/doctrine/io.ts`): export serializes every provenance leaf, you edit it off-device, and import validates strictly (rejects prototype-pollution keys and file versions newer than the app), then flips matching leaves to `status: "DOCTRINE"` in place. The banner recomputes from those statuses. The test suite enforces the doctrine-integrity side of the regime today; the end-to-end banner-clear test lands with the doctrine-import UI (Phase 2 of `docs/EXECUTION_PLAN.md`).
 
 ## Run / develop
 

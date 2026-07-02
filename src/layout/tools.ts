@@ -30,7 +30,8 @@ export function scenariosOverlay(scenarios: Scenario[], activeId: string | null)
             '<span class="scn-name">' + esc(s.name) + '</span>' +
             '<span class="scn-actions">' +
             '<button type="button" class="btn" data-action="scenario-load" data-id="' + esc(s.id) + '">Load</button>' +
-            '<button type="button" class="btn" data-action="scenario-delete" data-id="' + esc(s.id) + '">Delete</button>' +
+            '<button type="button" class="btn" data-action="scenario-duplicate" data-id="' + esc(s.id) + '">Duplicate</button>' +
+            '<button type="button" class="btn" data-action="scenario-delete" data-id="' + esc(s.id) + '" data-name="' + esc(s.name) + '">Delete</button>' +
             '</span></li>',
         )
         .join('')
@@ -86,7 +87,7 @@ export function compareOverlay(results: Result[]): string {
     line('Position', (r) => positions[r.inputs.positionType]?.label ?? r.inputs.positionType) +
     line('Standard', (r) => r.inputs.standard) +
     line('Threat', (r) => threatLabel(r.inputs.threat)) +
-    line('Depth', (r) => fmtLength(r.resolved.holeD, u)) +
+    line('Depth', (r) => fmtLength(r.resolved.depthOfCut, u)) +
     line('Overhead cover', cover) +
     line('Setback', (r) => fmtLength(r.resolved.setback, u)) +
     line('Sandbags (total)', (r) => num(bags(r))) +

@@ -67,7 +67,8 @@ export interface Result {
   resolved: {
     holeL: number;
     holeW: number;
-    holeD: number;
+    holeD: number; // doctrine hole depth BEFORE the standard's depth multiplier
+    depthOfCut: number; // the depth actually dug (holeD × depthMul) — what every display shows
     parapetW: number;
     parapetH: number;
     outerL: number;

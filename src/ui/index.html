@@ -13,8 +13,11 @@
   <body>
     <a class="skip-link" href="#app">Skip to planner</a>
     <div id="root">
-      <div id="app" aria-live="polite"></div>
+      <div id="app"></div>
     </div>
+    <!-- Polite live region for terse update announcements — aria-live on #app itself made
+         every input change re-announce the entire page to screen readers. -->
+    <div id="sr-status" class="visually-hidden" role="status" aria-live="polite"></div>
     <div id="overlay" class="overlay" hidden>
       <div class="overlay-card" role="dialog" aria-modal="true" aria-label="Detail">
         <button type="button" class="overlay-close" data-action="overlay-close" aria-label="Close">Close</button>

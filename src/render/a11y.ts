@@ -26,7 +26,7 @@ const VIEW_LABEL: Record<DrawView, string> = {
 
 export function describe(result: Result, view: DrawView): A11y {
   const posLabel = positions[result.inputs.positionType]?.label ?? result.inputs.positionType;
-  const cutDepth = fmtLength(result.resolved.holeD, result.inputs.unit);
+  const cutDepth = fmtLength(result.resolved.depthOfCut, result.inputs.unit);
 
   const features: string[] = [];
   if (result.cover.roofPath === 'earth_on_stringers') features.push('earth-on-stringers overhead cover');
@@ -37,13 +37,17 @@ export function describe(result: Result, view: DrawView): A11y {
 
   const featureText = features.length ? ' Features: ' + features.join(', ') + '.' : '';
   const title = VIEW_LABEL[view] + ' — ' + posLabel;
+  // Data-driven, like the topbar badge (§2.5): the warning clears when the placeholder count
+  // reaches zero via doctrine import — never hardcoded on.
+  const disclaimer =
+    result.placeholderReport.remaining > 0 ? ' Dimensions are illustrative placeholders — NOT FOR FIELD USE.' : '';
   const desc =
     posLabel +
     ', excavated ' +
     cutDepth +
     ' deep. The enemy is toward the front (top of the plan); FRONT and REAR are labeled.' +
     featureText +
-    ' Dimensions are illustrative placeholders — NOT FOR FIELD USE.';
+    disclaimer;
 
   return {
     role: 'img',

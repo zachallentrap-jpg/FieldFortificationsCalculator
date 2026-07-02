@@ -54,11 +54,22 @@ export class ScenarioStore {
     return out;
   }
 
-  // Import from a JSON string (file upload). Returns the scenario or a validation error.
-  parseImport(text: string): { ok: true; value: Scenario } | { ok: false; error: string } {
+  // Import from a JSON string (file upload). Accepts a single scenario object OR an array of
+  // them — the app's own "Export all" writes an array, so the round-trip must accept its own
+  // output (it didn't, pre-Phase-0). All-or-nothing: one bad entry rejects the file with a
+  // message naming the entry, so a partial import can't silently drop scenarios.
+  parseImportMany(text: string): { ok: true; value: Scenario[] } | { ok: false; error: string } {
     const parsed = safeJsonParse(text);
     if (!parsed.ok) return parsed;
-    return validateScenario(parsed.value);
+    const raw = Array.isArray(parsed.value) ? parsed.value : [parsed.value];
+    if (raw.length === 0) return { ok: false, error: 'File contains no scenarios.' };
+    const out: Scenario[] = [];
+    for (const item of raw) {
+      const v = validateScenario(item);
+      if (!v.ok) return { ok: false, error: 'Entry ' + (out.length + 1) + ' of ' + raw.length + ': ' + v.error };
+      out.push(v.value);
+    }
+    return { ok: true, value: out };
   }
 
   exportJson(s: Scenario): string {

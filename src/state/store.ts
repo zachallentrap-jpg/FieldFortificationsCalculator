@@ -30,9 +30,14 @@ export interface AppState {
   layoutMode: LayoutMode;
   theme: 'day' | 'night';
   activeScenarioId: string | null;
+  activeScenarioName: string | null;
   comparisonSet: Inputs[];
   missionSet: MissionItem[];
   lastError: string | null;
+  // Mirrors of history.canUndo()/canRedo() so the topbar can disable dead buttons — main.ts
+  // refreshes these after every history operation (history itself stays outside the store).
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
 export type Listener = (state: AppState) => void;
@@ -44,9 +49,12 @@ export function createStore(initial?: Partial<AppState>) {
     layoutMode: 'desktop',
     theme: 'day',
     activeScenarioId: null,
+    activeScenarioName: null,
     comparisonSet: [],
     missionSet: [],
     lastError: null,
+    canUndo: false,
+    canRedo: false,
     ...initial,
   };
   const listeners = new Set<Listener>();

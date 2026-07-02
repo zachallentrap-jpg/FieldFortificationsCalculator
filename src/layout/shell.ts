@@ -37,8 +37,11 @@ function drawSafe(fn: (r: Result) => string, result: Result, label: string): str
   return s.ok ? s.value : errorCardHtml(s.error);
 }
 
-function btn(action: string, label: string, title: string): string {
-  return '<button type="button" class="btn" data-action="' + action + '" title="' + title + '">' + label + '</button>';
+function btn(action: string, label: string, title: string, disabled = false): string {
+  return (
+    '<button type="button" class="btn" data-action="' + action + '" title="' + title + '"' +
+    (disabled ? ' disabled aria-disabled="true"' : '') + '>' + label + '</button>'
+  );
 }
 
 // A simple <details>/<summary> disclosure menu — keyboard- and screen-reader-operable with
@@ -91,7 +94,7 @@ function topbar(state: AppState, result: Result): string {
     '<header class="topbar">' +
     '<div class="brand"><strong>SAP-1</strong><span class="tagline">Survivability Position Planner</span>' + badge + '</div>' +
     '<div class="actions">' +
-    btn('undo', 'Undo', 'Undo the last change') + btn('redo', 'Redo', 'Redo') + btn('reset', 'Start over', 'Clear everything and start fresh') +
+    btn('undo', 'Undo', 'Undo the last change', !state.canUndo) + btn('redo', 'Redo', 'Redo', !state.canRedo) + btn('reset', 'Start over', 'Clear everything and start fresh') +
     btn('theme', themeLabel, themeLabel) +
     toolsMenu + exportMenu +
     btn('help', 'Help', 'Plain-language explanation of every input') +

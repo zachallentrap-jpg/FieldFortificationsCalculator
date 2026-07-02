@@ -5,6 +5,7 @@
 
 import { fmtLength, fmtVolume } from '../doctrine/units';
 import { positions } from '../doctrine/positions';
+import type { GeometryModel } from '../engine/geometry';
 import type { Result, Derivation, ValidationIssue } from '../engine/types';
 
 function esc(s: string): string {
@@ -26,28 +27,35 @@ function specRow(label: string, value: string): string {
   return '<div class="row"><span class="k">' + esc(label) + '</span>' + value + '</div>';
 }
 
+// Spec rows that have a tap-to-explain derivation, keyed by the geometry dim key.
+const DIM_TRACE: Record<string, string> = {
+  depth: 'depthOfCut',
+  setback: 'setback',
+  cover_t: 'coverThickness',
+};
+
 export function specsPanel(result: Result): string {
   const u = result.inputs.unit;
-  const r = result.resolved;
+  // Single source of truth: the same dims the plan/section drawings annotate, with the same
+  // per-dim placeholder flags. The panel can never disagree with the drawing or the trace
+  // again (the old panel showed raw holeD while section + trace showed depthOfCut).
+  const geo = result.geometry as GeometryModel;
   const posLabel = positions[result.inputs.positionType]?.label ?? result.inputs.positionType;
-  const cover =
-    result.cover.roofPath === 'earth_on_stringers'
-      ? specRow('Overhead cover', val(fmtLength(result.cover.thickness, u) + ' ' + result.cover.material, 'coverThickness', true))
-      : result.cover.roofPath === 'engineered_required'
-        ? specRow('Overhead roof', '<span class="val engineered">Engineered — see engineer</span>')
-        : '';
+  const rows = geo.dims
+    .map((dim) => {
+      const text =
+        dim.key === 'cover_t'
+          ? fmtLength(dim.valueFt, u) + ' ' + result.cover.material
+          : fmtLength(dim.valueFt, u);
+      return specRow(dim.label, val(text, DIM_TRACE[dim.key], dim.placeholder));
+    })
+    .join('');
+  const engineered =
+    result.cover.roofPath === 'engineered_required'
+      ? specRow('Overhead roof', '<span class="val engineered">Engineered — see engineer</span>')
+      : '';
 
-  return (
-    '<section class="panel"><h2>' + esc(posLabel) + '</h2>' +
-    specRow('Depth of cut', val(fmtLength(r.holeD, u), 'depthOfCut')) +
-    specRow('Frontage', val(fmtLength(r.holeL, u))) +
-    specRow('Front-to-back', val(fmtLength(r.holeW, u))) +
-    specRow('Overall (L×W)', val(fmtLength(r.outerL, u) + ' × ' + fmtLength(r.outerW, u))) +
-    specRow('Parapet', val(fmtLength(r.parapetW, u) + ' thick, ' + fmtLength(r.parapetH, u) + ' high')) +
-    specRow('Roof setback', val(fmtLength(r.setback, u), 'setback')) +
-    cover +
-    '</section>'
-  );
+  return '<section class="panel"><h2>' + esc(posLabel) + '</h2>' + rows + engineered + '</section>';
 }
 
 // BOM lines whose quantity is explained by a derivation get a trace link.

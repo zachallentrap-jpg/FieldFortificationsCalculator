@@ -288,6 +288,7 @@ export function compute(inputs: Inputs): Result {
       holeL: calc.holeL,
       holeW: calc.holeW,
       holeD: calc.holeD,
+      depthOfCut: calc.depthOfCut,
       parapetW: calc.parapetW,
       parapetH: calc.parapetH,
       outerL: calc.outerL,
