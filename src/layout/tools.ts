@@ -81,7 +81,7 @@ export function missionOverlay(result: MissionResult, count: number): string {
 // ── Comparison (2–3 configs) ─────────────────────────────────────────────────
 export function compareOverlay(results: Result[]): string {
   if (results.length === 0) {
-    return '<div class="tools"><h2>Compare setups</h2><p class="empty">Add 2–3 configurations to compare them side by side.</p><div class="tool-actions"><button type="button" class="btn" data-action="compare-add">Add current</button></div></div>';
+    return '<div class="tools"><h2>Compare setups</h2><p class="empty">Add 2–3 configurations to compare them side by side.</p><div class="tool-actions"><button type="button" class="btn" data-action="compare-add">Add current</button><button type="button" class="btn" data-action="compare-standards">Hasty vs deliberate vs reinforced</button></div></div>';
   }
   const u = results[0]!.inputs.unit;
   const bags = (r: Result): number => r.bom.filter((l) => l.id.startsWith('sandbags')).reduce((s, l) => s + l.qtyTotal, 0);
@@ -92,7 +92,7 @@ export function compareOverlay(results: Result[]): string {
     '<tr><td>' + esc(label) + '</td>' + results.map((r) => '<td class="n">' + esc(cell(r)) + '</td>').join('') + '</tr>';
   return (
     '<div class="tools"><h2>Compare setups</h2>' +
-    '<div class="tool-actions"><button type="button" class="btn" data-action="compare-add"' + (results.length >= 3 ? ' disabled' : '') + '>Add current</button><button type="button" class="btn" data-action="compare-clear">Clear</button></div>' +
+    '<div class="tool-actions"><button type="button" class="btn" data-action="compare-add"' + (results.length >= 3 ? ' disabled' : '') + '>Add current</button><button type="button" class="btn" data-action="compare-standards">Hasty vs deliberate vs reinforced</button><button type="button" class="btn" data-action="compare-clear">Clear</button></div>' +
     '<table class="compare"><thead>' + head + '</thead><tbody>' +
     line('Position', (r) => positions[r.inputs.positionType]?.label ?? r.inputs.positionType) +
     line('Standard', (r) => r.inputs.standard) +

@@ -7,8 +7,10 @@ import { el, group, textEl, callout } from './svg';
 import { makeProjector } from './project';
 import {
   HEADER_H, LEGEND_H, headerBar, fieldUseBanner, hDim, vDim, legendPanel, emptyPrompt, svgRoot,
+  northArrow, azimuthLabel, scaleBar,
 } from './chrome';
 import { describe, a11yAttrs } from './a11y';
+import { positions } from '../doctrine/positions';
 import { fmtLength } from '../doctrine/units';
 import type { GeometryModel, DimSpec } from '../engine/geometry';
 import type { Result } from '../engine/types';
@@ -63,6 +65,20 @@ export function drawPlan(result: Result): string {
     );
     used.add('sectors');
     parts.push(callout('sectors', ...midpoint(apex, r), used));
+    // Sector limits labeled in degrees AND mils — this is what makes the plan a usable range
+    // card. Placed outboard of each sector edge so they never crowd the ENEMY arrow.
+    parts.push(
+      textEl(l[0] - 4, l[1] - 4, azimuthLabel(p.sectors.leftDeg), { fill: 'var(--ink-soft)', 'font-size': 9.5, 'text-anchor': 'end', 'font-family': 'ui-monospace, monospace' }),
+      textEl(r[0] + 4, r[1] - 4, azimuthLabel(p.sectors.rightDeg), { fill: 'var(--ink-soft)', 'font-size': 9.5, 'text-anchor': 'start', 'font-family': 'ui-monospace, monospace' }),
+    );
+    // Machine-gun positions get a final protective line (FPL) along the left sector limit —
+    // the grazing-fire line a gun lays on. Plain language first, doctrinal term alongside.
+    if (positions[result.inputs.positionType]?.crewSize && result.inputs.positionType.startsWith('mg')) {
+      parts.push(
+        el('line', { x1: apex[0], y1: apex[1], x2: l[0], y2: l[1], stroke: 'var(--enemy)', 'stroke-width': 2, 'stroke-dasharray': '2 2' }),
+        textEl(midpoint(apex, l)[0] - 6, midpoint(apex, l)[1], 'grazing-fire line (FPL)', { fill: 'var(--enemy)', 'font-size': 9.5, 'text-anchor': 'end', 'font-family': 'system-ui, sans-serif' }),
+      );
+    }
   }
   const arrowTop = px(0, -halfW - enemyMargin * 0.95);
   const arrowBase = px(0, -halfW - 0.3);
@@ -128,6 +144,10 @@ export function drawPlan(result: Result): string {
   const lT = px(-p.holeL / 2, -p.holeW / 2);
   const lB = px(-p.holeL / 2, p.holeW / 2);
   parts.push(vDim(lT[1], lB[1], lT[0] - 30, dimLabel('front_back'), dimPh('front_back')));
+
+  // ── North arrow + scale bar (range-card chrome) ────────────────────────────────
+  parts.push(northArrow(W - 34, HEADER_H + 42));
+  parts.push(scaleBar(20, H - LEGEND_H - 8, proj, unit));
 
   // ── Legend ───────────────────────────────────────────────────────────────────
   const legend = legendPanel(12, H - LEGEND_H + 14, W - 24, used);

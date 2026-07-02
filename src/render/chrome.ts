@@ -41,7 +41,11 @@ export function drawingDefs(): string {
     '<marker id="mk-tick" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="8" markerHeight="8" orient="auto">' +
     el('line', { x1: 5, y1: 1, x2: 5, y2: 9, stroke: 'var(--dim)', 'stroke-width': 1.4 }) +
     '</marker>';
-  return '<defs>' + earth + cover + engineered + arrow + tick + '</defs>';
+  const north =
+    '<marker id="mk-north" viewBox="0 0 10 10" refX="5" refY="8" markerWidth="9" markerHeight="9" orient="auto">' +
+    el('path', { d: 'M5,0 L9,9 L5,6 L1,9 z', fill: 'var(--ink)' }) +
+    '</marker>';
+  return '<defs>' + earth + cover + engineered + arrow + tick + north + '</defs>';
 }
 
 // ── Header bar ───────────────────────────────────────────────────────────────────
@@ -166,6 +170,27 @@ export function standingFigure(xPx: number, groundYpx: number, proj: Projector):
     textEl(xPx + torsoW / 2 + 6, topY + hPx * 0.5, 'ref ~5\'-10"', {
       fill: 'var(--ink-soft)', 'font-size': 9.5, 'font-family': 'ui-monospace, monospace',
     }),
+  );
+}
+
+// ── Range-card helpers (Phase 3) — the plan doubles as a sector sketch ────────────
+// Doctrine directions are given in BOTH degrees and mils (6400 mils / 360°). Plain-language
+// first per §2.5: the technical term (mils) rides alongside the everyday one (degrees).
+export function degToMils(deg: number): number {
+  const norm = ((deg % 360) + 360) % 360;
+  return Math.round((norm * 6400) / 360);
+}
+export function azimuthLabel(deg: number): string {
+  const norm = Math.round(((deg % 360) + 360) % 360);
+  return norm + '° (' + degToMils(deg) + ' mils)';
+}
+
+// A small north arrow in a corner — a range card is useless without knowing which way is up.
+export function northArrow(xPx: number, yPx: number): string {
+  return group(
+    { class: 'north' },
+    el('line', { x1: xPx, y1: yPx + 16, x2: xPx, y2: yPx - 10, stroke: 'var(--ink)', 'stroke-width': 'var(--w-dim)', 'marker-end': 'url(#mk-north)' }),
+    textEl(xPx, yPx + 28, 'N', { fill: 'var(--ink)', 'font-size': 11, 'font-weight': '700', 'text-anchor': 'middle', 'font-family': 'ui-monospace, monospace' }),
   );
 }
 

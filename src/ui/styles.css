@@ -251,3 +251,12 @@ table.bom td.n { text-align: right; font-variant-numeric: tabular-nums; }
 .fill-table .u { color: var(--ink-soft); font-size: 9px; }
 .fill-table input[type="number"], .fill-table input[type="text"], .fill-table select { width: 100%; min-height: 26px; padding: 2px 5px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: 11px; }
 .fill-table .fill-verified { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; white-space: nowrap; }
+
+/* ── Phase 3 mobile hardening: single column under 640px, gloved-hands reality ── */
+@media (max-width: 640px) {
+  .drawings-row, .panels-row, .desktop-grid, .tablet-grid { grid-template-columns: 1fr !important; }
+  .topbar { flex-wrap: wrap; gap: 6px; }
+  .topbar .actions { flex-wrap: wrap; }
+  .btn, .menu-summary { min-height: 40px; } /* larger tap targets */
+  .summary-bar { position: sticky; bottom: 0; }
+}

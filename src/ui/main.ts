@@ -18,6 +18,8 @@ import { initialTheme, applyTheme, persistTheme, type Theme } from '../theme/the
 import { collectDiagnostics, diagnosticsText } from '../layout/diagnostics';
 import { jobSheet } from '../render/jobSheet';
 import { toCsv } from '../render/csv';
+import { drawPlan } from '../render/drawPlan';
+import { drawSection } from '../render/drawSection';
 import { scenariosOverlay, missionOverlay, compareOverlay, planOverlay, doctrineOverlay } from '../layout/tools';
 import { ScenarioStore, makeScenario, duplicateScenario } from '../state/scenarios';
 import { createStorageAdapter } from '../state/persistence';
@@ -288,6 +290,8 @@ document.addEventListener('click', (e) => {
     case 'print': doPrint(); break;
     case 'csv': doCsv(); break;
     case 'export': doExportJson(); break;
+    case 'svg': doSvg(); break;
+    case 'compare-standards': compareStandards(); break;
     case 'help': showOverlay(helpHtml()); break;
     case 'diagnostics': showDiagnostics(); break;
     case 'sheet-toggle': sheetOpen = !sheetOpen; applySheet(); break;
@@ -528,6 +532,23 @@ function doExportJson(): void {
   download('sap1-scenario.json', scenarioStore.exportJson(s), 'application/json');
   showToast('Settings file downloaded (sap1-scenario.json).');
 }
+function doSvg(): void {
+  if (!lastResult) return;
+  // The renderers already produce standalone SVG strings — a plan + section download needs no
+  // rasterization, stays fully offline, and drops into any range-card packet or briefing.
+  download('sap1-plan.svg', drawPlan(lastResult), 'image/svg+xml');
+  download('sap1-section.svg', drawSection(lastResult), 'image/svg+xml');
+  showToast('Plan and section downloaded as SVG drawings.');
+}
+
+// One-click "hasty vs deliberate vs reinforced" comparison — the canonical survivability
+// lesson (same position + threat, three standards side by side).
+function compareStandards(): void {
+  const base = store.getState().inputs;
+  store.setState({ comparisonSet: (['hasty', 'deliberate', 'reinforced'] as const).map((standard) => ({ ...base, standard })) });
+  openCompare();
+}
+
 function doPrint(): void {
   if (!lastResult) return;
   const w = window.open('', '_blank');

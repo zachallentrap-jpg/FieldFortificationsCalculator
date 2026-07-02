@@ -93,6 +93,7 @@ function topbar(state: AppState, result: Result): string {
     'export',
     'Save & print',
     menuItem('print', 'Print report', 'A printable page with the drawings, materials, and labor') +
+      menuItem('svg', 'Download drawings', 'Plan + section as SVG image files for a range-card packet') +
       menuItem('csv', 'Export spreadsheet', 'Materials list as a .csv file') +
       menuItem('export', 'Export settings file', 'Save this setup as a file you can load again later'),
   );

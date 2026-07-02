@@ -314,3 +314,35 @@ option, implement it, and log it here.
     of it is trusted. Tracked as the Phase 1 acceptance debt in `docs/EXECUTION_PLAN.md`.
   Four new doctrine leaves (berm W/H, blade-hour rate, ramp slope) move the placeholder count
   275→279 (188 safety-critical); all remain PLACEHOLDER, banner unaffected.
+
+- **D30 — Phase 2 doctrine unlock: the banner can now reach zero.** The placeholder regime's
+  central promise (fill real values offline → banner clears) was dead code — `exportDoctrine`/
+  `importDoctrine` had no UI. Now a Doctrine-values overlay (Tools menu) drives the burn-down,
+  through a hardened `io.ts`: **all-or-nothing** apply (one rejected entry refuses the whole
+  file — safety-critical data must never land half-applied), finite `0 ≤ v < 1000` bound,
+  rejection of a DOCTRINE status carrying a TODO source (would defeat the doctrine-integrity
+  invariant), a dry-run preview, and a **fill manifest** (deterministic FNV-1a content hash +
+  optional author/date) printed on the Status panel and the job-sheet footer so a DOCTRINE
+  stamp is attributable evidence. An applied fill persists to IndexedDB and is re-applied on
+  boot **through the same validated importer**, so a stored fill that no longer matches the
+  registry is refused, not trusted. The end-to-end banner-clear is test-backed (all 279 leaves
+  → DOCTRINE → remaining 0 → topbar badge gone → restore proves it is not a one-way latch).
+
+- **D31 — CUI: SAP-1 ships on ILLUSTRATIVE PLACEHOLDER data, so the empty shell is not itself
+  CUI — but its FILLED output is.** Resolving the CUI ambiguity the plan flagged (halfway is the
+  worst state): the distributed application, running on placeholder data with the NOT-FOR-FIELD-
+  USE banner up, carries no controlled information and needs no CUI marking to distribute. The
+  moment a qualified user imports real doctrine and the banner clears, the tool's output (job
+  sheet, drawings, exported doctrine file) may be CUI — the job-sheet footer names the doctrine
+  fill it was computed against precisely so that provenance is auditable, and the job sheet keeps
+  its handling note. The README CUI paragraph stands as the handling guidance for filled use;
+  distribution of the unfilled shell is unrestricted. Clear specifics with your S-6.
+
+- **D32 — Phase 3 field documents: the plan doubles as a range card.** Additive SVG only (the
+  render-intuitive gate — min font, callout/legend consistency, no dim-collision — is preserved):
+  sector limits labeled in degrees AND mils (6400/360, plain-language-first), a north arrow and
+  scale bar on the plan, and a grazing-fire line (FPL) for machine-gun positions. The job sheet
+  gains a hand-filled field header (grid / unit / DTG / azimuth of fire / prepared-by) — the tool
+  frames the card, the NCO supplies terrain ground truth, and the engine stays clock- and
+  terrain-free. Plus SVG download per drawing (the renderers already emit standalone SVG — no
+  rasterization, fully offline) and a one-click hasty/deliberate/reinforced compare preset.

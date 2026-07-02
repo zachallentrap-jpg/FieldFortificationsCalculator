@@ -96,6 +96,7 @@ export function jobSheet(result: Result, meta: JobSheetMeta): string {
     '<style>' + PRINT_CSS + '</style></head><body><div class="sheet">' +
     '<div class="mast"><h1>SAP-1 — Survivability Position Planner</h1>' +
     '<div class="meta">' + esc(meta.scenario) + '<br>' + esc(meta.date) + ' · ' + esc(APP_VERSION) + '</div></div>' +
+    fieldHeader() +
     stamp +
     '<section><div class="grid"><div><h2>Inputs</h2><table>' + inputRows + '</table></div>' +
     '<div><h2>Specifications</h2><table>' + specRows + '</table></div></div></section>' +
@@ -106,6 +107,21 @@ export function jobSheet(result: Result, meta: JobSheetMeta): string {
     '<section class="sign"><div class="line">Prepared by / date</div><div class="line">Verified by / date</div><div class="line">Position / grid</div></section>' +
     fillFooter() +
     '</div></body></html>'
+  );
+}
+
+// Field-document header: blank labeled lines the leader fills by hand on site — grid, unit,
+// DTG, azimuth of fire. The tool frames the range card; the NCO supplies the ground truth
+// (the engine stays clock-free and terrain-free by design). This is what makes the printout
+// the document the platoon already owes the company, not just a calculator dump.
+function fieldHeader(): string {
+  const line = (label: string): string =>
+    '<div style="flex:1;min-width:130px"><span style="color:var(--ink-soft);font-size:9px">' + esc(label) + '</span>' +
+    '<div style="border-bottom:1px solid var(--ink);height:14px"></div></div>';
+  return (
+    '<div style="display:flex;gap:12px;flex-wrap:wrap;margin:10px 0;padding:6px 0;border-bottom:1px solid var(--border)">' +
+    line('GRID') + line('UNIT') + line('DTG') + line('AZIMUTH OF FIRE') + line('PREPARED BY') +
+    '</div>'
   );
 }
 
