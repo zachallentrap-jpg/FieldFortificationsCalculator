@@ -3,6 +3,7 @@
 // a tier). Every code in codes.ts is reachable from here (asserted by the validate test).
 
 import { retainingWall } from '../doctrine/protection';
+import { backblast } from '../doctrine/positions';
 import { CODES, issue } from './codes';
 import { round1 } from './round';
 import type { ValidationIssue } from './types';
@@ -65,6 +66,11 @@ export function runValidation(calc: Calc): ValidationIssue[] {
   // say so instead of letting the operator believe cover was added.
   if (calc.inputs.overheadCover && calc.threat === 'none') {
     advisories.push(issue(CODES.COVER_NO_THREAT));
+  }
+
+  // ATGM/Javelin: the rear backblast danger area must be clear (a safety issue, not a dig).
+  if (calc.inputs.positionType === 'atgm_javelin') {
+    warnings.push(issue(CODES.ATGM_BACKBLAST, '(' + round1(backblast.clearanceFt.value) + ' ft to the rear)'));
   }
 
   // Hand-digging heavy/hard ground (vehicle positions get the stronger warning above).

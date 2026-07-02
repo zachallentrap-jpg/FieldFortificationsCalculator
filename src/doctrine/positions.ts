@@ -146,4 +146,40 @@ export const positions: Record<string, PositionRow> = {
     sectorsOfFire: false,
     crewSize: 4,
   },
+  // ── Catalog expansion (Phase 6) — defense, not just holes ──────────────────
+  connecting_trench: {
+    label: 'Connecting / crawl trench',
+    shape: 'rect',
+    volumeModel: 'prism',
+    hole: { L: ft(15.0, 'trench run length'), W: ft(2.5, 'trench width'), D: ft(5.5, 'crawl/fighting depth') },
+    grenadeSumps: 1,
+    elbowHoles: 0,
+    storageCompartment: false,
+    sectorsOfFire: false,
+    crewSize: 2,
+  },
+  atgm_javelin: {
+    label: 'ATGM / Javelin position',
+    shape: 'l_shape',
+    volumeModel: 'prism',
+    hole: { L: ft(8.0, 'gunner frontage'), W: ft(3.0, 'position depth'), D: ft(4.0, 'defilade depth') },
+    // ATGM launchers need a rear backblast area clear of the crew and hard surfaces — modeled
+    // as a dedicated clearance validation (engine/validate.ts), not a dug feature.
+    firingPlatform: {
+      L: ft(4.0, 'launcher platform length'),
+      W: ft(3.0, 'launcher platform width'),
+      depthBelowHole: ft(0.5, 'platform below bay'),
+    },
+    grenadeSumps: 1,
+    elbowHoles: 0,
+    storageCompartment: true,
+    sectorsOfFire: true,
+    crewSize: 2,
+  },
+};
+
+// ATGM backblast clearance — the danger area to the REAR that must be clear of the crew, walls,
+// and hard vertical surfaces. Safety-critical illustrative placeholder (backblast injures).
+export const backblast = {
+  clearanceFt: P(25.0, { unit: 'ft', safetyCritical: true, note: 'rear backblast danger-area clearance (illustrative)' }),
 };

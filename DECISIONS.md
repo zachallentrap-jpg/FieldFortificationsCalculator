@@ -346,3 +346,19 @@ option, implement it, and log it here.
   frames the card, the NCO supplies terrain ground truth, and the engine stays clock- and
   terrain-free. Plus SVG download per drawing (the renderers already emit standalone SVG — no
   rasterization, fully offline) and a one-click hasty/deliberate/reinforced compare preset.
+
+- **D34 — Phase 5 3D-that-teaches; D35 — Phase 6 catalog expansion.** (D33 skipped to keep the
+  Phase↔decision numbering aligned.) Phase 5: `buildScene3D(result, {stage, cutaway})` filters
+  parts so the model builds itself in the same doctrinal stage order the priorities-of-work
+  schedule uses (a keyboard-accessible scrubber drives it); a global clipping-plane cutaway; 3D
+  honesty parity (data-driven NOT-FOR-FIELD-USE badge, §2.7 fail-safe asserted at every stage);
+  one-man positions never draw a firing step (spec §2.f); a job-sheet engineer-handoff block.
+  A UI-only falsy bug (`parseInt('0') || 6` swallowed stage 0) was caught by browser
+  verification, not the node tests — the tests exercised `buildScene3D` directly; the event path
+  had the defect. Phase 6: two doctrine-gated positions (connecting/crawl trench; ATGM/Javelin)
+  that inherit the full fuzz/NaN/scene matrix automatically because those tests iterate the
+  position registry; an ATGM rear-backblast safety warning; and the radiationHalving leaves
+  (9 safety-critical, previously dead) wired into a fallout-attenuation readout so every
+  registered leaf now has a consumer. Placeholder count 283→293 (+2 SC). DEFERRED (documented,
+  not built): the squad battle-position multi-position sketch (mission aggregation already covers
+  the squad math) and the fine bonded-bag hero-model aesthetic (needs visual iteration).

@@ -9,7 +9,8 @@ import { positions, vehicleRamp } from '../doctrine/positions';
 import { soils } from '../doctrine/soils';
 import { standards } from '../doctrine/standards';
 import { sandbag, revetments, camo, sump, excavation, machine } from '../doctrine/materials';
-import { parapet, berm, overhead, threats, standoffMinFor, standoffLeafFor, stringerSizeForSpan } from '../doctrine/protection';
+import { parapet, berm, overhead, threats, standoffMinFor, standoffLeafFor, stringerSizeForSpan, radiationHalving } from '../doctrine/protection';
+import type { ShieldMaterial } from '../doctrine/protection';
 import { counts } from '../doctrine/registry';
 import type { PositionRow } from '../doctrine/positions';
 import type { SoilRow } from '../doctrine/soils';
@@ -78,6 +79,8 @@ export interface Calc {
   stringers: number;
   stringerSpan: number; // clear span the stringers bridge (the SHORT axis)
   stringerSize: string; // doctrine size label for that span ('' when no earth roof)
+  radHalvingLeaf: Provenance<number> | undefined; // fallout halving-thickness for the cover material
+  radHalvingLayers: number; // how many halving-thicknesses the earth cover provides (fallout)
 
   // volumes
   holeVol: number;
@@ -223,6 +226,14 @@ function computeCalc(raw: Inputs): Calc {
   const stringers = buildsEarthRoof ? ceilInt(Math.max(holeL, holeW) / spacing) + 1 : 0;
   const stringerSize = buildsEarthRoof ? stringerSizeForSpan(clearSpan) : '';
 
+  // Fallout attenuation the earth roof happens to provide, expressed in halving-thicknesses
+  // (each layer roughly halves the dose). Consumes the radiationHalving doctrine leaf so those
+  // safety-critical values earn their place in the banner instead of sitting dead (Phase 6).
+  const radHalvingLeaf = buildsEarthRoof && (coverMaterial in radiationHalving)
+    ? radiationHalving[coverMaterial as ShieldMaterial]
+    : undefined;
+  const radHalvingLayers = radHalvingLeaf && radHalvingLeaf.value > 0 ? coverT / radHalvingLeaf.value : 0;
+
   const bagVol = sandbag.L.value * sandbag.W.value * sandbag.H.value;
   const waste = sandbag.wasteFactor.value;
   const bagsParapet = isVehicle ? 0 : ceilInt((parapetRing / bagVol) * waste);
@@ -303,6 +314,8 @@ function computeCalc(raw: Inputs): Calc {
     stringers,
     stringerSpan: clearSpan,
     stringerSize,
+    radHalvingLeaf,
+    radHalvingLayers,
     holeVol,
     hasPlatform,
     platformVol,

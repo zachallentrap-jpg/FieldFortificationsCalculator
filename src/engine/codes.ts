@@ -67,6 +67,11 @@ export const CODES = {
     'advisory',
     'Roof overhead is on but no threat is selected — pick a caliber so the cover can be sized (none is added yet).',
   ),
+  ATGM_BACKBLAST: def(
+    'ATGM_BACKBLAST',
+    'warning',
+    'Keep the backblast danger area to the rear clear of the crew, walls, and hard surfaces before firing.',
+  ),
   EXCAV_HAND_HEAVY: def(
     'EXCAV_HAND_HEAVY',
     'advisory',

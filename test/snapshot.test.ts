@@ -27,12 +27,12 @@ test('default fixture (two-man / deliberate / loam / 81mm mortar) snapshot', () 
     stringers: 8,
     gravel_sump: 2,
   });
-  // Phase 1 added 4 doctrine leaves (berm W+H, machine blade-hour rate, vehicle ramp slope;
-  // 275→279, one safety-critical). Phase 4 added 4 stage-fraction leaves (excavation split;
-  // 279→283, none safety-critical). 283 total, 188 safety-critical.
-  assert.equal(r.placeholderReport.total, 283);
-  assert.equal(r.placeholderReport.remaining, 283);
-  assert.equal(r.placeholderReport.safetyCriticalRemaining, 188);
+  // Growth by phase: 275 (baseline) → 279 (P1: berm W/H, blade-hour rate, ramp slope; +1 SC)
+  // → 283 (P4: 4 excavation-split fractions) → 293 (P6: connecting-trench + ATGM hole/platform
+  // leaves + backblast clearance; +1 SC). 293 total, 189 safety-critical.
+  assert.equal(r.placeholderReport.total, 293);
+  assert.equal(r.placeholderReport.remaining, 293);
+  assert.equal(r.placeholderReport.safetyCriticalRemaining, 189);
 });
 
 test('engineered fixture never carries a fabricated cover thickness', () => {

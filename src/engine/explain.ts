@@ -271,6 +271,20 @@ export function buildDerivations(calc: Calc): Derivation[] {
     });
   }
 
+  if (calc.radHalvingLayers > 0 && calc.radHalvingLeaf) {
+    d.push({
+      key: 'radiationLayers',
+      label: 'Fallout attenuation (halving-layers)',
+      formula: 'coverThickness ÷ halvingThickness',
+      operands: [
+        op('coverThickness', calc.coverT, 'ft', calc.coverLeaf),
+        op('halvingThickness', calc.radHalvingLeaf.value, 'ft', calc.radHalvingLeaf),
+      ],
+      result: calc.radHalvingLayers,
+      unit: '× halved',
+    });
+  }
+
   if (calc.stringers > 0) {
     d.push({
       key: 'stringers',

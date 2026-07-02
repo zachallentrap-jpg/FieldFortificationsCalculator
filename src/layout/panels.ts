@@ -55,12 +55,19 @@ export function specsPanel(result: Result): string {
       ? specRow('Overhead roof', '<span class="val engineered">Engineered — see engineer</span>')
       : '';
 
+  // Fallout attenuation the earth roof provides (Phase 6) — traceable, from the radiation
+  // halving-thickness doctrine leaf.
+  const radDeriv = result.derivations.find((d) => d.key === 'radiationLayers');
+  const radiation = radDeriv
+    ? specRow('Fallout shielding', val((Math.round(radDeriv.result * 10) / 10) + '× halved', 'radiationLayers', true))
+    : '';
+
   // Model-fidelity statement — formulas get the same honesty as constants: this says which
   // volume model produced the dimensions, so "approximate" is never mistaken for doctrinal.
   const fidelity =
     '<p class="fidelity-note">Volume model: ' + esc(result.fidelity.volume) + '. Labor model: ' + esc(result.fidelity.labor) + '.</p>';
 
-  return '<section class="panel"><h2>' + esc(posLabel) + '</h2>' + rows + engineered + fidelity + '</section>';
+  return '<section class="panel"><h2>' + esc(posLabel) + '</h2>' + rows + engineered + radiation + fidelity + '</section>';
 }
 
 // BOM lines whose quantity is explained by a derivation get a trace link. Every BOM line that

@@ -6,7 +6,7 @@
 // doctrine except io.ts.
 
 import { registerTree, isProvenance } from './registry';
-import { positions, vehicleRamp } from './positions';
+import { positions, vehicleRamp, backblast } from './positions';
 import { soils } from './soils';
 import { standards } from './standards';
 import { sandbag, revetments, camo, sump, excavation, machine, lumber } from './materials';
@@ -36,10 +36,12 @@ export const protection = {
   threats,
 };
 export const vehicle = { ramp: vehicleRamp };
+export const weapons = { backblast };
 
 // Register every Provenance leaf under a stable dotted path.
 registerTree('positions', positions);
 registerTree('vehicle', vehicle);
+registerTree('weapons', weapons);
 registerTree('soils', soils);
 registerTree('standards', standards);
 registerTree('materials', materials);
@@ -61,7 +63,7 @@ function freezeStructure(obj: unknown): void {
   }
 }
 
-for (const table of [positions, soils, standards, materials, protection, labor, vehicle, stages]) {
+for (const table of [positions, soils, standards, materials, protection, labor, vehicle, stages, weapons]) {
   freezeStructure(table);
 }
 

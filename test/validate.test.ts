@@ -28,6 +28,7 @@ test('each validation code is reachable', () => {
     { positionType: 'vehicle_hull_defilade', machineAssist: true }, // SPOIL_EXCESS_VEHICLE
     { soil: 'silt' }, // DRAINAGE_WET_SOIL
     { threat: 'none', overheadCover: true }, // COVER_NO_THREAT
+    { positionType: 'atgm_javelin' }, // ATGM_BACKBLAST
   ];
   for (const s of scenarios) for (const c of codesFor(s)) fired.add(c);
 
