@@ -61,20 +61,20 @@ function syncHistory(): void {
 }
 
 // Transient confirmation toast — lives OUTSIDE #app so the full-shell re-render never eats it.
+// Created ONCE at boot: a role=status region only announces CHANGES, so inserting the element
+// and its first message in the same mutation could leave the first toast (possibly a failure
+// message) silent for screen-reader users.
+const toastEl = document.createElement('div');
+toastEl.id = 'toast';
+toastEl.className = 'toast';
+toastEl.setAttribute('role', 'status');
+document.body.appendChild(toastEl);
 let toastTimer = 0;
 function showToast(msg: string): void {
-  let t = document.getElementById('toast');
-  if (!t) {
-    t = document.createElement('div');
-    t.id = 'toast';
-    t.className = 'toast';
-    t.setAttribute('role', 'status');
-    document.body.appendChild(t);
-  }
-  t.textContent = msg;
-  t.classList.add('show');
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => t!.classList.remove('show'), 2600);
+  toastTimer = window.setTimeout(() => toastEl.classList.remove('show'), 2600);
 }
 let lastResult: Result | null = null;
 let sheetOpen = false;
@@ -182,7 +182,18 @@ function render(): void {
     store.setState({ lastError: c.error });
     app.innerHTML = errorCardHtml(c.error);
   }
-  if (refocus) app.querySelector<HTMLElement>(refocus)?.focus();
+  if (refocus) {
+    const el = app.querySelector<HTMLElement>(refocus);
+    if (el && !(el as HTMLButtonElement).disabled) {
+      el.focus();
+    } else if (el) {
+      // The control the user was on just became disabled (e.g. Undo after the last undo) —
+      // keep keyboard focus in its group instead of silently dropping it to <body>.
+      el.closest<HTMLElement>('.actions, form, .menu-panel')
+        ?.querySelector<HTMLElement>('button:not([disabled]), select, input')
+        ?.focus();
+    }
+  }
   applySheet();
 }
 
@@ -296,7 +307,9 @@ document.addEventListener('click', (e) => {
     case 'scenario-duplicate': {
       const id = actionEl.dataset['id'];
       if (id) scenarioStore.load(id).then((s) => {
-        if (s) scenarioStore.save(duplicateScenario(s, newId(), s.name + ' (copy)', new Date().toISOString())).then(openScenarios);
+        if (s) scenarioStore.save(duplicateScenario(s, newId(), s.name + ' (copy)', new Date().toISOString()))
+          .then(openScenarios)
+          .catch(() => showToast('Duplicate FAILED — device storage unavailable.'));
       });
       break;
     }
@@ -318,7 +331,7 @@ document.addEventListener('click', (e) => {
       Promise.all(r.value.map((s) => scenarioStore.save(s))).then(() => {
         showToast(r.value.length + ' scenario(s) imported.');
         openScenarios();
-      });
+      }).catch(() => showToast('Import FAILED — device storage unavailable. Nothing may have been saved.'));
     }); break;
     // ── Mission BOM ──
     case 'mission': openMission(); break;
@@ -365,8 +378,8 @@ function applyInputs(inputs: Inputs | null): void {
 
 // Keyboard: undo/redo (desktop), Esc closes overlay/sheet.
 document.addEventListener('keydown', (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); applyInputs(history.undo()); }
-  else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); applyInputs(history.redo()); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); applyInputs(history.undo()); syncHistory(); }
+  else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); applyInputs(history.redo()); syncHistory(); }
   else if (e.key === 'Escape') {
     const openMenu = document.querySelector<HTMLDetailsElement>('details.menu[open]');
     if (!overlay.hidden) hideOverlay();

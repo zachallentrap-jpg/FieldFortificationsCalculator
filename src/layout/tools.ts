@@ -10,8 +10,16 @@ import type { MissionResult } from '../engine/mission';
 import type { PlanResult } from '../engine/plan';
 import type { Scenario } from '../state/schema';
 
+// Attribute-safe escaping: scenario names/ids are UNTRUSTED (they arrive via file import,
+// §14) and are interpolated into double-quoted attributes — quotes MUST be escaped or an
+// imported name like `x" onmouseover="..."` becomes a live event handler (XSS).
 function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 function num(n: number): string {
   return Number.isFinite(n) ? (Math.round(n * 100) / 100).toString() : '—';
