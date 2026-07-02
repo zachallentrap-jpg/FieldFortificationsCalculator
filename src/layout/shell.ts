@@ -116,12 +116,25 @@ function topbar(state: AppState, result: Result): string {
 
 export function renderApp(state: AppState, result: Result, webglOk: boolean): string {
   const isoFallback = drawSafe(drawIso, result, '3D model');
+  // Honesty parity with the 2D views (§2.5): the 3D card carries the same data-driven NOT FOR
+  // FIELD USE badge and an "illustrative" note, so the friendly diorama can never be mistaken
+  // for a measured model while placeholders remain.
+  const badge3d = topbarHasFieldUseBadge(result)
+    ? '<span class="three-badge">NOT FOR FIELD USE — illustrative</span>'
+    : '';
+  // Stage scrubber: 0 = post security … 6 = camouflage (final). Drives buildScene3D(result,
+  // {stage}) so the model builds itself in doctrinal order. Keyboard-accessible (a range input).
+  const stageScrubber = webglOk
+    ? '<div class="three-scrubber"><label for="three-stage">Build stage</label>' +
+      '<input type="range" id="three-stage" min="0" max="6" step="1" value="6" aria-label="Construction stage" list="stage-ticks">' +
+      '<button type="button" class="btn tiny" data-action="three-cutaway" aria-pressed="false">Cutaway</button></div>'
+    : '';
   const threeCard =
     '<figure class="panel-card three-card" aria-label="Interactive 3D model">' +
-    '<div class="three-header"><span>3D MODEL</span><span class="three-hint-text">drag to turn it around</span></div>' +
+    '<div class="three-header"><span>3D MODEL</span>' + badge3d + '<span class="three-hint-text">drag to turn it around</span></div>' +
     (webglOk
-      ? '<div id="three-socket" class="three-socket"></div>' +
-        '<div class="three-controls"><span class="three-hint">Drag to turn • Scroll or pinch to zoom</span>' +
+      ? '<div id="three-socket" class="three-socket"></div>' + stageScrubber +
+        '<div class="three-controls"><span class="three-hint">Illustrative diorama • drag to turn • scroll/pinch to zoom</span>' +
         '<button type="button" class="btn tiny" data-action="three-reset">Reset view</button></div>'
       : '<div class="three-socket three-socket-fallback">' + isoFallback + '</div>');
 

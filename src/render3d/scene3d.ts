@@ -83,6 +83,35 @@ export interface Scene3DModel {
   parts: Part3[];
   bounds: { size: number }; // rough footprint size (feet) for camera framing
   engineeredRoof: boolean; // true → show the hazard marker, never a fabricated cover
+  cutaway: boolean; // viewer clips the near half so the interior/OHC reads at a glance
+}
+
+export interface BuildOpts {
+  stage?: number; // construction stage 0..6 (see STAGE_ORDER); undefined ⇒ final state
+  cutaway?: boolean;
+}
+
+// Which construction stage each part role first appears in (index into doctrine STAGE_ORDER:
+// security=0, hasty=1, deliberate=2, revet_sump=3, parapet=4, overhead=5, camo=6). The stage
+// scrubber shows only parts whose stage ≤ the selected one, so the model builds itself in
+// doctrinal order — the same order the priorities-of-work schedule (engine/stages.ts) uses.
+const ROLE_STAGE: Record<BoxRole, number> = {
+  ground: 0, // terrain + orientation are always present
+  bayFloor: 1, // hasty scrape opens the hole
+  bayWall: 1,
+  platform: 2,
+  firingStep: 2,
+  sump: 3, // revet & sump
+  parapet: 4, // front protection
+  rampBerm: 4,
+  cover: 5, // overhead
+  stringer: 5,
+  engineeredCover: 5,
+  camoNet: 6, // camouflage, continuous/last
+};
+function partStage(part: Part3): number {
+  if (part.kind === 'box' || part.kind === 'cyl' || part.kind === 'ring') return ROLE_STAGE[part.role] ?? 0;
+  return 0; // arrow / wedge / figure / dimLeader are orientation aids — always shown
 }
 
 function finite(n: number): number {
@@ -101,10 +130,10 @@ function wallFinishFor(result: Result): WallFinish {
   return 'earth'; // kind 'none' — bare earth, sloped per soil below
 }
 
-export function buildScene3D(result: Result): Scene3DModel {
+export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel {
   const geo = result.geometry as GeometryModel;
   if (!geo.hasAnything) {
-    return { hasAnything: false, parts: [], bounds: { size: 20 }, engineeredRoof: false };
+    return { hasAnything: false, parts: [], bounds: { size: 20 }, engineeredRoof: false, cutaway: opts.cutaway === true };
   }
 
   const p = geo.plan;
@@ -247,7 +276,11 @@ export function buildScene3D(result: Result): Scene3DModel {
   parts.push({ kind: 'figure', x: halfL + 2, z: 1.5, heightFt: 5.83 });
 
   const boundsSize = finite(Math.max(p.outerL, p.outerW, s.depthOfCut * 2) + 8);
-  return { hasAnything: true, parts, bounds: { size: boundsSize }, engineeredRoof };
+  // Stage filter: show only parts built by the selected stage (undefined ⇒ final state). The
+  // orientation aids (arrow/figure/wedge) always survive so the scene never loses its "which
+  // way is the enemy" cue mid-build.
+  const staged = opts.stage === undefined ? parts : parts.filter((part) => partStage(part) <= opts.stage!);
+  return { hasAnything: true, parts: staged, bounds: { size: boundsSize }, engineeredRoof, cutaway: opts.cutaway === true };
 }
 
 // A rectangular ring of 4 walls (front/rear/left/right) around a hole — used for the parapet.

@@ -122,6 +122,10 @@ function openSchedule(): void {
 const webglOk = isWebGLAvailable();
 const threeViewer = webglOk ? createThreeViewer() : null;
 threeViewer?.setTheme(store.getState().theme);
+// 3D scrubber state: stage 6 = final (all stages built); cutaway off. Threaded through every
+// viewer update so an unrelated input edit never resets the stage the user is inspecting.
+let threeStage = 6;
+let threeCutaway = false;
 
 function newId(): string {
   try {
@@ -208,8 +212,14 @@ function render(): void {
       const socket = document.getElementById('three-socket');
       if (socket) {
         threeViewer.attach(socket);
-        threeViewer.update(c.value);
+        threeViewer.update(c.value, { stage: threeStage >= 6 ? undefined : threeStage, cutaway: threeCutaway });
       }
+      // Re-render replaces the scrubber markup (default value 6) — restore the live stage so the
+      // slider thumb and the Cutaway button match the model the user is actually looking at.
+      const scrub = document.getElementById('three-stage') as HTMLInputElement | null;
+      if (scrub) scrub.value = String(threeStage);
+      const cut = document.querySelector('[data-action="three-cutaway"]');
+      if (cut) cut.setAttribute('aria-pressed', String(threeCutaway));
     }
     announce(c.value);
   } else {
@@ -286,6 +296,20 @@ document.addEventListener('change', (e) => {
       const first = munitionsByClass(el.value as ThreatClass)[0];
       if (first) commit({ threat: first.id });
     }
+  }
+});
+
+// Stage scrubber (range input) — drives the 3D build stage live. Handled on 'input' (not the
+// delegated 'change' path) so dragging updates the model continuously, and WITHOUT a full shell
+// re-render (the viewer just rebuilds its scene) so the drag stays smooth.
+document.addEventListener('input', (e) => {
+  const el = e.target;
+  if (el instanceof HTMLInputElement && el.id === 'three-stage') {
+    // NB: parseInt('0') is falsy — `|| 6` would silently swallow stage 0 (post security), so
+    // use an explicit finite check.
+    const v = parseInt(el.value, 10);
+    threeStage = Number.isFinite(v) ? Math.max(0, Math.min(6, v)) : 6;
+    if (lastResult) threeViewer?.update(lastResult, { stage: threeStage >= 6 ? undefined : threeStage, cutaway: threeCutaway });
   }
 });
 
@@ -435,7 +459,13 @@ document.addEventListener('click', (e) => {
     }
     case 'plan-apply': { const opt = lastPlan?.feasible[Number(actionEl.dataset['idx'])]; if (opt) { store.replaceInputs(opt.inputs); history.push(opt.inputs); syncHistory(); hideOverlay(); } break; }
     // ── 3D viewer ──
-    case 'three-reset': threeViewer?.resetView(); if (lastResult) threeViewer?.update(lastResult); break;
+    case 'three-reset': threeViewer?.resetView(); if (lastResult) threeViewer?.update(lastResult, { stage: threeStage >= 6 ? undefined : threeStage, cutaway: threeCutaway }); break;
+    case 'three-cutaway': {
+      threeCutaway = !threeCutaway;
+      actionEl.setAttribute('aria-pressed', String(threeCutaway));
+      if (lastResult) threeViewer?.update(lastResult, { stage: threeStage >= 6 ? undefined : threeStage, cutaway: threeCutaway });
+      break;
+    }
     default: break;
   }
   // Auto-close a dropdown menu after picking an item from it (native <details> stays open

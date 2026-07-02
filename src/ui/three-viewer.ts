@@ -18,7 +18,6 @@ import { bagWallLayout } from '../render3d/propLayout';
 import type { Result } from '../engine/types';
 import sandbagGlbUrl from '../assets/models/sandbag.glb?url';
 import picketGlbUrl from '../assets/models/picket.glb?url';
-import plywoodGlbUrl from '../assets/models/plywood.glb?url';
 import lumber2x4GlbUrl from '../assets/models/lumber_2x4.glb?url';
 import lumber2x6GlbUrl from '../assets/models/lumber_2x6.glb?url';
 import lumber4x4GlbUrl from '../assets/models/lumber_4x4.glb?url';
@@ -30,12 +29,12 @@ import lumber4x4GlbUrl from '../assets/models/lumber_4x4.glb?url';
 // variable holding it — still looked valid).
 const sharedTextures = new Set<THREE.Texture>();
 
-// Same story for geometry loaded from the Blender-authored GLB props (sandbag, picket, plywood) — one
+// Same story for geometry loaded from the Blender-authored GLB props (sandbag, picket, lumber) — one
 // template geometry is loaded once and CLONED (never disposed) for every tiled instance across
 // every re-render. See "Blender-authored props" below for the load/fallback lifecycle.
 const sharedGeometries = new Set<THREE.BufferGeometry>();
 
-// ── Blender-authored props (sandbag, picket, plywood) ─────────────────────────────────────────
+// ── Blender-authored props (sandbag, picket, lumber) ──────────────────────────────────────────
 // Modeled in Blender (headless bpy scripting, see DECISIONS D28) at correct real-world
 // PROPORTIONS, then exported as a unit 1x1x1 bounding-box mesh — this code applies the exact
 // doctrine dimensions via `mesh.scale.set(w, h, d)` at instance time, so one asset file serves
@@ -48,7 +47,6 @@ const sharedGeometries = new Set<THREE.BufferGeometry>();
 // nicer prop replaces the placeholder a moment later.
 let sandbagGeometry: THREE.BufferGeometry | null = null;
 let picketGeometry: THREE.BufferGeometry | null = null;
-let plywoodGeometry: THREE.BufferGeometry | null = null;
 // Dimensional-lumber props — one template per nominal size, each Blender-modeled at its true
 // DRESSED cross-section (a "2x4" is really 1.5" x 3.5") with size-appropriate crown/crook, so a
 // stiff 4x4 post and a springy 2x4 wale read differently even under runtime scaling.
@@ -82,7 +80,6 @@ function loadModelAssets(): void {
   };
   loadProp(sandbagGlbUrl, 'sandbag.glb', (g) => (sandbagGeometry = g));
   loadProp(picketGlbUrl, 'picket.glb', (g) => (picketGeometry = g));
-  loadProp(plywoodGlbUrl, 'plywood.glb', (g) => (plywoodGeometry = g));
   loadProp(lumber2x4GlbUrl, 'lumber_2x4.glb', (g) => (lumberGeometry['2x4'] = g));
   loadProp(lumber2x6GlbUrl, 'lumber_2x6.glb', (g) => (lumberGeometry['2x6'] = g));
   loadProp(lumber4x4GlbUrl, 'lumber_4x4.glb', (g) => (lumberGeometry['4x4'] = g));
@@ -208,33 +205,122 @@ function lumberTexture(): THREE.Texture {
   return tex;
 }
 
-// Pale plywood face — light birch tone with faint wavy grain, clearly NOT the warmer sawn-lumber
-// texture above (that one dresses the frame posts behind the sheets).
-let plywoodTexCache: THREE.Texture | null = null;
-function plywoodTexture(): THREE.Texture {
-  if (plywoodTexCache) return plywoodTexCache;
+// Pale plywood FACE — light birch tone with wavy grain, a few darker streaks, and a couple of
+// knots (concentric dark rings), clearly NOT the warmer sawn-lumber texture above (that one
+// dresses the frame posts behind the sheets). Drawn at 4:8 aspect so it maps a 4-ft × 8-ft sheet
+// without distorting the knots. Deterministic — no Math.random.
+let plywoodFaceTexCache: THREE.Texture | null = null;
+function plywoodFaceTexture(): THREE.Texture {
+  if (plywoodFaceTexCache) return plywoodFaceTexCache;
+  const W = 128;
+  const H = 256;
   const c = document.createElement('canvas');
-  c.width = 64;
-  c.height = 64;
+  c.width = W;
+  c.height = H;
   const ctx = c.getContext('2d')!;
   ctx.fillStyle = '#dcc08f';
-  ctx.fillRect(0, 0, 64, 64);
+  ctx.fillRect(0, 0, W, H);
+  // Long vertical grain lines running the full height, most faint, a few clearly darker.
   ctx.lineWidth = 1.5;
-  for (let i = 0; i < 6; i++) {
-    ctx.strokeStyle = i % 2 === 0 ? '#c5a670' : '#cfae78';
+  for (let i = 0; i < 12; i++) {
+    const dark = i % 4 === 0;
+    ctx.strokeStyle = dark ? '#8f6f3f' : i % 2 === 0 ? '#c5a670' : '#cfae78';
+    ctx.lineWidth = dark ? 2 : 1.3;
     ctx.beginPath();
-    const gx = 5 + i * 11;
+    const gx = 6 + i * 10;
     ctx.moveTo(gx, 0);
-    for (let y = 0; y <= 64; y += 4) {
-      ctx.lineTo(gx + Math.sin((y / 64) * Math.PI * 2 + i) * 2.5, y);
+    for (let y = 0; y <= H; y += 6) {
+      ctx.lineTo(gx + Math.sin((y / H) * Math.PI * 4 + i * 1.3) * 3.2, y);
     }
     ctx.stroke();
   }
+  // A few short dark mineral streaks.
+  ctx.strokeStyle = '#7a5c31';
+  ctx.lineWidth = 1.6;
+  for (const [sx, sy, len] of [[30, 60, 26], [92, 150, 34], [58, 205, 20]] as const) {
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + 5, sy + len);
+    ctx.stroke();
+  }
+  // Knots: filled dark-brown core + a couple of concentric rings, grain sweeping around each.
+  const knot = (kx: number, ky: number, r: number): void => {
+    for (let ring = 3; ring >= 1; ring--) {
+      ctx.beginPath();
+      ctx.ellipse(kx, ky, r * (ring / 3), r * 1.35 * (ring / 3), 0, 0, Math.PI * 2);
+      ctx.fillStyle = ring === 1 ? '#4b3618' : ring === 2 ? '#6d4e26' : '#8a6a3a';
+      ctx.fill();
+    }
+    ctx.strokeStyle = '#9c7b45';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(kx, ky, r * 1.5, r * 2, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  };
+  knot(44, 96, 7);
+  knot(96, 188, 5.5);
   const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  plywoodTexCache = tex;
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  plywoodFaceTexCache = tex;
   sharedTextures.add(tex);
   return tex;
+}
+
+// Plywood CUT EDGE — the stacked veneer plies, drawn as alternating light/dark bands separated by
+// thin dark glue lines, so a sawn edge reads unmistakably as plywood. `orient` picks which way the
+// bands run: the box's left/right edges map thickness to U (vertical bands), the top/bottom edges
+// map thickness to V (horizontal bands). Cached per orientation.
+const plywoodEdgeTexCache: Record<'h' | 'v', THREE.Texture | null> = { h: null, v: null };
+function plywoodEdgeTexture(orient: 'h' | 'v'): THREE.Texture {
+  const cached = plywoodEdgeTexCache[orient];
+  if (cached) return cached;
+  const N = 64; // long axis (along the edge)
+  const T = 32; // across the thickness — where the plies stack
+  const horizontal = orient === 'h'; // bands stack along image height
+  const c = document.createElement('canvas');
+  c.width = horizontal ? N : T;
+  c.height = horizontal ? T : N;
+  const ctx = c.getContext('2d')!;
+  const plies = 5; // ½" ply ≈ 5 veneers
+  const band = T / plies;
+  for (let p = 0; p < plies; p++) {
+    // Alternate light face-veneer and darker core plies for clear colour separation.
+    ctx.fillStyle = p % 2 === 0 ? '#e4cd9c' : '#b48c52';
+    const a = p * band;
+    if (horizontal) ctx.fillRect(0, a, N, band);
+    else ctx.fillRect(a, 0, band, N);
+    // Thin dark glue line between plies.
+    ctx.fillStyle = '#5c421f';
+    if (horizontal) ctx.fillRect(0, a - 0.75, N, 1.5);
+    else ctx.fillRect(a - 0.75, 0, 1.5, N);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  plywoodEdgeTexCache[orient] = tex;
+  sharedTextures.add(tex);
+  return tex;
+}
+
+// One plywood sheet as a unit box carrying THREE materials — the grained face on both broad
+// faces, and the layered-ply edge on all four sawn edges (vertical bands on the left/right edges,
+// horizontal on the top/bottom) — so the plies are visible whichever edge is exposed. Returns the
+// wrapper (mesh + black cartoon outline); callers scale it to the sheet's real dimensions. Fresh
+// materials/geometry each call (they're disposed per re-render); the canvas textures are shared.
+function plywoodSheet(parent: THREE.Group): THREE.Group {
+  const grad = toonGradient();
+  const face = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: grad, map: plywoodFaceTexture() });
+  const edgeV = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: grad, map: plywoodEdgeTexture('v') });
+  const edgeH = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: grad, map: plywoodEdgeTexture('h') });
+  // BoxGeometry material-index order: +x, -x, +y, -y, +z, -z. Local Z is the thin dimension, so
+  // ±Z are the broad faces; ±X (left/right edges) and ±Y (top/bottom edges) are the sawn edges.
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  const mesh = new THREE.Mesh(geo, [edgeV, edgeV, edgeH, edgeH, face, face]);
+  const wrapper = new THREE.Group();
+  const outline = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x16130d, side: THREE.BackSide }));
+  outline.scale.multiplyScalar(1.035);
+  wrapper.add(outline, mesh);
+  parent.add(wrapper);
+  return wrapper;
 }
 
 const ROLE_COLOR: Record<BoxRole, number> = {
@@ -539,7 +625,16 @@ const LUMBER_DRESSED: Record<LumberSize, { width: number; thick: number }> = {
 function lumberPiece(group: THREE.Group, size: LumberSize, length: number, width?: number, thick?: number): THREE.Group {
   const dressed = LUMBER_DRESSED[size];
   const wrapper = addToonMesh(group, lumberGeometry[size] ?? new THREE.BoxGeometry(1, 1, 1), 0xffffff, { map: lumberTexture() });
-  wrapper.scale.set(Math.max(0.05, length), width ?? dressed.width, thick ?? dressed.thick);
+  const l = Math.max(0.05, length);
+  const w = width ?? dressed.width;
+  const t = thick ?? dressed.thick;
+  wrapper.scale.set(l, w, t);
+  // addToonMesh's uniform 3.5% outline shell is calibrated for compact props (a sandbag) — on
+  // an 8-ft board, 3.5% of the LENGTH is ~3 inches of solid black past each end cap. Rescale
+  // the outline per-axis so the rim is a constant hairline in real feet on every face instead.
+  const outlineFt = 0.015;
+  const outline = wrapper.children.length > 1 ? (wrapper.children[0] as THREE.Mesh) : null;
+  outline?.scale.set(1 + (2 * outlineFt) / l, 1 + (2 * outlineFt) / w, 1 + (2 * outlineFt) / t);
   return wrapper;
 }
 
@@ -566,15 +661,13 @@ function buildPlankDeck(group: THREE.Group, x: number, y: number, z: number, w: 
   }
 }
 
-// Timber & plywood revetment: the honest construction from the doctrine note ("timber frame with
-// plywood facing") — the earth wall itself (dirt box), full 4-ft-wide plywood sheets pressed flat
-// against its hole-side face (cut down to wall height, ½" thick — floored at 0.05 ft so the edge
-// still reads at diorama scale), and a squared-timber frame (posts at every sheet seam + one top
-// wale) holding them in place. `outerAxis`/`outerSign` point AWAY from the hole (scene3d's taper
-// orientation), so facing goes on the opposite side. Each sheet is the Blender-authored plywood
-// prop (unit bounding box, gentle bow + softened edges — same pipeline as the sandbag, DECISIONS
-// D28) once loaded, with tiny deterministic lean/scale jitter so tiled sheets read hand-placed,
-// falling back to a plain box until the GLB resolves.
+// Timber & plywood revetment: the earth wall itself (dirt box) with full 4-ft-wide plywood
+// sheets pressed flat against its hole-side face (cut down to wall height, ½" thick — floored at
+// 0.05 ft so the edge still reads at diorama scale). Plywood ONLY — no rendered frame; the BOM
+// carries the timber, the visual carries the facing. `outerAxis`/`outerSign` point AWAY from the
+// hole (scene3d's taper orientation), so facing goes on the opposite side. Each sheet is a
+// multi-material box (grained face + layered-ply cut edges, see plywoodSheet), with tiny
+// deterministic lean/scale jitter so tiled sheets read hand-placed.
 function buildPlywoodWall(group: THREE.Group, x: number, y: number, z: number, w: number, h: number, d: number, outerAxis: 0 | 2, outerSign: 1 | -1): void {
   const alongX = w >= d; // front/rear walls run along X; left/right walls run along Z
   const length = alongX ? w : d;
@@ -584,43 +677,27 @@ function buildPlywoodWall(group: THREE.Group, x: number, y: number, z: number, w
   backing.position.set(x, y, z);
 
   const sheetT = 0.05; // ½" plywood, floored for visibility
-  const postT = LUMBER_DRESSED['4x4'].width; // the frame posts are honest 4x4s
-  const cols = Math.max(1, Math.round(length / 4)); // full sheets are 4 ft wide
-  const cellL = length / cols;
-  // Coordinate (along outerAxis) of each layer's center: facing sits just inside the hole,
-  // flush against the earth face; the frame presses against the facing.
+  // The four wall boxes all span the full hole footprint and OVERLAP in the corners — facing cut
+  // to the box length would poke through the adjacent walls as crossed fins. Span only the open
+  // face between the neighboring walls' own facings instead.
+  const run = Math.max(0.5, length - 2 * (wallT + sheetT));
+  const cols = Math.max(1, Math.round(run / 4)); // full sheets are 4 ft wide
+  const cellL = run / cols;
+  // Coordinate (along outerAxis) of the sheet plane: just inside the hole, flush against the
+  // earth face.
   const wallC = outerAxis === 0 ? x : z;
   const sheetC = wallC - outerSign * (wallT / 2 + sheetT / 2);
-  const postC = wallC - outerSign * (wallT / 2 + sheetT + postT / 2);
-
-  const place = (wrapper: THREE.Group, along: number, yPos: number, across: number): void => {
-    if (alongX) wrapper.position.set(along, yPos, across);
-    else wrapper.position.set(across, yPos, along);
-  };
 
   for (let i = 0; i < cols; i++) {
     const seed = i * 31 + x + z;
-    const along = (alongX ? x : z) - length / 2 + (i + 0.5) * cellL;
+    const along = (alongX ? x : z) - run / 2 + (i + 0.5) * cellL;
     const jitter = 0.985 + hashJitter(seed) * 0.015;
-    const wrapper = addToonMesh(group, plywoodGeometry ?? new THREE.BoxGeometry(1, 1, 1), 0xffffff, { map: plywoodTexture() });
+    const wrapper = plywoodSheet(group);
     wrapper.scale.set(Math.max(0.1, cellL - 0.08) * jitter, Math.max(0.1, h - 0.06) * jitter, sheetT);
     if (!alongX) wrapper.rotation.y = Math.PI / 2;
     wrapper.rotation.z += (hashJitter(seed + 0.5) - 0.5) * 0.02; // slight hand-placed lean
-    place(wrapper, along, y, sheetC);
+    wrapper.position.set(alongX ? along : sheetC, y, alongX ? sheetC : along);
   }
-
-  for (let i = 0; i <= cols; i++) {
-    const raw = (alongX ? x : z) - length / 2 + i * cellL;
-    const along = Math.min(Math.max(raw, (alongX ? x : z) - length / 2 + postT / 2), (alongX ? x : z) + length / 2 - postT / 2);
-    const post = lumberPiece(group, '4x4', Math.max(0.1, h - 0.02), postT, postT);
-    post.rotation.z = Math.PI / 2; // length upright
-    place(post, along, y, postC);
-  }
-
-  // One 2x4 wale laid flat across the posts near the top, pinning the sheet row.
-  const wale = lumberPiece(group, '2x4', length);
-  if (!alongX) wale.rotation.y = Math.PI / 2;
-  place(wale, alongX ? x : z, y + h / 2 - postT * 1.5, postC);
 }
 
 function buildPart(group: THREE.Group, part: Part3): void {
@@ -694,10 +771,15 @@ function buildPart(group: THREE.Group, part: Part3): void {
   }
 }
 
+export interface ViewOpts {
+  stage?: number; // construction stage 0..6 (undefined ⇒ final)
+  cutaway?: boolean; // clip the near half so the interior/OHC reads
+}
+
 export interface ThreeViewer {
   canvas: HTMLCanvasElement;
   attach(container: HTMLElement): void;
-  update(result: Result): void;
+  update(result: Result, opts?: ViewOpts): void;
   resize(): void;
   resetView(): void;
   setTheme(theme: 'day' | 'night'): void;
@@ -718,6 +800,10 @@ export function createThreeViewer(): ThreeViewer {
   // since the UA is otherwise free to clear the buffer right after compositing each frame.
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  // Cutaway support: one global clipping plane the viewer toggles. Clipping is off until the
+  // user presses Cutaway (localClippingEnabled gates ALL material.clippingPlanes at once).
+  renderer.localClippingEnabled = true;
+  const cutPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0); // clips the near (front, -z) half
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 500);
@@ -749,6 +835,18 @@ export function createThreeViewer(): ThreeViewer {
   let ro: ResizeObserver | null = null;
   let raf = 0;
   let lastResult: Result | null = null;
+  let lastOpts: ViewOpts = {};
+
+  // Apply the cutaway clip to every material in the parts group (called after each rebuild).
+  function applyCutaway(on: boolean): void {
+    const planes = on ? [cutPlane] : [];
+    partsGroup.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        const mats = Array.isArray(child.material) ? child.material : [child.material];
+        for (const m of mats) if (m) m.clippingPlanes = planes;
+      }
+    });
+  }
 
   function setSky(theme: 'day' | 'night'): void {
     const top = theme === 'night' ? 0x1a1410 : 0xbfe3ff;
@@ -797,12 +895,14 @@ export function createThreeViewer(): ThreeViewer {
       ro.observe(container);
       doResize();
     },
-    update(result: Result) {
+    update(result: Result, opts: ViewOpts = {}) {
       lastResult = result;
+      lastOpts = opts;
       disposeObject(partsGroup);
       partsGroup.clear();
-      const model = buildScene3D(result);
+      const model = buildScene3D(result, { stage: opts.stage, cutaway: opts.cutaway });
       for (const part of model.parts) buildPart(partsGroup, part);
+      applyCutaway(model.cutaway);
 
       if (!framed) {
         framed = true;
@@ -832,7 +932,7 @@ export function createThreeViewer(): ThreeViewer {
   // async, see "Blender-authored props" above), this viewer instance swaps the placeholder
   // box/cylinder geometry for the real prop without the caller needing to do anything.
   function onAssetsReady(): void {
-    if (lastResult) api.update(lastResult);
+    if (lastResult) api.update(lastResult, lastOpts);
   }
   rerenderCallbacks.add(onAssetsReady);
 

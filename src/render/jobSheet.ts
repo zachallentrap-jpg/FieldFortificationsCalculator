@@ -105,12 +105,33 @@ export function jobSheet(result: Result, meta: JobSheetMeta): string {
     '<section><h2>Bill of materials</h2><table><thead><tr><th>Item</th><th>Per position</th><th>Total</th><th>Unit</th></tr></thead><tbody>' +
     bomRows + '</tbody></table></section>' +
     '<section><h2>Labor</h2><table>' + laborRows + '</table></section>' +
+    engineerBlock(result) +
     '<section class="pow"><h2>Priorities of work (build in this order)</h2><table><thead><tr><th>#</th><th>Stage</th><th>What / why</th><th class="n">Man-hrs</th></tr></thead><tbody>' +
     powRows(result) + '</tbody></table></section>' +
     '<section class="sign"><div class="line">Prepared by / date</div><div class="line">Verified by / date</div><div class="line">Position / grid</div></section>' +
     fillFooter() +
     '</div></body></html>'
   );
+}
+
+// When the roof must be engineered (§2.7), the fail-safe should hand off usefully instead of
+// dead-ending: print what to bring the engineer so they can start, not so they have to re-survey.
+function engineerBlock(result: Result): string {
+  if (result.cover.roofPath !== 'engineered_required') return '';
+  const u = result.inputs.unit;
+  const rows =
+    specRow('Threat to defeat', threatName(result)) +
+    specRow('Clear span to roof', fmtLength(result.resolved.holeL, u) + ' × ' + fmtLength(result.resolved.holeW, u)) +
+    specRow('Standoff achieved', fmtLength(result.resolved.setback, u), true) +
+    specRow('Depth of cut', fmtLength(result.resolved.depthOfCut, u), true);
+  return (
+    '<section><h2>Take this to the engineer (roof must be engineered)</h2>' +
+    '<p style="font-size:11px;color:var(--ink-soft)">This position’s overhead cover exceeds field-expedient limits — a qualified engineer must design the roof. Bring these so they can start:</p>' +
+    '<table>' + rows + '</table></section>'
+  );
+}
+function threatName(result: Result): string {
+  return result.inputs.threat === 'none' ? 'none' : result.inputs.threat;
 }
 
 // Page-2 priorities-of-work table — the schedule a fire-team leader actually executes from.

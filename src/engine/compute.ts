@@ -200,8 +200,10 @@ function computeCalc(raw: Inputs): Calc {
     ? position.firingPlatform.L.value * position.firingPlatform.W.value * position.firingPlatform.depthBelowHole.value
     : 0;
   // The firingStep input drives the section-drawing firing-step ledge (§10) — a minor cut
-  // §9 folds into holeVol. It adds no fabricated volume or labor of its own.
-  const firingStepOn = inputs.firingStep;
+  // §9 folds into holeVol. It adds no fabricated volume or labor of its own. A one-man position
+  // is dug armpit-deep for standing fire and takes NO firing step (modeling spec §2.f), so the
+  // toggle is a no-op there — the drawing must never teach a step the doctrine forbids.
+  const firingStepOn = inputs.firingStep && raw.positionType !== 'one_man';
 
   const sumpOn = inputs.sump;
   const sumpCount = sumpOn ? position.grenadeSumps : 0;

@@ -260,3 +260,17 @@ table.bom td.n { text-align: right; font-variant-numeric: tabular-nums; }
   .btn, .menu-summary { min-height: 40px; } /* larger tap targets */
   .summary-bar { position: sticky; bottom: 0; }
 }
+
+/* ── 3D honesty parity + stage scrubber (Phase 5) ──────────────────────────── */
+.three-badge {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.3px;
+  background: var(--banner-bg); color: var(--banner-text);
+  padding: 2px 6px; border-radius: 3px; margin-left: 8px;
+}
+.three-scrubber {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px;
+  font-size: 11px; color: var(--ink-soft); border-top: 1px solid var(--border);
+}
+.three-scrubber label { white-space: nowrap; }
+.three-scrubber input[type="range"] { flex: 1; min-width: 80px; accent-color: var(--focus); min-height: 32px; }
+.three-scrubber .btn.tiny[aria-pressed="true"] { background: var(--focus); color: var(--bg); }
