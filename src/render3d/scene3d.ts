@@ -301,7 +301,11 @@ function pushBayBox(
     role: 'bayWall',
     finish,
     picketSpacing,
-    ...(taperAmount > 0 ? { taperAxis, taperSign, taperAmount } : {}),
+    // Axis/sign always carried (they orient the wall — which way is "away from the hole") so
+    // finish renderers can place facing panels against the earth face; amount only when sloping.
+    taperAxis,
+    taperSign,
+    ...(taperAmount > 0 ? { taperAmount } : {}),
   });
   parts.push(wall(cx, cz - hw + wallT / 2, l, wallT, 2, -1)); // front — outer face is -z
   parts.push(wall(cx, cz + hw - wallT / 2, l, wallT, 2, 1)); // rear — outer face is +z

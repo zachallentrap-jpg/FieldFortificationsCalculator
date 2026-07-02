@@ -263,3 +263,22 @@ option, implement it, and log it here.
   concept introduced by the materials work — it's a small, targeted patch on a limitation that
   predates it; extending every wall a quarter-foot above grade closes the gap for any ordinary
   viewing angle without changing the excavation's real depth.
+
+- **D28 — Blender-authored GLB props, normalized to a unit box, dimensioned at runtime.** Six
+  props (sandbag, picket, plywood sheet, 2x4 / 2x6 / 4x4 dimensional lumber) are modeled once in
+  headless Blender (`scripts/make_lumber.py` shows the pipeline; the sandbag/picket/plywood
+  scripts were authored the same way — adapt `make_lumber.py` to regenerate) at honest real-world
+  proportions with the organic detail that makes them read as real objects (bag sag, hewn-stake
+  facets, plywood bow, lumber crown/crook, dressed cross-sections), then normalized to a 1×1×1
+  bounding box before export. Runtime code applies exact doctrine dimensions via
+  `mesh.scale.set(w, h, d)`, so one asset serves any size input and a doctrine import changes the
+  3D model with everything else — no re-export. The GLBs are inlined as base64 `data:` URIs at
+  build time (`assetsInlineLimit`), so the offline invariant holds exactly as for every other
+  bundled asset. Load is async even for a data URI: every wall builder falls back to the plain
+  procedural shape until the template resolves, then registered viewers re-run their last
+  update(). Two rules keep this honest and deterministic: (1) instance jitter uses a hash of the
+  tile coordinates, never `Math.random()` — identical inputs render identically; (2) sandbag
+  walls tile in ALL THREE axes from the pure `render3d/propLayout.ts` grid (node-tested), so
+  cells track the doctrine bag's laid proportions and the fallback box tiles the same cells —
+  a wall's envelope can never differ between the fallback and the loaded prop, and a thick
+  parapet reads as multiple bags deep instead of one bag stretched to the wall's depth.

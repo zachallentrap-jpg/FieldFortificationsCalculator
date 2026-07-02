@@ -11,9 +11,17 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { buildScene3D } from '../render3d/scene3d';
 import type { Part3, BoxRole } from '../render3d/scene3d';
+import { bagWallLayout } from '../render3d/propLayout';
 import type { Result } from '../engine/types';
+import sandbagGlbUrl from '../assets/models/sandbag.glb?url';
+import picketGlbUrl from '../assets/models/picket.glb?url';
+import plywoodGlbUrl from '../assets/models/plywood.glb?url';
+import lumber2x4GlbUrl from '../assets/models/lumber_2x4.glb?url';
+import lumber2x6GlbUrl from '../assets/models/lumber_2x6.glb?url';
+import lumber4x4GlbUrl from '../assets/models/lumber_4x4.glb?url';
 
 // Textures created ONCE and reused across every update() (the toon gradient + the 3 material
 // textures below) — tracked here so disposeObject() never destroys them. update() disposes the
@@ -21,6 +29,73 @@ import type { Result } from '../engine/types';
 // the very next input edit (its GPU resource destroyed while the JS object — and the cache
 // variable holding it — still looked valid).
 const sharedTextures = new Set<THREE.Texture>();
+
+// Same story for geometry loaded from the Blender-authored GLB props (sandbag, picket, plywood) — one
+// template geometry is loaded once and CLONED (never disposed) for every tiled instance across
+// every re-render. See "Blender-authored props" below for the load/fallback lifecycle.
+const sharedGeometries = new Set<THREE.BufferGeometry>();
+
+// ── Blender-authored props (sandbag, picket, plywood) ─────────────────────────────────────────
+// Modeled in Blender (headless bpy scripting, see DECISIONS D28) at correct real-world
+// PROPORTIONS, then exported as a unit 1x1x1 bounding-box mesh — this code applies the exact
+// doctrine dimensions via `mesh.scale.set(w, h, d)` at instance time, so one asset file serves
+// any size input with no re-export needed if doctrine numbers ever change.
+//
+// GLTFLoader.load() is asynchronous even for an inlined data: URI, so the very first render(s)
+// may happen before the template geometry is ready. `buildSandbagWall`/`buildPicketWall` fall
+// back to the plain procedural box/cylinder in that case — never blocking, never throwing — and
+// once a template resolves, every registered viewer instance re-runs its last update() so the
+// nicer prop replaces the placeholder a moment later.
+let sandbagGeometry: THREE.BufferGeometry | null = null;
+let picketGeometry: THREE.BufferGeometry | null = null;
+let plywoodGeometry: THREE.BufferGeometry | null = null;
+// Dimensional-lumber props — one template per nominal size, each Blender-modeled at its true
+// DRESSED cross-section (a "2x4" is really 1.5" x 3.5") with size-appropriate crown/crook, so a
+// stiff 4x4 post and a springy 2x4 wale read differently even under runtime scaling.
+export type LumberSize = '2x4' | '2x6' | '4x4';
+const lumberGeometry: Record<LumberSize, THREE.BufferGeometry | null> = { '2x4': null, '2x6': null, '4x4': null };
+const rerenderCallbacks = new Set<() => void>();
+
+function extractFirstGeometry(root: THREE.Object3D): THREE.BufferGeometry | null {
+  let found: THREE.BufferGeometry | null = null;
+  root.traverse((child) => {
+    if (!found && child instanceof THREE.Mesh) found = child.geometry as THREE.BufferGeometry;
+  });
+  return found;
+}
+
+function loadModelAssets(): void {
+  const loader = new GLTFLoader();
+  const loadProp = (url: string, name: string, assign: (geo: THREE.BufferGeometry) => void): void => {
+    loader.load(
+      url,
+      (gltf) => {
+        const geo = extractFirstGeometry(gltf.scene);
+        if (!geo) return;
+        sharedGeometries.add(geo);
+        assign(geo);
+        for (const cb of rerenderCallbacks) cb();
+      },
+      undefined,
+      (err) => console.error(`${name} failed to load — falling back to the procedural shape`, err),
+    );
+  };
+  loadProp(sandbagGlbUrl, 'sandbag.glb', (g) => (sandbagGeometry = g));
+  loadProp(picketGlbUrl, 'picket.glb', (g) => (picketGeometry = g));
+  loadProp(plywoodGlbUrl, 'plywood.glb', (g) => (plywoodGeometry = g));
+  loadProp(lumber2x4GlbUrl, 'lumber_2x4.glb', (g) => (lumberGeometry['2x4'] = g));
+  loadProp(lumber2x6GlbUrl, 'lumber_2x6.glb', (g) => (lumberGeometry['2x6'] = g));
+  loadProp(lumber4x4GlbUrl, 'lumber_4x4.glb', (g) => (lumberGeometry['4x4'] = g));
+}
+loadModelAssets();
+
+// A cheap deterministic hash (NOT Math.random — every rebuild of the same doctrine inputs must
+// look identical) used to jitter cloned prop instances so a tiled wall of one repeated asset
+// doesn't read as an obviously stamped grid.
+function hashJitter(seed: number): number {
+  const x = Math.sin(seed * 12.9898) * 43758.5453;
+  return x - Math.floor(x); // 0..1
+}
 
 export function isWebGLAvailable(): boolean {
   try {
@@ -103,27 +178,61 @@ function corrugatedTexture(): THREE.Texture {
   return tex;
 }
 
-let timberTexCache: THREE.Texture | null = null;
-function timberTexture(): THREE.Texture {
-  if (timberTexCache) return timberTexCache;
+// Sawn dimensional lumber — warm SPF tone with fine, faintly wavy grain lines. Distinct from
+// the pale plywood face below (lumber is warmer and more densely grained), and dresses every
+// dimensional-lumber prop: stringers, the plywood-revetment frame, and platform/step decking.
+let lumberTexCache: THREE.Texture | null = null;
+function lumberTexture(): THREE.Texture {
+  if (lumberTexCache) return lumberTexCache;
   const c = document.createElement('canvas');
   c.width = 64;
   c.height = 64;
   const ctx = c.getContext('2d')!;
-  ctx.fillStyle = '#7a5a35';
+  ctx.fillStyle = '#cfa571';
   ctx.fillRect(0, 0, 64, 64);
-  ctx.strokeStyle = '#5c4227';
-  ctx.lineWidth = 3;
-  for (let y = 8; y < 64; y += 16) {
+  ctx.lineWidth = 1.2;
+  for (let i = 0; i < 9; i++) {
+    ctx.strokeStyle = i % 3 === 0 ? '#a97f4e' : i % 3 === 1 ? '#b98d59' : '#c29a66';
     ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(64, y);
+    const gy = 3 + i * 7;
+    ctx.moveTo(0, gy);
+    for (let x = 0; x <= 64; x += 4) {
+      ctx.lineTo(x, gy + Math.sin((x / 64) * Math.PI * 2 + i * 1.7) * 1.6);
+    }
     ctx.stroke();
   }
   const tex = new THREE.CanvasTexture(c);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(2, 3);
-  timberTexCache = tex;
+  lumberTexCache = tex;
+  sharedTextures.add(tex);
+  return tex;
+}
+
+// Pale plywood face — light birch tone with faint wavy grain, clearly NOT the warmer sawn-lumber
+// texture above (that one dresses the frame posts behind the sheets).
+let plywoodTexCache: THREE.Texture | null = null;
+function plywoodTexture(): THREE.Texture {
+  if (plywoodTexCache) return plywoodTexCache;
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 64;
+  const ctx = c.getContext('2d')!;
+  ctx.fillStyle = '#dcc08f';
+  ctx.fillRect(0, 0, 64, 64);
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 6; i++) {
+    ctx.strokeStyle = i % 2 === 0 ? '#c5a670' : '#cfae78';
+    ctx.beginPath();
+    const gx = 5 + i * 11;
+    ctx.moveTo(gx, 0);
+    for (let y = 0; y <= 64; y += 4) {
+      ctx.lineTo(gx + Math.sin((y / 64) * Math.PI * 2 + i) * 2.5, y);
+    }
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  plywoodTexCache = tex;
   sharedTextures.add(tex);
   return tex;
 }
@@ -146,7 +255,12 @@ const ROLE_COLOR: Record<BoxRole, number> = {
 function disposeObject(obj: THREE.Object3D): void {
   obj.traverse((child) => {
     if (child instanceof THREE.Mesh || child instanceof THREE.Sprite) {
-      child.geometry?.dispose?.();
+      // Never dispose a SHARED template geometry (the loaded sandbag/picket GLB props) — same
+      // reasoning as shared textures just below: it's cloned into many instances across many
+      // re-renders, and disposing the one underlying GPU buffer would break every future use.
+      if (!(child.geometry && sharedGeometries.has(child.geometry as THREE.BufferGeometry))) {
+        child.geometry?.dispose?.();
+      }
       const mats = Array.isArray(child.material) ? child.material : [child.material];
       for (const m of mats) {
         const map = m && 'map' in m ? (m as THREE.MeshBasicMaterial).map : null;
@@ -332,6 +446,11 @@ function taperOuterFace(geometry: THREE.BufferGeometry, axis: 0 | 2, sign: 1 | -
 // bagsParapet/bagsCover) — this tiles small boxes across the footprint instead of one flat slab,
 // so "if sandbags are used, it shows sandbags." One shared outline keeps the cartoon silhouette
 // clean; the individual bags skip their own outline (outlining every tiny bag would look busy).
+//
+// Each tile is the Blender-authored sandbag prop (DECISIONS D28) once `sandbagGeometry` has
+// loaded — a real sagging-pillow shape, not a cube — cloned and scaled to the tile cell with a
+// small deterministic per-instance rotation/scale jitter so a repeated asset doesn't read as an
+// obviously stamped grid. Falls back to a plain box (the pre-Blender look) until the GLB resolves.
 function buildSandbagWall(group: THREE.Group, x: number, y: number, z: number, w: number, h: number, d: number, colorHex: number): void {
   const outline = new THREE.Mesh(
     new THREE.BoxGeometry(Math.max(0.05, w), Math.max(0.05, h), Math.max(0.05, d)),
@@ -341,37 +460,56 @@ function buildSandbagWall(group: THREE.Group, x: number, y: number, z: number, w
   outline.position.set(x, y, z);
   group.add(outline);
 
-  const targetBagL = 1.25; // doctrine sandbag length (ft) — a tile size, not a literal bag model
-  const targetBagH = 0.35;
-  const cols = Math.max(1, Math.round(w / targetBagL));
-  const rows = Math.max(1, Math.round(h / targetBagH));
-  const cellW = w / cols;
-  const cellH = h / rows;
+  // Tile in ALL THREE axes from the pure layout (render3d/propLayout.ts): cells stay close to
+  // the doctrine bag's laid proportions, so a 3-ft-thick parapet reads as several bags deep —
+  // never one authored bag stretched 3 ft deep. The fallback box tiles the SAME cells, so the
+  // wall's envelope is identical before and after the async GLB resolves.
+  const { cols, rows, layers, cellW, cellH, cellD } = bagWallLayout(w, h, d);
   const mat = new THREE.MeshToonMaterial({ color: colorHex, gradientMap: toonGradient() });
-  const bagGeo = new THREE.BoxGeometry(Math.max(0.05, cellW - 0.04), Math.max(0.05, cellH - 0.04), Math.max(0.05, d - 0.02));
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const bx = x - w / 2 + (c + 0.5) * cellW;
-      const by = y - h / 2 + (r + 0.5) * cellH;
-      const mesh = new THREE.Mesh(bagGeo, mat);
-      mesh.position.set(bx, by, z);
-      group.add(mesh);
+  const bagGeo = sandbagGeometry ?? null;
+  const fallbackGeo = bagGeo ? null : new THREE.BoxGeometry(Math.max(0.05, cellW - 0.04), Math.max(0.05, cellH - 0.04), Math.max(0.05, cellD - 0.02));
+  for (let l = 0; l < layers; l++) {
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const seed = r * 97 + c * 13 + l * 29 + x + z;
+        const bx = x - w / 2 + (c + 0.5) * cellW + (hashJitter(seed) - 0.5) * cellW * 0.06;
+        const by = y - h / 2 + (r + 0.5) * cellH;
+        const bz = z - d / 2 + (l + 0.5) * cellD;
+        const mesh = new THREE.Mesh(bagGeo ?? fallbackGeo!, mat);
+        let settle = 0;
+        if (bagGeo) {
+          const jitter = 0.92 + hashJitter(seed + 0.5) * 0.14;
+          mesh.scale.set(Math.max(0.05, cellW * 0.94) * jitter, Math.max(0.05, cellH * 0.9) * jitter, Math.max(0.05, cellD * 0.92) * jitter);
+          mesh.rotation.y = (hashJitter(seed + 0.25) - 0.5) * 0.35;
+          mesh.rotation.z = (hashJitter(seed + 0.75) - 0.5) * 0.12;
+          settle = cellH * 0.02; // settle slightly, like a real stacked course
+        }
+        mesh.position.set(bx, by - settle, bz);
+        group.add(mesh);
+      }
     }
   }
 }
 
 // Pickets & wire: an open lattice (vertical posts + two horizontal wire lines), visibly NOT a
-// solid wall — the clearest possible contrast against sandbags/dirt/panel facings.
+// solid wall — the clearest possible contrast against sandbags/dirt/panel facings. Each post is
+// the Blender-authored driven-stake prop (DECISIONS D28) once `picketGeometry` has loaded, falling
+// back to a plain cylinder until the GLB resolves.
 function buildPicketWall(group: THREE.Group, x: number, y: number, z: number, w: number, h: number, d: number, spacing: number): void {
   const alongX = w >= d; // front/rear walls run along X; left/right walls run along Z
   const length = alongX ? w : d;
   const count = Math.max(2, Math.round(length / Math.max(0.5, spacing)) + 1);
   const postR = Math.max(0.04, Math.min(0.1, h / 20));
   const postMat = new THREE.MeshToonMaterial({ color: 0x4a3a22, gradientMap: toonGradient() });
+  const postGeo = picketGeometry ?? null;
   for (let i = 0; i < count; i++) {
     const frac = count === 1 ? 0.5 : i / (count - 1);
     const offset = (frac - 0.5) * length;
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(postR, postR, h, 8), postMat);
+    const post = new THREE.Mesh(postGeo ?? new THREE.CylinderGeometry(postR, postR, h, 8), postMat);
+    if (postGeo) {
+      post.scale.set(postR * 2, h, postR * 2);
+      post.rotation.y = hashJitter(i + x + z) * Math.PI * 2; // hewn posts have no "front", vary freely
+    }
     post.position.set(alongX ? x + offset : x, y, alongX ? z : z + offset);
     group.add(post);
   }
@@ -383,6 +521,106 @@ function buildPicketWall(group: THREE.Group, x: number, y: number, z: number, w:
     wire.position.set(x, wy, z);
     group.add(wire);
   }
+}
+
+// Dressed (actual) cross-sections in feet for nominal lumber sizes — a "2x4" is really 1.5" x 3.5".
+const LUMBER_DRESSED: Record<LumberSize, { width: number; thick: number }> = {
+  '2x4': { width: 3.5 / 12, thick: 1.5 / 12 },
+  '2x6': { width: 5.5 / 12, thick: 1.5 / 12 },
+  '4x4': { width: 3.5 / 12, thick: 3.5 / 12 },
+};
+
+// One piece of dimensional lumber — the Blender-authored prop for `size` (each modeled at its
+// true dressed cross-section with a size-appropriate crown, DECISIONS D28), toon-shaded with the
+// sawn-lumber grain and the standard cartoon outline. The prop's length runs along local X, face
+// width along local Y, thickness along local Z; callers rotate the returned wrapper into place.
+// Width/thickness default to the size's dressed dimensions; falls back to a plain box until the
+// GLB resolves (same lifecycle as every other prop).
+function lumberPiece(group: THREE.Group, size: LumberSize, length: number, width?: number, thick?: number): THREE.Group {
+  const dressed = LUMBER_DRESSED[size];
+  const wrapper = addToonMesh(group, lumberGeometry[size] ?? new THREE.BoxGeometry(1, 1, 1), 0xffffff, { map: lumberTexture() });
+  wrapper.scale.set(Math.max(0.05, length), width ?? dressed.width, thick ?? dressed.thick);
+  return wrapper;
+}
+
+// A deck of 2x6 planks over a solid fill body — the standing platform and the firing step are
+// built lumber, not bare earth mounds. Planks run along the longer horizontal dimension, laid
+// side by side across the shorter one, each one a real 2x6 prop (1.5" deck over the fill below).
+function buildPlankDeck(group: THREE.Group, x: number, y: number, z: number, w: number, h: number, d: number, colorHex: number): void {
+  const t = LUMBER_DRESSED['2x6'].thick;
+  const body = addToonMesh(group, new THREE.BoxGeometry(Math.max(0.05, w), Math.max(0.05, h - t), Math.max(0.05, d)), colorHex, { map: dirtTexture() });
+  body.position.set(x, y - t / 2, z);
+  const alongX = w >= d;
+  const across = alongX ? d : w;
+  const length = (alongX ? w : d) - 0.04;
+  const count = Math.max(1, Math.round(across / LUMBER_DRESSED['2x6'].width));
+  const cell = across / count;
+  const topY = y + h / 2 - t / 2;
+  for (let i = 0; i < count; i++) {
+    const jitter = 0.99 + hashJitter(i * 17 + x + z) * 0.01;
+    const plank = lumberPiece(group, '2x6', length * jitter, Math.max(0.05, cell - 0.025), t);
+    plank.rotateY(alongX ? 0 : Math.PI / 2);
+    plank.rotateX(-Math.PI / 2); // about its own length axis: face width flat, thickness up
+    const off = -across / 2 + (i + 0.5) * cell;
+    plank.position.set(alongX ? x : x + off, topY, alongX ? z + off : z);
+  }
+}
+
+// Timber & plywood revetment: the honest construction from the doctrine note ("timber frame with
+// plywood facing") — the earth wall itself (dirt box), full 4-ft-wide plywood sheets pressed flat
+// against its hole-side face (cut down to wall height, ½" thick — floored at 0.05 ft so the edge
+// still reads at diorama scale), and a squared-timber frame (posts at every sheet seam + one top
+// wale) holding them in place. `outerAxis`/`outerSign` point AWAY from the hole (scene3d's taper
+// orientation), so facing goes on the opposite side. Each sheet is the Blender-authored plywood
+// prop (unit bounding box, gentle bow + softened edges — same pipeline as the sandbag, DECISIONS
+// D28) once loaded, with tiny deterministic lean/scale jitter so tiled sheets read hand-placed,
+// falling back to a plain box until the GLB resolves.
+function buildPlywoodWall(group: THREE.Group, x: number, y: number, z: number, w: number, h: number, d: number, outerAxis: 0 | 2, outerSign: 1 | -1): void {
+  const alongX = w >= d; // front/rear walls run along X; left/right walls run along Z
+  const length = alongX ? w : d;
+  const wallT = alongX ? d : w;
+
+  const backing = addToonMesh(group, new THREE.BoxGeometry(Math.max(0.05, w), Math.max(0.05, h), Math.max(0.05, d)), ROLE_COLOR.bayWall, { map: dirtTexture() });
+  backing.position.set(x, y, z);
+
+  const sheetT = 0.05; // ½" plywood, floored for visibility
+  const postT = LUMBER_DRESSED['4x4'].width; // the frame posts are honest 4x4s
+  const cols = Math.max(1, Math.round(length / 4)); // full sheets are 4 ft wide
+  const cellL = length / cols;
+  // Coordinate (along outerAxis) of each layer's center: facing sits just inside the hole,
+  // flush against the earth face; the frame presses against the facing.
+  const wallC = outerAxis === 0 ? x : z;
+  const sheetC = wallC - outerSign * (wallT / 2 + sheetT / 2);
+  const postC = wallC - outerSign * (wallT / 2 + sheetT + postT / 2);
+
+  const place = (wrapper: THREE.Group, along: number, yPos: number, across: number): void => {
+    if (alongX) wrapper.position.set(along, yPos, across);
+    else wrapper.position.set(across, yPos, along);
+  };
+
+  for (let i = 0; i < cols; i++) {
+    const seed = i * 31 + x + z;
+    const along = (alongX ? x : z) - length / 2 + (i + 0.5) * cellL;
+    const jitter = 0.985 + hashJitter(seed) * 0.015;
+    const wrapper = addToonMesh(group, plywoodGeometry ?? new THREE.BoxGeometry(1, 1, 1), 0xffffff, { map: plywoodTexture() });
+    wrapper.scale.set(Math.max(0.1, cellL - 0.08) * jitter, Math.max(0.1, h - 0.06) * jitter, sheetT);
+    if (!alongX) wrapper.rotation.y = Math.PI / 2;
+    wrapper.rotation.z += (hashJitter(seed + 0.5) - 0.5) * 0.02; // slight hand-placed lean
+    place(wrapper, along, y, sheetC);
+  }
+
+  for (let i = 0; i <= cols; i++) {
+    const raw = (alongX ? x : z) - length / 2 + i * cellL;
+    const along = Math.min(Math.max(raw, (alongX ? x : z) - length / 2 + postT / 2), (alongX ? x : z) + length / 2 - postT / 2);
+    const post = lumberPiece(group, '4x4', Math.max(0.1, h - 0.02), postT, postT);
+    post.rotation.z = Math.PI / 2; // length upright
+    place(post, along, y, postC);
+  }
+
+  // One 2x4 wale laid flat across the posts near the top, pinning the sheet row.
+  const wale = lumberPiece(group, '2x4', length);
+  if (!alongX) wale.rotation.y = Math.PI / 2;
+  place(wale, alongX ? x : z, y + h / 2 - postT * 1.5, postC);
 }
 
 function buildPart(group: THREE.Group, part: Part3): void {
@@ -397,6 +635,17 @@ function buildPart(group: THREE.Group, part: Part3): void {
         buildSandbagWall(group, part.x, part.y, part.z, part.w, part.h, part.d, ROLE_COLOR.bayWall);
       } else if (part.role === 'bayWall' && part.finish === 'picket') {
         buildPicketWall(group, part.x, part.y, part.z, part.w, part.h, part.d, part.picketSpacing ?? 2);
+      } else if (part.role === 'bayWall' && part.finish === 'timber') {
+        buildPlywoodWall(group, part.x, part.y, part.z, part.w, part.h, part.d, part.taperAxis ?? (part.w >= part.d ? 2 : 0), part.taperSign ?? 1);
+      } else if (part.role === 'stringer') {
+        // Roof stringers are dimensional timber per doctrine (stringerSizeForSpan) — the 4x4
+        // prop scaled to the descriptor's own cross-section, laid across the bay.
+        const alongX = part.w >= part.d;
+        const beam = lumberPiece(group, '4x4', alongX ? part.w : part.d, part.h, alongX ? part.d : part.w);
+        if (!alongX) beam.rotation.y = Math.PI / 2;
+        beam.position.set(part.x, part.y, part.z);
+      } else if (part.role === 'platform' || part.role === 'firingStep') {
+        buildPlankDeck(group, part.x, part.y, part.z, part.w, part.h, part.d, ROLE_COLOR[part.role]);
       } else {
         const geometry = new THREE.BoxGeometry(Math.max(0.05, part.w), Math.max(0.05, part.h), Math.max(0.05, part.d));
         if (part.role === 'bayWall' && part.taperAmount) {
@@ -404,7 +653,6 @@ function buildPart(group: THREE.Group, part: Part3): void {
         }
         let map: THREE.Texture | undefined;
         if (part.role === 'bayWall' && part.finish === 'corrugated') map = corrugatedTexture();
-        else if (part.role === 'bayWall' && part.finish === 'timber') map = timberTexture();
         else if (part.role === 'ground' || part.role === 'bayFloor' || part.role === 'rampBerm' || (part.role === 'bayWall' && part.finish === 'earth')) map = dirtTexture();
         const opts = part.role === 'camoNet' ? { opacity: 0.4 } : map ? { map } : undefined;
         const wrapper = addToonMesh(group, geometry, ROLE_COLOR[part.role], opts);
@@ -492,11 +740,15 @@ export function createThreeViewer(): ThreeViewer {
 
   const partsGroup = new THREE.Group();
   scene.add(partsGroup);
+  // Dev-only inspection handle (stripped from prod builds): lets tooling/tests query and frame
+  // the live scene without threading debug APIs through the app.
+  if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__sap3d = { scene, partsGroup, camera: () => camera, controls: () => controls };
 
   let framed = false;
   let currentContainer: HTMLElement | null = null;
   let ro: ResizeObserver | null = null;
   let raf = 0;
+  let lastResult: Result | null = null;
 
   function setSky(theme: 'day' | 'night'): void {
     const top = theme === 'night' ? 0x1a1410 : 0xbfe3ff;
@@ -534,7 +786,7 @@ export function createThreeViewer(): ThreeViewer {
     camera.updateProjectionMatrix();
   }
 
-  return {
+  const api: ThreeViewer = {
     canvas,
     attach(container: HTMLElement) {
       if (currentContainer === container && container.contains(canvas)) return;
@@ -546,6 +798,7 @@ export function createThreeViewer(): ThreeViewer {
       doResize();
     },
     update(result: Result) {
+      lastResult = result;
       disposeObject(partsGroup);
       partsGroup.clear();
       const model = buildScene3D(result);
@@ -567,12 +820,23 @@ export function createThreeViewer(): ThreeViewer {
     dispose() {
       cancelAnimationFrame(raf);
       ro?.disconnect();
+      rerenderCallbacks.delete(onAssetsReady);
       disposeObject(partsGroup);
       disposeObject(scene);
       controls.dispose();
       renderer.dispose();
     },
   };
+
+  // Registered so that when the Blender-authored sandbag/picket GLBs finish loading (they load
+  // async, see "Blender-authored props" above), this viewer instance swaps the placeholder
+  // box/cylinder geometry for the real prop without the caller needing to do anything.
+  function onAssetsReady(): void {
+    if (lastResult) api.update(lastResult);
+  }
+  rerenderCallbacks.add(onAssetsReady);
+
+  return api;
 
   function setTheme(theme: 'day' | 'night'): void {
     setSky(theme);
