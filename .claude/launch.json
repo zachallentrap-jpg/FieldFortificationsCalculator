@@ -6,6 +6,18 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--host", "--port", "5173"],
       "port": 5173
+    },
+    {
+      "name": "sap3",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--host", "--port", "5183", "--strictPort"],
+      "port": 5183
+    },
+    {
+      "name": "sap2",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "--host", "--port", "5179", "--strictPort"],
+      "port": 5179
     }
   ]
 }
