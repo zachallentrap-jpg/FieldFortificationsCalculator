@@ -12,10 +12,20 @@
 
 import { excavationSplit, STAGE_ORDER, STAGE_BOM } from '../doctrine/stages';
 import { labor as laborDoctrine } from '../doctrine/labor';
-import { machine } from '../doctrine/materials';
+import { machine, revetments } from '../doctrine/materials';
 import { round1 } from './round';
 import type { StageId } from '../doctrine/stages';
 import type { BomLine, Result } from './types';
+
+// Whether the position total actually CHARGED revetment labor — the truth is the resolved
+// row's buildsFace (exactly what compute.ts keys on), NOT a raw `revetment !== 'none'` string
+// compare. An unknown revetment string falls back to the 'none' row (buildsFace=false), so no
+// revetAdd is in the total; keying on the raw string would subtract/add a phantom 2.0 mh and
+// throw the per-stage stand-to clock off (the grand total still balances, hiding it from the
+// partition test).
+function chargedRevetLabor(result: Result): boolean {
+  return (revetments[result.inputs.revetment] ?? revetments['none']!).buildsFace === true;
+}
 
 export interface StageStep {
   id: StageId;
@@ -41,7 +51,7 @@ function excavationLabor(result: Result): number {
   const a = laborDoctrine;
   const roofEarth = result.cover.roofPath === 'earth_on_stringers';
   if (roofEarth) adders += a.overheadAdd.value;
-  if (result.inputs.revetment !== 'none') adders += a.revetAdd.value;
+  if (chargedRevetLabor(result)) adders += a.revetAdd.value;
   const hasSump = result.bom.some((b) => b.id === 'grenade_sumps');
   if (hasSump) adders += a.sumpAdd.value;
   if (result.inputs.camouflage) adders += a.camoAdd.value;
@@ -56,7 +66,7 @@ export function computeStages(result: Result): StagePlan {
   const excav = excavationLabor(result);
   const a = laborDoctrine;
   const roofEarth = result.cover.roofPath === 'earth_on_stringers';
-  const hasRevet = result.inputs.revetment !== 'none';
+  const hasRevet = chargedRevetLabor(result);
   const hasSump = result.bom.some((b) => b.id === 'grenade_sumps');
   const hasCamo = result.inputs.camouflage;
 

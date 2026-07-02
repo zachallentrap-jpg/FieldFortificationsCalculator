@@ -304,8 +304,13 @@ function plywoodEdgeTexture(orient: 'h' | 'v'): THREE.Texture {
 // One plywood sheet as a unit box carrying THREE materials — the grained face on both broad
 // faces, and the layered-ply edge on all four sawn edges (vertical bands on the left/right edges,
 // horizontal on the top/bottom) — so the plies are visible whichever edge is exposed. Returns the
-// wrapper (mesh + black cartoon outline); callers scale it to the sheet's real dimensions. Fresh
-// materials/geometry each call (they're disposed per re-render); the canvas textures are shared.
+// wrapper; callers scale it to the sheet's real dimensions. Fresh materials/geometry each call
+// (they're disposed per re-render); the canvas textures are shared.
+//
+// No per-sheet cartoon outline: the standard black silhouette shell, sized to a sheet that's 4×8 ft
+// but only ½ in thick, reads as a heavy black FRAME around the whole panel rather than a thin edge.
+// Same reasoning as the sandbag tiles (which also skip their own outline) — the earth-wall backing
+// behind the sheets already carries the wall silhouette.
 function plywoodSheet(parent: THREE.Group): THREE.Group {
   const grad = toonGradient();
   const face = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: grad, map: plywoodFaceTexture() });
@@ -314,11 +319,8 @@ function plywoodSheet(parent: THREE.Group): THREE.Group {
   // BoxGeometry material-index order: +x, -x, +y, -y, +z, -z. Local Z is the thin dimension, so
   // ±Z are the broad faces; ±X (left/right edges) and ±Y (top/bottom edges) are the sawn edges.
   const geo = new THREE.BoxGeometry(1, 1, 1);
-  const mesh = new THREE.Mesh(geo, [edgeV, edgeV, edgeH, edgeH, face, face]);
   const wrapper = new THREE.Group();
-  const outline = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0x16130d, side: THREE.BackSide }));
-  outline.scale.multiplyScalar(1.035);
-  wrapper.add(outline, mesh);
+  wrapper.add(new THREE.Mesh(geo, [edgeV, edgeV, edgeH, edgeH, face, face]));
   parent.add(wrapper);
   return wrapper;
 }
@@ -802,8 +804,13 @@ export function createThreeViewer(): ThreeViewer {
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   // Cutaway support: one global clipping plane the viewer toggles. Clipping is off until the
   // user presses Cutaway (localClippingEnabled gates ALL material.clippingPlanes at once).
+  // A plane KEEPS the half its normal points toward. The default camera sits on +z (the rear,
+  // beside the scale figure), so to open a cross-section of the fighting bay we clip the NEAR
+  // (+z, rear) half: normal (0,0,-1) keeps z<0 (front + interior) and clips z>0. Pointing the
+  // normal at +z instead clips the FAR half the viewer already can't see (the original bug —
+  // the cutaway appeared to do almost nothing).
   renderer.localClippingEnabled = true;
-  const cutPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0); // clips the near (front, -z) half
+  const cutPlane = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0); // clips the near (rear, +z) half toward the camera
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 500);
@@ -942,3 +949,55 @@ export function createThreeViewer(): ThreeViewer {
     setSky(theme);
   }
 }
+
+// ── Dev-only asset showcase (consumed by src/ui/props-gallery.ts — never by the app UI) ───────
+// Builds each prop and assembly EXACTLY as the app renders it — same builders, textures, tiling,
+// jitter, and outline treatment — so the /props.html gallery shows the real material detail
+// (stacked bag courses, plywood grain/knots and layered cut edges, wire on pickets, plank decks)
+// instead of bare untextured geometry. Returns each item's label + plot center for captions.
+export interface ShowcaseItem {
+  label: string;
+  x: number;
+}
+export function buildPropShowcase(group: THREE.Group): ShowcaseItem[] {
+  const items: ShowcaseItem[] = [];
+  const spacing = 7;
+  let i = 0;
+  const plot = (label: string): number => {
+    const x = (i++ - 3.5) * spacing;
+    items.push({ label, x });
+    return x;
+  };
+
+  let x = plot('sandbag');
+  buildSandbagWall(group, x, 0.19, 0, 1.3, 0.38, 0.9, ROLE_COLOR.parapet);
+
+  x = plot('sandbag wall');
+  buildSandbagWall(group, x, 0.75, 0, 4, 1.5, 1.2, ROLE_COLOR.parapet);
+
+  for (const size of ['2x4', '2x6', '4x4'] as const) {
+    x = plot(`${size} x 8 ft`);
+    const board = lumberPiece(group, size, 8);
+    board.rotation.y = 0.9;
+    board.position.set(x, 0.35, 0);
+  }
+
+  x = plot('plank deck (2x6)');
+  buildPlankDeck(group, x, 0.5, 0, 4, 1.0, 3, ROLE_COLOR.platform);
+
+  x = plot('pickets & wire');
+  buildPicketWall(group, x, 1.6, 0, 4, 3.2, 0.3, 2);
+
+  x = plot('plywood revetment');
+  buildPlywoodWall(group, x, 1.6, 0, 8, 3.2, 0.5, 2, -1); // sheets face the camera (+z)
+
+  return items;
+}
+
+// Lets the gallery rebuild when the async GLB templates resolve (same hook the app viewers use).
+export function onPropAssetsReady(cb: () => void): () => void {
+  rerenderCallbacks.add(cb);
+  return () => rerenderCallbacks.delete(cb);
+}
+
+export { disposeObject, toonGradient };

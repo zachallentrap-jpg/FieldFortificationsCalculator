@@ -75,6 +75,20 @@ test('shortfall math: unreachable stand-to reports hours past, feasible reports 
   assert.equal(loose.shortfallHours, 0);
 });
 
+test('an unknown revetment string never invents phantom revet-stage labor (per-stage clock stays honest)', () => {
+  // An unknown revetment resolves to the 'none' row (buildsFace=false) → no revet labor in the
+  // total, so the stage plan must match the 'none' plan exactly, NOT bill a phantom revet stage.
+  const bogus = computeStages(compute(defaultInputs({ revetment: 'bogus_revet', sump: true })));
+  const none = computeStages(compute(defaultInputs({ revetment: 'none', sump: true })));
+  const mh = (plan: ReturnType<typeof computeStages>, id: string) => plan.steps.find((s) => s.id === id)?.manHours ?? 0;
+  for (const id of ['security', 'hasty', 'deliberate', 'revet_sump', 'parapet']) {
+    assert.ok(Math.abs(mh(bogus, id) - mh(none, id)) < 1e-9, id + ' stage matches the none-revet plan');
+  }
+  // And a REAL revetment that builds a face DOES add the revet stage labor.
+  const real = computeStages(compute(defaultInputs({ revetment: 'pickets_wire', sump: true })));
+  assert.ok(mh(real, 'revet_sump') > mh(none, 'revet_sump'), 'a real revetment adds revet-stage labor');
+});
+
 test('security posture: fewer diggers on the tools (more on watch) lengthens the build', () => {
   const plan = computeStages(compute(defaultInputs()));
   const allDigging = scheduleStages(plan, { teamSize: 4, availableHours: 24, securityPostureFrac: 1, machineAssist: false });
