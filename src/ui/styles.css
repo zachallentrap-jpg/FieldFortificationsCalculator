@@ -231,3 +231,23 @@ table.bom td.n { text-align: right; font-variant-numeric: tabular-nums; }
   margin: 8px 0 0; padding-top: 6px; border-top: 1px dashed var(--border);
   font-size: 11px; color: var(--ink-soft); line-height: 1.4;
 }
+
+/* ── Doctrine fill overlay (Phase 2 — the placeholder burn-down) ───────────── */
+.doctrine .cleared-badge {
+  display: inline-block; padding: 4px 10px; border-radius: var(--r-sm);
+  background: var(--ok, #2e7d32); color: #fff; font-weight: 700; font-size: 12px;
+}
+.doctrine-groups { margin: 10px 0; max-width: 420px; }
+.import-report { margin: 8px 0; padding: 8px 10px; border-radius: var(--r-sm); border: 1px solid var(--border); font-size: 12px; }
+.import-report.ok { border-color: var(--focus); }
+.import-report.bad { border-color: var(--draw-engineered); }
+.import-report ul { margin: 4px 0 0; padding-left: 18px; }
+.fill-scroll { max-height: 46vh; overflow: auto; border: 1px solid var(--border); border-radius: var(--r-sm); margin-top: 8px; }
+.fill-table { width: 100%; font-size: 11px; }
+.fill-table th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.fill-table tr.filled { background: color-mix(in srgb, var(--focus) 8%, transparent); }
+.fill-table .fill-path { font-family: ui-monospace, monospace; font-size: 10px; }
+.fill-table .sc { color: var(--draw-engineered); font-weight: 700; font-size: 9px; }
+.fill-table .u { color: var(--ink-soft); font-size: 9px; }
+.fill-table input[type="number"], .fill-table input[type="text"], .fill-table select { width: 100%; min-height: 26px; padding: 2px 5px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: 11px; }
+.fill-table .fill-verified { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; white-space: nowrap; }

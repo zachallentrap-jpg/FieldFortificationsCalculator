@@ -1,8 +1,10 @@
-// Doctrine import/export (§8, §14). exportDoctrine() serializes every Provenance leaf so
-// a qualified user can fill real values OFFLINE and reload. importDoctrine() validates
-// strictly, rejects prototype-pollution keys and newer versions, then updates matching
-// live leaves in place (value/status/source). The banner recomputes from the mutated
-// statuses via the registry. Never trusts a file blindly.
+// Doctrine import/export (§8, §14) — the keystone of the placeholder regime. exportDoctrine()
+// serializes every Provenance leaf so a qualified user can fill real values OFFLINE and reload.
+// importDoctrine() validates strictly and applies ALL-OR-NOTHING: if any entry is rejected the
+// whole file is refused and NOTHING is mutated — safety-critical data must never land half-
+// applied. A dry run validates without mutating so the UI can preview. Every applied fill
+// carries a manifest (content hash + optional author/date) so a DOCTRINE stamp is attributable
+// evidence, printed on the job sheet. Never trusts a file blindly.
 
 import { DOCTRINE_VERSION } from '../version';
 import { all, getByPath, counts } from './registry';
@@ -18,21 +20,59 @@ export interface DoctrineEntryDTO {
   note?: string;
 }
 
+export interface DoctrineManifest {
+  author?: string;
+  date?: string; // caller-supplied (io stays clock-free)
+  contentHash: string; // deterministic hash of the applied entries — change detection + attribution
+}
+
 export interface DoctrineExport {
   doctrineVersion: number;
   note: string;
+  manifest?: DoctrineManifest;
   entries: DoctrineEntryDTO[];
 }
 
 export interface DoctrineImportReport {
   ok: boolean;
-  applied: number;
+  applied: number; // entries that were (or in a dry run, would be) applied
+  dryRun: boolean;
   rejected: { path: string; reason: string }[];
   message?: string;
+  manifest?: DoctrineManifest; // echoed from the file (with a freshly computed contentHash)
   counts: Counts;
 }
 
-export function exportDoctrine(): DoctrineExport {
+// Numeric sanity bound — the same 0 ≤ v < 1000 the doctrine-integrity test enforces on a
+// fresh build. A filled value outside it is a transcription error, not real doctrine.
+const MAX_MAGNITUDE = 1000;
+
+// FNV-1a over the canonical (path|value|status) list — deterministic, dependency-free. Used
+// only for attribution / change detection, never for security, so a fast non-crypto hash is fine.
+function contentHash(entries: DoctrineEntryDTO[]): string {
+  const canonical = entries
+    .map((e) => e.path + '|' + JSON.stringify(e.value) + '|' + e.status)
+    .sort()
+    .join('\n');
+  let h = 0x811c9dc5;
+  for (let i = 0; i < canonical.length; i++) {
+    h ^= canonical.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, '0');
+}
+
+// The manifest of the fill currently applied to the live doctrine (null until an import lands).
+// Read by the Status panel and the job sheet so every DOCTRINE stamp is attributable.
+let appliedFill: DoctrineManifest | null = null;
+export function getFillState(): DoctrineManifest | null {
+  return appliedFill;
+}
+export function resetFillState(): void {
+  appliedFill = null;
+}
+
+export function exportDoctrine(manifest?: { author?: string; date?: string }): DoctrineExport {
   const entries: DoctrineEntryDTO[] = [];
   for (const e of all()) {
     const p = getByPath(e.path);
@@ -43,9 +83,13 @@ export function exportDoctrine(): DoctrineExport {
     if (p.note !== undefined) dto.note = p.note;
     entries.push(dto);
   }
+  const m: DoctrineManifest = { contentHash: contentHash(entries) };
+  if (manifest?.author) m.author = manifest.author;
+  if (manifest?.date) m.date = manifest.date;
   return {
     doctrineVersion: DOCTRINE_VERSION,
     note: 'SAP-1 doctrine export — values are ILLUSTRATIVE PLACEHOLDERS unless status is DOCTRINE. NOT FOR FIELD USE.',
+    manifest: m,
     entries,
   };
 }
@@ -65,12 +109,24 @@ function hasDangerousKeys(v: unknown, depth = 0): boolean {
 const fail = (message: string): DoctrineImportReport => ({
   ok: false,
   applied: 0,
+  dryRun: false,
   rejected: [],
   message,
   counts: counts(),
 });
 
-export function importDoctrine(raw: unknown, opts?: { maxEntries?: number }): DoctrineImportReport {
+// One staged mutation, validated but not yet applied. All-or-nothing: we build the whole list
+// first and only touch live leaves once every entry has passed.
+interface Staged {
+  path: string;
+  value: unknown;
+  status: 'PLACEHOLDER' | 'DOCTRINE';
+  source: string;
+  note: string | undefined;
+}
+
+export function importDoctrine(raw: unknown, opts?: { maxEntries?: number; dryRun?: boolean }): DoctrineImportReport {
+  const dryRun = opts?.dryRun === true;
   if (typeof raw !== 'object' || raw === null) return fail('Not a doctrine object.');
   if (hasDangerousKeys(raw)) return fail('Rejected: file contains prototype-pollution keys.');
 
@@ -88,7 +144,7 @@ export function importDoctrine(raw: unknown, opts?: { maxEntries?: number }): Do
   if (entries.length > max) return fail('Too many entries (' + entries.length + ' > ' + max + ').');
 
   const rejected: { path: string; reason: string }[] = [];
-  let applied = 0;
+  const staged: Staged[] = [];
 
   for (const item of entries) {
     if (typeof item !== 'object' || item === null) {
@@ -111,15 +167,54 @@ export function importDoctrine(raw: unknown, opts?: { maxEntries?: number }): Do
       rejected.push({ path, reason: 'invalid status' });
       continue;
     }
-    if (typeof e['value'] !== typeof target.value) {
+    const value = e['value'];
+    if (typeof value !== typeof target.value) {
       rejected.push({ path, reason: 'value type mismatch' });
       continue;
     }
-    target.value = e['value'];
-    target.status = status;
-    if (typeof e['source'] === 'string') target.source = e['source'];
-    applied++;
+    if (typeof value === 'number' && (!Number.isFinite(value) || value < 0 || value >= MAX_MAGNITUDE)) {
+      rejected.push({ path, reason: 'number out of range (0 ≤ v < ' + MAX_MAGNITUDE + ')' });
+      continue;
+    }
+    const source = typeof e['source'] === 'string' ? e['source'] : target.source;
+    // A DOCTRINE stamp with a TODO source is a contradiction — it would defeat the very
+    // check the regime exists to enforce (doctrine-integrity: no DOCTRINE carries a TODO).
+    if (status === 'DOCTRINE' && /todo/i.test(source)) {
+      rejected.push({ path, reason: 'DOCTRINE status with a TODO source' });
+      continue;
+    }
+    const note = typeof e['note'] === 'string' ? e['note'] : target.note;
+    staged.push({ path, value, status, source, note });
   }
 
-  return { ok: true, applied, rejected, counts: counts() };
+  // All-or-nothing: any rejection refuses the ENTIRE file (safety-critical data must never
+  // land half-applied). Nothing has been mutated yet.
+  if (rejected.length > 0) {
+    return { ok: false, applied: 0, dryRun, rejected, message: 'Rejected — ' + rejected.length + ' entr(y/ies) failed validation; nothing was applied.', counts: counts() };
+  }
+
+  const manifest: DoctrineManifest = { contentHash: contentHash(entries as DoctrineEntryDTO[]) };
+  const rawManifest = obj['manifest'];
+  if (typeof rawManifest === 'object' && rawManifest !== null) {
+    const rm = rawManifest as Record<string, unknown>;
+    if (typeof rm['author'] === 'string') manifest.author = rm['author'];
+    if (typeof rm['date'] === 'string') manifest.date = rm['date'];
+  }
+
+  if (dryRun) {
+    return { ok: true, applied: staged.length, dryRun: true, rejected: [], manifest, counts: counts() };
+  }
+
+  // Commit: mutate live leaves in place (value/status/source/note only — unit and
+  // safetyCritical are structural and never come from a file).
+  for (const s of staged) {
+    const target = getByPath(s.path)!;
+    target.value = s.value;
+    target.status = s.status;
+    target.source = s.source;
+    if (s.note !== undefined) target.note = s.note;
+  }
+  appliedFill = manifest;
+
+  return { ok: true, applied: staged.length, dryRun: false, rejected: [], manifest, counts: counts() };
 }

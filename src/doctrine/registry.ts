@@ -8,10 +8,12 @@ import type { Provenance } from './types';
 
 export interface RegEntry {
   path: string;
+  value: unknown; // current live value (for the fill-table UI)
   status: Provenance<unknown>['status'];
   source: string;
   safetyCritical: boolean;
   unit?: string;
+  note?: string;
 }
 
 export interface Counts {
@@ -72,11 +74,13 @@ export function all(): RegEntry[] {
   for (const [path, prov] of entries) {
     const entry: RegEntry = {
       path,
+      value: prov.value,
       status: prov.status,
       source: prov.source,
       safetyCritical: prov.safetyCritical === true,
     };
     if (prov.unit !== undefined) entry.unit = prov.unit;
+    if (prov.note !== undefined) entry.note = prov.note;
     out.push(entry);
   }
   out.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));

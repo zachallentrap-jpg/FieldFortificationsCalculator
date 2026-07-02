@@ -18,10 +18,14 @@ import { initialTheme, applyTheme, persistTheme, type Theme } from '../theme/the
 import { collectDiagnostics, diagnosticsText } from '../layout/diagnostics';
 import { jobSheet } from '../render/jobSheet';
 import { toCsv } from '../render/csv';
-import { scenariosOverlay, missionOverlay, compareOverlay, planOverlay } from '../layout/tools';
+import { scenariosOverlay, missionOverlay, compareOverlay, planOverlay, doctrineOverlay } from '../layout/tools';
 import { ScenarioStore, makeScenario, duplicateScenario } from '../state/scenarios';
 import { createStorageAdapter } from '../state/persistence';
 import { saveSession, restoreSession } from '../state/session';
+import { all as allDoctrine, counts as doctrineCounts } from '../doctrine/registry';
+import { exportDoctrine, importDoctrine, getFillState } from '../doctrine/io';
+import { DOCTRINE_VERSION } from '../version';
+import { saveFill, restoreFill } from '../state/doctrineFill';
 import { aggregateMission } from '../engine/mission';
 import { planForTime, type PlanResult } from '../engine/plan';
 import { isWebGLAvailable, createThreeViewer } from './three-viewer';
@@ -45,8 +49,18 @@ const store = createStore({
   ...(restored ? { inputs: restored.inputs, missionSet: restored.missionSet, comparisonSet: restored.comparisonSet } : {}),
 });
 const history = createHistory(store.getState().inputs);
-const scenarioStore = new ScenarioStore(createStorageAdapter());
+const persistAdapter = createStorageAdapter();
+const scenarioStore = new ScenarioStore(persistAdapter);
 const onHand: Record<string, number> = { ...(restored?.onHand ?? {}) };
+
+// Doctrine-fill overlay state.
+let doctrineScOnly = false;
+let doctrineReport: import('../doctrine/io').DoctrineImportReport | null = null;
+let pendingImport: unknown = null; // a dry-run-validated file awaiting the user's Apply
+
+function openDoctrine(): void {
+  showOverlay(doctrineOverlay(allDoctrine(), doctrineCounts(), getFillState(), doctrineScOnly, doctrineReport));
+}
 
 function persistSession(): void {
   if (!sessionStorage_) return;
@@ -334,6 +348,37 @@ document.addEventListener('click', (e) => {
       }).catch(() => showToast('Import FAILED — device storage unavailable. Nothing may have been saved.'));
     }); break;
     // ── Mission BOM ──
+    // ── Doctrine fill (placeholder burn-down) ──
+    case 'doctrine': doctrineReport = null; pendingImport = null; openDoctrine(); break;
+    case 'doctrine-export':
+      download('sap1-doctrine.json', JSON.stringify(exportDoctrine(), null, 2), 'application/json');
+      showToast('Doctrine file exported — edit it offline against current pubs, then import it back.');
+      break;
+    case 'doctrine-import':
+      pickFile((text) => {
+        let parsed: unknown;
+        try { parsed = JSON.parse(text); } catch { showToast('Import failed: not valid JSON.'); return; }
+        pendingImport = parsed;
+        doctrineReport = importDoctrine(parsed, { dryRun: true }); // preview only — nothing mutated yet
+        openDoctrine();
+      });
+      break;
+    case 'doctrine-import-apply':
+      if (pendingImport !== null) {
+        doctrineReport = importDoctrine(pendingImport);
+        pendingImport = null;
+        if (doctrineReport.ok) { saveFill(persistAdapter); showToast(doctrineReport.applied + ' doctrine value(s) applied and saved on this device.'); scheduleRender(); }
+        openDoctrine();
+      }
+      break;
+    case 'doctrine-apply-edits': {
+      doctrineReport = applyInlineDoctrineEdits();
+      if (doctrineReport.ok) { saveFill(persistAdapter); showToast(doctrineReport.applied + ' doctrine value(s) applied.'); scheduleRender(); }
+      openDoctrine();
+      break;
+    }
+    case 'doctrine-sc-toggle': doctrineScOnly = !doctrineScOnly; openDoctrine(); break;
+    // ── Mission BOM ──
     case 'mission': openMission(); break;
     case 'mission-add': store.setState({ missionSet: [...store.getState().missionSet, { inputs: { ...store.getState().inputs } }] }); openMission(); break;
     case 'mission-clear': store.setState({ missionSet: [] }); openMission(); break;
@@ -409,6 +454,28 @@ function hideOverlay(): void {
 overlay.addEventListener('click', (e) => {
   if (e.target === overlay) hideOverlay();
 });
+// Read the inline fill-table inputs from the open overlay, overlay them onto a fresh full
+// export, and run the SAME validated importer (all-or-nothing) — so an inline edit is exactly
+// as safe as an imported file. Unedited leaves keep their current values.
+function applyInlineDoctrineEdits(): import('../doctrine/io').DoctrineImportReport {
+  const base = exportDoctrine();
+  const byPath = new Map(base.entries.map((e) => [e.path, e]));
+  for (const el of overlayBody.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-fillpath]')) {
+    const path = el.dataset['fillpath']!;
+    const entry = byPath.get(path);
+    if (!entry) continue;
+    const type = el.dataset['filltype'];
+    if (type === 'number') { const n = parseFloat(el.value); if (Number.isFinite(n)) entry.value = n; }
+    else if (type === 'boolean') entry.value = el.value === 'true';
+    else entry.value = el.value;
+    const src = overlayBody.querySelector<HTMLInputElement>('[data-fillsrc="' + CSS.escape(path) + '"]');
+    if (src && src.value.trim()) entry.source = src.value.trim();
+    const verify = overlayBody.querySelector<HTMLInputElement>('[data-fillverify="' + CSS.escape(path) + '"]');
+    entry.status = verify?.checked ? 'DOCTRINE' : 'PLACEHOLDER';
+  }
+  return importDoctrine({ ...base, doctrineVersion: DOCTRINE_VERSION });
+}
+
 function openTrace(key: string): void {
   const d = lastResult?.derivations.find((x) => x.key === key);
   if (d) showOverlay(traceHtml(d));
@@ -499,3 +566,10 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 
 // ── First paint ──────────────────────────────────────────────────────────────
 render();
+
+// Re-apply any persisted doctrine fill (async — IndexedDB), then repaint so the banner and
+// every computed value reflect the filled doctrine. Re-validated through the strict importer,
+// so a stored fill that no longer matches the registry is refused, not silently trusted.
+restoreFill(persistAdapter).then((n) => {
+  if (n > 0) scheduleRender();
+});

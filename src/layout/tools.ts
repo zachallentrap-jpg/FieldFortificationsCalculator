@@ -9,6 +9,8 @@ import type { Result, MissionBomLine } from '../engine/types';
 import type { MissionResult } from '../engine/mission';
 import type { PlanResult } from '../engine/plan';
 import type { Scenario } from '../state/schema';
+import type { RegEntry, Counts } from '../doctrine/registry';
+import type { DoctrineImportReport, DoctrineManifest } from '../doctrine/io';
 
 // Attribute-safe escaping: scenario names/ids are UNTRUSTED (they arrive via file import,
 // §14) and are interpolated into double-quoted attributes — quotes MUST be escaped or an
@@ -102,6 +104,93 @@ export function compareOverlay(results: Result[]): string {
     line('Man-hours total', (r) => num(r.labor.manHoursTotal)) +
     line('Elapsed', (r) => num(r.labor.elapsedHours) + ' hr') +
     '</tbody></table></div>'
+  );
+}
+
+// ── Doctrine fill (the placeholder burn-down) ────────────────────────────────
+// The battalion cell fills real values here — offline — until the NOT-FOR-FIELD-USE banner
+// clears. Spartan and paranoid by design: export → edit with pubs open → import (validated
+// all-or-nothing), OR edit inline and Apply (same validated path). Read-only burn-down counts
+// per doctrine table so progress is visible.
+function fillGroup(path: string): string {
+  return path.split(/[.[]/)[0] ?? path;
+}
+
+export function doctrineOverlay(
+  entries: RegEntry[],
+  c: Counts,
+  fill: DoctrineManifest | null,
+  scOnly: boolean,
+  report: DoctrineImportReport | null,
+): string {
+  const shown = scOnly ? entries.filter((e) => e.safetyCritical) : entries;
+
+  // Per-table remaining counts (from the FULL set, not the filtered view).
+  const groups = new Map<string, { total: number; remaining: number }>();
+  for (const e of entries) {
+    const g = groups.get(fillGroup(e.path)) ?? { total: 0, remaining: 0 };
+    g.total++;
+    if (e.status !== 'DOCTRINE') g.remaining++;
+    groups.set(fillGroup(e.path), g);
+  }
+  const groupRows = [...groups.entries()]
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+    .map(([g, v]) => '<tr><td>' + esc(g) + '</td><td class="n">' + v.remaining + '</td><td class="n">' + v.total + '</td></tr>')
+    .join('');
+
+  const fillLine = fill
+    ? '<p class="tool-note">Applied doctrine fill <code>' + esc(fill.contentHash) + '</code>' +
+      (fill.author ? ' by ' + esc(fill.author) : '') + (fill.date ? ' on ' + esc(fill.date) : '') + '.</p>'
+    : '<p class="tool-note">No doctrine fill applied — every value is an illustrative placeholder.</p>';
+
+  const reportBlock = report
+    ? '<div class="import-report ' + (report.ok ? 'ok' : 'bad') + '">' +
+      '<strong>' + (report.ok ? (report.dryRun ? 'Preview: ' : 'Applied: ') + report.applied + ' value(s)' : 'Import rejected') + '</strong>' +
+      (report.message ? '<div>' + esc(report.message) + '</div>' : '') +
+      (report.rejected.length
+        ? '<ul>' + report.rejected.slice(0, 12).map((r) => '<li>' + esc(r.path) + ' — ' + esc(r.reason) + '</li>').join('') +
+          (report.rejected.length > 12 ? '<li>…and ' + (report.rejected.length - 12) + ' more</li>' : '') + '</ul>'
+        : '') +
+      (report.dryRun && report.ok ? '<button type="button" class="btn" data-action="doctrine-import-apply">Apply this import</button>' : '') +
+      '</div>'
+    : '';
+
+  const rowFor = (e: RegEntry): string => {
+    const isNum = typeof e.value === 'number';
+    const isBool = typeof e.value === 'boolean';
+    const valInput = isBool
+      ? '<select data-fillpath="' + esc(e.path) + '" data-filltype="boolean"><option value="true"' + (e.value ? ' selected' : '') + '>true</option><option value="false"' + (!e.value ? ' selected' : '') + '>false</option></select>'
+      : '<input type="' + (isNum ? 'number' : 'text') + '" step="any" data-fillpath="' + esc(e.path) + '" data-filltype="' + (isNum ? 'number' : 'string') + '" value="' + esc(String(e.value)) + '">';
+    return (
+      '<tr class="' + (e.status === 'DOCTRINE' ? 'filled' : '') + '">' +
+      '<td class="fill-path">' + esc(e.path) + (e.safetyCritical ? ' <span class="sc">SC</span>' : '') + (e.unit ? ' <span class="u">' + esc(e.unit) + '</span>' : '') + '</td>' +
+      '<td>' + valInput + '</td>' +
+      '<td><input type="text" class="fill-src" data-fillsrc="' + esc(e.path) + '" value="' + esc(e.source) + '" placeholder="source / pub reference"></td>' +
+      '<td class="n"><label class="fill-verified"><input type="checkbox" data-fillverify="' + esc(e.path) + '"' + (e.status === 'DOCTRINE' ? ' checked' : '') + '> verified</label></td>' +
+      '</tr>'
+    );
+  };
+
+  const badge =
+    c.placeholder > 0
+      ? '<span class="fielduse-badge" role="status">NOT FOR FIELD USE — ' + c.placeholder + ' practice value(s) remain (' + c.safetyCriticalRemaining + ' safety-critical)</span>'
+      : '<span class="cleared-badge" role="status">All values filled — banner cleared.</span>';
+
+  return (
+    '<div class="tools doctrine"><h2>Doctrine values (fill the placeholders)</h2>' +
+    badge + fillLine +
+    '<p class="tool-note">Fill values <strong>offline</strong> against current pubs. Export the file, edit it off-device, and import it back — or edit inline below and Apply. Imports are validated all-or-nothing: one bad value rejects the whole file, nothing half-applies.</p>' +
+    '<div class="tool-actions">' +
+    '<button type="button" class="btn" data-action="doctrine-export">Export doctrine file</button>' +
+    '<button type="button" class="btn" data-action="doctrine-import">Import doctrine file…</button>' +
+    '<button type="button" class="btn" data-action="doctrine-apply-edits">Apply inline edits</button>' +
+    '<button type="button" class="btn" data-action="doctrine-sc-toggle">' + (scOnly ? 'Show all' : 'Safety-critical only') + '</button>' +
+    '</div>' +
+    reportBlock +
+    '<table class="doctrine-groups"><thead><tr><th>Table</th><th class="n">Remaining</th><th class="n">Total</th></tr></thead><tbody>' + groupRows + '</tbody></table>' +
+    '<div class="fill-scroll"><table class="fill-table"><thead><tr><th>Value</th><th>New value</th><th>Source</th><th>Verified</th></tr></thead><tbody>' +
+    shown.map(rowFor).join('') +
+    '</tbody></table></div></div>'
   );
 }
 

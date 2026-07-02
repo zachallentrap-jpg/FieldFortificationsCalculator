@@ -11,6 +11,7 @@ import { DAY_TOKENS_CSS } from './print-tokens';
 import { APP_VERSION } from '../version';
 import { positions } from '../doctrine/positions';
 import { fmtLength } from '../doctrine/units';
+import { getFillState } from '../doctrine/io';
 import type { Result } from '../engine/types';
 
 export interface JobSheetMeta {
@@ -103,8 +104,19 @@ export function jobSheet(result: Result, meta: JobSheetMeta): string {
     bomRows + '</tbody></table></section>' +
     '<section><h2>Labor</h2><table>' + laborRows + '</table></section>' +
     '<section class="sign"><div class="line">Prepared by / date</div><div class="line">Verified by / date</div><div class="line">Position / grid</div></section>' +
+    fillFooter() +
     '</div></body></html>'
   );
+}
+
+// Doctrine-fill provenance: a DOCTRINE stamp is only evidence if it names the fill it was
+// computed against. Printed small at the foot of every sheet.
+function fillFooter(): string {
+  const f = getFillState();
+  const text = f
+    ? 'Computed against doctrine fill ' + esc(f.contentHash) + (f.author ? ', filled by ' + esc(f.author) : '') + (f.date ? ', ' + esc(f.date) : '') + '.'
+    : 'Computed against illustrative placeholder doctrine (no fill applied).';
+  return '<p style="margin-top:16px;font-size:9px;color:var(--ink-soft)">' + text + '</p>';
 }
 
 function num(n: number): string {

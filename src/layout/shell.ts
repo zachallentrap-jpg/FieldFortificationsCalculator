@@ -61,9 +61,15 @@ function menuItem(action: string, label: string, hint: string): string {
   );
 }
 
+// Whether the topbar shows the NOT-FOR-FIELD-USE badge — data-driven off the placeholder
+// count, so it clears exactly when a doctrine fill drives remaining to zero (§2.5). Exported
+// for the banner-unlock test.
+export function topbarHasFieldUseBadge(result: Result): boolean {
+  return result.placeholderReport.remaining > 0;
+}
+
 function topbar(state: AppState, result: Result): string {
-  const remaining = result.placeholderReport.remaining;
-  const badge = remaining > 0 ? '<span class="fielduse-badge" role="status">NOT FOR FIELD USE — practice data only</span>' : '';
+  const badge = topbarHasFieldUseBadge(result) ? '<span class="fielduse-badge" role="status">NOT FOR FIELD USE — practice data only</span>' : '';
   const themeLabel = state.theme === 'day' ? 'Switch to night mode' : 'Switch to day mode';
   const overrideOpts = ([
     ['auto', 'Auto (fits your screen)'],
@@ -80,7 +86,8 @@ function topbar(state: AppState, result: Result): string {
     menuItem('scenarios', 'Saved setups', 'Save this setup, or load one you saved before') +
       menuItem('mission', 'Group job list', 'Combine several positions into one materials list (Mission BOM)') +
       menuItem('compare', 'Compare setups', 'Put 2–3 setups side by side') +
-      menuItem('plan', 'Time planner', 'Given hours and a crew size, find a setup that fits'),
+      menuItem('plan', 'Time planner', 'Given hours and a crew size, find a setup that fits') +
+      menuItem('doctrine', 'Doctrine values', 'Fill the placeholder numbers with real doctrine (offline) to clear the banner'),
   );
   const exportMenu = menu(
     'export',
