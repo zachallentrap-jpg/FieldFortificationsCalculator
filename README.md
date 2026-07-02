@@ -1,6 +1,8 @@
 # SAP-1 — Survivability Position Planner
 
-SAP-1 is a deterministic, offline, private, parametric planner for doctrinal USMC/Army combat-engineer survivability positions — fighting positions, crew-served positions, vehicle defilade, and bunkers. You pick from dropdowns and toggles (position, threat, soil, standard, roof), and SAP-1 turns those inputs into dimensioned plan/section drawings, a real **drag-to-rotate 3D model** of the position, a bill of materials, a labor estimate, and a printable job sheet — all recomputed live as you change an input.
+SAP-1 is a deterministic, offline, private, parametric planner for doctrinal USMC/Army combat-engineer survivability positions — fighting positions, crew-served positions, vehicle defilade, bunkers, connecting trenches, and ATGM positions. You pick from dropdowns and toggles (position, threat, soil, standard, roof), and SAP-1 turns those inputs into dimensioned plan/section drawings that double as a **range card** (sectors of fire in degrees and mils, north arrow, scale bar, FPL), a real **drag-to-rotate 3D model** with a **construction-stage scrubber** and cutaway, a bill of materials, a labor estimate, a **priorities-of-work timeline** that answers "are we ready by stand-to," and a printable job sheet — all recomputed live as you change an input.
+
+The whole roadmap that produced the current tool — the multi-angle plan and the phase-by-phase execution — is in [`docs/EXECUTION_PLAN.md`](docs/EXECUTION_PLAN.md); the decisions are logged in [`DECISIONS.md`](DECISIONS.md).
 
 The interface leads with plain language everywhere (the technical term stays alongside in parentheses — e.g. "Dirt wall up front (parapet)") so it's usable without already knowing the jargon; the fixed doctrinal vocabulary the spec requires is never hidden, just never load-bearing for basic use.
 
@@ -32,7 +34,7 @@ Threat is a **specific caliber, not a coarse bucket** — class → round: small
 
 ## Positions
 
-`one_man`, `two_man`, `mg_crew` (inverted-T with firing platform), `fifty_cal` (L-shape), `mortar_pit`, `vehicle_hull_defilade`, `vehicle_turret_defilade`, and `bunker_op_cp`.
+`one_man`, `two_man`, `mg_crew` (inverted-T with firing platform), `fifty_cal` (L-shape), `mortar_pit` (π/4 circular volume), `vehicle_hull_defilade` and `vehicle_turret_defilade` (ramp-cut excavation + spoil berm, blade-hours), `bunker_op_cp`, `connecting_trench`, and `atgm_javelin` (with rear backblast-clearance warning).
 
 ## Placeholder regime
 
