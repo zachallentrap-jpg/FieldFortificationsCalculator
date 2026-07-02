@@ -8,6 +8,7 @@ import { threats } from '../doctrine/protection';
 import type { Result, MissionBomLine } from '../engine/types';
 import type { MissionResult } from '../engine/mission';
 import type { PlanResult } from '../engine/plan';
+import type { Schedule } from '../engine/stages';
 import type { Scenario } from '../state/schema';
 import type { RegEntry, Counts } from '../doctrine/registry';
 import type { DoctrineImportReport, DoctrineManifest } from '../doctrine/io';
@@ -104,6 +105,30 @@ export function compareOverlay(results: Result[]): string {
     line('Man-hours total', (r) => num(r.labor.manHoursTotal)) +
     line('Elapsed', (r) => num(r.labor.elapsedHours) + ' hr') +
     '</tbody></table></div>'
+  );
+}
+
+// ── Priorities of work / "ready by stand-to" (Phase 4) ───────────────────────
+export function scheduleOverlay(sched: Schedule | null, team: number, hours: number, posture: number): string {
+  const form =
+    '<div class="tool-actions plan-form">' +
+    '<label class="ctrl mini">Team size<input type="number" id="sch-team" min="1" step="1" value="' + team + '"></label>' +
+    '<label class="ctrl mini">Hours to stand-to<input type="number" id="sch-hours" min="1" step="1" value="' + hours + '"></label>' +
+    '<label class="ctrl mini">% on the tools<input type="number" id="sch-posture" min="10" max="100" step="10" value="' + Math.round(posture * 100) + '"></label>' +
+    '<button type="button" class="btn" data-action="schedule-run">Build the timeline</button></div>';
+  if (!sched) {
+    return '<div class="tools"><h2>Priorities of work (ready by stand-to)</h2><p class="empty">Who does what now, and are we ready by stand-to? Enter your team, the hours until stand-to, and how much of the team stays on the tools (the rest pull security).</p>' + form + '</div>';
+  }
+  const status = sched.feasible
+    ? '<div class="import-report ok"><strong>Ready with ' + num(sched.availableHours - sched.totalElapsedHours) + ' hr to spare.</strong> ' + num(sched.totalElapsedHours) + ' hr with ' + num(sched.effectiveDiggers) + ' effective diggers.</div>'
+    : '<div class="import-report bad"><strong>NOT ready by stand-to — short ' + num(sched.shortfallHours) + ' hr.</strong> Cut the standard, add hands, or accept a hasty position.</div>';
+  const rows = sched.steps
+    .map((s) => '<tr><td>' + esc(s.label) + '</td><td class="n">' + num(s.manHours) + '</td><td class="n">H+' + num(s.cumulativeHours) + '</td></tr>')
+    .join('');
+  return (
+    '<div class="tools"><h2>Priorities of work (ready by stand-to)</h2>' + form + status +
+    '<table class="plan"><thead><tr><th>Stage (in order)</th><th class="n">Man-hrs</th><th class="n">Done by</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+    '<p class="tool-note">Stages run in doctrinal order; man-hours partition the position total exactly. Times assume the whole team works each stage together.</p></div>'
   );
 }
 

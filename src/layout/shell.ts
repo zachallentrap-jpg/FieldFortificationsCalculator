@@ -87,6 +87,7 @@ function topbar(state: AppState, result: Result): string {
       menuItem('mission', 'Group job list', 'Combine several positions into one materials list (Mission BOM)') +
       menuItem('compare', 'Compare setups', 'Put 2–3 setups side by side') +
       menuItem('plan', 'Time planner', 'Given hours and a crew size, find a setup that fits') +
+      menuItem('schedule', 'Priorities of work', 'Stage-by-stage timeline: who does what, ready by stand-to?') +
       menuItem('doctrine', 'Doctrine values', 'Fill the placeholder numbers with real doctrine (offline) to clear the banner'),
   );
   const exportMenu = menu(

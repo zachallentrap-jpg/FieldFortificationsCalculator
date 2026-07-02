@@ -21,8 +21,10 @@ import {
   threats,
 } from './protection';
 import { labor } from './labor';
+import { excavationSplit } from './stages';
 
 export const materials = { sandbag, revetments, camo, sump, excavation, machine, lumber };
+export const stages = { excavationSplit };
 export const protection = {
   shielding,
   radiationHalving,
@@ -43,6 +45,7 @@ registerTree('standards', standards);
 registerTree('materials', materials);
 registerTree('protection', protection);
 registerTree('labor', labor);
+registerTree('stages', stages);
 
 // Freeze structure but stop at Provenance leaves (keep them mutable for import).
 function freezeStructure(obj: unknown): void {
@@ -58,7 +61,7 @@ function freezeStructure(obj: unknown): void {
   }
 }
 
-for (const table of [positions, soils, standards, materials, protection, labor, vehicle]) {
+for (const table of [positions, soils, standards, materials, protection, labor, vehicle, stages]) {
   freezeStructure(table);
 }
 

@@ -20,7 +20,8 @@ import { jobSheet } from '../render/jobSheet';
 import { toCsv } from '../render/csv';
 import { drawPlan } from '../render/drawPlan';
 import { drawSection } from '../render/drawSection';
-import { scenariosOverlay, missionOverlay, compareOverlay, planOverlay, doctrineOverlay } from '../layout/tools';
+import { scenariosOverlay, missionOverlay, compareOverlay, planOverlay, doctrineOverlay, scheduleOverlay } from '../layout/tools';
+import { computeStages, scheduleStages, type Schedule } from '../engine/stages';
 import { ScenarioStore, makeScenario, duplicateScenario } from '../state/scenarios';
 import { createStorageAdapter } from '../state/persistence';
 import { saveSession, restoreSession } from '../state/session';
@@ -97,6 +98,23 @@ let sheetOpen = false;
 let planHours = 8;
 let planTeam = 2;
 let lastPlan: PlanResult | null = null;
+let schedTeam = 4;
+let schedHours = 12;
+let schedPosture = 0.75;
+let lastSchedule: Schedule | null = null;
+
+function runSchedule(): void {
+  if (!lastResult) return;
+  lastSchedule = scheduleStages(computeStages(lastResult), {
+    teamSize: schedTeam,
+    availableHours: schedHours,
+    securityPostureFrac: schedPosture,
+    machineAssist: lastResult.inputs.machineAssist,
+  });
+}
+function openSchedule(): void {
+  showOverlay(scheduleOverlay(lastSchedule, schedTeam, schedHours, schedPosture));
+}
 
 // The 3D canvas is created ONCE and re-parented into the fresh markup after every render (a
 // <canvas> can't survive an innerHTML replace, but detach/reattach keeps its WebGL context,
@@ -382,6 +400,19 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'doctrine-sc-toggle': doctrineScOnly = !doctrineScOnly; openDoctrine(); break;
+    // ── Priorities of work / stand-to scheduler ──
+    case 'schedule': openSchedule(); break;
+    case 'schedule-run': {
+      const t = document.getElementById('sch-team') as HTMLInputElement | null;
+      const h = document.getElementById('sch-hours') as HTMLInputElement | null;
+      const p = document.getElementById('sch-posture') as HTMLInputElement | null;
+      schedTeam = t ? Math.max(1, parseInt(t.value, 10) || schedTeam) : schedTeam;
+      schedHours = h ? Math.max(1, parseInt(h.value, 10) || schedHours) : schedHours;
+      schedPosture = p ? Math.min(1, Math.max(0.1, (parseInt(p.value, 10) || 75) / 100)) : schedPosture;
+      runSchedule();
+      openSchedule();
+      break;
+    }
     // ── Mission BOM ──
     case 'mission': openMission(); break;
     case 'mission-add': store.setState({ missionSet: [...store.getState().missionSet, { inputs: { ...store.getState().inputs } }] }); openMission(); break;

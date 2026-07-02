@@ -12,6 +12,7 @@ import { APP_VERSION } from '../version';
 import { positions } from '../doctrine/positions';
 import { fmtLength } from '../doctrine/units';
 import { getFillState } from '../doctrine/io';
+import { computeStages } from '../engine/stages';
 import type { Result } from '../engine/types';
 
 export interface JobSheetMeta {
@@ -104,10 +105,22 @@ export function jobSheet(result: Result, meta: JobSheetMeta): string {
     '<section><h2>Bill of materials</h2><table><thead><tr><th>Item</th><th>Per position</th><th>Total</th><th>Unit</th></tr></thead><tbody>' +
     bomRows + '</tbody></table></section>' +
     '<section><h2>Labor</h2><table>' + laborRows + '</table></section>' +
+    '<section class="pow"><h2>Priorities of work (build in this order)</h2><table><thead><tr><th>#</th><th>Stage</th><th>What / why</th><th class="n">Man-hrs</th></tr></thead><tbody>' +
+    powRows(result) + '</tbody></table></section>' +
     '<section class="sign"><div class="line">Prepared by / date</div><div class="line">Verified by / date</div><div class="line">Position / grid</div></section>' +
     fillFooter() +
     '</div></body></html>'
   );
+}
+
+// Page-2 priorities-of-work table — the schedule a fire-team leader actually executes from.
+// Stages in doctrinal order; per-stage man-hours partition the position total exactly.
+function powRows(result: Result): string {
+  return computeStages(result)
+    .steps.map((s, i) =>
+      '<tr><td class="n">' + (i + 1) + '</td><td>' + esc(s.label) + '</td><td>' + esc(s.detail) + '</td><td class="n">' + num(s.manHours) + '</td></tr>',
+    )
+    .join('');
 }
 
 // Field-document header: blank labeled lines the leader fills by hand on site — grid, unit,

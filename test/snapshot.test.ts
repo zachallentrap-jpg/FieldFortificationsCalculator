@@ -27,10 +27,11 @@ test('default fixture (two-man / deliberate / loam / 81mm mortar) snapshot', () 
     stringers: 8,
     gravel_sump: 2,
   });
-  // Phase 1 added 4 doctrine leaves (berm W+H, machine blade-hour rate, vehicle ramp slope);
-  // one (berm thickness) is safety-critical. 275→279 total, 187→188 safety-critical.
-  assert.equal(r.placeholderReport.total, 279);
-  assert.equal(r.placeholderReport.remaining, 279);
+  // Phase 1 added 4 doctrine leaves (berm W+H, machine blade-hour rate, vehicle ramp slope;
+  // 275→279, one safety-critical). Phase 4 added 4 stage-fraction leaves (excavation split;
+  // 279→283, none safety-critical). 283 total, 188 safety-critical.
+  assert.equal(r.placeholderReport.total, 283);
+  assert.equal(r.placeholderReport.remaining, 283);
   assert.equal(r.placeholderReport.safetyCriticalRemaining, 188);
 });
 
