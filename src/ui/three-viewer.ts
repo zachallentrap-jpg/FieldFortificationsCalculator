@@ -12,9 +12,16 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { buildScene3D } from '../render3d/scene3d';
+import { buildScene3D, partStage } from '../render3d/scene3d';
 import type { Part3, BoxRole } from '../render3d/scene3d';
 import { bagWallLayout } from '../render3d/propLayout';
+import { sharedTextures, sharedGeometries, hashJitter, toonGradient, disposeObject } from './engine/shared';
+import { palette } from './engine/palette';
+import type { Palette, Theme3D } from './engine/palette';
+import { buildTerrain } from './engine/terrain';
+import { buildSky, applyFog } from './engine/sky';
+import { SandbagBatcher } from './engine/bagInstancing';
+import { createPipeline, detectTier } from './engine/post';
 import type { Result } from '../engine/types';
 import sandbagGlbUrl from '../assets/models/sandbag.glb?url';
 import picketGlbUrl from '../assets/models/picket.glb?url';
@@ -22,17 +29,9 @@ import lumber2x4GlbUrl from '../assets/models/lumber_2x4.glb?url';
 import lumber2x6GlbUrl from '../assets/models/lumber_2x6.glb?url';
 import lumber4x4GlbUrl from '../assets/models/lumber_4x4.glb?url';
 
-// Textures created ONCE and reused across every update() (the toon gradient + the 3 material
-// textures below) — tracked here so disposeObject() never destroys them. update() disposes the
-// whole parts group every render; without this a shared texture would work once, then break on
-// the very next input edit (its GPU resource destroyed while the JS object — and the cache
-// variable holding it — still looked valid).
-const sharedTextures = new Set<THREE.Texture>();
-
-// Same story for geometry loaded from the Blender-authored GLB props (sandbag, picket, lumber) — one
-// template geometry is loaded once and CLONED (never disposed) for every tiled instance across
-// every re-render. See "Blender-authored props" below for the load/fallback lifecycle.
-const sharedGeometries = new Set<THREE.BufferGeometry>();
+// The shared-resource registries (sharedTextures / sharedGeometries), the deterministic
+// hashJitter, the toon gradient, and disposeObject moved to ./engine/shared so the diorama
+// engine modules participate in the SAME disposal contract. Imported above.
 
 // ── Blender-authored props (sandbag, picket, lumber) ──────────────────────────────────────────
 // Modeled in Blender (headless bpy scripting, see DECISIONS D28) at correct real-world
@@ -86,14 +85,6 @@ function loadModelAssets(): void {
 }
 loadModelAssets();
 
-// A cheap deterministic hash (NOT Math.random — every rebuild of the same doctrine inputs must
-// look identical) used to jitter cloned prop instances so a tiled wall of one repeated asset
-// doesn't read as an obviously stamped grid.
-function hashJitter(seed: number): number {
-  const x = Math.sin(seed * 12.9898) * 43758.5453;
-  return x - Math.floor(x); // 0..1
-}
-
 export function isWebGLAvailable(): boolean {
   try {
     const c = document.createElement('canvas');
@@ -101,27 +92,6 @@ export function isWebGLAvailable(): boolean {
   } catch {
     return false;
   }
-}
-
-// ── Cartoon toon-shading helpers ──────────────────────────────────────────────
-let gradientMapCache: THREE.Texture | null = null;
-function toonGradient(): THREE.Texture {
-  if (gradientMapCache) return gradientMapCache;
-  const canvas = document.createElement('canvas');
-  canvas.width = 4;
-  canvas.height = 1;
-  const ctx = canvas.getContext('2d')!;
-  // 4 flat bands (dark → light) for a chunky cel-shaded look.
-  ctx.fillStyle = '#6b6b6b'; ctx.fillRect(0, 0, 1, 1);
-  ctx.fillStyle = '#9c9c9c'; ctx.fillRect(1, 0, 1, 1);
-  ctx.fillStyle = '#cfcfcf'; ctx.fillRect(2, 0, 1, 1);
-  ctx.fillStyle = '#ffffff'; ctx.fillRect(3, 0, 1, 1);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.minFilter = THREE.NearestFilter;
-  tex.magFilter = THREE.NearestFilter;
-  gradientMapCache = tex;
-  sharedTextures.add(tex);
-  return tex;
 }
 
 // ── Material textures — honest, at-a-glance materials (§ "if sandbags are used, show sandbags") ──
@@ -134,15 +104,24 @@ function dirtTexture(): THREE.Texture {
   c.width = 64;
   c.height = 64;
   const ctx = c.getContext('2d')!;
-  ctx.fillStyle = '#8a6a3c';
+  // NEUTRAL near-white detail map, not brown: this texture is always MULTIPLIED by a role
+  // color (bay floor, walls, berms) — a brown map × a dark-brown role color lands in
+  // mud-black (the old linear-treated-as-sRGB pipeline hid this by over-brightening every
+  // texture ~2.2 gamma; honest sRGB + ACES exposed it). Centering the map on white keeps the
+  // speckle detail while the role color alone decides the surface's actual hue/value.
+  ctx.fillStyle = '#f5efe7';
   ctx.fillRect(0, 0, 64, 64);
   for (let i = 0; i < 220; i++) {
     const sx = (i * 37) % 64;
     const sy = (i * 53) % 64;
-    ctx.fillStyle = i % 3 === 0 ? '#6e5330' : i % 3 === 1 ? '#a8875a' : '#7a5e34';
+    ctx.fillStyle = i % 3 === 0 ? '#e0d5c5' : i % 3 === 1 ? '#fdf9f2' : '#e9ddcc';
     ctx.fillRect(sx, sy, 2, 2);
   }
   const tex = new THREE.CanvasTexture(c);
+  // Canvas hex fills are sRGB; untagged, three treats them as linear and the dirt washes out
+  // pale through the ACES/output chain. Every canvas color map carries this tag (the toon
+  // gradientMap deliberately does not — it's a shading ramp, not a color).
+  tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(3, 3);
   dirtTexCache = tex;
@@ -168,6 +147,7 @@ function corrugatedTexture(): THREE.Texture {
     ctx.stroke();
   }
   const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace; // see dirtTexture — all canvas color maps are sRGB
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(3, 2);
   corrugatedTexCache = tex;
@@ -199,6 +179,7 @@ function lumberTexture(): THREE.Texture {
     ctx.stroke();
   }
   const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace; // see dirtTexture — all canvas color maps are sRGB
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   lumberTexCache = tex;
   sharedTextures.add(tex);
@@ -260,6 +241,7 @@ function plywoodFaceTexture(): THREE.Texture {
   knot(44, 96, 7);
   knot(96, 188, 5.5);
   const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace; // see dirtTexture — all canvas color maps are sRGB
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
   plywoodFaceTexCache = tex;
   sharedTextures.add(tex);
@@ -295,6 +277,7 @@ function plywoodEdgeTexture(orient: 'h' | 'v'): THREE.Texture {
     else ctx.fillRect(a - 0.75, 0, 1.5, N);
   }
   const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace; // see dirtTexture — all canvas color maps are sRGB
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
   plywoodEdgeTexCache[orient] = tex;
   sharedTextures.add(tex);
@@ -325,42 +308,12 @@ function plywoodSheet(parent: THREE.Group): THREE.Group {
   return wrapper;
 }
 
-const ROLE_COLOR: Record<BoxRole, number> = {
-  ground: 0x8ec06a,
-  parapet: 0xd9b877,
-  bayWall: 0x8a6a3c,
-  bayFloor: 0x6e5330,
-  cover: 0xb98a4b,
-  engineeredCover: 0xff5a4d,
-  stringer: 0x3a2c1a,
-  platform: 0x4a3a22,
-  firingStep: 0x4a3a22,
-  sump: 0x241b12,
-  camoNet: 0x4c7a3f,
-  rampBerm: 0xcaa869,
-};
-
-function disposeObject(obj: THREE.Object3D): void {
-  obj.traverse((child) => {
-    if (child instanceof THREE.Mesh || child instanceof THREE.Sprite) {
-      // Never dispose a SHARED template geometry (the loaded sandbag/picket GLB props) — same
-      // reasoning as shared textures just below: it's cloned into many instances across many
-      // re-renders, and disposing the one underlying GPU buffer would break every future use.
-      if (!(child.geometry && sharedGeometries.has(child.geometry as THREE.BufferGeometry))) {
-        child.geometry?.dispose?.();
-      }
-      const mats = Array.isArray(child.material) ? child.material : [child.material];
-      for (const m of mats) {
-        const map = m && 'map' in m ? (m as THREE.MeshBasicMaterial).map : null;
-        // Never dispose a SHARED texture (the toon gradient, dirt/corrugated/timber) — those are
-        // cached module-level and reused across every re-render; disposing one here would work
-        // once, then leave every later use of that material broken.
-        if (map && !sharedTextures.has(map)) map.dispose();
-        m?.dispose?.();
-      }
-    }
-  });
-}
+// Role colors now come from the diorama palette and switch WITH the theme — night is a
+// hue-shifted second palette (moonlit blue-slate with the sandbags kept lightest so the taught
+// geometry stays legible), never just the day colors under dimmer lights. setTheme() swaps
+// activePalette and rebuilds the scene, so every builder below picks up the themed colors.
+let activePalette: Palette = palette('day');
+let ROLE_COLOR: Record<BoxRole, number> = activePalette.role;
 
 // A toon mesh + a slightly-larger black backface shell = a cheap, robust cartoon outline.
 // Both live inside one returned Group so a caller positions/rotates ONE object and the outline
@@ -374,6 +327,11 @@ function addToonMesh(parent: THREE.Group, geometry: THREE.BufferGeometry, colorH
   }
   if (opts?.map) mat.map = opts.map;
   const mesh = new THREE.Mesh(geometry, mat);
+  // Every structural mesh participates in the shadow pass — grounded contact is what makes the
+  // diorama read as physical instead of floating plastic. The outline shell must NOT cast: a
+  // 3.5%-oversized black backface would double every silhouette's shadow edge.
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
   const wrapper = new THREE.Group();
   if (!opts?.opacity) {
     const outline = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0x16130d, side: THREE.BackSide }));
@@ -404,7 +362,10 @@ function labelSprite(text: string): THREE.Sprite {
   ctx.fillText(text, 128, 33);
   const tex = new THREE.CanvasTexture(canvas);
   tex.minFilter = THREE.LinearFilter;
-  const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true });
+  tex.colorSpace = THREE.SRGBColorSpace;
+  // toneMapped:false — labels are UI ink, not scene surfaces; ACES graying a white pill with
+  // dark text reads as a rendering mistake.
+  const mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true, toneMapped: false });
   const sprite = new THREE.Sprite(mat);
   sprite.scale.set(3.2, 0.8, 1);
   sprite.renderOrder = 999;
@@ -420,30 +381,42 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
   ctx.closePath();
 }
 
-// A simple, abstract "toy figure" — not a specific person, just a scale reference.
+// A simple, abstract "toy figure" — not a specific person, just a scale reference. Olive like
+// a miniature figurine (a saturated primary would steal focus from the fortification being
+// taught — red stays reserved for hazards/ENEMY), with one small blaze band so it stays
+// findable at a glance.
 function buildFigure(group: THREE.Group, x: number, z: number, heightFt: number): void {
+  const f = activePalette.figure;
   const legH = heightFt * 0.46;
   const torsoH = heightFt * 0.34;
   const headR = heightFt * 0.09;
   const torsoR = heightFt * 0.12;
   const torso = new THREE.Mesh(
     new THREE.CapsuleGeometry(torsoR, torsoH, 4, 10),
-    new THREE.MeshToonMaterial({ color: 0x3b6ea5, gradientMap: toonGradient() }),
+    new THREE.MeshToonMaterial({ color: f.torso, gradientMap: toonGradient() }),
   );
   torso.position.set(x, legH + torsoH / 2 + torsoR, z);
   const legs = new THREE.Mesh(
     new THREE.CapsuleGeometry(torsoR * 0.7, legH * 0.7, 4, 8),
-    new THREE.MeshToonMaterial({ color: 0x2b2b2b, gradientMap: toonGradient() }),
+    new THREE.MeshToonMaterial({ color: f.legs, gradientMap: toonGradient() }),
   );
   legs.position.set(x, legH * 0.5 + torsoR * 0.7, z);
   const head = new THREE.Mesh(
     new THREE.SphereGeometry(headR, 12, 10),
-    new THREE.MeshToonMaterial({ color: 0xe8b98a, gradientMap: toonGradient() }),
+    new THREE.MeshToonMaterial({ color: f.skin, gradientMap: toonGradient() }),
   );
   head.position.set(x, legH + torsoH + torsoR + headR * 0.9, z);
-  group.add(legs, torso, head);
+  const blaze = new THREE.Mesh(
+    new THREE.CylinderGeometry(torsoR * 1.04, torsoR * 1.04, torsoH * 0.18, 10),
+    new THREE.MeshToonMaterial({ color: f.blaze, gradientMap: toonGradient() }),
+  );
+  blaze.position.set(x, legH + torsoH * 0.72 + torsoR, z);
+  for (const m of [legs, torso, head, blaze]) { m.castShadow = true; m.receiveShadow = true; }
+  group.add(legs, torso, head, blaze);
   const label = labelSprite('For scale (~5\'-10")');
-  label.position.set(x, legH + torsoH + torsoR * 2 + headR * 2 + 0.6, z);
+  // Snug above the head, not floating 0.6 ft over it — the old offset pushed the label past the
+  // top frame edge at the default camera on several positions (audit: label clipped/missing).
+  label.position.set(x, legH + torsoH + torsoR * 2 + headR * 2 + 0.15, z);
   group.add(label);
 }
 
@@ -455,12 +428,15 @@ function buildArrow(group: THREE.Group, fromX: number, fromZ: number, toX: numbe
   const mid = new THREE.Vector3((fromX + toX) / 2, y, (fromZ + toZ) / 2);
   const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), dir);
 
-  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, len * 0.7, 10), new THREE.MeshToonMaterial({ color: 0xd23a1e, gradientMap: toonGradient() }));
+  // Basic (unlit, un-tone-mapped) red: the arrow must stay the most saturated thing in frame in
+  // both themes — as a lit toon surface it dimmed with the scene and vanished at night.
+  const arrowMat = (): THREE.MeshBasicMaterial => new THREE.MeshBasicMaterial({ color: 0xd23a1e, toneMapped: false });
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, len * 0.7, 10), arrowMat());
   shaft.quaternion.copy(quat);
   shaft.rotateX(Math.PI / 2);
   shaft.position.copy(mid).addScaledVector(dir, -len * 0.15);
 
-  const head = new THREE.Mesh(new THREE.ConeGeometry(0.35, len * 0.35, 12), new THREE.MeshToonMaterial({ color: 0xd23a1e, gradientMap: toonGradient() }));
+  const head = new THREE.Mesh(new THREE.ConeGeometry(0.35, len * 0.35, 12), arrowMat());
   head.quaternion.copy(quat);
   head.rotateX(Math.PI / 2);
   head.position.copy(mid).addScaledVector(dir, len * 0.35);
@@ -486,12 +462,14 @@ function buildWedge(group: THREE.Group, x: number, z: number, radius: number, le
   }
   geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
   geo.computeVertexNormals();
-  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xd23a1e, transparent: true, opacity: 0.18, side: THREE.DoubleSide }));
+  // toneMapped:false + a stronger alpha: the fan is an ORIENTATION CUE, not scenery — under
+  // ACES + the grade pass, 0.18 red over green grass washed out to an unreadable beige.
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xd23a1e, transparent: true, opacity: 0.3, side: THREE.DoubleSide, toneMapped: false }));
   group.add(mesh);
 }
 
 // A smooth annulus (circular parapet) — one extruded ring mesh, no segment seams.
-function buildRing(group: THREE.Group, x: number, z: number, outerR: number, innerR: number, height: number, colorHex: number): void {
+function ringGeo(x: number, z: number, outerR: number, innerR: number, height: number): THREE.ExtrudeGeometry {
   const shape = new THREE.Shape();
   shape.absarc(0, 0, outerR, 0, Math.PI * 2, false);
   const hole = new THREE.Path();
@@ -500,7 +478,24 @@ function buildRing(group: THREE.Group, x: number, z: number, outerR: number, inn
   const geo = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false, curveSegments: 32 });
   geo.rotateX(-Math.PI / 2); // extrude was along +Z; lay it flat so it extrudes along +Y (up)
   geo.translate(x, 0, z);
-  addToonMesh(group, geo, colorHex);
+  return geo;
+}
+function buildRing(group: THREE.Group, x: number, z: number, outerR: number, innerR: number, height: number, colorHex: number): void {
+  const mat = new THREE.MeshToonMaterial({ color: colorHex, gradientMap: toonGradient() });
+  const mesh = new THREE.Mesh(ringGeo(x, z, outerR, innerR, height), mat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  // Outline is a HAIRLINE-EXPANDED second ring, not a 1.035-scaled shell: uniform scaling a
+  // wide flat annulus inflates it radially AND downward into a fat black skirt at the base
+  // (audit: "thick solid-black band rings the torus — reads as a broken outline slab").
+  const outline = new THREE.Mesh(
+    ringGeo(x, z, outerR + 0.05, Math.max(0.05, innerR - 0.05), height + 0.04),
+    new THREE.MeshBasicMaterial({ color: 0x16130d, side: THREE.BackSide }),
+  );
+  outline.position.y = -0.02;
+  const wrapper = new THREE.Group();
+  wrapper.add(outline, mesh);
+  group.add(wrapper);
 }
 
 // A sloped earthen excavation face: the vertices on the OUTER side (away from the hole, along
@@ -608,6 +603,8 @@ function buildPicketWall(group: THREE.Group, x: number, y: number, z: number, w:
       postY = y - h / 2;
     }
     post.position.set(alongX ? x + offset : x, postY, alongX ? z : z + offset);
+    post.castShadow = true;
+    post.receiveShadow = true;
     group.add(post);
   }
   const wireMat = new THREE.MeshBasicMaterial({ color: 0x55524a });
@@ -711,16 +708,30 @@ function buildPlywoodWall(group: THREE.Group, x: number, y: number, z: number, w
   }
 }
 
-function buildPart(group: THREE.Group, part: Part3): void {
+function buildPart(group: THREE.Group, part: Part3, bags: SandbagBatcher): void {
+  // Tag everything this part adds with its construction stage so the stage scrubber's rise-in
+  // animation can find what JUST appeared (children appended during this call get the tag).
+  const firstNew = group.children.length;
+  buildPartInner(group, part, bags);
+  const stage = partStage(part);
+  for (let i = firstNew; i < group.children.length; i++) group.children[i]!.userData.stage = stage;
+}
+
+function buildPartInner(group: THREE.Group, part: Part3, bags: SandbagBatcher): void {
   switch (part.kind) {
     case 'box': {
       // Parapet + overhead cover are ALWAYS sandbag construction per doctrine — tiled regardless
       // of `finish`. A revetted excavation face gets its own distinct material; an unrevetted one
       // is bare (sloped, if part.taperAmount is set) or plain earth.
+      //
+      // Sandbag walls queue into the InstancedMesh batcher instead of spawning one Mesh per bag
+      // (a bunker scene was ~900 meshes; batched it's a handful of draw calls) — the tiling math
+      // is bit-identical (engine/bagInstancing.ts replicates buildSandbagWall's cells/seeds).
+      // buildSandbagWall itself stays for the props-showcase gallery.
       if (part.role === 'parapet' || part.role === 'cover') {
-        buildSandbagWall(group, part.x, part.y, part.z, part.w, part.h, part.d, ROLE_COLOR[part.role]);
+        bags.wall(part.x, part.y, part.z, part.w, part.h, part.d, ROLE_COLOR[part.role]);
       } else if (part.role === 'bayWall' && part.finish === 'sandbag') {
-        buildSandbagWall(group, part.x, part.y, part.z, part.w, part.h, part.d, ROLE_COLOR.bayWall);
+        bags.wall(part.x, part.y, part.z, part.w, part.h, part.d, ROLE_COLOR.bayWall);
       } else if (part.role === 'bayWall' && part.finish === 'picket') {
         buildPicketWall(group, part.x, part.y, part.z, part.w, part.h, part.d, part.picketSpacing ?? 2);
       } else if (part.role === 'bayWall' && part.finish === 'timber') {
@@ -740,10 +751,17 @@ function buildPart(group: THREE.Group, part: Part3): void {
           taperOuterFace(geometry, part.taperAxis ?? 2, part.taperSign ?? 1, part.taperAmount);
         }
         let map: THREE.Texture | undefined;
-        if (part.role === 'bayWall' && part.finish === 'corrugated') map = corrugatedTexture();
-        else if (part.role === 'ground' || part.role === 'bayFloor' || part.role === 'rampBerm' || (part.role === 'bayWall' && part.finish === 'earth')) map = dirtTexture();
+        let tint = ROLE_COLOR[part.role];
+        if (part.role === 'bayWall' && part.finish === 'corrugated') {
+          // The corrugated map carries the steel look itself — tinting it with the earth-brown
+          // wall color would land it in mud (see dirtTexture's neutral-map rationale).
+          map = corrugatedTexture();
+          tint = 0xffffff;
+        } else if (part.role === 'ground' || part.role === 'bayFloor' || part.role === 'rampBerm' || (part.role === 'bayWall' && part.finish === 'earth')) {
+          map = dirtTexture();
+        }
         const opts = part.role === 'camoNet' ? { opacity: 0.4 } : map ? { map } : undefined;
-        const wrapper = addToonMesh(group, geometry, ROLE_COLOR[part.role], opts);
+        const wrapper = addToonMesh(group, geometry, tint, opts);
         wrapper.position.set(part.x, part.y, part.z);
       }
       if (part.label) {
@@ -840,62 +858,208 @@ export function createThreeViewer(): ThreeViewer {
   // mobile; horizontal drag + pinch still reach the controls. (See the canvas init above.)
   renderer.domElement.style.touchAction = 'pan-y';
 
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x4a3a22, 1.1);
-  const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-  sun.position.set(12, 20, 8);
-  // A flat ambient floor so faces turned away from the sun read as a shaded cartoon tone,
-  // never a near-black "broken looking" patch (a toon material with only 4 gradient bands
-  // can otherwise go very dark on unlit faces).
-  const ambient = new THREE.AmbientLight(0xffffff, 0.55);
-  scene.add(hemi, sun, ambient);
+  // ── Diorama light rig (engine/palette.ts) ────────────────────────────────────
+  // Keylight + fill, not a wash: the old triple-stacked rig (ambient 0.55 + hemi 1.1 + sun 1.0
+  // ≈ 2.6x white) collapsed the 4-band toon gradient to its top bands — the "flat plastic"
+  // look. Budget now ≈ 1.9x across hemi/sun/ambient/rim so the bands actually span 4 values,
+  // and the sun casts real PCF-soft shadows (grounded contact is the single biggest tell that
+  // separates a physical diorama from floating game pieces).
+  renderer.shadowMap.enabled = true;
+  // PCFSoftShadowMap is deprecated in three r185 (falls back to PCF with a console warning) —
+  // plain PCF + a blur radius gives the same soft penumbra without the noise.
+  renderer.shadowMap.type = THREE.PCFShadowMap;
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x4a3a22, 0.45);
+  const sun = new THREE.DirectionalLight(0xffffff, 1.15);
+  sun.castShadow = true;
+  sun.shadow.bias = -0.0005;
+  sun.shadow.normalBias = 0.02; // feet — kills acne on the bumpy sandbag prop without peter-panning
+  sun.shadow.radius = 4; // soft painted-shadow edge, not a hard CAD shadow
+  const ambient = new THREE.AmbientLight(0xffffff, 0.15);
+  // Cool counter-light with NO shadows: on toon materials a rim like this pushes a band-step
+  // highlight along silhouettes so the black outline shells read as deliberate ink.
+  const rim = new THREE.DirectionalLight(0xffffff, 0.25);
+  scene.add(hemi, sun, ambient, rim);
+
+  // Sky dome + fog (engine/sky.ts) — a painted 3-stop backdrop, not a photo sky: real dioramas
+  // sit in front of a lit painted backdrop, and a photo sky would make the toon geometry look
+  // like a mistake. The dome replaces scene.background entirely.
+  const skyRig = buildSky(280);
+  scene.add(skyRig.dome);
+
+  // Post pipeline (engine/post.ts): ACES + MSAA composer + tilt-shift miniature band + grade,
+  // tiered by device. 'low' falls back to the plain renderer path (current behavior).
+  const pipeline = createPipeline(renderer, scene, camera, detectTier());
+
+  function applyLightRig(size: number): void {
+    const L = activePalette.light;
+    hemi.color.set(L.hemiSky);
+    hemi.groundColor.set(L.hemiGround);
+    hemi.intensity = L.hemiIntensity;
+    sun.color.set(L.sunColor);
+    sun.intensity = L.sunIntensity;
+    sun.position.set(L.sunFrom[0] * size * 1.6, L.sunFrom[1] * size * 1.6, L.sunFrom[2] * size * 1.6);
+    ambient.intensity = L.ambientIntensity;
+    rim.color.set(L.rimColor);
+    rim.intensity = L.rimIntensity;
+    rim.position.set(L.rimFrom[0] * size * 1.6, L.rimFrom[1] * size * 1.6, L.rimFrom[2] * size * 1.6);
+    // Fit the shadow frustum to the model, not a fixed box — too big wastes map resolution
+    // (blocky shadows), too small clips them.
+    const ext = size * 0.85;
+    sun.shadow.camera.left = -ext;
+    sun.shadow.camera.right = ext;
+    sun.shadow.camera.top = ext;
+    sun.shadow.camera.bottom = -ext;
+    sun.shadow.camera.near = 1;
+    sun.shadow.camera.far = size * 5;
+    sun.shadow.intensity = L.shadowStrength;
+    // Reallocate the shadow render target ONLY when its size actually changes (tier demotion /
+    // theme flip) — this runs on every input keystroke, and disposing a 2048² target each time
+    // is pure GPU allocation churn (lifecycle review finding).
+    const mapSize = pipeline.tier === 'low' ? 1024 : L.shadowMapSize;
+    if (sun.shadow.mapSize.x !== mapSize) {
+      sun.shadow.mapSize.setScalar(mapSize);
+      if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; }
+    }
+    sun.shadow.camera.updateProjectionMatrix();
+  }
 
   const partsGroup = new THREE.Group();
   scene.add(partsGroup);
-  // Dev-only inspection handle (stripped from prod builds): lets tooling/tests query and frame
-  // the live scene without threading debug APIs through the app.
-  if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__sap3d = { scene, partsGroup, camera: () => camera, controls: () => controls };
+
+  // Terrain lives in its OWN group, cached by a content key: the app rebuilds partsGroup on
+  // every input change (every keystroke), but repainting a 1024² ground canvas + re-extruding
+  // the earth block each time is the single most expensive part of a rebuild — and the terrain
+  // only actually changes when the footprint/theme/stage-0 state does (perf review finding).
+  const terrainGroup = new THREE.Group();
+  scene.add(terrainGroup);
+  let terrainKey = '';
+  let terrainDispose: (() => void) | null = null;
 
   let framed = false;
+  let everFramed = false;
   let currentContainer: HTMLElement | null = null;
   let ro: ResizeObserver | null = null;
   let raf = 0;
   let lastResult: Result | null = null;
   let lastOpts: ViewOpts = {};
+  let theme: Theme3D = 'day';
 
-  // Apply the cutaway clip to every material in the parts group (called after each rebuild).
+  // Dev-only inspection handle (stripped from prod builds): lets tooling/tests query and frame
+  // the live scene without threading debug APIs through the app.
+  if (import.meta.env.DEV) {
+    (window as unknown as Record<string, unknown>).__sap3d = {
+      scene, partsGroup, renderer, pipeline,
+      camera: () => camera, controls: () => controls,
+    };
+  }
+
+  // ── Camera fly-to (eased) ─────────────────────────────────────────────────────
+  // Reset-view/first-frame-of-a-new-position glides instead of teleporting — cancelled the
+  // instant the user grabs the controls so it never fights their input.
+  let fly: { fromPos: THREE.Vector3; fromTgt: THREE.Vector3; toPos: THREE.Vector3; toTgt: THREE.Vector3; start: number } | null = null;
+  controls.addEventListener('start', () => { fly = null; });
+  function flyTo(toPos: THREE.Vector3, toTgt: THREE.Vector3): void {
+    if (!everFramed) {
+      // Very first frame: snap. An animation before the user has even seen the model is noise.
+      camera.position.copy(toPos);
+      controls.target.copy(toTgt);
+      controls.update();
+      everFramed = true;
+      return;
+    }
+    fly = { fromPos: camera.position.clone(), fromTgt: controls.target.clone(), toPos, toTgt, start: performance.now() };
+  }
+
+  // ── Stage rise-in ─────────────────────────────────────────────────────────────
+  // When the build-stage scrubber advances, the parts that JUST appeared rise ~0.4 ft into
+  // place — the model visibly "builds itself" instead of blinking. Rebuild-driven (parts are
+  // recreated every update), so this just offsets the new stage's objects and eases them home.
+  let riseAnims: Array<{ obj: THREE.Object3D; baseY: number; start: number }> = [];
+  function startStageRise(stage: number): void {
+    riseAnims = [];
+    const now = performance.now();
+    for (const child of partsGroup.children) {
+      if (child.userData.stage === stage) {
+        riseAnims.push({ obj: child, baseY: child.position.y, start: now });
+        child.position.y -= 0.45;
+      }
+    }
+  }
+
+  // Apply the cutaway clip to every material in the parts + terrain groups (after each rebuild).
   function applyCutaway(on: boolean): void {
     const planes = on ? [cutPlane] : [];
-    partsGroup.traverse((child) => {
-      if (child instanceof THREE.Mesh) {
-        const mats = Array.isArray(child.material) ? child.material : [child.material];
-        for (const m of mats) if (m) m.clippingPlanes = planes;
-      }
-    });
+    for (const root of [partsGroup, terrainGroup]) {
+      root.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          const mats = Array.isArray(child.material) ? child.material : [child.material];
+          for (const m of mats) if (m) m.clippingPlanes = planes;
+        }
+      });
+    }
   }
 
-  function setSky(theme: 'day' | 'night'): void {
-    const top = theme === 'night' ? 0x1a1410 : 0xbfe3ff;
-    const bottom = theme === 'night' ? 0x0a0605 : 0xf4f2ec;
-    const c = document.createElement('canvas');
-    c.width = 2;
-    c.height = 64;
-    const ctx = c.getContext('2d')!;
-    const grad = ctx.createLinearGradient(0, 0, 0, 64);
-    grad.addColorStop(0, '#' + top.toString(16).padStart(6, '0'));
-    grad.addColorStop(1, '#' + bottom.toString(16).padStart(6, '0'));
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 2, 64);
-    const tex = new THREE.CanvasTexture(c);
-    scene.background = tex;
-    hemi.intensity = theme === 'night' ? 0.6 : 1.1;
-    sun.intensity = theme === 'night' ? 0.5 : 1.0;
-  }
-  setSky('day');
+  // Theme boot: paint the sky, aim the lights, set fog + exposure for the default day look.
+  skyRig.setTheme(activePalette);
+  applyFog(scene, activePalette, 60);
+  pipeline.setTheme(activePalette);
+  applyLightRig(30);
+
+  const easeInOut = (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  const easeOut = (t: number): number => 1 - Math.pow(1 - t, 3);
+
+  // Frame-time watchdog: if the composer path can't hold a usable frame rate on this device,
+  // demote the pipeline tier ONCE rather than letting the whole app feel sluggish. 60-frame
+  // rolling average, threshold generous (25 fps) so a momentary GC never triggers it.
+  let frameTimes: number[] = [];
+  let lastFrameAt = 0;
+  let demoted = false;
 
   function loop(): void {
     raf = requestAnimationFrame(loop);
+    const now = performance.now();
+
+    if (fly) {
+      const t = Math.min(1, (now - fly.start) / 700);
+      const k = easeInOut(t);
+      camera.position.lerpVectors(fly.fromPos, fly.toPos, k);
+      controls.target.lerpVectors(fly.fromTgt, fly.toTgt, k);
+      if (t >= 1) fly = null;
+    }
+    if (riseAnims.length) {
+      const remaining: typeof riseAnims = [];
+      for (const a of riseAnims) {
+        const t = Math.min(1, (now - a.start) / 340);
+        a.obj.position.y = a.baseY - 0.45 * (1 - easeOut(t));
+        if (t < 1) remaining.push(a);
+      }
+      riseAnims = remaining;
+    }
+
     controls.update();
-    renderer.render(scene, camera);
+    pipeline.render();
+
+    if (lastFrameAt > 0) {
+      const dt = now - lastFrameAt;
+      // rAF pauses in background tabs — a single giant delta after tab-switch would poison the
+      // rolling average and permanently demote a fast machine (correctness review finding).
+      // Outliers reset the window instead of entering it.
+      if (dt < 250) {
+        frameTimes.push(dt);
+        if (frameTimes.length > 60) frameTimes.shift();
+      } else {
+        frameTimes = [];
+      }
+      if (!demoted && frameTimes.length === 60 && pipeline.tier !== 'low') {
+        const avg = frameTimes.reduce((a, b) => a + b, 0) / 60;
+        if (avg > 40) {
+          demoted = true;
+          pipeline.setTier(pipeline.tier === 'high' ? 'medium' : 'low');
+          frameTimes = [];
+        }
+      }
+    }
+    lastFrameAt = now;
   }
   loop();
 
@@ -905,6 +1069,7 @@ export function createThreeViewer(): ThreeViewer {
     const w = Math.max(1, el.clientWidth);
     const h = Math.max(1, el.clientHeight || w * 0.72);
     renderer.setSize(w, h, false);
+    pipeline.setSize(w, h, Math.min(2, window.devicePixelRatio || 1));
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
   }
@@ -921,13 +1086,63 @@ export function createThreeViewer(): ThreeViewer {
       doResize();
     },
     update(result: Result, opts: ViewOpts = {}) {
+      const prevStage = lastOpts.stage;
       lastResult = result;
       lastOpts = opts;
+      riseAnims = [];
       disposeObject(partsGroup);
       partsGroup.clear();
       const model = buildScene3D(result, { stage: opts.stage, cutaway: opts.cutaway });
-      for (const part of model.parts) buildPart(partsGroup, part);
+
+      // Terrain path: one earth block with TRUE holes (museum-diorama base with strata sides)
+      // replaces the flat role-'ground' frame parts — those stay in the descriptor as the
+      // low-tier fallback. At stage 0 (post security — nothing dug yet) the ground renders
+      // UNBROKEN: holes only exist once the hasty scrape (stage 1) has happened. The build is
+      // cached by content key (see terrainGroup above) so keystroke rebuilds skip it entirely.
+      const useTerrain = model.terrain !== undefined && pipeline.tier !== 'low';
+      if (useTerrain && model.terrain) {
+        const spec = opts.stage !== undefined && opts.stage < 1 ? { ...model.terrain, holes: [] } : model.terrain;
+        const scatter = pipeline.tier === 'high';
+        const key = JSON.stringify(spec) + '|' + theme + '|' + scatter;
+        if (key !== terrainKey) {
+          terrainKey = key;
+          terrainDispose?.();
+          disposeObject(terrainGroup);
+          terrainGroup.clear();
+          const t = buildTerrain(spec, activePalette, { scatter });
+          terrainDispose = t.dispose;
+          terrainGroup.add(t.group);
+        }
+        terrainGroup.visible = true;
+      } else {
+        terrainGroup.visible = false;
+      }
+
+      const bags = new SandbagBatcher(sandbagGeometry, activePalette.bagJitter);
+      const bagStageByColor = new Map<number, number>();
+      for (const part of model.parts) {
+        if (useTerrain && (part.kind === 'box' || part.kind === 'ring') && part.role === 'ground') continue;
+        if ((part.kind === 'box') && (part.role === 'parapet' || part.role === 'cover' || (part.role === 'bayWall' && part.finish === 'sandbag'))) {
+          bagStageByColor.set(part.role === 'bayWall' ? ROLE_COLOR.bayWall : ROLE_COLOR[part.role], partStage(part));
+        }
+        buildPart(partsGroup, part, bags);
+      }
+      const beforeFlush = partsGroup.children.length;
+      bags.flush(partsGroup);
+      for (let i = beforeFlush; i < partsGroup.children.length; i++) {
+        const child = partsGroup.children[i]!;
+        const hex = child.userData.colorHex as number | undefined;
+        child.userData.stage = hex !== undefined ? (bagStageByColor.get(hex) ?? 0) : 0;
+      }
+
       applyCutaway(model.cutaway);
+      applyLightRig(model.bounds.size);
+      applyFog(scene, activePalette, model.bounds.size);
+
+      // Stage scrubbed FORWARD: rise-in the parts that just appeared.
+      if (opts.stage !== undefined && prevStage !== undefined && opts.stage === prevStage + 1) {
+        startStageRise(opts.stage);
+      }
 
       if (!framed) {
         framed = true;
@@ -937,9 +1152,7 @@ export function createThreeViewer(): ThreeViewer {
         // far deeper than 8% of its wide footprint — aiming shallow there left the camera looking
         // mostly over the top of the cut at open sky instead of down into it).
         const targetDepth = Math.max(size * 0.08, model.bounds.depth * 0.5);
-        camera.position.set(size * 0.55, size * 0.5, size * 0.7);
-        controls.target.set(0, -targetDepth, 0);
-        controls.update();
+        flyTo(new THREE.Vector3(size * 0.55, size * 0.5, size * 0.7), new THREE.Vector3(0, -targetDepth, 0));
       }
     },
     resize: doResize,
@@ -951,8 +1164,13 @@ export function createThreeViewer(): ThreeViewer {
       cancelAnimationFrame(raf);
       ro?.disconnect();
       rerenderCallbacks.delete(onAssetsReady);
+      terrainDispose?.();
+      disposeObject(terrainGroup);
       disposeObject(partsGroup);
       disposeObject(scene);
+      sun.shadow.dispose(); // the live shadow render target isn't reachable by disposeObject
+      skyRig.dispose();
+      pipeline.dispose();
       controls.dispose();
       renderer.dispose();
     },
@@ -968,8 +1186,18 @@ export function createThreeViewer(): ThreeViewer {
 
   return api;
 
-  function setTheme(theme: 'day' | 'night'): void {
-    setSky(theme);
+  // Theme flip = swap the ACTIVE PALETTE and rebuild: night is a hue-shifted second palette
+  // (terrain, sandbags, dirt, figure all re-colored), plus the moonlit sky/fog/exposure — not
+  // the old approach of dimming the day lights over unchanged day colors.
+  function setTheme(next: 'day' | 'night'): void {
+    if (theme === next) return;
+    theme = next;
+    activePalette = palette(next);
+    ROLE_COLOR = activePalette.role;
+    skyRig.setTheme(activePalette);
+    pipeline.setTheme(activePalette);
+    if (lastResult) api.update(lastResult, lastOpts);
+    else { applyLightRig(30); applyFog(scene, activePalette, 60); }
   }
 }
 

@@ -78,6 +78,26 @@ export type BoxRole =
 
 export type Part3 = Box3 | Cyl3 | Ring3 | Wedge3 | Arrow3 | Figure3;
 
+// ── Terrain spec (pure data) ─────────────────────────────────────────────────
+// The renderer's terrain path cuts REAL holes into one earth block instead of tiling flat
+// "ground" frame boxes around the main bay. Frame boxes can only picture-frame a single
+// rectangle — an inverted-T's stem trench and an L's arm trench end up UNDER solid ground
+// bands (and the fifty-cal arm literally overhangs the slab edge). This spec describes the
+// full footprint honestly: one outer block + every sunken volume, in feet, same axes as parts.
+// Hole envelopes are expanded past the excavation by the wall taper (sloped bare-earth walls
+// flare OUTWARD toward the top) plus a small clearance so terrain never clips through walls.
+export interface TerrainHoleRect { kind: 'rect'; x: number; z: number; w: number; d: number; depth: number }
+export interface TerrainHoleCircle { kind: 'circle'; x: number; z: number; r: number; depth: number }
+// A single simple polygon (no self-intersection), for compound T/L footprints — two separate
+// rect holes sharing an edge would be degenerate for shape triangulation, so the union is
+// emitted as ONE outline. Points ordered consistently; the renderer normalizes winding.
+export interface TerrainHolePoly { kind: 'poly'; pts: Array<[number, number]>; depth: number }
+export type TerrainHole = TerrainHoleRect | TerrainHoleCircle | TerrainHolePoly;
+export interface TerrainSpec {
+  outer: { x: number; z: number; w: number; d: number };
+  holes: TerrainHole[];
+}
+
 export interface Scene3DModel {
   hasAnything: boolean;
   parts: Part3[];
@@ -86,6 +106,10 @@ export interface Scene3DModel {
   // deep one (the ramp's exaggerated relief) can share the same size but need very different
   // camera pitch, so the viewer frames on both, not size alone.
   bounds: { size: number; depth: number };
+  // Present whenever hasAnything — the renderer's terrain path builds one earth block with
+  // true holes from this; the flat role-'ground' frame parts stay emitted as the low-tier
+  // fallback (and to keep every existing consumer/test untouched).
+  terrain?: TerrainSpec;
   engineeredRoof: boolean; // true → show the hazard marker, never a fabricated cover
   cutaway: boolean; // viewer clips the near half so the interior/OHC reads at a glance
 }
@@ -113,7 +137,9 @@ const ROLE_STAGE: Record<BoxRole, number> = {
   engineeredCover: 5,
   camoNet: 6, // camouflage, continuous/last
 };
-function partStage(part: Part3): number {
+// Exported so the renderer can tag built meshes with their construction stage (the stage
+// scrubber's rise-in animation needs to know which parts JUST appeared).
+export function partStage(part: Part3): number {
   if (part.kind === 'box' || part.kind === 'cyl' || part.kind === 'ring') return ROLE_STAGE[part.role] ?? 0;
   return 0; // arrow / wedge / figure / dimLeader are orientation aids — always shown
 }
@@ -152,6 +178,8 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
   const p = geo.plan;
   const s = geo.section;
   const parts: Part3[] = [];
+  const terrainHoles: TerrainHole[] = [];
+  let terrainOuter = { x: 0, z: 0, w: 20, d: 20 };
   const halfL = p.holeL / 2;
   const halfW = p.holeW / 2;
   const wallT = Math.max(0.3, p.parapetW * 0.35); // visual wall thickness for the excavation sides
@@ -190,6 +218,9 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
       kind: 'cyl', x: 0, y: -s.depthOfCut / 2 + gradeMargin / 2, z: 0,
       radius: rHole, radiusTop: rTop, height: s.depthOfCut + gradeMargin, role: 'bayFloor',
     });
+    // Terrain hole = the pit at its WIDEST (the battered top radius), plus clearance.
+    terrainHoles.push({ kind: 'circle', x: 0, z: 0, r: rTop + 0.05, depth: finite(s.depthOfCut) });
+    terrainOuter = { x: 0, z: 0, w: rOuter * 2 + 4, d: rOuter * 2 + 4 };
   } else if (geo.shape === 'vehicle_ramp') {
     const runLen = p.holeW;
     // Ground is centered on the RAMP's own z-center (not world origin) so its footprint always
@@ -242,6 +273,12 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     const bermH = Math.max(0.3, p.parapetW * 0.15);
     parts.push({ kind: 'box', x: -(halfL + p.parapetW / 2), y: bermH / 2, z: -runLen / 4, w: p.parapetW, h: bermH, d: runLen, role: 'rampBerm', finish: 'earth' });
     parts.push({ kind: 'box', x: halfL + p.parapetW / 2, y: bermH / 2, z: -runLen / 4, w: p.parapetW, h: bermH, d: runLen, role: 'rampBerm', finish: 'earth' });
+    // Terrain hole matches the DRAWN (exaggerated) staircase, not the doctrinal depthOfCut —
+    // the earth block has to enclose what's actually rendered. +0.1 width clearance: the tread
+    // boxes are exactly holeL wide, and a zero-clearance hole leaves their side faces coplanar
+    // with the terrain cut (z-fighting shimmer down both flanks of the ramp).
+    terrainHoles.push({ kind: 'rect', x: 0, z: -runLen / 2, w: p.holeL + 0.1, d: runLen, depth: finite(depthEx) });
+    terrainOuter = { x: 0, z: rampZCenter, w: p.outerL + 4, d: runLen + 6 };
   } else {
     // rect, rect_roofed, inverted_t, l_shape all start from a rectangular ring + bay.
     // Every position needs a way in and out — a fully closed 4-sided box (the previous shape)
@@ -259,6 +296,15 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     pushRing(parts, 0, 0, p.holeL, p.holeW, p.parapetW, 1.1, entranceGap);
     pushBayBox(parts, 0, 0, p.holeL, p.holeW, s.depthOfCut, wallT, finish, slopeRatio, picketSpacing, p.parapetW, entranceGap);
 
+    // Hole envelopes expand past the excavation by the wall taper (bare sloped earth flares
+    // OUTWARD toward the top — same formula as pushBayBox's taperAmount) plus clearance, so
+    // the terrain block never clips through a flared wall top.
+    const mainTaper = finish === 'earth' ? Math.min(slopeRatio * s.depthOfCut, p.parapetW * 0.9) : 0;
+    const e = mainTaper + 0.05;
+    const subTaper = finish === 'earth' ? Math.min(slopeRatio * s.depthOfCut * 0.85, p.parapetW * 0.7 * 0.9) : 0;
+    const es = subTaper + 0.05;
+    terrainOuter = { x: 0, z: 0, w: p.outerL + 4, d: p.outerW + 4 };
+
     if (geo.shape === 'inverted_t') {
       // A narrower connecting trench extends toward the rear from the bay's center (the "shaft"
       // of the inverted-T) — a doctrinal crew/ammo trench, not a separately-parapeted position
@@ -270,6 +316,13 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
       const stemLen = p.holeW * 1.1;
       const stemZ = halfW + stemLen / 2;
       pushBayBox(parts, 0, stemZ, stemW, stemLen, s.depthOfCut * 0.85, wallT * 0.8, finish, slopeRatio, picketSpacing, p.parapetW * 0.7, Math.min(2.5, stemW));
+      // One T-shaped union outline (main bay ∪ stem) — two rect holes sharing an edge would
+      // be degenerate for shape triangulation.
+      const HL = halfL + e, HW = halfW + e, SW = stemW / 2 + es, SZ = halfW + stemLen + es;
+      terrainHoles.push({
+        kind: 'poly', depth: finite(s.depthOfCut),
+        pts: [[-HL, -HW], [HL, -HW], [HL, HW], [SW, HW], [SW, SZ], [-SW, SZ], [-SW, HW], [-HL, HW]],
+      });
     } else if (geo.shape === 'l_shape') {
       // A perpendicular arm attached at one end (crew/ammo alcove) forming an L — same
       // reasoning as the inverted-T's shaft: a connecting trench, not its own parapeted position.
@@ -278,6 +331,14 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
       const armX = halfL + armLen / 2;
       const armZ = halfW - armW / 2;
       pushBayBox(parts, armX, armZ, armLen, armW, s.depthOfCut * 0.85, wallT * 0.8, finish, slopeRatio, picketSpacing, p.parapetW * 0.7);
+      // One L-shaped union outline (main bay ∪ side arm), same single-polygon reasoning.
+      const HL = halfL + e, HW = halfW + e, AZ = halfW - armW - es, AX = halfL + armLen + es;
+      terrainHoles.push({
+        kind: 'poly', depth: finite(s.depthOfCut),
+        pts: [[-HL, -HW], [HL, -HW], [HL, AZ], [AX, AZ], [AX, HW], [-HL, HW]],
+      });
+    } else {
+      terrainHoles.push({ kind: 'rect', x: 0, z: 0, w: p.holeL + 2 * e, d: p.holeW + 2 * e, depth: finite(s.depthOfCut) });
     }
   }
 
@@ -326,18 +387,49 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
   }
 
   // ── Standing figure for scale ──────────────────────────────────────────────
-  parts.push({ kind: 'figure', x: halfL + 2, z: 1.5, heightFt: 5.83 });
+  // Circular positions: halfL + 2 lands INSIDE the parapet annulus (the ring extends to
+  // rHole + parapetW), clipping the figure's legs through the ring — place it past the ring.
+  const figureX = geo.shape === 'circular' ? Math.max(p.outerL, p.outerW) / 2 + 1.5 : halfL + 2;
+  parts.push({ kind: 'figure', x: figureX, z: 1.5, heightFt: 5.83 });
 
   // The vehicle ramp's visual depth is exaggerated (RELIEF_EXAGGERATION) well past depthOfCut —
   // frame the camera to that actual drawn depth, not the real doctrinal one, or the deep end
   // renders mostly out of frame against blank sky.
   const effectiveDepth = geo.shape === 'vehicle_ramp' ? s.depthOfCut * RELIEF_EXAGGERATION + 1 : s.depthOfCut;
   const boundsSize = finite(Math.max(p.outerL, p.outerW, effectiveDepth * 2) + 8);
+
+  // The terrain outer block must CONTAIN every hole with margin — the fifty-cal's L-arm tip
+  // used to overhang the old fixed-size ground frame's edge. Grow (never shrink) the outer
+  // rect to cover each hole envelope plus a 1.5 ft apron.
+  let oMinX = terrainOuter.x - terrainOuter.w / 2;
+  let oMaxX = terrainOuter.x + terrainOuter.w / 2;
+  let oMinZ = terrainOuter.z - terrainOuter.d / 2;
+  let oMaxZ = terrainOuter.z + terrainOuter.d / 2;
+  for (const h of terrainHoles) {
+    const env =
+      h.kind === 'rect' ? { minX: h.x - h.w / 2, maxX: h.x + h.w / 2, minZ: h.z - h.d / 2, maxZ: h.z + h.d / 2 }
+      : h.kind === 'circle' ? { minX: h.x - h.r, maxX: h.x + h.r, minZ: h.z - h.r, maxZ: h.z + h.r }
+      : {
+          minX: Math.min(...h.pts.map((pt) => pt[0])),
+          maxX: Math.max(...h.pts.map((pt) => pt[0])),
+          minZ: Math.min(...h.pts.map((pt) => pt[1])),
+          maxZ: Math.max(...h.pts.map((pt) => pt[1])),
+        };
+    oMinX = Math.min(oMinX, env.minX - 1.5);
+    oMaxX = Math.max(oMaxX, env.maxX + 1.5);
+    oMinZ = Math.min(oMinZ, env.minZ - 1.5);
+    oMaxZ = Math.max(oMaxZ, env.maxZ + 1.5);
+  }
+  const terrain: TerrainSpec = {
+    outer: { x: finite((oMinX + oMaxX) / 2), z: finite((oMinZ + oMaxZ) / 2), w: finite(oMaxX - oMinX), d: finite(oMaxZ - oMinZ) },
+    holes: terrainHoles,
+  };
+
   // Stage filter: show only parts built by the selected stage (undefined ⇒ final state). The
   // orientation aids (arrow/figure/wedge) always survive so the scene never loses its "which
   // way is the enemy" cue mid-build.
   const staged = opts.stage === undefined ? parts : parts.filter((part) => partStage(part) <= opts.stage!);
-  return { hasAnything: true, parts: staged, bounds: { size: boundsSize, depth: finite(effectiveDepth) }, engineeredRoof, cutaway: opts.cutaway === true };
+  return { hasAnything: true, parts: staged, bounds: { size: boundsSize, depth: finite(effectiveDepth) }, terrain, engineeredRoof, cutaway: opts.cutaway === true };
 }
 
 // A flat "ground" slab with a rectangular hole cut out over the excavation, built as 4
