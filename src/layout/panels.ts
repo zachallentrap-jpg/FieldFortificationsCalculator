@@ -1,7 +1,7 @@
 // Read-only output panels (§10, §12): specs, bill of materials, labor, validation, the sticky
 // summary bar, and the tap-to-explain derivation trace. Any value backed by a Derivation is a
-// button carrying data-trace=<key>; main.ts opens that derivation. Placeholder-derived figures
-// are flagged (PH). Numbers formatted through the unit layer (feet-internal, display-converted).
+// button carrying data-trace=<key>; main.ts opens that derivation. Numbers formatted through
+// the unit layer (feet-internal, display-converted).
 
 import { fmtLength, fmtVolume } from '../doctrine/units';
 import { positions } from '../doctrine/positions';
@@ -16,11 +16,10 @@ function num(n: number): string {
 }
 
 // A value cell: a button (opens the trace) when a derivation key is given, else plain text.
-function val(text: string, traceKey?: string, ph = false): string {
-  const cls = 'val' + (ph ? ' ph' : '');
+function val(text: string, traceKey?: string): string {
   return traceKey
-    ? '<button class="' + cls + '" type="button" data-trace="' + esc(traceKey) + '">' + esc(text) + (ph ? ' (PH)' : '') + '</button>'
-    : '<span class="' + cls + '">' + esc(text) + (ph ? ' (PH)' : '') + '</span>';
+    ? '<button class="val" type="button" data-trace="' + esc(traceKey) + '">' + esc(text) + '</button>'
+    : '<span class="val">' + esc(text) + '</span>';
 }
 
 function specRow(label: string, value: string): string {
@@ -36,9 +35,9 @@ const DIM_TRACE: Record<string, string> = {
 
 export function specsPanel(result: Result): string {
   const u = result.inputs.unit;
-  // Single source of truth: the same dims the plan/section drawings annotate, with the same
-  // per-dim placeholder flags. The panel can never disagree with the drawing or the trace
-  // again (the old panel showed raw holeD while section + trace showed depthOfCut).
+  // Single source of truth: the same dims the plan/section drawings annotate. The panel can
+  // never disagree with the drawing or the trace again (the old panel showed raw holeD while
+  // section + trace showed depthOfCut).
   const geo = result.geometry as GeometryModel;
   const posLabel = positions[result.inputs.positionType]?.label ?? result.inputs.positionType;
   const rows = geo.dims
@@ -47,7 +46,7 @@ export function specsPanel(result: Result): string {
         dim.key === 'cover_t'
           ? fmtLength(dim.valueFt, u) + ' ' + result.cover.material
           : fmtLength(dim.valueFt, u);
-      return specRow(dim.label, val(text, DIM_TRACE[dim.key], dim.placeholder));
+      return specRow(dim.label, val(text, DIM_TRACE[dim.key]));
     })
     .join('');
   const engineered =
@@ -59,7 +58,7 @@ export function specsPanel(result: Result): string {
   // halving-thickness doctrine leaf.
   const radDeriv = result.derivations.find((d) => d.key === 'radiationLayers');
   const radiation = radDeriv
-    ? specRow('Fallout shielding', val((Math.round(radDeriv.result * 10) / 10) + '× halved', 'radiationLayers', true))
+    ? specRow('Fallout shielding', val((Math.round(radDeriv.result * 10) / 10) + '× halved', 'radiationLayers'))
     : '';
 
   // Model-fidelity statement — formulas get the same honesty as constants: this says which
@@ -93,7 +92,7 @@ export function bomPanel(result: Result): string {
     .map(
       (l) =>
         '<tr><td>' + esc(l.label) + '</td><td class="n">' +
-        val(num(l.qtyPerPosition), BOM_TRACE[l.id], l.fromPlaceholder) +
+        val(num(l.qtyPerPosition), BOM_TRACE[l.id]) +
         '</td><td class="n">' + num(l.qtyTotal) + '</td><td>' + esc(l.unit) + '</td></tr>',
     )
     .join('');
@@ -158,7 +157,6 @@ export function traceHtml(d: Derivation): string {
       (o) =>
         '<li><span class="op-name">' + esc(o.name) + '</span>' +
         '<span class="op-val">' + num(o.value) + (o.unit ? ' ' + esc(o.unit) : '') + '</span>' +
-        (o.placeholder ? '<span class="op-ph" title="' + esc(o.source ?? 'placeholder') + '">placeholder</span>' : '') +
         '</li>',
     )
     .join('');
@@ -166,7 +164,6 @@ export function traceHtml(d: Derivation): string {
     '<div class="trace"><h3>' + esc(d.label) + '</h3>' +
     '<code class="formula">' + esc(d.formula) + '</code>' +
     '<div class="trace-result">= ' + num(d.result) + ' ' + esc(d.unit) + '</div>' +
-    '<ul class="operands">' + operands + '</ul>' +
-    '<p class="trace-note">Every placeholder figure is illustrative — confirm against current pubs.</p></div>'
+    '<ul class="operands">' + operands + '</ul></div>'
   );
 }

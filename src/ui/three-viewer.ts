@@ -532,47 +532,52 @@ function taperOuterFace(geometry: THREE.BufferGeometry, axis: 0 | 2, sign: 1 | -
 
 // Parapet and overhead cover are ALWAYS sandbag construction per doctrine (§ engine/materials.ts
 // bagsParapet/bagsCover) — this tiles small boxes across the footprint instead of one flat slab,
-// so "if sandbags are used, it shows sandbags." One shared outline keeps the cartoon silhouette
-// clean; the individual bags skip their own outline (outlining every tiny bag would look busy).
+// so "if sandbags are used, it shows sandbags." Individual bags skip their own outline (outlining
+// every tiny bag would look busy).
+//
+// The bags are scaled slightly OVERSIZED vs their layout cell so neighbors press into each
+// other — a real stack has no daylight between bags, so the wall needs no filler box behind the
+// courses at all. (Earlier versions hid the gaps behind an oversized black outline shell, which
+// read as a black backdrop panel at close range, then behind an inset core box, which swallowed
+// the bags into a mud slab.)
 //
 // Each tile is the Blender-authored sandbag prop (DECISIONS D28) once `sandbagGeometry` has
-// loaded — a real sagging-pillow shape, not a cube — cloned and scaled to the tile cell with a
-// small deterministic per-instance rotation/scale jitter so a repeated asset doesn't read as an
+// loaded — a real sagging-pillow shape with its origin at the BASE of the bag (unit bbox y 0..1,
+// the CommandHub-Led pipeline convention) — cloned and scaled to the tile cell with a small
+// deterministic per-instance rotation/scale jitter so a repeated asset doesn't read as an
 // obviously stamped grid. Falls back to a plain box (the pre-Blender look) until the GLB resolves.
 function buildSandbagWall(group: THREE.Group, x: number, y: number, z: number, w: number, h: number, d: number, colorHex: number): void {
-  const outline = new THREE.Mesh(
-    new THREE.BoxGeometry(Math.max(0.05, w), Math.max(0.05, h), Math.max(0.05, d)),
-    new THREE.MeshBasicMaterial({ color: 0x16130d, side: THREE.BackSide }),
-  );
-  outline.scale.multiplyScalar(1.035);
-  outline.position.set(x, y, z);
-  group.add(outline);
-
   // Tile in ALL THREE axes from the pure layout (render3d/propLayout.ts): cells stay close to
   // the doctrine bag's laid proportions, so a 3-ft-thick parapet reads as several bags deep —
-  // never one authored bag stretched 3 ft deep. The fallback box tiles the SAME cells, so the
-  // wall's envelope is identical before and after the async GLB resolves.
+  // never one authored bag stretched 3 ft deep. The fallback box tiles the SAME cells (and is
+  // translated to the same base-at-origin convention as the prop), so the wall's envelope is
+  // identical before and after the async GLB resolves.
   const { cols, rows, layers, cellW, cellH, cellD } = bagWallLayout(w, h, d);
   const mat = new THREE.MeshToonMaterial({ color: colorHex, gradientMap: toonGradient() });
   const bagGeo = sandbagGeometry ?? null;
-  const fallbackGeo = bagGeo ? null : new THREE.BoxGeometry(Math.max(0.05, cellW - 0.04), Math.max(0.05, cellH - 0.04), Math.max(0.05, cellD - 0.02));
+  let fallbackGeo: THREE.BoxGeometry | null = null;
+  if (!bagGeo) {
+    const fh = Math.max(0.05, cellH - 0.04);
+    fallbackGeo = new THREE.BoxGeometry(Math.max(0.05, cellW - 0.04), fh, Math.max(0.05, cellD - 0.02));
+    fallbackGeo.translate(0, fh / 2, 0);
+  }
   for (let l = 0; l < layers; l++) {
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const seed = r * 97 + c * 13 + l * 29 + x + z;
         const bx = x - w / 2 + (c + 0.5) * cellW + (hashJitter(seed) - 0.5) * cellW * 0.06;
-        const by = y - h / 2 + (r + 0.5) * cellH;
+        const baseY = y - h / 2 + r * cellH; // the prop's origin is the bag's BASE
         const bz = z - d / 2 + (l + 0.5) * cellD;
         const mesh = new THREE.Mesh(bagGeo ?? fallbackGeo!, mat);
         let settle = 0;
         if (bagGeo) {
-          const jitter = 0.92 + hashJitter(seed + 0.5) * 0.14;
-          mesh.scale.set(Math.max(0.05, cellW * 0.94) * jitter, Math.max(0.05, cellH * 0.9) * jitter, Math.max(0.05, cellD * 0.92) * jitter);
+          const jitter = 0.97 + hashJitter(seed + 0.5) * 0.1;
+          mesh.scale.set(Math.max(0.05, cellW * 1.08) * jitter, Math.max(0.05, cellH * 1.05) * jitter, Math.max(0.05, cellD * 1.1) * jitter);
           mesh.rotation.y = (hashJitter(seed + 0.25) - 0.5) * 0.35;
           mesh.rotation.z = (hashJitter(seed + 0.75) - 0.5) * 0.12;
-          settle = cellH * 0.02; // settle slightly, like a real stacked course
+          settle = cellH * 0.03; // settle slightly, like a real stacked course
         }
-        mesh.position.set(bx, by - settle, bz);
+        mesh.position.set(bx, baseY - settle, bz);
         group.add(mesh);
       }
     }
@@ -594,11 +599,15 @@ function buildPicketWall(group: THREE.Group, x: number, y: number, z: number, w:
     const frac = count === 1 ? 0.5 : i / (count - 1);
     const offset = (frac - 0.5) * length;
     const post = new THREE.Mesh(postGeo ?? new THREE.CylinderGeometry(postR, postR, h, 8), postMat);
+    // The GLB prop's origin is the stake's BASE (unit bbox y 0..1); the fallback cylinder is
+    // center-origin — place each accordingly so the posts stand ON the wall's bottom either way.
+    let postY = y;
     if (postGeo) {
       post.scale.set(postR * 2, h, postR * 2);
       post.rotation.y = hashJitter(i + x + z) * Math.PI * 2; // hewn posts have no "front", vary freely
+      postY = y - h / 2;
     }
-    post.position.set(alongX ? x + offset : x, y, alongX ? z : z + offset);
+    post.position.set(alongX ? x + offset : x, postY, alongX ? z : z + offset);
     group.add(post);
   }
   const wireMat = new THREE.MeshBasicMaterial({ color: 0x55524a });
@@ -795,7 +804,12 @@ export function createThreeViewer(): ThreeViewer {
   canvas.style.display = 'block';
   canvas.style.width = '100%';
   canvas.style.height = '100%';
-  canvas.style.touchAction = 'none'; // let OrbitControls own touch gestures (drag/pinch)
+  // pan-y (not 'none'): the model sits in a scrolling page/column, so a one-finger VERTICAL
+  // drag must scroll the page THROUGH the model — with 'none' the model trapped every touch and
+  // the user couldn't scroll past it on a phone. pan-y still routes one-finger HORIZONTAL drags
+  // (the "turn it around" gesture) and all multi-touch (pinch-zoom, two-finger orbit) to
+  // OrbitControls. Re-applied after `new OrbitControls` below, which forces 'none' on connect().
+  canvas.style.touchAction = 'pan-y';
 
   // preserveDrawingBuffer:true — without it, a throttled/backgrounded tab (or any read of the
   // canvas outside the exact rAF tick, e.g. a browser mid-frame) can show a blank/cleared canvas
@@ -821,6 +835,10 @@ export function createThreeViewer(): ThreeViewer {
   controls.maxPolarAngle = Math.PI * 0.49; // never dip below ground
   controls.minDistance = 3;
   controls.maxDistance = 200;
+  // OrbitControls.connect() (called from its constructor) hard-sets touchAction='none' to grab
+  // every touch. Override it back to pan-y so vertical page-scroll passes through the model on
+  // mobile; horizontal drag + pinch still reach the controls. (See the canvas init above.)
+  renderer.domElement.style.touchAction = 'pan-y';
 
   const hemi = new THREE.HemisphereLight(0xffffff, 0x4a3a22, 1.1);
   const sun = new THREE.DirectionalLight(0xffffff, 1.0);
@@ -914,8 +932,13 @@ export function createThreeViewer(): ThreeViewer {
       if (!framed) {
         framed = true;
         const size = model.bounds.size;
+        // Aim the target at whichever is deeper: the usual shallow 8%-of-size dip (most
+        // positions), or the model's own real depth (the vehicle ramp's exaggerated relief runs
+        // far deeper than 8% of its wide footprint — aiming shallow there left the camera looking
+        // mostly over the top of the cut at open sky instead of down into it).
+        const targetDepth = Math.max(size * 0.08, model.bounds.depth * 0.5);
         camera.position.set(size * 0.55, size * 0.5, size * 0.7);
-        controls.target.set(0, -size * 0.08, 0);
+        controls.target.set(0, -targetDepth, 0);
         controls.update();
       }
     },
@@ -1000,4 +1023,4 @@ export function onPropAssetsReady(cb: () => void): () => void {
   return () => rerenderCallbacks.delete(cb);
 }
 
-export { disposeObject, toonGradient };
+export { disposeObject, toonGradient, lumberPiece, plywoodSheet };

@@ -1,8 +1,8 @@
 // Printable job sheet (§10). A self-contained HTML document: repeating masthead (SAP-1,
-// scenario, date, APP_VERSION), the honest NOT FOR FIELD USE stamp, inputs summary, the
-// annotated plan + section (same numbered-callout system), specs, BOM, labor, and a
-// Prepared by / Verified by / Date block. Page-break-safe via @media print rules. Pure —
-// the date is passed in (the engine reads no clock).
+// scenario, date, APP_VERSION), inputs summary, the annotated plan + section (same
+// numbered-callout system), specs, BOM, labor, and a Prepared by / Verified by / Date block.
+// Page-break-safe via @media print rules. Pure — the date is passed in (the engine reads no
+// clock).
 
 import { esc } from './svg';
 import { drawPlan } from './drawPlan';
@@ -27,7 +27,6 @@ const PRINT_CSS =
   '.mast{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid var(--ink);padding-bottom:6px}' +
   '.mast h1{font-size:18px;margin:0;letter-spacing:1px}' +
   '.mast .meta{font-size:11px;color:var(--ink-soft);text-align:right}' +
-  '.stamp{margin:10px 0;padding:6px 10px;background:var(--banner-bg);color:var(--banner-text);font-weight:700;letter-spacing:0.5px;border-radius:4px;text-align:center}' +
   '.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}' +
   '.drawings{display:grid;grid-template-columns:1fr;gap:10px}' +
   '.drawings svg{width:100%;height:auto;border:1px solid var(--border);border-radius:8px}' +
@@ -36,22 +35,19 @@ const PRINT_CSS =
   'th,td{text-align:left;padding:4px 6px;border-bottom:1px solid var(--border)}' +
   'th{color:var(--ink-soft);font-weight:600}' +
   'td.n{text-align:right;font-family:ui-monospace,monospace}' +
-  '.ph{color:var(--dim-text);font-weight:600}' +
+  '.engineered{color:var(--draw-engineered);font-weight:700}' +
   '.sign{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:24px}' +
   '.sign .line{border-top:1px solid var(--ink);padding-top:4px;font-size:10px;color:var(--ink-soft)}' +
   '@media print{.sheet{padding:0}section,table,.drawings svg{break-inside:avoid}@page{margin:0.5in}}';
 
-function specRow(label: string, value: string, ph = false): string {
-  return '<tr><td>' + esc(label) + '</td><td class="n' + (ph ? ' ph' : '') + '">' + esc(value) + (ph ? ' (PH)' : '') + '</td></tr>';
+function specRow(label: string, value: string): string {
+  return '<tr><td>' + esc(label) + '</td><td class="n">' + esc(value) + '</td></tr>';
 }
 
 export function jobSheet(result: Result, meta: JobSheetMeta): string {
   const unit = result.inputs.unit;
   const posLabel = positions[result.inputs.positionType]?.label ?? result.inputs.positionType;
-  const notForField = result.placeholderReport.remaining > 0;
   const r = result.resolved;
-
-  const stamp = notForField ? '<div class="stamp">NOT FOR FIELD USE — illustrative placeholder data. Confirm every value against current pubs.</div>' : '';
 
   const inputRows =
     specRow('Position', posLabel) +
@@ -69,16 +65,16 @@ export function jobSheet(result: Result, meta: JobSheetMeta): string {
     specRow('Parapet', fmtLength(r.parapetW, unit) + ' thick, ' + fmtLength(r.parapetH, unit) + ' high') +
     specRow('Roof setback', fmtLength(r.setback, unit)) +
     (result.cover.roofPath === 'earth_on_stringers'
-      ? specRow('Overhead cover', fmtLength(result.cover.thickness, unit) + ' ' + result.cover.material, true)
+      ? specRow('Overhead cover', fmtLength(result.cover.thickness, unit) + ' ' + result.cover.material)
       : result.cover.roofPath === 'engineered_required'
-        ? '<tr><td>Overhead roof</td><td class="n ph">ENGINEERED — see engineer</td></tr>'
+        ? '<tr><td>Overhead roof</td><td class="n engineered">ENGINEERED — see engineer</td></tr>'
         : specRow('Overhead cover', 'none')) +
     '<tr><td>Volume model</td><td class="n">' + esc(result.fidelity.volume) + '</td></tr>';
 
   const bomRows = result.bom
     .map(
       (l) =>
-        '<tr><td>' + esc(l.label) + (l.fromPlaceholder ? ' <span class="ph">(PH)</span>' : '') + '</td>' +
+        '<tr><td>' + esc(l.label) + '</td>' +
         '<td class="n">' + num(l.qtyPerPosition) + '</td>' +
         '<td class="n">' + num(l.qtyTotal) + '</td><td>' + esc(l.unit) + '</td></tr>',
     )
@@ -98,7 +94,6 @@ export function jobSheet(result: Result, meta: JobSheetMeta): string {
     '<div class="mast"><h1>SAP-1 — Survivability Position Planner</h1>' +
     '<div class="meta">' + esc(meta.scenario) + '<br>' + esc(meta.date) + ' · ' + esc(APP_VERSION) + '</div></div>' +
     fieldHeader() +
-    stamp +
     '<section><div class="grid"><div><h2>Inputs</h2><table>' + inputRows + '</table></div>' +
     '<div><h2>Specifications</h2><table>' + specRows + '</table></div></div></section>' +
     '<section><h2>Drawings</h2><div class="drawings">' + drawPlan(result) + drawSection(result) + '</div></section>' +
@@ -122,8 +117,8 @@ function engineerBlock(result: Result): string {
   const rows =
     specRow('Threat to defeat', threatName(result)) +
     specRow('Clear span to roof', fmtLength(result.resolved.holeL, u) + ' × ' + fmtLength(result.resolved.holeW, u)) +
-    specRow('Standoff achieved', fmtLength(result.resolved.setback, u), true) +
-    specRow('Depth of cut', fmtLength(result.resolved.depthOfCut, u), true);
+    specRow('Standoff achieved', fmtLength(result.resolved.setback, u)) +
+    specRow('Depth of cut', fmtLength(result.resolved.depthOfCut, u));
   return (
     '<section><h2>Take this to the engineer (roof must be engineered)</h2>' +
     '<p style="font-size:11px;color:var(--ink-soft)">This position’s overhead cover exceeds field-expedient limits — a qualified engineer must design the roof. Bring these so they can start:</p>' +

@@ -33,11 +33,10 @@ test('specs panel shows the SAME depth the derivation trace computes, across pos
   }
 });
 
-test('specs panel flags placeholder-derived rows with (PH), from the same dims the drawings use', () => {
+test('specs panel never flags rows with (PH), even before a doctrine fill', () => {
   const r = compute(defaultInputs());
   const html = specsPanel(r);
-  // Everything is a placeholder before a doctrine fill, so every dim row must carry the flag.
-  assert.ok(html.includes('(PH)'), 'placeholder flags present pre-fill');
+  assert.ok(!html.includes('(PH)'), 'no placeholder flags shown, pre- or post-fill');
 });
 
 // ── Scenario round-trips: the app re-opens every file it writes ──────────────
@@ -112,13 +111,13 @@ test('corrupt or hostile session data degrades to null / partial, never throws',
   assert.deepEqual(back.onHand, { b: 5 });
 });
 
-// ── Data-driven drawing disclaimer (a11y parity with the topbar badge) ────────
+// ── Drawing descriptions never carry a disclaimer ─────────────────────────────
 
-test('drawing desc carries NOT FOR FIELD USE only while placeholders remain', () => {
+test('drawing desc never carries a NOT FOR FIELD USE disclaimer, placeholders or not', () => {
   const r = compute(defaultInputs());
-  assert.ok(describeDrawing(r, 'plan').desc.includes('NOT FOR FIELD USE'), 'flagged while placeholders remain');
+  assert.ok(!describeDrawing(r, 'plan').desc.includes('NOT FOR FIELD USE'), 'no disclaimer with placeholders remaining');
   const cleared: Result = { ...r, placeholderReport: { ...r.placeholderReport, remaining: 0 } };
-  assert.ok(!describeDrawing(cleared, 'plan').desc.includes('NOT FOR FIELD USE'), 'clears at zero like the badge');
+  assert.ok(!describeDrawing(cleared, 'plan').desc.includes('NOT FOR FIELD USE'), 'no disclaimer once cleared either');
   assert.ok(describeDrawing(cleared, 'plan').desc.includes('deep'), 'depth still described');
 });
 

@@ -41,6 +41,13 @@ test('fine pointer + narrow = tablet fallback (never desktop below desktopMin)',
   assert.equal(resolveLayout(env({ width: BP.desktopMin - 1, pointerCoarse: false })), 'tablet');
 });
 
+test('below tabletMin every pointer type gets the stacked mobile layout', () => {
+  // A narrow desktop window with a mouse previously resolved to tablet and crushed the
+  // two-column grid into ~390 px of viewport.
+  assert.equal(resolveLayout(env({ width: BP.tabletMin - 1, pointerCoarse: false })), 'mobile');
+  assert.equal(resolveLayout(env({ width: 390, pointerCoarse: false })), 'mobile');
+});
+
 test('full width × pointer × override matrix is total and stable', () => {
   const widths = [200, 320, 639, 640, 800, 1023, 1024, 1440, 2560];
   const overrides: LayoutEnv['override'][] = ['auto', 'mobile', 'tablet', 'desktop'];

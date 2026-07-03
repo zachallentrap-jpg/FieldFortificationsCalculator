@@ -6,7 +6,7 @@
 import { el, group, textEl, callout } from './svg';
 import { makeProjector } from './project';
 import {
-  HEADER_H, LEGEND_H, headerBar, fieldUseBanner, hDim, vDim, legendPanel, emptyPrompt, svgRoot,
+  HEADER_H, LEGEND_H, headerBar, hDim, vDim, legendPanel, emptyPrompt, svgRoot,
   northArrow, azimuthLabel, scaleBar,
 } from './chrome';
 import { describe, a11yAttrs } from './a11y';
@@ -33,16 +33,20 @@ export function drawPlan(result: Result): string {
   const halfW = p.outerW / 2;
   const enemyMargin = Math.max(3, halfW * 0.7);
   const sidePad = Math.max(1.5, p.parapetW);
+  // The inverted-T's rear stem and the L-shape's side arm (see the shape-specific draw below)
+  // extend past the plain rectangle's own footprint — pad the projector bounds so they never
+  // clip off-canvas instead of sizing bounds only for the main bay.
+  const stemLen = geo.shape === 'inverted_t' ? p.holeW * 1.1 : 0;
+  const armLen = geo.shape === 'l_shape' ? Math.max(2.5, p.holeL * 0.6) : 0;
 
   const proj = makeProjector(
-    { minX: -halfL - sidePad, maxX: halfL + sidePad, minY: -halfW - enemyMargin, maxY: halfW + sidePad + 1 },
+    { minX: -halfL - sidePad, maxX: halfL + sidePad + armLen, minY: -halfW - enemyMargin, maxY: halfW + sidePad + 1 + stemLen },
     { x: 0, y: HEADER_H + 20, w: W, h: H - LEGEND_H - (HEADER_H + 20), pad: 30 },
   );
   const px = (xf: number, yf: number): [number, number] => proj.toPx(xf, yf);
 
   const dm = new Map<string, DimSpec>(geo.dims.map((d) => [d.key, d]));
   const dimLabel = (k: string): string => fmtLength(dm.get(k)?.valueFt ?? 0, unit);
-  const dimPh = (k: string): boolean => dm.get(k)?.placeholder ?? false;
 
   const used = new Set<string>();
   const parts: string[] = [];
@@ -90,14 +94,37 @@ export function drawPlan(result: Result): string {
   parts.push(callout('enemy', arrowBase[0] + 16, arrowBase[1] - 6, used));
 
   // ── Parapet ring + fighting bay ────────────────────────────────────────────────
-  const oTL = px(-halfL, -halfW);
-  parts.push(
-    el('rect', { x: oTL[0], y: oTL[1], width: proj.lenPx(p.outerL), height: proj.lenPx(p.outerW), fill: 'var(--draw-parapet)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)', rx: 3 }),
-  );
-  const hTL = px(-p.holeL / 2, -p.holeW / 2);
-  parts.push(
-    el('rect', { x: hTL[0], y: hTL[1], width: proj.lenPx(p.holeL), height: proj.lenPx(p.holeW), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }),
-  );
+  // A round position (mortar pit) reads as a circle here, not a square — the plan view has to
+  // match the same silhouette the 3D model and doctrine both use (§ scene3d.ts's circular
+  // branch). The rectangular ring below stays the shared case for every other shape.
+  if (geo.shape === 'circular') {
+    const rOuter = Math.max(p.outerL, p.outerW) / 2;
+    const rHole = Math.max(p.holeL, p.holeW) / 2;
+    const c = px(0, 0);
+    parts.push(el('circle', { cx: c[0], cy: c[1], r: proj.lenPx(rOuter), fill: 'var(--draw-parapet)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
+    parts.push(el('circle', { cx: c[0], cy: c[1], r: proj.lenPx(rHole), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
+  } else {
+    const oTL = px(-halfL, -halfW);
+    parts.push(
+      el('rect', { x: oTL[0], y: oTL[1], width: proj.lenPx(p.outerL), height: proj.lenPx(p.outerW), fill: 'var(--draw-parapet)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)', rx: 3 }),
+    );
+    const hTL = px(-p.holeL / 2, -p.holeW / 2);
+    parts.push(
+      el('rect', { x: hTL[0], y: hTL[1], width: proj.lenPx(p.holeL), height: proj.lenPx(p.holeW), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }),
+    );
+    // The inverted-T's rear connecting trench / the L-shape's side alcove — same footprint
+    // math as scene3d.ts's 3D branches for these two shapes, so the plan matches the model
+    // instead of flattening every non-rectangular design down to a plain rectangle.
+    if (geo.shape === 'inverted_t') {
+      const stemW = Math.max(2, p.holeL * 0.3);
+      const sTL = px(-stemW / 2, p.holeW / 2);
+      parts.push(el('rect', { x: sTL[0], y: sTL[1], width: proj.lenPx(stemW), height: proj.lenPx(stemLen), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
+    } else if (geo.shape === 'l_shape') {
+      const armW = p.holeW * 0.9;
+      const aTL = px(p.holeL / 2, p.holeW / 2 - armW);
+      parts.push(el('rect', { x: aTL[0], y: aTL[1], width: proj.lenPx(armLen), height: proj.lenPx(armW), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
+    }
+  }
   used.add('parapet');
   parts.push(callout('parapet', ...px(0, -(halfW + p.holeW / 2) / 2), used));
   used.add('bay');
@@ -133,26 +160,30 @@ export function drawPlan(result: Result): string {
   const frontLabel = px(halfL * 0.72, -halfW * 0.8);
   const rearLabel = px(halfL * 0.72, halfW * 0.82);
   parts.push(
-    textEl(frontLabel[0], frontLabel[1], 'FRONT', { fill: 'var(--ink-soft)', 'font-size': 10.5, 'font-weight': '700', 'text-anchor': 'middle', 'letter-spacing': '1' }),
-    textEl(rearLabel[0], rearLabel[1], 'REAR', { fill: 'var(--ink-soft)', 'font-size': 10.5, 'font-weight': '700', 'text-anchor': 'middle', 'letter-spacing': '1' }),
+    // Full-strength ink: these sit ON the parapet fill, and the night theme's soft ink
+    // (#c76a45) is nearly the same hue as the night parapet (#b5622f) — invisible.
+    textEl(frontLabel[0], frontLabel[1], 'FRONT', { fill: 'var(--ink)', 'font-size': 10.5, 'font-weight': '700', 'text-anchor': 'middle', 'letter-spacing': '1' }),
+    textEl(rearLabel[0], rearLabel[1], 'REAR', { fill: 'var(--ink)', 'font-size': 10.5, 'font-weight': '700', 'text-anchor': 'middle', 'letter-spacing': '1' }),
   );
 
   // ── Dimensions ─────────────────────────────────────────────────────────────────
   const bTL = px(-p.holeL / 2, p.holeW / 2);
   const bTR = px(p.holeL / 2, p.holeW / 2);
-  parts.push(hDim(bTL[0], bTR[0], bTL[1] + 26, dimLabel('frontage'), dimPh('frontage')));
+  parts.push(hDim(bTL[0], bTR[0], bTL[1] + 26, dimLabel('frontage')));
   const lT = px(-p.holeL / 2, -p.holeW / 2);
   const lB = px(-p.holeL / 2, p.holeW / 2);
-  parts.push(vDim(lT[1], lB[1], lT[0] - 30, dimLabel('front_back'), dimPh('front_back')));
+  parts.push(vDim(lT[1], lB[1], lT[0] - 30, dimLabel('front_back')));
 
   // ── North arrow + scale bar (range-card chrome) ────────────────────────────────
   parts.push(northArrow(W - 34, HEADER_H + 42));
-  parts.push(scaleBar(20, H - LEGEND_H - 8, proj, unit));
+  // Scale bar sits in the free padding band ABOVE the legend panel — at -8 its unit label
+  // landed exactly on the LEGEND heading baseline (legendPanel draws it at -LEGEND_H + 8).
+  parts.push(scaleBar(20, H - LEGEND_H - 24, proj, unit));
 
   // ── Legend ───────────────────────────────────────────────────────────────────
   const legend = legendPanel(12, H - LEGEND_H + 14, W - 24, used);
 
-  return svgRoot(W, H, a11y, a11yDefs, headerBar(W, 'PLAN VIEW') + fieldUseBanner(W, result.placeholderReport.remaining) + group({}, ...parts) + legend);
+  return svgRoot(W, H, a11y, a11yDefs, headerBar(W, 'PLAN VIEW') + group({}, ...parts) + legend);
 }
 
 function midpoint(a: [number, number], b: [number, number]): [number, number] {

@@ -46,11 +46,11 @@ export function aggregateMission(items: MissionItem[], opts: MissionOptions = {}
 
   const onHand = opts.onHand ?? {};
   const lines = [...merged.values()].map((line): MissionBomLine => {
-    const oh = onHand[line.id];
-    if (typeof oh === 'number' && Number.isFinite(oh)) {
-      return { ...line, onHand: oh, shortfall: Math.max(0, line.qtyTotal - oh) };
-    }
-    return line;
+    // No entry means nothing on hand yet — short by the full need. (Rendering an undefined
+    // shortfall as 0 read as "not short" in the UI, the opposite of the truth.)
+    const raw = onHand[line.id];
+    const oh = typeof raw === 'number' && Number.isFinite(raw) ? raw : 0;
+    return { ...line, onHand: oh, shortfall: Math.max(0, line.qtyTotal - oh) };
   });
 
   lines.sort((a, b) => (a.sortKey - b.sortKey) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));

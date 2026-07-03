@@ -6,7 +6,6 @@ function item(term: string, def: string): string {
 export function helpHtml(): string {
   return (
     '<div class="help"><h2>How to use SAP-1</h2>' +
-    '<p class="help-warn">Everything here runs on <strong>illustrative placeholder data</strong>. Numbers marked (PH) are not authoritative — confirm each against current pubs before any field use.</p>' +
     '<dl>' +
     item('Type', 'The doctrinal position: one/two-man fighting positions, crew-served, vehicle defilade, mortar pit, bunker/OP-CP. Each has fixed geometry and features.') +
     item('Standard', 'Hasty → deliberate → reinforced. Scales depth, cover, and labor — a hasty position is faster and shallower; reinforced is deeper with more protection.') +
@@ -19,7 +18,7 @@ export function helpHtml(): string {
     item('Camouflage / Machine assist', 'Camouflage adds net area; machine assist reduces excavation labor.') +
     item('Positions / Team size', 'Count of positions to build and the crew size — drive total man-hours and elapsed time.') +
     item('Units', 'Display only. All math is in feet; switching imperial/metric never changes the result, only how it reads.') +
-    item('Tap a number', 'Any value with an underline opens its derivation — the exact formula, its operands, and which are placeholders.') +
+    item('Tap a number', 'Any value with an underline opens its derivation — the exact formula and its operands.') +
     '</dl></div>'
   );
 }

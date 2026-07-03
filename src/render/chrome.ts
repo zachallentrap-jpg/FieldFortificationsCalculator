@@ -1,10 +1,9 @@
 // Shared drawing chrome (§10) — the visual system every view reuses so plan, section, iso,
 // and the authored reference all speak one language: a dark header bar per view, numbered
 // callouts tied to ONE shared legend (svg.ts registry), coded high-contrast fills, all
-// dimensions in a single accent with (PH) flags, an explicit scale (bar + standing figure),
-// and the data-driven NOT FOR FIELD USE banner. Colors/weights are tokens (tokens.css) —
-// no hardcoded hex here. Pattern fills give redundancy beyond hue so drawings stay legible
-// in Night theme, monochrome print, and under color-vision deficiency.
+// dimensions in a single accent, and an explicit scale (bar + standing figure). Colors/weights
+// are tokens (tokens.css) — no hardcoded hex here. Pattern fills give redundancy beyond hue so
+// drawings stay legible in Night theme, monochrome print, and under color-vision deficiency.
 
 import { el, group, textEl, esc, buildLegend, callout } from './svg';
 import type { Projector } from './project';
@@ -70,30 +69,12 @@ export function headerBar(w: number, title: string): string {
   );
 }
 
-// Data-driven NOT FOR FIELD USE banner (§2.5) — a thin strip under the header, shown only
-// while placeholder-derived figures remain. Clears at zero placeholders.
-export function fieldUseBanner(w: number, remaining: number): string {
-  if (remaining <= 0) return '';
-  return group(
-    { class: 'banner' },
-    el('rect', { x: 0, y: HEADER_H, width: w, height: 16, fill: 'var(--banner-bg)' }),
-    textEl(w / 2, HEADER_H + 12, 'NOT FOR FIELD USE — illustrative placeholder data', {
-      fill: 'var(--banner-text)',
-      'font-size': 10,
-      'font-weight': '700',
-      'text-anchor': 'middle',
-      'letter-spacing': '0.5',
-      'font-family': 'system-ui, sans-serif',
-    }),
-  );
+// ── Dimension lines (single accent, end ticks) ────────────────────────────────
+function dimText(label: string): string {
+  return esc(label);
 }
 
-// ── Dimension lines (single accent, end ticks, (PH) suffix) ──────────────────────
-function dimText(label: string, ph: boolean): string {
-  return esc(label) + (ph ? ' (PH)' : '');
-}
-
-export function hDim(px1: number, px2: number, y: number, label: string, ph: boolean): string {
+export function hDim(px1: number, px2: number, y: number, label: string): string {
   const ext = 5;
   const mid = (px1 + px2) / 2;
   return group(
@@ -105,17 +86,17 @@ export function hDim(px1: number, px2: number, y: number, label: string, ph: boo
       stroke: 'var(--dim)', 'stroke-width': 'var(--w-dim)',
       'marker-start': 'url(#mk-tick)', 'marker-end': 'url(#mk-tick)',
     }),
-    el('rect', { x: mid - 3.4 * (dimText(label, ph).length), y: y - 15, width: 6.8 * dimText(label, ph).length, height: 12, fill: 'var(--surface)', opacity: '0.9', rx: 2 }),
-    textEl(mid, y - 5, dimText(label, ph), {
+    el('rect', { x: mid - 3.4 * (dimText(label).length), y: y - 15, width: 6.8 * dimText(label).length, height: 12, fill: 'var(--surface)', opacity: '0.9', rx: 2 }),
+    textEl(mid, y - 5, dimText(label), {
       fill: 'var(--dim-text)', 'font-size': 11, 'font-weight': '600', 'text-anchor': 'middle', 'font-family': 'ui-monospace, monospace',
     }),
   );
 }
 
-export function vDim(py1: number, py2: number, x: number, label: string, ph: boolean): string {
+export function vDim(py1: number, py2: number, x: number, label: string): string {
   const ext = 5;
   const mid = (py1 + py2) / 2;
-  const t = dimText(label, ph);
+  const t = dimText(label);
   return group(
     { class: 'dim' },
     el('line', { x1: x - ext, y1: py1, x2: x + ext, y2: py1, stroke: 'var(--dim)', 'stroke-width': 'var(--w-thin)' }),

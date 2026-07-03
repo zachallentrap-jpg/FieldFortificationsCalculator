@@ -15,8 +15,10 @@ export const BP = { tabletMin: 640, desktopMin: 1024 } as const;
 
 export function resolveLayout(e: LayoutEnv): LayoutMode {
   if (e.override !== 'auto') return e.override;
+  // Below tabletMin NO pointer type can host a multi-column grid — a narrow desktop window
+  // (fine pointer) previously fell through to 'tablet' and crushed two columns into ~390 px.
+  if (e.width < BP.tabletMin) return 'mobile';
   if (e.width >= BP.desktopMin && !e.pointerCoarse) return 'desktop';
-  if (e.pointerCoarse && e.width < BP.tabletMin) return 'mobile';
   if (e.pointerCoarse) return 'tablet';
-  return e.width >= BP.desktopMin ? 'desktop' : 'tablet';
+  return 'tablet';
 }

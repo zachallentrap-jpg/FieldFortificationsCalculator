@@ -7,7 +7,7 @@
 import { el, group, textEl, callout } from './svg';
 import { makeProjector } from './project';
 import {
-  HEADER_H, LEGEND_H, headerBar, fieldUseBanner, hDim, vDim, scaleBar, standingFigure, legendPanel, emptyPrompt, svgRoot,
+  HEADER_H, LEGEND_H, headerBar, hDim, vDim, scaleBar, standingFigure, legendPanel, emptyPrompt, svgRoot,
 } from './chrome';
 import { describe, a11yAttrs } from './a11y';
 import { fmtLength } from '../doctrine/units';
@@ -41,7 +41,6 @@ export function drawSection(result: Result): string {
   const px = (xf: number, yf: number): [number, number] => proj.toPx(xf, yf);
   const dm = new Map<string, DimSpec>(geo.dims.map((d) => [d.key, d]));
   const dl = (k: string): string => fmtLength(dm.get(k)?.valueFt ?? 0, unit);
-  const dph = (k: string): boolean => dm.get(k)?.placeholder ?? false;
 
   const used = new Set<string>();
   const parts: string[] = [];
@@ -123,10 +122,10 @@ export function drawSection(result: Result): string {
     used.add('overhead');
     parts.push(callout('overhead', slabX1 + slabW / 2, slabTopY + slabH / 2, used));
 
-    parts.push(hDim(px(-halfBay, 0)[0], slabX1, slabTopY - 14, dl('setback'), dph('setback')));
+    parts.push(hDim(px(-halfBay, 0)[0], slabX1, slabTopY - 14, dl('setback')));
     used.add('setback');
     parts.push(callout('setback', (px(-halfBay, 0)[0] + slabX1) / 2, gradeY - 6, used));
-    parts.push(vDim(slabTopY, slabBottomY, slabX2 + 16, dl('cover_t'), dph('cover_t')));
+    parts.push(vDim(slabTopY, slabBottomY, slabX2 + 16, dl('cover_t')));
   } else if (engineered) {
     const hzTL = px(-(halfBay + s.parapetW * 0.5), -(s.parapetH + 1.4));
     const hzW = proj.lenPx(s.holeW + s.parapetW);
@@ -139,19 +138,19 @@ export function drawSection(result: Result): string {
 
   // ── Standing figure (scale) + scale bar ────────────────────────────────────────
   parts.push(standingFigure(px(-halfBay * 0.35, 0)[0], px(0, s.depthOfCut)[1], proj));
-  parts.push(scaleBar(gL[0] + 20, H - LEGEND_H - 16, proj, unit));
+  parts.push(scaleBar(gL[0] + 20, H - LEGEND_H - 24, proj, unit)); // clear of the LEGEND heading (see drawPlan)
 
   // ── Dimensions ─────────────────────────────────────────────────────────────────
   const depthTop = px(halfBay, 0)[1];
   const depthBot = px(halfBay, s.depthOfCut)[1];
-  parts.push(vDim(depthTop, depthBot, px(halfBay, 0)[0] + 34, dl('depth'), dph('depth')));
-  parts.push(hDim(px(-halfBay, s.depthOfCut)[0], px(halfBay, s.depthOfCut)[0], depthBot + 30, dl('front_back'), dph('front_back')));
-  parts.push(vDim(paraFront[1], gradeY, paraFront[0] - 16, dl('parapet_h'), dph('parapet_h')));
+  parts.push(vDim(depthTop, depthBot, px(halfBay, 0)[0] + 34, dl('depth')));
+  parts.push(hDim(px(-halfBay, s.depthOfCut)[0], px(halfBay, s.depthOfCut)[0], depthBot + 30, dl('front_back')));
+  parts.push(vDim(paraFront[1], gradeY, paraFront[0] - 16, dl('parapet_h')));
 
   // ── FRONT / REAR ───────────────────────────────────────────────────────────────
   parts.push(textEl(gL[0] + 32, gradeY - 6, 'FRONT', { fill: 'var(--ink-soft)', 'font-size': 10.5, 'font-weight': '700', 'letter-spacing': '1' }));
   parts.push(textEl(gR[0] - 32, gradeY - 6, 'REAR', { fill: 'var(--ink-soft)', 'font-size': 10.5, 'font-weight': '700', 'text-anchor': 'end', 'letter-spacing': '1' }));
 
   const legend = legendPanel(12, H - LEGEND_H + 14, W - 24, used);
-  return svgRoot(W, H, a11y, a11yDefs, headerBar(W, 'SECTION A–A') + fieldUseBanner(W, result.placeholderReport.remaining) + group({}, ...parts) + legend);
+  return svgRoot(W, H, a11y, a11yDefs, headerBar(W, 'SECTION A–A') + group({}, ...parts) + legend);
 }

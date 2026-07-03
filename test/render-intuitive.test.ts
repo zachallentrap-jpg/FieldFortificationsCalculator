@@ -1,7 +1,7 @@
 // §10 / §17 render.intuitive — the drawings must be immediately readable: header bar per
 // view, numbered callouts tied to ONE shared legend (numbers consistent within & across
-// views), loud orientation, single-accent dimensions flagged (PH), an explicit scale, legible
-// minimum type, pattern redundancy beyond hue, and no colliding dimension labels.
+// views), loud orientation, single-accent dimensions, an explicit scale, legible minimum type,
+// pattern redundancy beyond hue, and no colliding dimension labels.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compute } from '../src/engine/compute';
@@ -80,20 +80,20 @@ test('plan carries header, loud orientation, A–A cross-ref, and consistent cal
   assert.ok(plan.includes('marker-end="url(#mk-arrow)"'), 'enemy arrow');
   assert.ok(plan.includes('>FRONT<') && plan.includes('>REAR<'), 'FRONT/REAR labeled');
   assert.equal((plan.match(/class="cut-marker"/g) ?? []).length, 2, 'two A–A cut markers');
-  assert.ok(plan.includes('(PH)'), 'placeholder-derived dimensions flagged');
+  assert.ok(!plan.includes('(PH)'), 'no placeholder flags shown on dimensions');
   assert.ok(plan.includes('var(--dim)'), 'dimensions in the single accent');
   assertCalloutLegendConsistent(plan, 'plan');
   assertMinFont(plan, 'plan');
   assertNoDimCollision(plan, 'plan');
 });
 
-test('section carries header, standing figure + scale, single-accent PH dims, cover redundancy', () => {
+test('section carries header, standing figure + scale, single-accent dims, cover redundancy', () => {
   const section = drawSection(compute(defaultInputs()));
   assert.ok(section.includes('SECTION A–A'), 'header bar title');
   assert.ok(/ref ~5/.test(section), 'standing figure reference height');
   assert.ok(section.includes('class="scale"'), 'scale bar');
   assert.ok(section.includes('>FRONT<') && section.includes('>REAR<'), 'FRONT/REAR labeled');
-  assert.ok(section.includes('(PH)') && section.includes('var(--dim)'), 'single-accent PH dimensions');
+  assert.ok(!section.includes('(PH)') && section.includes('var(--dim)'), 'single-accent dimensions, no placeholder flags');
   assert.ok(section.includes('url(#pat-cover)') || section.includes('url(#pat-earth)'), 'pattern redundancy beyond hue');
   assertCalloutLegendConsistent(section, 'section');
   assertMinFont(section, 'section');

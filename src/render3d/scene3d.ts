@@ -81,7 +81,11 @@ export type Part3 = Box3 | Cyl3 | Ring3 | Wedge3 | Arrow3 | Figure3;
 export interface Scene3DModel {
   hasAnything: boolean;
   parts: Part3[];
-  bounds: { size: number }; // rough footprint size (feet) for camera framing
+  // size: rough footprint size (feet), drives camera distance. depth: how far below grade the
+  // deepest visible part actually goes — a WIDE, shallow position (most of them) and a NARROW,
+  // deep one (the ramp's exaggerated relief) can share the same size but need very different
+  // camera pitch, so the viewer frames on both, not size alone.
+  bounds: { size: number; depth: number };
   engineeredRoof: boolean; // true → show the hazard marker, never a fabricated cover
   cutaway: boolean; // viewer clips the near half so the interior/OHC reads at a glance
 }
@@ -118,6 +122,15 @@ function finite(n: number): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+// A vehicle-defilade cut is doctrinally SHALLOW relative to how WIDE it is — rendered at true
+// scale the relief all but disappears, so the vehicle_ramp branch below exaggerates the
+// STAIRCASE's visual depth only (display-only, like vertical exaggeration on a terrain-relief
+// model; never touches depthOfCut itself). Module-scoped so the camera-framing bounds size at
+// the bottom of buildScene3D can size itself to what's actually drawn, not the un-exaggerated
+// depth — otherwise the reset camera frames the model as if it were 3x shallower than it reads,
+// leaving the deep end of the ramp mostly out of frame.
+const RELIEF_EXAGGERATION = 3;
+
 // What the excavation FACE is actually built from, straight from the operator's own revetment
 // choice — the same doctrine row the BOM already reads. 'panel' covers two distinct doctrinal
 // systems (corrugated metal, timber/plywood) that the engine's BOM treats identically; the 3D
@@ -133,7 +146,7 @@ function wallFinishFor(result: Result): WallFinish {
 export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel {
   const geo = result.geometry as GeometryModel;
   if (!geo.hasAnything) {
-    return { hasAnything: false, parts: [], bounds: { size: 20 }, engineeredRoof: false, cutaway: opts.cutaway === true };
+    return { hasAnything: false, parts: [], bounds: { size: 20, depth: 0 }, engineeredRoof: false, cutaway: opts.cutaway === true };
   }
 
   const p = geo.plan;
@@ -152,21 +165,38 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
   if (geo.shape === 'circular') {
     const rOuter = Math.max(p.outerL, p.outerW) / 2;
     const rHole = Math.max(halfL, halfW);
-    parts.push({ kind: 'cyl', x: 0, y: 0, z: 0, radius: rOuter, height: 0.05, role: 'ground' });
+    // A ring (not a solid disc) — same reasoning as pushGroundFrame below: a solid disc would
+    // span the ENTIRE footprint including the pit itself, hiding the floor cylinder several feet
+    // down under a solid grass-green cap. innerR matches the floor cylinder's own radius exactly.
+    parts.push({ kind: 'ring', x: 0, z: 0, outerR: rOuter, innerR: rHole, height: 0.05, role: 'ground' });
     // A single smooth extruded annulus — no segment seams (a prior 8-box approximation left
     // visible outline clutter at every seam and read as a dark, broken-looking ring).
     parts.push({ kind: 'ring', x: 0, z: 0, outerR: rHole + p.parapetW, innerR: rHole, height: 1.2, role: 'parapet' });
-    // A sloped soil pit is wider at the mouth than at the floor — CylinderGeometry natively
-    // supports distinct top/bottom radii, so this needs no custom vertex work at all.
-    const rTop = Math.min(rHole + Math.min(slopeRatio * s.depthOfCut, p.parapetW * 0.9), rOuter - 0.2);
-    parts.push({ kind: 'cyl', x: 0, y: -s.depthOfCut / 2, z: 0, radius: rHole, radiusTop: rTop, height: s.depthOfCut, role: 'bayFloor' });
+    // Mortar-pit walls are ALWAYS splayed/battered outward bottom-to-top (~4:1 to 5:1,
+    // vertical:horizontal) regardless of revetment choice — doctrine sizes this batter for
+    // repeated firing-concussion durability, not soil stability, so unlike the rectangular
+    // shapes' earth-only taper this applies even when sandbag-revetted (the previous code only
+    // sloped an UNrevetted earth face, matching soil angle-of-repose logic that doesn't apply
+    // here). MORTAR_PIT_BATTER is a fixed doctrine ratio, independent of the soil-driven
+    // slopeRatio used for bare unrevetted rectangular walls elsewhere in this file.
+    const MORTAR_PIT_BATTER = 0.25; // 1 ft horizontal per 4 ft vertical
+    const rTop = Math.min(rHole + Math.min(MORTAR_PIT_BATTER * s.depthOfCut, p.parapetW * 0.9), rOuter - 0.2);
+    // Grade margin matches pushBayBox's rationale exactly: without it this cylinder's top cap
+    // sits precisely at y=0, the SAME level as the ground disc above — the ground plane then
+    // occludes it entirely from any top-down-ish angle, showing flat grass-green where a dark
+    // excavated pit floor should read. Extending the wall a touch above grade closes that gap.
+    const gradeMargin = 0.25;
+    parts.push({
+      kind: 'cyl', x: 0, y: -s.depthOfCut / 2 + gradeMargin / 2, z: 0,
+      radius: rHole, radiusTop: rTop, height: s.depthOfCut + gradeMargin, role: 'bayFloor',
+    });
   } else if (geo.shape === 'vehicle_ramp') {
     const runLen = p.holeW;
     // Ground is centered on the RAMP's own z-center (not world origin) so its footprint always
     // fully contains the ramp regardless of length — a fixed-at-origin ground previously left
     // the deep end of a long ramp hanging past its edge with nothing rendered underneath.
     const rampZCenter = -runLen / 2;
-    parts.push({ kind: 'box', x: 0, y: -0.02, z: rampZCenter, w: p.outerL + 4, h: 0.05, d: runLen + 6, role: 'ground' });
+    pushGroundFrame(parts, 0, rampZCenter, p.outerL + 4, runLen + 6, p.holeL, runLen);
     // A ramp descending from grade to full depth, built as a stepped "staircase" of plain
     // boxes — the same proven box primitive every other part uses (a single continuously
     // sloped/rotated extrude turned out fragile: see DECISIONS D20). Cartoon-appropriate too.
@@ -178,7 +208,6 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     // the STAIRCASE'S visual depth only, purely inside this 3D descriptor. It never touches
     // depthOfCut itself, so every real number (BOM, labor, the 2D plan/section) is unaffected —
     // this view alone is allowed to be honest about shape at the cost of being literal about scale.
-    const RELIEF_EXAGGERATION = 3;
     const depthEx = s.depthOfCut * RELIEF_EXAGGERATION;
     const steps = 6;
     const stepLen = runLen / steps;
@@ -201,29 +230,53 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
         finish: 'earth',
       });
     }
-    const bermH = Math.max(1, p.parapetW * 0.5) * RELIEF_EXAGGERATION;
+    // Doctrine (FM 5-103): for a DELIBERATE vehicle position defeating kinetic-energy threats,
+    // "the spoil is flattened out or hauled away" — a tall piled berm is explicitly the WRONG
+    // technique here (it gives a false sense of security against KE rounds, which a parapet
+    // can't stop, and raises the position's visual signature). The depth of cut is what protects
+    // the vehicle, not a mound beside it. This used to render as a prominent 3x-exaggerated wall
+    // flanking the ramp, which taught exactly the wrong mental model — now a low, flattened
+    // spoil residue, not exaggerated with the cut's own RELIEF_EXAGGERATION (that multiplier
+    // exists to keep the CUT legible at scale; applying it to the berm too made "flattened"
+    // spoil read as a deliberately-built rampart instead).
+    const bermH = Math.max(0.3, p.parapetW * 0.15);
     parts.push({ kind: 'box', x: -(halfL + p.parapetW / 2), y: bermH / 2, z: -runLen / 4, w: p.parapetW, h: bermH, d: runLen, role: 'rampBerm', finish: 'earth' });
     parts.push({ kind: 'box', x: halfL + p.parapetW / 2, y: bermH / 2, z: -runLen / 4, w: p.parapetW, h: bermH, d: runLen, role: 'rampBerm', finish: 'earth' });
   } else {
     // rect, rect_roofed, inverted_t, l_shape all start from a rectangular ring + bay.
-    parts.push({ kind: 'box', x: 0, y: -0.02, z: 0, w: p.outerL + 4, h: 0.05, d: p.outerW + 4, role: 'ground' });
-    pushRing(parts, 0, 0, p.holeL, p.holeW, p.parapetW, 1.1);
-    pushBayBox(parts, 0, 0, p.holeL, p.holeW, s.depthOfCut, wallT, finish, slopeRatio, picketSpacing, p.parapetW);
+    // Every position needs a way in and out — a fully closed 4-sided box (the previous shape)
+    // has none. Doctrine puts the entrance at the rear (away from the enemy), so both the raised
+    // parapet and the excavation wall beneath it open there, sized for a person to pass through.
+    //
+    // ATGM/Javelin positions need far more than a walk-through gap back there: the launcher's
+    // backblast cone (Javelin ~60°/25m, TOW ~90°/75m) needs a genuinely open lane clear of hard
+    // vertical surfaces — a normal rear parapet is exactly the kind of obstruction that could
+    // reflect the backblast back at the crew. Structurally these positions need a wide open rear,
+    // not a taller wall, so the gap covers most of the bay's width instead of a person-sized slot.
+    const isAtgm = result.inputs.positionType === 'atgm_javelin';
+    const entranceGap = isAtgm ? p.holeL * 0.85 : Math.min(3, p.holeL * 0.4);
+    pushGroundFrame(parts, 0, 0, p.outerL + 4, p.outerW + 4, p.holeL, p.holeW);
+    pushRing(parts, 0, 0, p.holeL, p.holeW, p.parapetW, 1.1, entranceGap);
+    pushBayBox(parts, 0, 0, p.holeL, p.holeW, s.depthOfCut, wallT, finish, slopeRatio, picketSpacing, p.parapetW, entranceGap);
 
     if (geo.shape === 'inverted_t') {
-      // A narrower trench extends toward the rear from the bay's center (inverted-T).
+      // A narrower connecting trench extends toward the rear from the bay's center (the "shaft"
+      // of the inverted-T) — a doctrinal crew/ammo trench, not a separately-parapeted position
+      // in its own right, so unlike the main bay it gets NO raised parapet ring: just the
+      // excavated trench walls (previously it wrongly got a full ring scaled off the MAIN
+      // parapet's thickness, which for a trench this narrow ballooned out wide enough to
+      // swallow most of the main bay's own footprint).
       const stemW = Math.max(2, p.holeL * 0.3);
       const stemLen = p.holeW * 1.1;
       const stemZ = halfW + stemLen / 2;
-      pushRing(parts, 0, stemZ, stemW, stemLen, p.parapetW * 0.7, 1.0);
-      pushBayBox(parts, 0, stemZ, stemW, stemLen, s.depthOfCut * 0.85, wallT * 0.8, finish, slopeRatio, picketSpacing, p.parapetW * 0.7);
+      pushBayBox(parts, 0, stemZ, stemW, stemLen, s.depthOfCut * 0.85, wallT * 0.8, finish, slopeRatio, picketSpacing, p.parapetW * 0.7, Math.min(2.5, stemW));
     } else if (geo.shape === 'l_shape') {
-      // A perpendicular arm attached at one end (crew/ammo alcove) forming an L.
+      // A perpendicular arm attached at one end (crew/ammo alcove) forming an L — same
+      // reasoning as the inverted-T's shaft: a connecting trench, not its own parapeted position.
       const armW = p.holeW * 0.9;
       const armLen = Math.max(2.5, p.holeL * 0.6);
       const armX = halfL + armLen / 2;
       const armZ = halfW - armW / 2;
-      pushRing(parts, armX, armZ, armLen, armW, p.parapetW * 0.7, 1.0);
       pushBayBox(parts, armX, armZ, armLen, armW, s.depthOfCut * 0.85, wallT * 0.8, finish, slopeRatio, picketSpacing, p.parapetW * 0.7);
     }
   }
@@ -275,21 +328,69 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
   // ── Standing figure for scale ──────────────────────────────────────────────
   parts.push({ kind: 'figure', x: halfL + 2, z: 1.5, heightFt: 5.83 });
 
-  const boundsSize = finite(Math.max(p.outerL, p.outerW, s.depthOfCut * 2) + 8);
+  // The vehicle ramp's visual depth is exaggerated (RELIEF_EXAGGERATION) well past depthOfCut —
+  // frame the camera to that actual drawn depth, not the real doctrinal one, or the deep end
+  // renders mostly out of frame against blank sky.
+  const effectiveDepth = geo.shape === 'vehicle_ramp' ? s.depthOfCut * RELIEF_EXAGGERATION + 1 : s.depthOfCut;
+  const boundsSize = finite(Math.max(p.outerL, p.outerW, effectiveDepth * 2) + 8);
   // Stage filter: show only parts built by the selected stage (undefined ⇒ final state). The
   // orientation aids (arrow/figure/wedge) always survive so the scene never loses its "which
   // way is the enemy" cue mid-build.
   const staged = opts.stage === undefined ? parts : parts.filter((part) => partStage(part) <= opts.stage!);
-  return { hasAnything: true, parts: staged, bounds: { size: boundsSize }, engineeredRoof, cutaway: opts.cutaway === true };
+  return { hasAnything: true, parts: staged, bounds: { size: boundsSize, depth: finite(effectiveDepth) }, engineeredRoof, cutaway: opts.cutaway === true };
 }
 
-// A rectangular ring of 4 walls (front/rear/left/right) around a hole — used for the parapet.
+// A flat "ground" slab with a rectangular hole cut out over the excavation, built as 4
+// picture-frame boxes (front/back full-width bands + left/right side bands) instead of one
+// solid rectangle. A solid ground rectangle spans the ENTIRE footprint, including the hole
+// itself — sitting barely below grade, its top face is only inches above the actual floor
+// mesh several feet down, so any camera angle with enough downward component looks straight
+// through the (unfilled) middle of the bay and sees flat grass-green where a dark excavated
+// floor should read, no matter how tall the surrounding walls are built. The frame's inner
+// edge exactly matches the excavation's true envelope (holeL x holeW) so there's no seam gap
+// and no grass rendered over the hole.
+function pushGroundFrame(parts: Part3[], cx: number, cz: number, outerL: number, outerW: number, holeL: number, holeW: number): void {
+  const oHL = outerL / 2;
+  const oHW = outerW / 2;
+  const hHL = holeL / 2;
+  const hHW = holeW / 2;
+  const y = -0.02;
+  const h = 0.05;
+  const bandD = oHW - hHW; // front/back band depth
+  if (bandD > 0.01) {
+    parts.push({ kind: 'box', x: cx, y, z: cz - hHW - bandD / 2, w: outerL, h, d: bandD, role: 'ground' });
+    parts.push({ kind: 'box', x: cx, y, z: cz + hHW + bandD / 2, w: outerL, h, d: bandD, role: 'ground' });
+  }
+  const bandL = oHL - hHL; // left/right band width
+  if (bandL > 0.01) {
+    parts.push({ kind: 'box', x: cx - hHL - bandL / 2, y, z: cz, w: bandL, h, d: holeW, role: 'ground' });
+    parts.push({ kind: 'box', x: cx + hHL + bandL / 2, y, z: cz, w: bandL, h, d: holeW, role: 'ground' });
+  }
+}
+
+// A rectangular ring of walls (front/rear/left/right) around a hole — used for the parapet.
 // Always 'parapet' role: the renderer treats that role as unconditionally sandbag-built.
-function pushRing(parts: Part3[], cx: number, cz: number, l: number, w: number, thick: number, height: number): void {
+//
+// rearGapFt (default 0 = fully closed, for secondary bays like an inverted-T's connecting
+// trench that don't need their own entrance) splits the REAR wall — the side away from the
+// enemy, +z per the plan's front=-z convention — into two segments with a centered gap, wide
+// enough for a person to pass through. A fully closed 4-sided box was the previous shape here;
+// every real fighting position needs a way in and out, and doctrine consistently puts that
+// entrance at the rear, never through the frontal parapet that's actually facing the threat.
+function pushRing(parts: Part3[], cx: number, cz: number, l: number, w: number, thick: number, height: number, rearGapFt = 0): void {
   const hl = l / 2;
   const hw = w / 2;
   parts.push({ kind: 'box', x: cx, y: height / 2, z: cz - hw - thick / 2, w: l + 2 * thick, h: height, d: thick, role: 'parapet' }); // front
-  parts.push({ kind: 'box', x: cx, y: height / 2, z: cz + hw + thick / 2, w: l + 2 * thick, h: height, d: thick, role: 'parapet' }); // rear
+  if (rearGapFt > 0 && rearGapFt < l) {
+    const gapHalf = rearGapFt / 2;
+    // Same total span as the un-gapped rear wall (l + 2*thick, reaching the outer corners where
+    // the side walls meet it) minus the gap, split into two segments that flank the opening.
+    const segW = hl + thick - gapHalf;
+    parts.push({ kind: 'box', x: cx - hl - thick + segW / 2, y: height / 2, z: cz + hw + thick / 2, w: segW, h: height, d: thick, role: 'parapet' });
+    parts.push({ kind: 'box', x: cx + hl + thick - segW / 2, y: height / 2, z: cz + hw + thick / 2, w: segW, h: height, d: thick, role: 'parapet' });
+  } else {
+    parts.push({ kind: 'box', x: cx, y: height / 2, z: cz + hw + thick / 2, w: l + 2 * thick, h: height, d: thick, role: 'parapet' }); // rear
+  }
   parts.push({ kind: 'box', x: cx - hl - thick / 2, y: height / 2, z: cz, w: thick, h: height, d: w, role: 'parapet' }); // left
   parts.push({ kind: 'box', x: cx + hl + thick / 2, y: height / 2, z: cz, w: thick, h: height, d: w, role: 'parapet' }); // right
 }
@@ -299,6 +400,11 @@ function pushRing(parts: Part3[], cx: number, cz: number, l: number, w: number, 
 // soil calls for a slope, each wall's OUTER face (away from the hole) flares out from bottom
 // (unchanged, matching the floor) to top (wider, matching a real excavation's wider mouth) —
 // clamped to stay within the parapet's own footprint so it never pokes out past the ground plane.
+//
+// rearGapFt (default 0) mirrors pushRing's entrance gap in the excavation wall itself, at the
+// same rear location — without this, the parapet above would show an open entrance sitting
+// directly over a solid excavation wall below it, reading as a mismatch/glitch rather than a way
+// down into the position.
 function pushBayBox(
   parts: Part3[],
   cx: number,
@@ -311,6 +417,7 @@ function pushBayBox(
   slopeRatio: number,
   picketSpacing: number,
   parapetW: number,
+  rearGapFt = 0,
 ): void {
   parts.push({ kind: 'box', x: cx, y: -depth - 0.05, z: cz, w: l, h: 0.1, d: w, role: 'bayFloor', finish: 'earth' });
   const hl = l / 2;
@@ -320,7 +427,15 @@ function pushBayBox(
   // angle skim over its top and see a sliver of the ground's surface beyond it, right in the
   // middle of what should read as a recessed hole. A small margin above grade closes that gap
   // for any normal viewing angle without changing the excavation's real depth.
-  const gradeMargin = 0.25;
+  //
+  // 0.25 ft was tuned against small positions (one-man, ~4x2 ft) and worked there, but the
+  // sandbag-tiled wall (buildSandbagWall) rows in discrete courses with a small per-course
+  // "settle" nudge — that shortfall is a roughly fixed FRACTION of each course's height, so on
+  // a wide position (a 10x8 ft bunker) the coverage falls further short of true grade in
+  // absolute terms, letting a much bigger patch of the green ground plane show through the gap
+  // than on a small one. Doubling the margin gives the tiling enough headroom to close it
+  // regardless of the position's footprint.
+  const gradeMargin = 0.5;
   const h = depth + gradeMargin;
   const taperAmount = finish === 'earth' ? Math.min(slopeRatio * depth, parapetW * 0.9) : 0;
   const wall = (x: number, z: number, w2: number, d2: number, taperAxis: 0 | 2, taperSign: 1 | -1): Box3 => ({
@@ -341,7 +456,14 @@ function pushBayBox(
     ...(taperAmount > 0 ? { taperAmount } : {}),
   });
   parts.push(wall(cx, cz - hw + wallT / 2, l, wallT, 2, -1)); // front — outer face is -z
-  parts.push(wall(cx, cz + hw - wallT / 2, l, wallT, 2, 1)); // rear — outer face is +z
+  if (rearGapFt > 0 && rearGapFt < l) {
+    const gapHalf = rearGapFt / 2;
+    const segW = hl - gapHalf; // inset walls meet at the inner corners (±hl), no corner overlap to account for
+    parts.push(wall(cx - hl + segW / 2, cz + hw - wallT / 2, segW, wallT, 2, 1));
+    parts.push(wall(cx + hl - segW / 2, cz + hw - wallT / 2, segW, wallT, 2, 1));
+  } else {
+    parts.push(wall(cx, cz + hw - wallT / 2, l, wallT, 2, 1)); // rear — outer face is +z
+  }
   parts.push(wall(cx - hl + wallT / 2, cz, wallT, w, 0, -1)); // left — outer face is -x
   parts.push(wall(cx + hl - wallT / 2, cz, wallT, w, 0, 1)); // right — outer face is +x
 }

@@ -1,7 +1,7 @@
 {
-  "name": "SAP-1 — Survivability Position Planner",
-  "short_name": "SAP-1",
-  "description": "Deterministic, offline planner for doctrinal survivability positions. Illustrative placeholder data; not for field use.",
+  "name": "Fighting Position Planner",
+  "short_name": "Position Planner",
+  "description": "Deterministic, offline planner for digging and building defensive positions. Illustrative placeholder data; not for field use.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

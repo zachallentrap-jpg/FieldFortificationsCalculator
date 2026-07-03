@@ -1,7 +1,6 @@
 // CSV export (§10) — RFC-4180: fields quoted only when needed, embedded quotes doubled,
 // CRLF line endings, '.' decimal, NO thousands separators regardless of display locale.
-// A metadata header carries scenario/date/NOT-FOR-FIELD-USE; a `Placeholder` column flags
-// every quantity derived from a placeholder doctrine value. Per-position AND total columns.
+// A metadata header carries scenario/date. Per-position AND total columns.
 // Pure — the date is passed in (the engine never reads a clock).
 
 import type { Result } from '../engine/types';
@@ -28,7 +27,6 @@ export interface CsvMeta {
 
 export function toCsv(result: Result, meta: CsvMeta): string {
   const lines: string[] = [];
-  const notForField = result.placeholderReport.remaining > 0;
 
   lines.push(row('SAP-1 Survivability Position Planner'));
   lines.push(row('Scenario', meta.scenario));
@@ -38,12 +36,11 @@ export function toCsv(result: Result, meta: CsvMeta): string {
   lines.push(row('Soil', result.inputs.soil));
   lines.push(row('Threat', result.inputs.threat));
   lines.push(row('Count', result.inputs.count));
-  if (notForField) lines.push(row('NOTICE', 'NOT FOR FIELD USE — illustrative placeholder data'));
   lines.push('');
 
-  lines.push(row('Section', 'Item', 'Unit', 'Per position', 'Total', 'Placeholder'));
+  lines.push(row('Section', 'Item', 'Unit', 'Per position', 'Total'));
   for (const l of result.bom) {
-    lines.push(row('BOM', l.label, l.unit, l.qtyPerPosition, l.qtyTotal, l.fromPlaceholder ? 'yes' : 'no'));
+    lines.push(row('BOM', l.label, l.unit, l.qtyPerPosition, l.qtyTotal));
   }
   lines.push('');
 

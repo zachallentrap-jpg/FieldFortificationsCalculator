@@ -3,6 +3,8 @@
 // comparison/mission sets, the on-hand map) and wires the data-action buttons.
 
 import { fmtLength } from '../doctrine/units';
+import { revetments } from '../doctrine/materials';
+import { standards } from '../doctrine/standards';
 import { positions } from '../doctrine/positions';
 import { threats } from '../doctrine/protection';
 import type { Result, MissionBomLine } from '../engine/types';
@@ -67,7 +69,7 @@ export function missionOverlay(result: MissionResult, count: number): string {
     return '<div class="tools"><h2>Group job list (Mission BOM)</h2><p class="empty">Add positions to roll up one bill of materials, then enter on-hand quantities to see shortfalls.</p>' + addClear + '</div>';
   }
   const row = (l: MissionBomLine): string =>
-    '<tr><td>' + esc(l.label) + (l.fromPlaceholder ? ' <span class="ph">(PH)</span>' : '') + '</td>' +
+    '<tr><td>' + esc(l.label) + '</td>' +
     '<td class="n">' + num(l.qtyTotal) + ' ' + esc(l.unit) + '</td>' +
     '<td><input type="number" min="0" step="1" class="onhand" data-onhand="' + esc(l.id) + '" value="' + (l.onHand ?? 0) + '" aria-label="On hand ' + esc(l.label) + '"></td>' +
     '<td class="n' + ((l.shortfall ?? 0) > 0 ? ' short' : '') + '">' + num(l.shortfall ?? 0) + '</td></tr>';
@@ -96,7 +98,7 @@ export function compareOverlay(results: Result[]): string {
     '<div class="tool-actions"><button type="button" class="btn" data-action="compare-add"' + (results.length >= 3 ? ' disabled' : '') + '>Add current</button><button type="button" class="btn" data-action="compare-standards">Hasty vs deliberate vs reinforced</button><button type="button" class="btn" data-action="compare-clear">Clear</button></div>' +
     '<table class="compare"><thead>' + head + '</thead><tbody>' +
     line('Position', (r) => positions[r.inputs.positionType]?.label ?? r.inputs.positionType) +
-    line('Standard', (r) => r.inputs.standard) +
+    line('Standard', (r) => standards[r.inputs.standard]?.label ?? r.inputs.standard) +
     line('Threat', (r) => threatLabel(r.inputs.threat)) +
     line('Depth', (r) => fmtLength(r.resolved.depthOfCut, u)) +
     line('Overhead cover', cover) +
@@ -198,7 +200,7 @@ export function doctrineOverlay(
 
   const badge =
     c.placeholder > 0
-      ? '<span class="fielduse-badge" role="status">NOT FOR FIELD USE — ' + c.placeholder + ' practice value(s) remain (' + c.safetyCriticalRemaining + ' safety-critical)</span>'
+      ? '<span class="fielduse-badge" role="status">' + c.placeholder + ' practice value(s) remain (' + c.safetyCriticalRemaining + ' safety-critical)</span>'
       : '<span class="cleared-badge" role="status">All values filled — banner cleared.</span>';
 
   return (
@@ -233,13 +235,14 @@ export function planOverlay(plan: PlanResult | null, hours: number, team: number
     ? plan.feasible
         .map(
           (o, i) =>
-            '<tr><td>' + esc(o.standard) + '</td><td>' + (o.overheadCover ? (o.roofPath === 'engineered_required' ? 'engineered' : 'cover') : '—') + '</td>' +
-            '<td>' + esc(o.revetment) + '</td><td class="n">' + num(o.elapsedHours) + ' hr</td>' +
+            // Plain-language names, never raw enum ids (§ the app's own selects say "Pickets & wire").
+            '<tr><td>' + esc(standards[o.standard]?.label ?? o.standard) + '</td><td>' + (o.overheadCover ? (o.roofPath === 'engineered_required' ? 'engineered' : 'cover') : '—') + '</td>' +
+            '<td>' + esc(revetments[o.revetment]?.label ?? o.revetment) + '</td><td class="n">' + num(o.elapsedHours) + ' hr</td>' +
             '<td><button type="button" class="btn" data-action="plan-apply" data-idx="' + i + '">Use</button></td></tr>',
         )
         .join('')
     : '<tr><td colspan="5">Nothing fits ' + num(plan.budgetHours) + ' hr with a team of ' + plan.teamSize + '. Closest over-budget: ' +
-      (plan.infeasibleBest ? esc(plan.infeasibleBest.standard) + ' at ' + num(plan.infeasibleBest.elapsedHours) + ' hr' : '—') + '.</td></tr>';
+      (plan.infeasibleBest ? esc(standards[plan.infeasibleBest.standard]?.label ?? plan.infeasibleBest.standard) + ' at ' + num(plan.infeasibleBest.elapsedHours) + ' hr' : '—') + '.</td></tr>';
   return (
     '<div class="tools"><h2>Time planner</h2>' + form +
     '<table class="plan"><thead><tr><th>Standard</th><th>Roof</th><th>Revet</th><th>Elapsed</th><th></th></tr></thead><tbody>' + rows + '</tbody></table>' +

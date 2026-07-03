@@ -201,13 +201,36 @@ function focusKey(): string | null {
   return null;
 }
 
+// The whole shell is swapped via innerHTML on every input change, which resets the page scroll
+// AND every internal scroll container (the mobile edit-sheet, the desktop/tablet sticky rails).
+// On a phone that means: scroll down the form, change a dropdown, get yanked to the top — the
+// #1 reported mobile annoyance. Capture each scrollable region by a STABLE selector before the
+// swap and restore it on the freshly-built node after. Window scroll is captured separately.
+const SCROLL_SELECTORS = ['.sheet-scroll', '.controls-region', '.rail'] as const;
+function captureScroll(): { win: number; regions: Array<[string, number]> } {
+  const regions: Array<[string, number]> = [];
+  for (const sel of SCROLL_SELECTORS) {
+    const el = app.querySelector<HTMLElement>(sel);
+    if (el && el.scrollTop > 0) regions.push([sel, el.scrollTop]);
+  }
+  return { win: window.scrollY, regions };
+}
+function restoreScroll(snap: { win: number; regions: Array<[string, number]> }): void {
+  for (const [sel, top] of snap.regions) {
+    const el = app.querySelector<HTMLElement>(sel);
+    if (el) el.scrollTop = top;
+  }
+  if (window.scrollY !== snap.win) window.scrollTo(0, snap.win);
+}
+
 function render(): void {
   const state = store.getState();
   const c = safeCompute(state.inputs);
   const refocus = focusKey();
+  const scroll = captureScroll();
   if (c.ok) {
     lastResult = c.value;
-    app.innerHTML = renderApp(state, c.value, webglOk);
+    app.innerHTML = renderApp(state, c.value, webglOk, sheetOpen);
     if (threeViewer) {
       const socket = document.getElementById('three-socket');
       if (socket) {
@@ -228,17 +251,20 @@ function render(): void {
   }
   if (refocus) {
     const el = app.querySelector<HTMLElement>(refocus);
+    // preventScroll: refocusing the rebuilt control must not scroll it into view — on mobile
+    // that fights the scroll restore below and produces a visible jump after every edit.
     if (el && !(el as HTMLButtonElement).disabled) {
-      el.focus();
+      el.focus({ preventScroll: true });
     } else if (el) {
       // The control the user was on just became disabled (e.g. Undo after the last undo) —
       // keep keyboard focus in its group instead of silently dropping it to <body>.
       el.closest<HTMLElement>('.actions, form, .menu-panel')
         ?.querySelector<HTMLElement>('button:not([disabled]), select, input')
-        ?.focus();
+        ?.focus({ preventScroll: true });
     }
   }
   applySheet();
+  restoreScroll(scroll);
 }
 
 // Screen-reader announcement: a terse summary into a dedicated polite live region, replacing
@@ -259,8 +285,14 @@ store.subscribe(persistSession);
 function coerce(field: keyof Inputs, el: HTMLInputElement | HTMLSelectElement): Partial<Inputs> {
   if (el instanceof HTMLInputElement && el.type === 'checkbox') return { [field]: el.checked } as Partial<Inputs>;
   if (el instanceof HTMLInputElement && el.type === 'number') {
+    // Clamp to the input's own declared range — otherwise the field can display 0 (or -5)
+    // while the engine quietly computes with the clamped value, and the two never agree.
+    const min = el.min === '' ? -Infinity : Number(el.min);
+    const max = el.max === '' ? Infinity : Number(el.max);
     const n = parseInt(el.value, 10);
-    return { [field]: Number.isFinite(n) ? n : 0 } as Partial<Inputs>;
+    const fallback = Number.isFinite(min) ? min : 0;
+    const v = Math.min(max, Math.max(min, Number.isFinite(n) ? n : fallback));
+    return { [field]: v } as Partial<Inputs>;
   }
   return { [field]: el.value } as Partial<Inputs>;
 }
@@ -282,7 +314,15 @@ document.addEventListener('change', (e) => {
   }
   const field = el.dataset['field'] as keyof Inputs | undefined;
   if (field) {
-    commit(coerce(field, el));
+    const patch = coerce(field, el);
+    commit(patch);
+    // If the clamp lands on the SAME value the state already had (e.g. typing 0 when count
+    // is 1), nothing changes → no re-render → the field would keep showing the rejected
+    // text. Snap the visible value to what was actually committed.
+    const v = patch[field];
+    if (el instanceof HTMLInputElement && el.type === 'number' && typeof v === 'number' && el.value !== String(v)) {
+      el.value = String(v);
+    }
     return;
   }
   if (el instanceof HTMLSelectElement && el.dataset['action'] === 'layout-override') {
@@ -327,7 +367,17 @@ document.addEventListener('click', (e) => {
   switch (action) {
     case 'undo': applyInputs(history.undo()); syncHistory(); break;
     case 'redo': applyInputs(history.redo()); syncHistory(); break;
-    case 'reset': store.replaceInputs(DEFAULT_INPUTS); history.reset(DEFAULT_INPUTS); store.setState({ activeScenarioId: null, activeScenarioName: null }); syncHistory(); break;
+    // Also resets a pinned layout override back to 'auto' — the View picker that undoes a pin is
+    // itself hidden while mobile is forced (see shell.ts topbar()), so without this, a
+    // desktop/tablet user who force-previews "Phone" would have no UI path back to their own
+    // device's real layout (resolveLayout ignores window size entirely once override !== 'auto').
+    case 'reset':
+      store.replaceInputs(DEFAULT_INPUTS);
+      history.reset(DEFAULT_INPUTS);
+      store.setState({ activeScenarioId: null, activeScenarioName: null, layoutOverride: 'auto' });
+      recomputeLayout();
+      syncHistory();
+      break;
     case 'theme': toggleTheme(); break;
     case 'print': doPrint(); break;
     case 'csv': doCsv(); break;
@@ -556,14 +606,64 @@ function showDiagnostics(): void {
 // ── Mobile bottom-sheet ──────────────────────────────────────────────────────
 function applySheet(): void {
   const sheet = app.querySelector<HTMLElement>('.bottom-sheet');
-  const fab = app.querySelector<HTMLElement>('.fab');
+  const backdrop = app.querySelector<HTMLElement>('.sheet-backdrop');
+  // NOT the generic '[data-action="sheet-toggle"]' — the sheet-backdrop div carries that same
+  // action (tap-to-dismiss) and would win a plain querySelector by DOM order; button:: scopes
+  // this to the actual toolbar trigger, the only element aria-expanded is meaningful on.
+  const trigger = app.querySelector<HTMLElement>('button[data-action="sheet-toggle"]');
   if (sheet) {
     sheet.setAttribute('data-open', String(sheetOpen));
     sheet.setAttribute('aria-hidden', String(!sheetOpen));
   }
-  if (fab) fab.setAttribute('aria-expanded', String(sheetOpen));
+  // The backdrop is what actually stops the background page from scrolling/receiving taps
+  // while the sheet is open — CSS alone (html.sheet-open{overflow:hidden}) blocks wheel/keyboard
+  // scroll but not iOS Safari's touch-scroll-through-a-fixed-element quirk; a full-viewport
+  // element with its own touch-action:none closes that gap.
+  if (backdrop) backdrop.setAttribute('data-open', String(sheetOpen));
+  if (trigger) trigger.setAttribute('aria-expanded', String(sheetOpen));
   document.documentElement.classList.toggle('sheet-open', sheetOpen);
 }
+
+// Swipe-down-to-dismiss on the sheet's drag handle — the handle previously rendered but had no
+// gesture wired to it at all, so the one interaction every user tries on a bottom-sheet handle
+// (drag it down) silently did nothing. Delegated at the document level (pointerdown keyed off
+// data-action) because the handle node is destroyed and rebuilt on every full-shell re-render,
+// so a listener attached directly to it would need re-attaching after every input change.
+let dragStartY: number | null = null;
+let dragLastDy = 0;
+let dragSheetEl: HTMLElement | null = null;
+const DISMISS_THRESHOLD_PX = 70;
+document.addEventListener('pointerdown', (e) => {
+  const handle = (e.target as HTMLElement).closest<HTMLElement>('[data-action="sheet-drag-handle"]');
+  if (!handle) return;
+  dragSheetEl = handle.closest<HTMLElement>('.bottom-sheet');
+  if (!dragSheetEl) return;
+  dragStartY = e.clientY;
+  dragLastDy = 0;
+  dragSheetEl.style.transition = 'none'; // track the finger 1:1 while dragging
+});
+document.addEventListener('pointermove', (e) => {
+  if (dragStartY === null || !dragSheetEl) return;
+  dragLastDy = Math.max(0, e.clientY - dragStartY); // only downward drag moves the sheet
+  dragSheetEl.style.transform = 'translateY(' + dragLastDy + 'px)';
+});
+function endDrag(): void {
+  if (dragStartY === null || !dragSheetEl) return;
+  const el = dragSheetEl;
+  const dy = dragLastDy;
+  dragStartY = null;
+  dragSheetEl = null;
+  el.style.transition = ''; // restore the CSS transition for both outcomes below
+  el.style.transform = '';
+  if (dy > DISMISS_THRESHOLD_PX) {
+    sheetOpen = false;
+    applySheet();
+  }
+  // Otherwise clearing the inline transform lets data-open="true"'s CSS rule (translateY(0))
+  // snap the sheet back open — no separate "cancel" branch needed.
+}
+document.addEventListener('pointerup', endDrag);
+document.addEventListener('pointercancel', endDrag);
 
 // ── Exports (local; the user clicks to download) ─────────────────────────────
 // The job sheet / CSV header carries the REAL scenario name when one is active — an unsaved

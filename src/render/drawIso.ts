@@ -4,7 +4,7 @@
 // no dimensions here. Shares the header + legend chrome and the callout registry.
 
 import { el, group, textEl, callout } from './svg';
-import { HEADER_H, LEGEND_H, headerBar, fieldUseBanner, legendPanel, emptyPrompt, svgRoot } from './chrome';
+import { HEADER_H, LEGEND_H, headerBar, legendPanel, emptyPrompt, svgRoot } from './chrome';
 import { describe, a11yAttrs } from './a11y';
 import type { GeometryModel } from '../engine/geometry';
 import type { Result } from '../engine/types';
@@ -74,7 +74,7 @@ export function drawIso(result: Result): string {
   parts.push(textEl(iso(0, hw, 0)[0], iso(0, hw, 0)[1] + 22, 'REAR', { fill: 'var(--ink-soft)', 'font-size': 10.5, 'font-weight': '700', 'text-anchor': 'middle', 'letter-spacing': '1' }));
 
   const legend = legendPanel(12, H - LEGEND_H + 14, W - 24, used);
-  return svgRoot(W, H, a11y, a11yDefs, headerBar(W, 'ISOMETRIC — SCHEMATIC') + fieldUseBanner(W, result.placeholderReport.remaining) + group({}, ...parts) + legend);
+  return svgRoot(W, H, a11y, a11yDefs, headerBar(W, 'ISOMETRIC — SCHEMATIC') + group({}, ...parts) + legend);
 }
 
 function midpt(a: [number, number], b: [number, number]): [number, number] {

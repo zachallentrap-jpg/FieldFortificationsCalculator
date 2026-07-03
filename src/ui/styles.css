@@ -12,6 +12,11 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 #root { min-height: 100%; display: flex; flex-direction: column; }
+/* Background scroll lock while the mobile edit-sheet is open (class toggled in main.ts). Without
+   this the page underneath the fixed sheet stayed fully scrollable, so a scroll gesture anywhere
+   near the sheet could move the page behind it instead of (or as well as) the sheet's own
+   content — the sheet's .sheet-backdrop above is the touch-level half of this same fix. */
+html.sheet-open { overflow: hidden; }
 
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -26,19 +31,19 @@ body {
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
 
 /* ── Topbar ─────────────────────────────────────────────────────────────────── */
+/* Slim by design now: brand + one hamburger menu, nothing else — the four constantly-used
+   actions live in the persistent .bottom-toolbar instead (§ redesign). */
 .topbar {
   position: sticky; top: 0; z-index: 20;
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-  padding: 8px 14px; background: var(--surface); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 14px; background: var(--surface); border-bottom: 1px solid var(--border);
 }
 .brand { display: flex; align-items: baseline; gap: 8px; }
-.brand strong { font-size: 17px; letter-spacing: 0.5px; }
-.tagline { color: var(--ink-soft); font-size: 12px; }
+.brand strong { font-size: 16px; letter-spacing: 0.2px; font-weight: 700; }
 .fielduse-badge {
   margin-left: 6px; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.4px;
   background: var(--banner-bg); color: var(--banner-text);
 }
-.actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .btn {
   min-height: 34px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--r-sm);
   background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; cursor: pointer;
@@ -50,14 +55,14 @@ body {
 }
 .ov-label { font-size: 11px; color: var(--ink-soft); margin-right: 4px; }
 
-/* ── Dropdown menus (Tools / Save & print) — plain <details>, keyboard + SR friendly ────── */
+/* ── Hamburger menu — plain <details>, keyboard + SR friendly ─────────────────── */
 .menu { position: relative; }
-.menu-summary { list-style: none; cursor: pointer; }
+.menu-summary { list-style: none; cursor: pointer; font-size: 14px; }
 .menu-summary::-webkit-details-marker { display: none; }
 .menu-summary::after { content: ' ▾'; font-size: 10px; opacity: 0.7; }
 .menu[open] .menu-summary { background: var(--surface-2); }
 .menu-panel {
-  position: absolute; top: calc(100% + 6px); left: 0; z-index: 25; min-width: 260px;
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 25; min-width: 270px; max-height: 80vh; overflow: auto;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md);
   box-shadow: 0 8px 24px rgba(0,0,0,0.18); padding: 6px; display: flex; flex-direction: column; gap: 2px;
 }
@@ -69,6 +74,14 @@ body {
 .menu-item:hover, .menu-item:focus-visible { background: var(--surface-2); }
 .mi-label { font-size: 13px; font-weight: 600; }
 .mi-hint { font-size: 11px; color: var(--ink-soft); }
+/* Section headings inside the hamburger — it now holds every non-quick action, grouped so a
+   long flat list doesn't turn into a wall of text. */
+.menu-group-title {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--ink-soft);
+  padding: 10px 10px 2px; margin-top: 2px; border-top: 1px solid var(--border);
+}
+.menu-group-title:first-child { margin-top: 0; border-top: 0; padding-top: 4px; }
+.menu-row { padding: 6px 10px 4px; }
 
 /* ── 3D model card ──────────────────────────────────────────────────────────── */
 .three-card { margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
@@ -77,20 +90,25 @@ body {
   background: var(--ink); color: var(--surface); font-size: 13px; font-weight: 700; letter-spacing: 1px;
 }
 .three-hint-text { font-size: 10.5px; font-weight: 400; letter-spacing: normal; opacity: 0.85; text-transform: none; }
-.three-socket { position: relative; width: 100%; aspect-ratio: 760 / 560; background: var(--surface); touch-action: none; }
+/* pan-y: one-finger vertical scroll passes THROUGH the model (so a phone user can scroll past
+   it), while horizontal drag + pinch reach the 3D controls. See three-viewer.ts for the rationale
+   and the matching canvas/OrbitControls override. */
+.three-socket { position: relative; width: 100%; aspect-ratio: 760 / 560; background: var(--surface); touch-action: pan-y; }
 .three-socket canvas { display: block; }
 .three-socket-fallback svg { display: block; width: 100%; height: 100%; }
 .three-controls { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); }
 .three-hint { font-size: 11px; color: var(--ink-soft); }
 
 /* ── Body layouts ───────────────────────────────────────────────────────────── */
-.app-body { padding: 12px; gap: 12px; }
+/* padding-bottom clears the persistent .bottom-toolbar (now present on every screen size, not
+   just mobile) so the last row of content is never hidden underneath it. */
+.app-body { padding: 12px; padding-bottom: 64px; gap: 12px; }
 .layout-desktop { display: grid; grid-template-columns: 320px minmax(0, 1fr) 340px; align-items: start; }
 .layout-tablet { display: grid; grid-template-columns: 300px minmax(0, 1fr); align-items: start; }
-.layout-mobile { display: block; padding-bottom: 96px; }
+.layout-mobile { display: block; padding-bottom: 76px; }
 .region { min-width: 0; }
 .layout-desktop .controls-region, .layout-desktop .rail,
-.layout-tablet .controls-region { position: sticky; top: 60px; max-height: calc(100vh - 72px); overflow: auto; }
+.layout-tablet .controls-region { position: sticky; top: 52px; max-height: calc(100vh - 116px); overflow: auto; }
 .drawings-region { display: flex; flex-direction: column; gap: 12px; }
 .canvas-region { display: flex; flex-direction: column; gap: 12px; }
 .drawings-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -125,7 +143,6 @@ body {
 .val { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); background: none; border: 0; font: inherit; font-weight: 600; padding: 0; }
 button.val { cursor: pointer; text-decoration: underline dotted var(--dim); text-underline-offset: 3px; }
 button.val:hover { color: var(--dim-text); }
-.val.ph { color: var(--dim-text); }
 .val.engineered { color: var(--draw-engineered); font-weight: 700; }
 table.bom { width: 100%; border-collapse: collapse; font-size: 12px; }
 table.bom th, table.bom td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--border); }
@@ -139,27 +156,64 @@ table.bom td.n { text-align: right; font-variant-numeric: tabular-nums; }
 .issue.warning .sev { color: var(--dim-text); border-color: var(--dim); }
 .issue.advisory .sev { color: var(--ink-soft); }
 
-/* ── Mobile: summary bar, FAB, bottom sheet ─────────────────────────────────── */
+/* ── Mobile summary bar ─────────────────────────────────────────────────────── */
 .summary-bar {
-  position: sticky; top: 52px; z-index: 10; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  position: sticky; top: 48px; z-index: 10; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
   padding: 10px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-md); margin-bottom: 12px;
 }
 .s-cell { display: flex; flex-direction: column; }
 .s-k { font-size: 10px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.4px; }
 .s-v { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.fab {
-  position: fixed; right: 16px; bottom: 16px; z-index: 30; min-height: var(--tap-min); padding: 12px 18px;
-  border: 0; border-radius: 999px; background: var(--ink); color: var(--surface); font: inherit; font-weight: 700; cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.28);
+
+/* ── Persistent bottom toolbar (§ redesign) ────────────────────────────────────
+   Undo/redo/reset/theme (+ Edit on mobile) — the actions used constantly while
+   iterating, always one tap away on every screen size. Icon-over-label so 4-5 items
+   fit across a narrow phone with ≥44px tap targets each. */
+.bottom-toolbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+  display: flex; background: var(--surface); border-top: 1px solid var(--border);
+  padding: 4px max(4px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left));
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.14);
 }
+.tbtn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: var(--tap-min); padding: 6px 4px; border: 0; border-radius: var(--r-sm);
+  background: none; color: var(--ink); font: inherit; cursor: pointer;
+}
+.tbtn:hover:not(:disabled) { background: var(--surface-2); }
+.tbtn:disabled { opacity: 0.35; cursor: default; }
+.tbtn-icon { font-size: 18px; line-height: 1; }
+.tbtn-label { font-size: 10px; font-weight: 600; letter-spacing: 0.2px; }
+
+/* ── Mobile bottom sheet ────────────────────────────────────────────────────── */
+/* The open sheet (z-index 35) sits ON TOP of the bottom toolbar (z-index 30) that opens it, so
+   its Edit button is not a usable close control once open — this backdrop is the real one. It
+   also blocks the background page from scrolling/receiving taps while the sheet is up
+   (html.sheet-open{overflow:hidden} below stops keyboard/wheel scroll but not iOS Safari's
+   touch-scroll-through-a-fixed-element quirk; a full-viewport element with touch-action:none
+   closes that gap). */
+.sheet-backdrop {
+  position: fixed; inset: 0; z-index: 34; background: rgba(0,0,0,0.32); touch-action: none;
+  opacity: 0; pointer-events: none; transition: opacity 0.22s ease;
+}
+.sheet-backdrop[data-open="true"] { opacity: 1; pointer-events: auto; }
 .bottom-sheet {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 35; max-height: 82vh; overflow: hidden;
+  display: flex; flex-direction: column;
   background: var(--surface); border-top: 1px solid var(--border); border-radius: 16px 16px 0 0;
   transform: translateY(100%); transition: transform 0.22s ease; box-shadow: 0 -6px 24px rgba(0,0,0,0.25);
 }
 .bottom-sheet[data-open="true"] { transform: translateY(0); }
-.sheet-handle { width: 40px; height: 4px; border-radius: 999px; background: var(--border); margin: 8px auto; }
-.sheet-scroll { max-height: calc(82vh - 28px); overflow: auto; padding: 4px 14px 20px; }
+.sheet-header { display: flex; align-items: center; flex: 0 0 auto; }
+/* The visible pill is a decorative ::before inside a much larger full-width drag target — the
+   old 40x4px pill WAS the entire hit area, too small to reliably grab, and had no gesture wired
+   to it at all (the single interaction every user tries on a bottom-sheet handle). Closing is
+   gesture-only by design: drag this down past the threshold, or tap the backdrop. */
+.sheet-handle { flex: 1; height: 36px; display: flex; align-items: center; justify-content: center; cursor: grab; touch-action: none; }
+.sheet-handle::before { content: ''; width: 40px; height: 4px; border-radius: 999px; background: var(--border); }
+/* overscroll-behavior:contain stops scroll-chaining — without it, scrolling this list to its
+   end and continuing to swipe scrolls whatever is visually behind the (fixed) sheet next. */
+.sheet-scroll { flex: 1 1 auto; overflow: auto; overscroll-behavior: contain; padding: 4px 14px 20px; }
 
 /* ── Overlay (trace / help / diagnostics) ───────────────────────────────────── */
 .overlay { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0,0,0,0.4); }
@@ -173,8 +227,6 @@ table.bom td.n { text-align: right; font-variant-numeric: tabular-nums; }
 .operands li { display: flex; gap: 10px; align-items: baseline; font-size: 13px; }
 .op-name { flex: 1; color: var(--ink-soft); }
 .op-val { font-variant-numeric: tabular-nums; font-weight: 600; }
-.op-ph { font-size: 10px; color: var(--dim-text); border: 1px solid var(--dim); border-radius: 999px; padding: 0 6px; }
-.trace-note, .help-warn { color: var(--ink-soft); font-size: 12px; }
 .help dl { display: grid; grid-template-columns: minmax(90px, auto) 1fr; gap: 6px 12px; margin: 12px 0 0; }
 .help dt { font-weight: 700; }
 .help dd { margin: 0; color: var(--ink-soft); }
@@ -189,7 +241,6 @@ table.bom td.n { text-align: right; font-variant-numeric: tabular-nums; }
 .tools th, .tools td { text-align: left; padding: 5px 7px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .tools th { color: var(--ink-soft); font-weight: 600; }
 .tools td.n, .tools th.n { text-align: right; font-variant-numeric: tabular-nums; }
-.tools .ph { color: var(--dim-text); font-weight: 600; font-size: 10px; }
 .tools td.short { color: var(--draw-engineered); font-weight: 700; }
 .onhand { width: 72px; min-height: 32px; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); font: inherit; text-align: right; }
 .scn-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -261,12 +312,7 @@ table.bom td.n { text-align: right; font-variant-numeric: tabular-nums; }
   .summary-bar { position: sticky; bottom: 0; }
 }
 
-/* ── 3D honesty parity + stage scrubber (Phase 5) ──────────────────────────── */
-.three-badge {
-  font-size: 9px; font-weight: 700; letter-spacing: 0.3px;
-  background: var(--banner-bg); color: var(--banner-text);
-  padding: 2px 6px; border-radius: 3px; margin-left: 8px;
-}
+/* ── 3D stage scrubber (Phase 5) ────────────────────────────────────────────── */
 .three-scrubber {
   display: flex; align-items: center; gap: 8px; padding: 6px 10px;
   font-size: 11px; color: var(--ink-soft); border-top: 1px solid var(--border);

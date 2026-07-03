@@ -4,20 +4,155 @@
     {
       "name": "sap1",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--host", "--port", "5173"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--host",
+        "--port",
+        "5173"
+      ],
       "port": 5173
     },
     {
       "name": "sap3",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--host", "--port", "5183", "--strictPort"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--host",
+        "--port",
+        "5183",
+        "--strictPort"
+      ],
       "port": 5183
     },
     {
       "name": "sap2",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--host", "--port", "5179", "--strictPort"],
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--host",
+        "--port",
+        "5179",
+        "--strictPort"
+      ],
       "port": 5179
+    },
+    {
+      "name": "sap-verify",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--host",
+        "--port",
+        "5197",
+        "--strictPort"
+      ],
+      "port": 5197
+    },
+    {
+      "name": "timber1b",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--host",
+        "--port",
+        "5277",
+        "--strictPort"
+      ],
+      "port": 5277
+    },
+    {
+      "name": "mobilecheck",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--host",
+        "--port",
+        "5283",
+        "--strictPort"
+      ],
+      "port": 5283
+    },
+    {
+      "name": "sheetcheck",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--host",
+        "--port",
+        "5289",
+        "--strictPort"
+      ],
+      "port": 5289
+    },
+    {
+      "name": "timber1",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--host",
+        "--port",
+        "5271",
+        "--strictPort"
+      ],
+      "port": 5271
+    },
+    {
+      "name": "sap-ply",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--host",
+        "--port",
+        "5211",
+        "--strictPort"
+      ],
+      "port": 5211
+    },
+    {
+      "name": "3dfixes",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--host",
+        "--port",
+        "5307",
+        "--strictPort"
+      ],
+      "port": 5307
+    },
+    {
+      "name": "sap-ply2",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--host",
+        "--port",
+        "5261",
+        "--strictPort"
+      ],
+      "port": 5261
     }
   ]
 }
