@@ -234,8 +234,9 @@ export function buildTerrain(spec: TerrainSpec, p: Palette, opts: { scatter: boo
     const posV = new THREE.Vector3();
     const sclV = new THREE.Vector3();
 
-    // (1) grass tufts — crossed alpha-cutout cards.
-    const tuftWant = Math.min(140, Math.max(8, Math.round((area / 100) * 7)));
+    // (1) grass tufts — crossed alpha-cutout cards. Density scales with the soil's look
+    // (p.scatterMul): sand and rock grow far less grass than loam.
+    const tuftWant = Math.min(140, Math.max(2, Math.round((area / 100) * 7 * p.scatterMul.tuft)));
     const tufts = scatterPoints(tuftWant, 0);
     if (tufts.length > 0) {
       const mat = new THREE.MeshToonMaterial({
@@ -263,8 +264,8 @@ export function buildTerrain(spec: TerrainSpec, p: Palette, opts: { scatter: boo
       instanced.push(mesh);
     }
 
-    // (2) rocks.
-    const rockWant = Math.min(24, Math.max(2, Math.round((area / 100) * 1.5)));
+    // (2) rocks — gravel/rock soils read stony (p.scatterMul.rock up to 3x).
+    const rockWant = Math.min(60, Math.max(2, Math.round((area / 100) * 1.5 * p.scatterMul.rock)));
     const rocks = scatterPoints(rockWant, 700001);
     if (rocks.length > 0) {
       const mat = new THREE.MeshToonMaterial({ color: p.rock, gradientMap: toonGradient() });

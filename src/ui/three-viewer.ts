@@ -16,7 +16,7 @@ import { buildScene3D, partStage } from '../render3d/scene3d';
 import type { Part3, BoxRole } from '../render3d/scene3d';
 import { bagWallLayout } from '../render3d/propLayout';
 import { sharedTextures, sharedGeometries, hashJitter, toonGradient, disposeObject } from './engine/shared';
-import { palette } from './engine/palette';
+import { palette, paletteFor } from './engine/palette';
 import type { Palette, Theme3D } from './engine/palette';
 import { buildTerrain } from './engine/terrain';
 import { buildSky, applyFog } from './engine/sky';
@@ -1090,6 +1090,11 @@ export function createThreeViewer(): ThreeViewer {
       lastResult = result;
       lastOpts = opts;
       riseAnims = [];
+      // Resolve the working palette from theme AND the picked soil — the dirt you see must be
+      // the dirt you chose (the soil input already drives dig labor and wall slope; rendering
+      // green loam over a clay or rock pick would contradict the model's own numbers).
+      activePalette = paletteFor(theme, result.inputs.soil);
+      ROLE_COLOR = activePalette.role;
       disposeObject(partsGroup);
       partsGroup.clear();
       const model = buildScene3D(result, { stage: opts.stage, cutaway: opts.cutaway });
@@ -1103,7 +1108,7 @@ export function createThreeViewer(): ThreeViewer {
       if (useTerrain && model.terrain) {
         const spec = opts.stage !== undefined && opts.stage < 1 ? { ...model.terrain, holes: [] } : model.terrain;
         const scatter = pipeline.tier === 'high';
-        const key = JSON.stringify(spec) + '|' + theme + '|' + scatter;
+        const key = JSON.stringify(spec) + '|' + theme + '|' + scatter + '|' + result.inputs.soil;
         if (key !== terrainKey) {
           terrainKey = key;
           terrainDispose?.();

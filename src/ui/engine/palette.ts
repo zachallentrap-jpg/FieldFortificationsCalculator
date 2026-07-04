@@ -60,6 +60,8 @@ export interface Palette {
   figure: { torso: number; legs: number; skin: number; blaze: number };
   /** Per-bag value jitter half-range (multiplier deviation, e.g. 0.06 ⇒ ±6%). */
   bagJitter: number;
+  /** Terrain scatter density multipliers — rocky soils grow rocks, sand loses grass. */
+  scatterMul: { tuft: number; rock: number };
   light: LightRig;
 }
 
@@ -91,6 +93,7 @@ const DAY: Palette = {
   fog: 0xe3decb,
   figure: { torso: 0x6b7250, legs: 0x4e5442, skin: 0xd9a87c, blaze: 0xe8722d },
   bagJitter: 0.06,
+  scatterMul: { tuft: 1, rock: 1 },
   light: {
     hemiSky: 0xdcebfa,
     hemiGround: 0x8a7350,
@@ -139,6 +142,7 @@ const NIGHT: Palette = {
   fog: 0x1c2838,
   figure: { torso: 0x4e5442, legs: 0x33372c, skin: 0x9a7f63, blaze: 0xd96a35 },
   bagJitter: 0.05,
+  scatterMul: { tuft: 1, rock: 1 },
   light: {
     // Night runs a HIGHER proportional floor than day — the palette colors already carry the
     // darkness (hue-shifted blue-slate values), so the rig's job is legibility, not gloom.
@@ -161,4 +165,125 @@ const NIGHT: Palette = {
 
 export function palette(theme: Theme3D): Palette {
   return theme === 'night' ? NIGHT : DAY;
+}
+
+// ── Soil looks (§ honest materials) ─────────────────────────────────────────
+// The soil input already drives dig labor and wall slope — the terrain must LOOK like the
+// soil picked, or the model contradicts its own numbers. Each look overrides only the
+// earth-derived fields (grass/ring/strata/excavated tints/scatter); sandbags, lights, sky,
+// figure never vary with soil. Loam is the baseline — no entry, base palette as-is.
+interface SoilLook {
+  grass: Palette['grass'];
+  wornRing: string;
+  spoilFleck: string;
+  strata: Palette['strata'];
+  bayWall: number;
+  bayFloor: number;
+  rampBerm: number;
+  ground: number; // low-tier flat-ground fallback tint
+  scatterMul: { tuft: number; rock: number };
+}
+
+const SOIL_DAY: Record<string, SoilLook> = {
+  sand: {
+    grass: { base: '#B0A470', dark: '#988D5E', light: '#C4B87F', dry: '#CDBB85' },
+    wornRing: '#C2A468',
+    spoilFleck: '#E2CE9A',
+    strata: { base: '#C9AE7A', lines: ['#D9C18E', '#B29767'] },
+    bayWall: 0xc2a878, bayFloor: 0xa8905f, rampBerm: 0xd6c190, ground: 0xb0a470,
+    scatterMul: { tuft: 0.4, rock: 0.6 },
+  },
+  sandy_loam: {
+    grass: { base: '#95A363', dark: '#7C8B51', light: '#AAB675', dry: '#B3A76E' },
+    wornRing: '#AC8D5C',
+    spoilFleck: '#D3BC88',
+    strata: { base: '#8A6B45', lines: ['#9C7E55', '#715636'] },
+    bayWall: 0x9e8054, bayFloor: 0x846a45, rampBerm: 0xc4ab7c, ground: 0x95a363,
+    scatterMul: { tuft: 0.75, rock: 0.8 },
+  },
+  silt: {
+    grass: { base: '#7F9A5E', dark: '#68824C', light: '#93AC70', dry: '#9C9670' },
+    wornRing: '#8C7658',
+    spoilFleck: '#B5A182',
+    strata: { base: '#75604C', lines: ['#877260', '#5D4A38'] },
+    bayWall: 0x7e6a52, bayFloor: 0x665442, rampBerm: 0xa6947a, ground: 0x7f9a5e,
+    scatterMul: { tuft: 1, rock: 0.7 },
+  },
+  clay: {
+    grass: { base: '#7E9C58', dark: '#688348', light: '#92AF6B', dry: '#A98E62' },
+    wornRing: '#A06B48',
+    spoilFleck: '#C09070',
+    strata: { base: '#8A5638', lines: ['#9E6746', '#70432A'] },
+    bayWall: 0x93643f, bayFloor: 0x7a5030, rampBerm: 0xb08258, ground: 0x7e9c58,
+    scatterMul: { tuft: 1, rock: 0.8 },
+  },
+  gravel: {
+    grass: { base: '#83985F', dark: '#6C7F4E', light: '#97A972', dry: '#9B9478' },
+    wornRing: '#877A68',
+    spoilFleck: '#A99E8C',
+    strata: { base: '#7A7062', lines: ['#8D8375', '#5E5548'] },
+    bayWall: 0x7e7466, bayFloor: 0x685f52, rampBerm: 0x9a9080, ground: 0x83985f,
+    scatterMul: { tuft: 0.6, rock: 2.2 },
+  },
+  rock: {
+    grass: { base: '#7C9060', dark: '#66784E', light: '#8FA272', dry: '#8E8C74' },
+    wornRing: '#7D746A',
+    spoilFleck: '#9C968E',
+    strata: { base: '#6E6E74', lines: ['#808088', '#535358'] },
+    bayWall: 0x70707a, bayFloor: 0x5c5c64, rampBerm: 0x8c8c94, ground: 0x7c9060,
+    scatterMul: { tuft: 0.35, rock: 3 },
+  },
+  frozen: {
+    grass: { base: '#9FB0A4', dark: '#87988C', light: '#C2CFC6', dry: '#D8E2DC' },
+    wornRing: '#9B9284',
+    spoilFleck: '#D9DFDB',
+    strata: { base: '#7A7268', lines: ['#9AA0A2', '#5C564E'] },
+    bayWall: 0x8a8478, bayFloor: 0x716b60, rampBerm: 0xb8bfba, ground: 0x9fb0a4,
+    scatterMul: { tuft: 0.3, rock: 1.4 },
+  },
+};
+
+// Night variants are derived, not hand-authored per soil: darken toward the night rig's
+// blue-slate ambience while keeping each soil's hue signature. Loam stays the hand-tuned
+// base NIGHT palette (no derivation), so the audited night look never drifts.
+function nightHex(day: number): number {
+  const r = (day >> 16) & 0xff, g = (day >> 8) & 0xff, b = day & 0xff;
+  // 0.5/0.2 calibrated against the hand-tuned loam night values (day grass #86A05C should land
+  // near night grass #54645A) so derived soils sit at the same audited legibility floor.
+  const mix = (c: number, t: number): number => Math.round(c * 0.5 + t * 0.2);
+  return (mix(r, 0x46) << 16) | (mix(g, 0x54) << 8) | mix(b, 0x5e);
+}
+function nightCss(day: string): string {
+  return '#' + nightHex(parseInt(day.slice(1), 16)).toString(16).padStart(6, '0');
+}
+function nightLook(d: SoilLook): SoilLook {
+  return {
+    grass: { base: nightCss(d.grass.base), dark: nightCss(d.grass.dark), light: nightCss(d.grass.light), dry: nightCss(d.grass.dry) },
+    wornRing: nightCss(d.wornRing),
+    spoilFleck: nightCss(d.spoilFleck),
+    strata: { base: nightCss(d.strata.base), lines: [nightCss(d.strata.lines[0]), nightCss(d.strata.lines[1])] },
+    bayWall: nightHex(d.bayWall), bayFloor: nightHex(d.bayFloor), rampBerm: nightHex(d.rampBerm), ground: nightHex(d.ground),
+    scatterMul: d.scatterMul,
+  };
+}
+
+/**
+ * The theme palette with the picked soil's look folded in. Unknown soil ids (and loam, the
+ * baseline) return the base palette untouched — the engine can never break on a new soil row,
+ * it just renders it as loam until a look is authored.
+ */
+export function paletteFor(theme: Theme3D, soil: string): Palette {
+  const base = palette(theme);
+  const day = SOIL_DAY[soil];
+  if (!day) return base;
+  const look = theme === 'night' ? nightLook(day) : day;
+  return {
+    ...base,
+    role: { ...base.role, bayWall: look.bayWall, bayFloor: look.bayFloor, rampBerm: look.rampBerm, ground: look.ground },
+    grass: look.grass,
+    wornRing: look.wornRing,
+    spoilFleck: look.spoilFleck,
+    strata: look.strata,
+    scatterMul: look.scatterMul,
+  };
 }
