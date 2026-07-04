@@ -74,6 +74,7 @@ const DAY: Palette = {
   role: {
     ground: 0x86a05c,
     parapet: 0xc9b183,
+    earthParapet: 0xa2805a, // mounded spoil — reads as dirt, not the tan sandbag parapet
     bayWall: 0x8a6a48,
     bayFloor: 0x6f573c,
     cover: 0xb39c72,
@@ -130,6 +131,7 @@ const NIGHT: Palette = {
   role: {
     ground: 0x54645a,
     parapet: 0x9a9284, // lightest earthwork — legibility floor
+    earthParapet: 0x6e6456, // mounded spoil — dirt, distinct from the light sandbag parapet
     bayWall: 0x6e6456,
     bayFloor: 0x564c3e,
     cover: 0x8a8272,

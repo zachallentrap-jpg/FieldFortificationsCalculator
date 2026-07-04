@@ -5,7 +5,7 @@
 // byte-identical Result (asserted by the determinism test).
 
 import '../doctrine/index'; // side-effect: registers every Provenance leaf + freezes structure
-import { positions, vehicleRamp } from '../doctrine/positions';
+import { positions, vehicleRamp, parapetModeFor } from '../doctrine/positions';
 import { soils } from '../doctrine/soils';
 import { standards } from '../doctrine/standards';
 import { sandbag, revetments, camo, sump, excavation, machine } from '../doctrine/materials';
@@ -97,7 +97,8 @@ export interface Calc {
   // materials
   bagVol: number;
   waste: number;
-  bagsParapet: number; // 0 for vehicle positions (berm, not bags)
+  parapetMode: import('../doctrine/positions').ParapetMode; // earth | sandbag | berm
+  bagsParapet: number; // earth: firing-rest bags only; sandbag: full ring; berm: 0
   bermFill: number; // ft³ of dozed spoil in the berm (vehicle positions only)
   bagsCover: number; // 0 unless the cover material is sandbagged_soil
   coverFill: number; // ft³ of plain fill when the cover material is loose soil, not bags
@@ -236,7 +237,18 @@ function computeCalc(raw: Inputs): Calc {
 
   const bagVol = sandbag.L.value * sandbag.W.value * sandbag.H.value;
   const waste = sandbag.wasteFactor.value;
-  const bagsParapet = isVehicle ? 0 : ceilInt((parapetRing / bagVol) * waste);
+  // Frontal parapet is filled from SPOIL, not stacked bags (ATP 3-21.8 §5-240) — so an EARTH
+  // parapet (rifle/crew/mortar/ATGM/trench) bills sandbags ONLY for the firing rest at the
+  // aperture, not the whole ring. A 'sandbag' parapet (bunker/OP) keeps the ring-volume bag
+  // count; a 'berm' (vehicle) bills none. The parapet's protective mass is charged to spoil
+  // for every mode via fillDemand below — the earlier model double-counted it as ~190 bags.
+  const parapetMode = parapetModeFor(position);
+  const restsPerPosition = position.sectorsOfFire ? (position.crewSize >= 2 ? 2 : 1) : 0;
+  const bagsAperture = ceilInt(restsPerPosition * sandbag.bagsPerRest.value * waste);
+  const bagsParapet =
+    parapetMode === 'berm' ? 0 :
+    parapetMode === 'sandbag' ? ceilInt((parapetRing / bagVol) * waste) :
+    bagsAperture; // earth parapet — bags only at the firing rest
   const bermFill = isVehicle ? parapetRing : 0;
   // Cover priced as what it IS: bags only when the doctrine material is sandbagged soil;
   // loose-soil cover is a fill volume, not a phantom bag count.
@@ -328,6 +340,7 @@ function computeCalc(raw: Inputs): Calc {
     excavLoose,
     bagVol,
     waste,
+    parapetMode,
     bagsParapet,
     bermFill,
     bagsCover,

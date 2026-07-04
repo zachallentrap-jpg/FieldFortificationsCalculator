@@ -72,6 +72,11 @@ export const CODES = {
     'advisory',
     'The overhead cover as drawn is thinner than full protection for this threat — a hasty roof trades protection for speed; thicken it when time allows.',
   ),
+  SANDBAG_BASIC_LOAD_EXCEEDED: def(
+    'SANDBAG_BASIC_LOAD_EXCEEDED',
+    'advisory',
+    'This design needs more sandbags than the crew carries — the rest are filled on site or resupplied; plan the material and the time to fill them.',
+  ),
   ATGM_BACKBLAST: def(
     'ATGM_BACKBLAST',
     'warning',

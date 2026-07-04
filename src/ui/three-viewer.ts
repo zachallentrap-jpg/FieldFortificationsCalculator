@@ -778,7 +778,8 @@ function buildPartInner(group: THREE.Group, part: Part3, bags: SandbagBatcher): 
         buildPlankDeck(group, part.x, part.y, part.z, part.w, part.h, part.d, ROLE_COLOR[part.role]);
       } else {
         const geometry = new THREE.BoxGeometry(Math.max(0.05, part.w), Math.max(0.05, part.h), Math.max(0.05, part.d));
-        if (part.role === 'bayWall' && part.taperAmount) {
+        // Both the sloped bay wall AND the mounded earth parapet flare their outer face.
+        if ((part.role === 'bayWall' || part.role === 'earthParapet') && part.taperAmount) {
           taperOuterFace(geometry, part.taperAxis ?? 2, part.taperSign ?? 1, part.taperAmount);
         }
         let map: THREE.Texture | undefined;
@@ -788,7 +789,11 @@ function buildPartInner(group: THREE.Group, part: Part3, bags: SandbagBatcher): 
           // wall color would land it in mud (see dirtTexture's neutral-map rationale).
           map = corrugatedTexture();
           tint = 0xffffff;
-        } else if (part.role === 'ground' || part.role === 'bayFloor' || part.role === 'rampBerm' || (part.role === 'bayWall' && part.finish === 'earth')) {
+        } else if (
+          part.role === 'ground' || part.role === 'bayFloor' || part.role === 'rampBerm' ||
+          part.role === 'earthParapet' || (part.role === 'bayWall' && part.finish === 'earth')
+        ) {
+          // Earth parapet = mounded dirt (spoil), same material as the ground/berm.
           map = dirtTexture();
         }
         // Interior surfaces (bay walls/floors, ramp treads) skip the outline shell: they sit

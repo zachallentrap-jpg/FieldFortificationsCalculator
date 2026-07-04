@@ -4,6 +4,7 @@
 
 import { retainingWall, threats } from '../doctrine/protection';
 import { backblast } from '../doctrine/positions';
+import { sandbag } from '../doctrine/materials';
 import { CODES, issue } from './codes';
 import { round1 } from './round';
 import type { ValidationIssue } from './types';
@@ -94,6 +95,19 @@ export function runValidation(calc: Calc): ValidationIssue[] {
   // Hand-digging heavy/hard ground (vehicle positions get the stronger warning above).
   if (!calc.inputs.machineAssist && HEAVY_SOILS.has(calc.inputs.soil) && !calc.isVehicle) {
     advisories.push(issue(CODES.EXCAV_HAND_HEAVY));
+  }
+
+  // Materials availability: a squad carries only a few sandbags per soldier (basicLoad), so a
+  // design needing many more implies on-site filling / resupply — a real planning fact. This
+  // now essentially never fires for a corrected earth-parapet rifle position (~12 aperture
+  // bags < what a crew carries) and correctly fires for a bunker or a sandbagged deliberate
+  // position with overhead cover. Advisory, not error: exceeding it is legitimate, you resupply.
+  const bagsTotal = calc.bagsParapet + calc.bagsCover + calc.bagsRevet;
+  const carriedBags = calc.inputs.count * calc.inputs.teamSize * sandbag.basicLoad.value;
+  if (bagsTotal > carriedBags) {
+    advisories.push(
+      issue(CODES.SANDBAG_BASIC_LOAD_EXCEEDED, '(needs ~' + bagsTotal + ' bags; a crew carries ~' + carriedBags + ')'),
+    );
   }
 
   // Clamp advisories.

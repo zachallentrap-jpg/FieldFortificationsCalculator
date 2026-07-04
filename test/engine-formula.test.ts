@@ -51,8 +51,11 @@ test('§9 chain: two-man / deliberate / loam / fragmentation matches an independ
 
   const bagVol = sandbag.L.value * sandbag.W.value * sandbag.H.value;
   const waste = sandbag.wasteFactor.value;
-  const bagsParapet = ceil((parapetRing / bagVol) * waste);
+  // Two-man is an EARTH parapet (spoil, not bags) — its only bags are the two firing rests at
+  // the aperture (sectorsOfFire, crewSize ≥ 2 ⇒ 2 rests), NOT the full parapet ring.
+  const bagsParapet = ceil(2 * sandbag.bagsPerRest.value * waste);
   const bagsCover = ceil((coverVol / bagVol) * waste);
+  void parapetRing; // parapet mass is charged to spoil (fillDemand), not bags — see compute.ts
 
   const mh =
     labor.baseMH.value * 1.0 /* loam dig */ * std.laborMul.value +

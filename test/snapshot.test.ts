@@ -19,7 +19,9 @@ test('default fixture (two-man / deliberate / loam / 81mm mortar) snapshot', () 
   assert.deepEqual(bom, {
     excavation_loose: 72.5,
     grenade_sumps: 2,
-    sandbags_parapet: 168,
+    // Two-man is an EARTH parapet — bags only at the two firing rests (ceil(2 × 5 × 1.15) = 12),
+    // NOT the full ring (was 168). The parapet's protective mass is spoil, charged via fillDemand.
+    sandbags_parapet: 12,
     sandbags_cover: 157,
     // Phase 1 (DECISIONS D29): stringers now count along the LONG axis (7 ft frontage → 8),
     // spanning the 2 ft short axis — the pre-Phase-1 count keyed on the short axis (3) and
@@ -29,10 +31,27 @@ test('default fixture (two-man / deliberate / loam / 81mm mortar) snapshot', () 
   });
   // Growth by phase: 275 (baseline) → 279 (P1: berm W/H, blade-hour rate, ramp slope; +1 SC)
   // → 283 (P4: 4 excavation-split fractions) → 293 (P6: connecting-trench + ATGM hole/platform
-  // leaves + backblast clearance; +1 SC). 293 total, 189 safety-critical.
-  assert.equal(r.placeholderReport.total, 293);
-  assert.equal(r.placeholderReport.remaining, 293);
+  // leaves + backblast clearance; +1 SC) → 295 (earth-parapet pass: sandbag.bagsPerRest +
+  // sandbag.basicLoad, both non-SC). 295 total, 189 safety-critical.
+  assert.equal(r.placeholderReport.total, 295);
+  assert.equal(r.placeholderReport.remaining, 295);
   assert.equal(r.placeholderReport.safetyCriticalRemaining, 189);
+});
+
+test('earth-parapet rifle position bills firing-rest bags only; bunker keeps the full sandbag ring', () => {
+  const bags = (over: Parameters<typeof defaultInputs>[0]): number => {
+    const l = compute(defaultInputs({ overheadCover: false, ...over })).bom.find((b) => b.id === 'sandbags_parapet');
+    return l ? l.qtyPerPosition : 0;
+  };
+  // Two-man rifle hole with NO overhead cover: the parapet is spoil — only the ~12 aperture bags.
+  const twoMan = bags({ positionType: 'two_man' });
+  assert.ok(twoMan > 0 && twoMan <= 12, 'two-man earth parapet ≤ 12 bags, got ' + twoMan);
+  // One-man: a single firing rest ⇒ fewer still.
+  assert.ok(bags({ positionType: 'one_man' }) < twoMan, 'one-man (1 rest) < two-man (2 rests)');
+  // Bunker/OP is the one class still built of sandbag walls — full ring, dozens+ of bags.
+  assert.ok(bags({ positionType: 'bunker_op_cp' }) > 40, 'bunker keeps the full sandbag ring');
+  // Vehicle defilade is a dozed berm — zero parapet bags.
+  assert.equal(bags({ positionType: 'vehicle_hull_defilade', machineAssist: true }), 0, 'vehicle berm bills no bags');
 });
 
 test('engineered fixture never carries a fabricated cover thickness', () => {

@@ -38,8 +38,10 @@ test('CSV uses . decimals and no thousands separators regardless of locale', () 
   assert.ok(csv.includes('72.5'), 'spoil volume formatted with a dot decimal');
   assert.ok(csv.endsWith('\r\n'), 'RFC-4180 CRLF line endings');
 
-  // A genuinely large total (168 parapet sandbags × 999) must appear bare, never grouped.
+  // A genuinely large total (157 overhead-cover sandbags × 999) must appear bare, never grouped.
+  // (The parapet is now an earth berm — only ~12 firing-rest bags — so cover bags carry the
+  // large-number case.)
   const big = toCsv(compute(defaultInputs({ count: 999 })), { scenario: 'S', date: '2026-06-30' });
-  assert.ok(big.includes('167832'), 'large totals are ungrouped');
-  assert.ok(!big.includes('167,832'), 'no thousands separator inside a number');
+  assert.ok(big.includes('156843'), 'large totals are ungrouped');
+  assert.ok(!big.includes('156,843'), 'no thousands separator inside a number');
 });

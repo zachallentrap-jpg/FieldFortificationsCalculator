@@ -40,6 +40,26 @@ export interface PositionRow {
 
 const ft = (v: number, note: string): Provenance<number> => P(v, { unit: 'ft', note });
 
+// What the frontal parapet is BUILT FROM (research-verified — ATP 3-21.8 §5-240 "Use spoil
+// from hole to fill parapets in order of front, flanks, and rear"; FM 5-103 "Parapets are
+// constructed using spoil from the excavation"):
+//   'earth'   — mounded excavated SPOIL. Rifle / crew-served / mortar / ATGM / trench: the
+//               protective mass is dirt; sandbags appear only at the firing rest (aperture),
+//               in overhead cover, and as revetment when the soil is loose — never as the
+//               parapet mass. A hasty rifle position uses zero sandbags.
+//   'sandbag' — built-up sandbag walls ARE the structure. Only the bunker/OP (rect_roofed):
+//               "Walls of fighting and protective positions are built of sandbags" (FM 5-103,
+//               shelters/bunkers section) — the one class that stays mostly sandbag.
+//   'berm'    — dozed spoil berm (vehicle defilade). Already modeled; nobody fills ~450 bags
+//               around a hull-down (FM 5-103: spoil "flattened out or hauled away").
+// Derived from existing signals so a new position never silently defaults wrong.
+export type ParapetMode = 'earth' | 'sandbag' | 'berm';
+export function parapetModeFor(pos: PositionRow): ParapetMode {
+  if (pos.volumeModel === 'prism_ramp') return 'berm';
+  if (pos.shape === 'rect_roofed') return 'sandbag';
+  return 'earth';
+}
+
 // Vehicle-defilade excavation doctrine (shared by the vehicle_ramp shape family). The access
 // ramp is the dominant excavation volume of a defilade — omitting it was falsifiable by any
 // equipment operator in minutes (EXECUTION_PLAN Phase 1).

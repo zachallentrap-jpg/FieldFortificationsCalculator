@@ -128,18 +128,34 @@ export function buildDerivations(calc: Calc): Derivation[] {
   });
 
   if (calc.bagsParapet > 0) {
-    d.push({
-      key: 'sandbagsParapet',
-      label: 'Sandbags — parapet',
-      formula: 'ceil(parapetVolume ÷ bagVolume × wasteFactor)',
-      operands: [
-        op('parapetVolume', calc.parapetRing, 'ft³'),
-        op('bagVolume', calc.bagVol, 'ft³', sandbag.L),
-        op('wasteFactor', calc.waste, '×', sandbag.wasteFactor),
-      ],
-      result: calc.bagsParapet,
-      unit: 'ea',
-    });
+    // An EARTH parapet's mass is spoil (see the Parapet-volume row); its only bags are the
+    // firing-rest course at the aperture. A SANDBAG parapet (bunker) still bills the full ring.
+    d.push(
+      calc.parapetMode === 'sandbag'
+        ? {
+            key: 'sandbagsParapet',
+            label: 'Sandbags — parapet',
+            formula: 'ceil(parapetVolume ÷ bagVolume × wasteFactor)',
+            operands: [
+              op('parapetVolume', calc.parapetRing, 'ft³'),
+              op('bagVolume', calc.bagVol, 'ft³', sandbag.L),
+              op('wasteFactor', calc.waste, '×', sandbag.wasteFactor),
+            ],
+            result: calc.bagsParapet,
+            unit: 'ea',
+          }
+        : {
+            key: 'sandbagsParapet',
+            label: 'Sandbags — firing rest',
+            formula: 'ceil(restsPerPosition × bagsPerRest × wasteFactor)',
+            operands: [
+              op('bagsPerRest', sandbag.bagsPerRest.value, 'ea', sandbag.bagsPerRest),
+              op('wasteFactor', calc.waste, '×', sandbag.wasteFactor),
+            ],
+            result: calc.bagsParapet,
+            unit: 'ea',
+          },
+    );
   }
 
   if (calc.bermFill > 0) {
