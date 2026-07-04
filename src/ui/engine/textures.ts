@@ -118,6 +118,168 @@ function traceHole(ctx: CanvasRenderingContext2D, h: TerrainHole): void {
 
 // ── ground top (per-scene) ─────────────────────────────────────────────────────────────────────
 
+// The ground-surface painters, one per soil face character. All work in plan feet on a
+// transformed context, deterministic via hashJitter + the footprint salt.
+function paintSurface(ctx: CanvasRenderingContext2D, p: Palette, minX: number, minZ: number, w: number, d: number, fp: number): void {
+  const minDim = Math.min(w, d);
+
+  // Soft irregular tone patches — shared by several painters (dry grass, dust, frost).
+  const patches = (color: string, n: number, alpha: number, salt: number): void => {
+    for (let i = 0; i < n; i++) {
+      const s = fp + salt + i * 11;
+      const cx = minX + w * (0.12 + hashJitter(s + 1) * 0.76);
+      const cz = minZ + d * (0.12 + hashJitter(s + 2) * 0.76);
+      const r = minDim * (0.12 + hashJitter(s + 3) * 0.14);
+      const g = ctx.createRadialGradient(cx, cz, 0, cx, cz, r);
+      g.addColorStop(0, rgba(color, alpha));
+      g.addColorStop(0.7, rgba(color, alpha * 0.7));
+      g.addColorStop(1, rgba(color, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(cx, cz, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+
+  // Small scattered dots (pebbles, speckles, moss) on a jittered lattice.
+  const dots = (colors: string[], step: number, keepFrac: number, rMin: number, rMax: number, salt: number): void => {
+    let cell = 0;
+    for (let gz = minZ + step / 2; gz < minZ + d; gz += step) {
+      for (let gx = minX + step / 2; gx < minX + w; gx += step) {
+        cell++;
+        const s = fp + salt + cell * 7;
+        if (hashJitter(s + 1) > keepFrac) continue;
+        ctx.fillStyle = colors[Math.floor(hashJitter(s + 2) * colors.length) % colors.length]!;
+        const bx = gx + (hashJitter(s + 3) - 0.5) * step * 0.8;
+        const bz = gz + (hashJitter(s + 4) - 0.5) * step * 0.8;
+        const r = rMin + hashJitter(s + 5) * (rMax - rMin);
+        ctx.beginPath();
+        ctx.arc(bx, bz, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  };
+
+  // Long wavy strokes (sand ripples, ice streaks) running roughly along x.
+  const streaks = (color: string, n: number, width: number, alpha: number, salt: number): void => {
+    ctx.strokeStyle = rgba(color, alpha);
+    ctx.lineWidth = width;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < n; i++) {
+      const s = fp + salt + i * 13;
+      const z0 = minZ + d * ((i + 0.5) / n) + (hashJitter(s + 1) - 0.5) * (d / n) * 0.6;
+      const amp = 0.25 + hashJitter(s + 2) * 0.3;
+      const phase = hashJitter(s + 3) * Math.PI * 2;
+      ctx.beginPath();
+      for (let x = minX; x <= minX + w; x += 0.5) {
+        const z = z0 + Math.sin((x / w) * Math.PI * (3 + hashJitter(s + 4) * 2) + phase) * amp;
+        if (x === minX) ctx.moveTo(x, z);
+        else ctx.lineTo(x, z);
+      }
+      ctx.stroke();
+    }
+  };
+
+  // Thin jagged crack lines (clay polygons, rock fissures).
+  const cracks = (color: string, n: number, alpha: number, salt: number): void => {
+    ctx.strokeStyle = rgba(color, alpha);
+    ctx.lineWidth = 0.06;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < n; i++) {
+      const s = fp + salt + i * 17;
+      let x = minX + w * (0.08 + hashJitter(s + 1) * 0.84);
+      let z = minZ + d * (0.08 + hashJitter(s + 2) * 0.84);
+      let ang = hashJitter(s + 3) * Math.PI * 2;
+      ctx.beginPath();
+      ctx.moveTo(x, z);
+      const segs = 3 + Math.round(hashJitter(s + 4) * 3);
+      for (let k = 0; k < segs; k++) {
+        ang += (hashJitter(s + 5 + k) - 0.5) * 1.4;
+        const len = 0.6 + hashJitter(s + 9 + k) * 1.2;
+        x += Math.cos(ang) * len;
+        z += Math.sin(ang) * len;
+        ctx.lineTo(x, z);
+      }
+      ctx.stroke();
+    }
+  };
+
+  switch (p.faceLook) {
+    // Non-meadow soils get a STRONG opaque-ish base overlay in the soil's own tone — the green
+    // underneath survives only as faint variation. "Make the whole surface a new terrain, not
+    // just a green color with circles" is the requirement these overlays carry.
+    case 'cone': {
+      // Sand field: pale dune base, wind ripples, fine speckles.
+      ctx.fillStyle = rgba(p.spoilFleck, 0.8);
+      ctx.fillRect(minX, minZ, w, d);
+      streaks(p.wornRing, Math.max(4, Math.round(d / 1.6)), 0.12, 0.4, 100);
+      dots([p.grass.dry, p.grass.dark], 1.1, 0.3, 0.04, 0.09, 200);
+      patches(p.wornRing, 2, 0.15, 300);
+      break;
+    }
+    case 'stony': {
+      // Gravel bed: densely scattered pebbles over a dirt base, a few larger stones.
+      ctx.fillStyle = rgba(p.wornRing, 0.75);
+      ctx.fillRect(minX, minZ, w, d);
+      dots([p.grass.dark, p.grass.light, p.spoilFleck], 0.55, 0.75, 0.06, 0.16, 100);
+      dots([p.grass.dark], 2.2, 0.5, 0.18, 0.3, 400);
+      patches(p.grass.dry, 2, 0.12, 300);
+      break;
+    }
+    case 'blocky': {
+      // Clay hardpan: dusty red-brown base, polygonal drying cracks, sparse dry vegetation.
+      ctx.fillStyle = rgba(p.wornRing, 0.8);
+      ctx.fillRect(minX, minZ, w, d);
+      cracks(p.grass.dark, Math.max(8, Math.round((w * d) / 18)), 0.55, 100);
+      patches(p.grass.dry, 3, 0.18, 300);
+      patches(p.grass.base, 2, 0.2, 600); // surviving vegetation patches, not the base
+      break;
+    }
+    case 'stratified': {
+      // Broken rock: grey stone base, angular fissures, slab patches, sparse moss dots.
+      ctx.fillStyle = rgba(p.wornRing, 0.8);
+      ctx.fillRect(minX, minZ, w, d);
+      cracks(p.strata.lines[1], Math.max(10, Math.round((w * d) / 14)), 0.6, 100);
+      patches(p.spoilFleck, 3, 0.25, 200);
+      patches(p.strata.base, 2, 0.2, 500);
+      dots([p.grass.dark, p.grass.base], 1.4, 0.25, 0.08, 0.18, 400); // moss/lichen
+      break;
+    }
+    case 'iceblocky': {
+      // Frozen ground: frosted pale base, icy patches, thin windblown ice streaks.
+      ctx.fillStyle = rgba(p.grass.light, 0.7);
+      ctx.fillRect(minX, minZ, w, d);
+      patches('#ffffff', 4, 0.3, 100);
+      streaks('#ffffff', Math.max(3, Math.round(d / 2.4)), 0.1, 0.35, 300);
+      dots([p.grass.dark], 1.8, 0.25, 0.06, 0.14, 400);
+      break;
+    }
+    default: {
+      // 'planar' — the loam-family grass meadow: 3-tone blob speckle + soft dry patches
+      // (the original look, unchanged).
+      const step = 0.9;
+      let cell = 0;
+      for (let gz = minZ + step / 2; gz < minZ + d; gz += step) {
+        for (let gx = minX + step / 2; gx < minX + w; gx += step) {
+          cell++;
+          const roll = hashJitter(cell * 7 + 1);
+          if (roll < 0.6) continue;
+          ctx.fillStyle = roll < 0.85 ? p.grass.dark : p.grass.light;
+          const bx = gx + (hashJitter(cell * 7 + 2) - 0.5) * step * 0.8;
+          const bz = gz + (hashJitter(cell * 7 + 3) - 0.5) * step * 0.8;
+          const rx = 0.3 + hashJitter(cell * 7 + 4) * 0.2;
+          const rz = 0.3 + hashJitter(cell * 7 + 5) * 0.2;
+          ctx.beginPath();
+          ctx.ellipse(bx, bz, rx, rz, hashJitter(cell * 7 + 6) * Math.PI, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      patches(p.grass.dry, 2 + (hashJitter(fp + 7) > 0.5 ? 1 : 0), 0.2, 0);
+      break;
+    }
+  }
+}
+
 export function groundTopTexture(spec: TerrainSpec, p: Palette): THREE.CanvasTexture {
   const o = spec.outer;
   const canvas = document.createElement('canvas');
@@ -140,49 +302,17 @@ export function groundTopTexture(spec: TerrainSpec, p: Palette): THREE.CanvasTex
   const sz = 1024 / Math.max(o.d, 1e-6);
   ctx.setTransform(sx, 0, 0, sz, -minX * sx, -minZ * sz);
 
-  // (a) grass base
+  // (a) base
   ctx.fillStyle = p.grass.base;
   ctx.fillRect(minX, minZ, o.w, o.d);
 
-  // (b) 3-tone speckle on a jittered ~0.9 ft lattice — the position jitter plus per-blob
-  // radii/rotation is what keeps this from reading as a printed grid. ~60% of cells stay bare
-  // (base shows through), ~25% dark, ~15% light.
-  const step = 0.9;
-  let cell = 0;
-  for (let gz = minZ + step / 2; gz < minZ + o.d; gz += step) {
-    for (let gx = minX + step / 2; gx < minX + o.w; gx += step) {
-      cell++;
-      const roll = hashJitter(cell * 7 + 1);
-      if (roll < 0.6) continue;
-      ctx.fillStyle = roll < 0.85 ? p.grass.dark : p.grass.light;
-      const bx = gx + (hashJitter(cell * 7 + 2) - 0.5) * step * 0.8;
-      const bz = gz + (hashJitter(cell * 7 + 3) - 0.5) * step * 0.8;
-      const rx = 0.3 + hashJitter(cell * 7 + 4) * 0.2; // semi-axes → 0.6..1.0 ft blobs
-      const rz = 0.3 + hashJitter(cell * 7 + 5) * 0.2;
-      ctx.beginPath();
-      ctx.ellipse(bx, bz, rx, rz, hashJitter(cell * 7 + 6) * Math.PI, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  // (c) 2-3 large soft dry patches. Footprint-derived integer salt so different positions don't
-  // all share one recognizable patch layout — still identical for identical inputs.
+  // (b)+(c) SURFACE CHARACTER, per soil (keyed by faceLook): the whole ground reads as the
+  // soil picked — a sand field, a pebble bed, cracked clay hardpan, broken rock, frost — not
+  // one green speckled meadow recolored per soil. Only the loam family keeps the meadow.
+  // Every painter draws in plan feet with deterministic hashJitter, colors sourced from the
+  // soil-adjusted palette so night variants derive automatically.
   const fp = Math.round(o.w * 13 + o.d * 29);
-  const dryN = 2 + (hashJitter(fp + 7) > 0.5 ? 1 : 0);
-  for (let i = 0; i < dryN; i++) {
-    const s = fp + i * 11;
-    const cx = minX + o.w * (0.2 + hashJitter(s + 1) * 0.6);
-    const cz = minZ + o.d * (0.2 + hashJitter(s + 2) * 0.6);
-    const r = Math.min(o.w, o.d) * (0.16 + hashJitter(s + 3) * 0.12);
-    const g = ctx.createRadialGradient(cx, cz, 0, cx, cz, r);
-    g.addColorStop(0, rgba(p.grass.dry, 0.2));
-    g.addColorStop(0.7, rgba(p.grass.dry, 0.14));
-    g.addColorStop(1, rgba(p.grass.dry, 0));
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(cx, cz, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  paintSurface(ctx, p, minX, minZ, o.w, o.d, fp);
 
   // (d) worn dirt ring + (e) spoil flecks, per hole.
   ctx.lineJoin = 'round';

@@ -86,9 +86,6 @@ test('each revetment choice tags the excavation wall with its own distinct finis
 });
 
 test('unrevetted wall taper scales with the soil\'s real wallSlopeRatio — steeper soil ⇒ more taper', () => {
-  // Hasty (shallow) so the flare stays below the parapet-footprint clamp and the soil ordering
-  // is observable — a deep cut in slumping soil saturates the clamp (and is doctrinally revetted
-  // anyway, since sand/gravel are revetForced), which would erase the distinction.
   const taperFor = (soil: string): number => {
     const r = compute(defaultInputs({ soil, standard: 'hasty', revetment: 'none' }));
     const scene = buildScene3D(r);
@@ -96,12 +93,31 @@ test('unrevetted wall taper scales with the soil\'s real wallSlopeRatio — stee
     return wall?.taperAmount ?? 0;
   };
   // Researched face angles: rock/frozen are VERTICAL (ratio 0 ⇒ no taper); loam moderate (0.65);
-  // clay steeper-but-still-sloped (0.75); sand/gravel slump wide (1.48). Not the old 0.1
-  // placeholder that gave "stable" rock a near-vertical-but-nonzero taper.
+  // clay steeper-but-still-sloped (0.75); sand/gravel slump wide (1.48). The rendered taper is
+  // additionally clamped to the bay's own size (see below), so on a narrow rifle bay steep soils
+  // saturate to the same drawable maximum — ordering is monotonic (≤), not strict.
   assert.equal(taperFor('rock'), 0, 'intact rock cuts vertical — no taper');
   assert.equal(taperFor('frozen'), 0, 'frozen ground cuts vertical while frozen');
-  assert.ok(taperFor('loam') < taperFor('clay'), 'loam < clay');
-  assert.ok(taperFor('clay') < taperFor('sand'), 'clay (steep) < sand (slumped)');
+  assert.ok(taperFor('loam') <= taperFor('clay'), 'loam ≤ clay');
+  assert.ok(taperFor('clay') <= taperFor('sand'), 'clay ≤ sand');
+  assert.ok(taperFor('loam') > 0, 'a sloping soil still shows a taper');
+});
+
+test('bay-wall taper never exceeds the bay\'s own size — walls cannot flare into each other', () => {
+  // The regression this pins: an ATGM (3 ft front-to-back) in sand at deliberate depth rendered
+  // a raw ~5+ ft flare per wall — opposite/adjacent walls interpenetrated into a pile of flaps.
+  // (mg_crew omitted: its T-stem clamps to the stem's OWN dims, slightly above the main bay's.)
+  for (const positionType of ['atgm_javelin', 'two_man']) {
+    const r = compute(defaultInputs({ positionType, soil: 'sand', standard: 'deliberate', revetment: 'none' }));
+    const scene = buildScene3D(r);
+    const walls = scene.parts.filter((p) => p.kind === 'box' && p.role === 'bayWall') as Array<{ taperAmount?: number }>;
+    assert.ok(walls.length > 0, positionType + ' has bay walls');
+    const geo = r.geometry as { plan: { holeL: number; holeW: number } };
+    const cap = Math.min(geo.plan.holeL, geo.plan.holeW) * 0.35 + 1e-9;
+    for (const w of walls) {
+      assert.ok((w.taperAmount ?? 0) <= cap, positionType + ' taper ' + w.taperAmount + ' ≤ bay cap ' + cap);
+    }
+  }
 });
 
 test('a revetted wall never tapers, regardless of how steep the soil would otherwise require', () => {
