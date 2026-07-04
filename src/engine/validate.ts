@@ -2,7 +2,7 @@
 // catalog. Ordering is deterministic (errors, then warnings, then advisories, stable within
 // a tier). Every code in codes.ts is reachable from here (asserted by the validate test).
 
-import { retainingWall } from '../doctrine/protection';
+import { retainingWall, threats } from '../doctrine/protection';
 import { backblast } from '../doctrine/positions';
 import { CODES, issue } from './codes';
 import { round1 } from './round';
@@ -66,6 +66,24 @@ export function runValidation(calc: Calc): ValidationIssue[] {
   // say so instead of letting the operator believe cover was added.
   if (calc.inputs.overheadCover && calc.threat === 'none') {
     advisories.push(issue(CODES.COVER_NO_THREAT));
+  }
+
+  // Protection adequacy — "the cover as drawn is thinner than the threat needs." The overhead
+  // cover is threat-sized (coverLeaf = the threat's full shielding requirement) then scaled by
+  // the standard's coverMul, so a HASTY roof (0.75×) renders THINNER than that requirement.
+  // Surface the tradeoff with both numbers. Deliberate (1.0×) meets it and reinforced (1.4×)
+  // exceeds it, so this stays silent there; it never fires without a real earth cover
+  // (engineered/none leave coverT at 0 and coverLeaf undefined). Compared on the ROUNDED
+  // values the panel actually shows, so the warning agrees with the numbers on screen and
+  // never fires a sub-tenth-of-a-foot phantom shortfall.
+  if (calc.coverLeaf && calc.coverT > 0 && round1(calc.coverT) < round1(calc.coverLeaf.value)) {
+    const label = threats[calc.threat]?.label ?? 'this threat';
+    advisories.push(
+      issue(
+        CODES.COVER_UNDER_THREAT,
+        '(roof ~' + round1(calc.coverT) + ' ft as drawn; ~' + round1(calc.coverLeaf.value) + ' ft fully stops ' + label + ')',
+      ),
+    );
   }
 
   // ATGM/Javelin: the rear backblast danger area must be clear (a safety issue, not a dig).

@@ -28,6 +28,7 @@ test('each validation code is reachable', () => {
     { positionType: 'vehicle_hull_defilade', machineAssist: true }, // SPOIL_EXCESS_VEHICLE
     { soil: 'silt' }, // DRAINAGE_WET_SOIL
     { threat: 'none', overheadCover: true }, // COVER_NO_THREAT
+    { threat: 'sa-556', overheadCover: true, standard: 'hasty' }, // COVER_UNDER_THREAT (0.75x roof)
     { positionType: 'atgm_javelin' }, // ATGM_BACKBLAST
   ];
   for (const s of scenarios) for (const c of codesFor(s)) fired.add(c);
@@ -35,6 +36,18 @@ test('each validation code is reachable', () => {
   for (const def of allCodes()) {
     assert.ok(fired.has(def.code), 'code never fired: ' + def.code);
   }
+});
+
+test('COVER_UNDER_THREAT fires for a hasty roof and clears at deliberate/reinforced', () => {
+  const cov = (standard: Inputs['standard']): Set<string> =>
+    codesFor({ threat: 'sa-556', overheadCover: true, standard });
+  // Hasty scales the threat-sized cover to 0.75× — thinner than full protection.
+  assert.ok(cov('hasty').has('COVER_UNDER_THREAT'), 'hasty roof is under-thick for the threat');
+  // Deliberate builds the full doctrinal thickness; reinforced exceeds it — neither is short.
+  assert.ok(!cov('deliberate').has('COVER_UNDER_THREAT'), 'deliberate meets the requirement');
+  assert.ok(!cov('reinforced').has('COVER_UNDER_THREAT'), 'reinforced exceeds it');
+  // No cover requested ⇒ nothing to be short.
+  assert.ok(!codesFor({ threat: 'sa-556', overheadCover: false, standard: 'hasty' }).has('COVER_UNDER_THREAT'), 'no roof, no shortfall');
 });
 
 test('REVET_REQUIRED_SOIL is an error and clears when a revetment is chosen', () => {
