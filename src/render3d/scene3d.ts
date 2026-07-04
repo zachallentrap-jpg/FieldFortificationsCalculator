@@ -188,6 +188,11 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
   const soilRow = soils[result.inputs.soil];
   const slopeRatio = finish === 'earth' ? (soilRow ? soilRow.wallSlopeRatio.value : 0) : 0;
   const picketSpacing = revetments[result.inputs.revetment]?.spacing?.value ?? 2;
+  // The RENDERED parapet height is the COMPUTED one (doctrine × standard), not a hardcoded
+  // constant — a previous fixed 1.1 ft drew more than double the doctrine's 0.5 ft of bags,
+  // so the model contradicted the spec panel's own "Parapet height" row and every position
+  // read as massively over-bagged. Floored at one laid course so it never renders as zero.
+  const parapetH = Math.max(0.35, finite(s.parapetH));
 
   // ── Footprint by shape (§ each design gets a distinct silhouette) ────────────
   if (geo.shape === 'circular') {
@@ -199,7 +204,7 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     parts.push({ kind: 'ring', x: 0, z: 0, outerR: rOuter, innerR: rHole, height: 0.05, role: 'ground' });
     // A single smooth extruded annulus — no segment seams (a prior 8-box approximation left
     // visible outline clutter at every seam and read as a dark, broken-looking ring).
-    parts.push({ kind: 'ring', x: 0, z: 0, outerR: rHole + p.parapetW, innerR: rHole, height: 1.2, role: 'parapet' });
+    parts.push({ kind: 'ring', x: 0, z: 0, outerR: rHole + p.parapetW, innerR: rHole, height: parapetH, role: 'parapet' });
     // Mortar-pit walls are ALWAYS splayed/battered outward bottom-to-top (~4:1 to 5:1,
     // vertical:horizontal) regardless of revetment choice — doctrine sizes this batter for
     // repeated firing-concussion durability, not soil stability, so unlike the rectangular
@@ -209,11 +214,9 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     // slopeRatio used for bare unrevetted rectangular walls elsewhere in this file.
     const MORTAR_PIT_BATTER = 0.25; // 1 ft horizontal per 4 ft vertical
     const rTop = Math.min(rHole + Math.min(MORTAR_PIT_BATTER * s.depthOfCut, p.parapetW * 0.9), rOuter - 0.2);
-    // Grade margin matches pushBayBox's rationale exactly: without it this cylinder's top cap
-    // sits precisely at y=0, the SAME level as the ground disc above — the ground plane then
-    // occludes it entirely from any top-down-ish angle, showing flat grass-green where a dark
-    // excavated pit floor should read. Extending the wall a touch above grade closes that gap.
-    const gradeMargin = 0.25;
+    // Grade margin matches pushBayBox's rationale exactly (see there): a sliver above grade to
+    // close the crust seam — the terrain's true hole cutout made the old bigger margin obsolete.
+    const gradeMargin = 0.08;
     parts.push({
       kind: 'cyl', x: 0, y: -s.depthOfCut / 2 + gradeMargin / 2, z: 0,
       radius: rHole, radiusTop: rTop, height: s.depthOfCut + gradeMargin, role: 'bayFloor',
@@ -293,7 +296,7 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     const isAtgm = result.inputs.positionType === 'atgm_javelin';
     const entranceGap = isAtgm ? p.holeL * 0.85 : Math.min(3, p.holeL * 0.4);
     pushGroundFrame(parts, 0, 0, p.outerL + 4, p.outerW + 4, p.holeL, p.holeW);
-    pushRing(parts, 0, 0, p.holeL, p.holeW, p.parapetW, 1.1, entranceGap);
+    pushRing(parts, 0, 0, p.holeL, p.holeW, p.parapetW, parapetH, entranceGap);
     pushBayBox(parts, 0, 0, p.holeL, p.holeW, s.depthOfCut, wallT, finish, slopeRatio, picketSpacing, p.parapetW, entranceGap);
 
     // Hole envelopes expand past the excavation by the wall taper (bare sloped earth flares
@@ -387,9 +390,13 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
   }
 
   // ── Standing figure for scale ──────────────────────────────────────────────
-  // Circular positions: halfL + 2 lands INSIDE the parapet annulus (the ring extends to
-  // rHole + parapetW), clipping the figure's legs through the ring — place it past the ring.
-  const figureX = geo.shape === 'circular' ? Math.max(p.outerL, p.outerW) / 2 + 1.5 : halfL + 2;
+  // Clear of the earthworks on EVERY shape: the rectangular family's parapet ring extends to
+  // halfL + parapetW, so the old halfL + 2 planted the figure ON the ring (legs clipping
+  // through the bag courses — flagged by three separate audit frames). It stands on grass
+  // beside the position, where a scale reference actually reads as one.
+  const figureX = geo.shape === 'circular'
+    ? Math.max(p.outerL, p.outerW) / 2 + 1.5
+    : halfL + p.parapetW + 1.3;
   parts.push({ kind: 'figure', x: figureX, z: 1.5, heightFt: 5.83 });
 
   // The vehicle ramp's visual depth is exaggerated (RELIEF_EXAGGERATION) well past depthOfCut —
@@ -514,20 +521,15 @@ function pushBayBox(
   parts.push({ kind: 'box', x: cx, y: -depth - 0.05, z: cz, w: l, h: 0.1, d: w, role: 'bayFloor', finish: 'earth' });
   const hl = l / 2;
   const hw = w / 2;
-  // Walls run a touch ABOVE grade (not stopping exactly at y=0) — the ground plane is a solid
-  // slab with no real cutout, so a wall ending precisely at grade lets a shallow enough viewing
-  // angle skim over its top and see a sliver of the ground's surface beyond it, right in the
-  // middle of what should read as a recessed hole. A small margin above grade closes that gap
-  // for any normal viewing angle without changing the excavation's real depth.
-  //
-  // 0.25 ft was tuned against small positions (one-man, ~4x2 ft) and worked there, but the
-  // sandbag-tiled wall (buildSandbagWall) rows in discrete courses with a small per-course
-  // "settle" nudge — that shortfall is a roughly fixed FRACTION of each course's height, so on
-  // a wide position (a 10x8 ft bunker) the coverage falls further short of true grade in
-  // absolute terms, letting a much bigger patch of the green ground plane show through the gap
-  // than on a small one. Doubling the margin gives the tiling enough headroom to close it
-  // regardless of the position's footprint.
-  const gradeMargin = 0.5;
+  // Walls run a HAIR above grade — just enough to close the seam where the wall top meets the
+  // terrain crust's cut edge. The old 0.5 ft margin predates the terrain engine: it existed to
+  // stop a SOLID ground plane (no real cutout) from showing green through the hole at shallow
+  // view angles. The terrain now cuts TRUE holes, so there's no plane to hide — and half a foot
+  // of wall poking above grade read as brown slabs with black outline rims floating across the
+  // excavation mouth, especially once the parapet dropped to its honest doctrine height. The
+  // low-quality tier still renders the flat ground frame, but its inner edge follows the hole
+  // contour exactly, so a sliver margin covers that seam too.
+  const gradeMargin = 0.08;
   const h = depth + gradeMargin;
   const taperAmount = finish === 'earth' ? Math.min(slopeRatio * depth, parapetW * 0.9) : 0;
   const wall = (x: number, z: number, w2: number, d2: number, taperAxis: 0 | 2, taperSign: 1 | -1): Box3 => ({

@@ -9,12 +9,14 @@
 // could only match by cloning a material per bag. The bottom course is darkened a step further —
 // a baked contact-shadow line that reads as 80% of an AO pass at zero runtime cost.
 //
-// The tiling contract below REPLICATES buildSandbagWall exactly (same seed constants, same
-// oversize/jitter/settle numbers) so swapping the builder for the batcher changes nothing about
-// how a wall looks — only what it costs.
+// Bags lay in a real masonry bond (bagWallBond): running-bond stagger with half-bags squaring
+// the course ends, and header courses turned 90° wherever the wall is thick enough to take a
+// bag lengthwise across it — the aligned-lattice look (every joint continuous, every bag
+// pointing one way) is exactly the stacking doctrine forbids. Jitter/settle/shading constants
+// carry over from the original buildSandbagWall so the hand-placed feel is unchanged.
 
 import * as THREE from 'three';
-import { bagWallLayout } from '../../render3d/propLayout';
+import { bagWallBond } from '../../render3d/propLayout';
 import { hashJitter, sharedGeometries, toonGradient } from './shared';
 
 // Fallback while the sandbag GLB is still resolving: a plain box, tiled on the SAME cells so the
@@ -61,50 +63,56 @@ export class SandbagBatcher {
 
   /** Queue one wall's bags; nothing hits the scene graph until flush(). */
   wall(x: number, y: number, z: number, w: number, h: number, d: number, colorHex: number): void {
-    const { cols, rows, layers, cellW, cellH, cellD } = bagWallLayout(w, h, d);
+    // The wall runs along X here; callers with Z-running walls pass swapped w/d and the bond
+    // stays correct because it only reasons about run/thickness, never world axes.
+    const cells = bagWallBond(w, h, d);
     let batch = this.batches.get(colorHex);
     if (!batch) {
       batch = [];
       this.batches.set(colorHex, batch);
     }
-    for (let l = 0; l < layers; l++) {
-      for (let r = 0; r < rows; r++) {
-        for (let c = 0; c < cols; c++) {
-          // Seed constants match buildSandbagWall so a batched rebuild of the same inputs lands
-          // every bag in the exact pose the per-mesh builder gave it.
-          const seed = r * 97 + c * 13 + l * 29 + x + z;
-          const bx = x - w / 2 + (c + 0.5) * cellW + (hashJitter(seed) - 0.5) * cellW * 0.06;
-          const baseY = y - h / 2 + r * cellH; // the prop's origin is the bag's BASE
-          const bz = z - d / 2 + (l + 0.5) * cellD;
-          if (this.template) {
-            // Oversized vs the cell so neighbors press together (no daylight between bags),
-            // with a small deterministic scale/rotation jitter and a settle drop per course.
-            const jitter = 0.97 + hashJitter(seed + 0.5) * 0.1;
-            _scale.set(
-              Math.max(0.05, cellW * 1.08) * jitter,
-              Math.max(0.05, cellH * 1.05) * jitter,
-              Math.max(0.05, cellD * 1.1) * jitter,
-            );
-            _euler.set(0, (hashJitter(seed + 0.25) - 0.5) * 0.35, (hashJitter(seed + 0.75) - 0.5) * 0.12, 'XYZ');
-            _quat.setFromEuler(_euler);
-            _pos.set(bx, baseY - cellH * 0.03, bz);
-          } else {
-            // Fallback box: no rotation, no settle — the plain-box wall must keep the exact
-            // pre-GLB envelope so the async load never shifts the model's silhouette.
-            _scale.set(Math.max(0.05, cellW - 0.04), Math.max(0.05, cellH - 0.04), Math.max(0.05, cellD - 0.02));
-            _quat.identity();
-            _pos.set(bx, baseY, bz);
-          }
-          // Per-bag value variation around the role color, bottom course darkened into a baked
-          // contact-shadow line. Shade can exceed 1 by design (bags brighter than the flat role
-          // color) — instanceColor is a float buffer, nothing clips.
-          let shade = 1 - this.bagJitter + hashJitter(seed + 0.33) * 2 * this.bagJitter;
-          if (r === 0) shade *= 0.9;
-          const tint = new THREE.Color(colorHex).multiplyScalar(shade);
-          // compose() is the same T*R*S Object3D.updateMatrix uses, so poses match per-mesh bags.
-          batch.push({ matrix: new THREE.Matrix4().compose(_pos, _quat, _scale), tint });
-        }
+    let i = 0;
+    for (const cell of cells) {
+      // Deterministic per-bag seed: cell index + wall position, so the same wall re-lays the
+      // exact same bags every rebuild.
+      const seed = i * 13 + x + z;
+      i++;
+      const bx = x + cell.dx + (hashJitter(seed) - 0.5) * cell.w * 0.05;
+      const baseY = y - h / 2 + cell.dy; // the prop's origin is the bag's BASE
+      const bz = z + cell.dz;
+      const row = Math.round(cell.dy / Math.max(0.01, cell.h));
+      if (this.template) {
+        // Oversized vs the cell so neighbors press together (no daylight between bags), with a
+        // small deterministic scale/rotation jitter and a settle drop per course. A header
+        // bag's authored length runs ACROSS the wall: rotate 90° and swap the footprint scales
+        // so the prop keeps its own proportions instead of being smeared to the turned cell.
+        const jitter = 0.97 + hashJitter(seed + 0.5) * 0.1;
+        const sx = Math.max(0.05, (cell.header ? cell.d : cell.w) * 1.08) * jitter;
+        const sz = Math.max(0.05, (cell.header ? cell.w : cell.d) * 1.1) * jitter;
+        _scale.set(sx, Math.max(0.05, cell.h * 1.05) * jitter, sz);
+        _euler.set(
+          0,
+          (cell.header ? Math.PI / 2 : 0) + (hashJitter(seed + 0.25) - 0.5) * 0.35,
+          (hashJitter(seed + 0.75) - 0.5) * 0.12,
+          'XYZ',
+        );
+        _quat.setFromEuler(_euler);
+        _pos.set(bx, baseY - cell.h * 0.03, bz);
+      } else {
+        // Fallback box: no rotation, no settle — the plain-box wall must keep the exact
+        // pre-GLB envelope so the async load never shifts the model's silhouette.
+        _scale.set(Math.max(0.05, cell.w - 0.04), Math.max(0.05, cell.h - 0.04), Math.max(0.05, cell.d - 0.02));
+        _quat.identity();
+        _pos.set(bx, baseY, bz);
       }
+      // Per-bag value variation around the role color, bottom course darkened into a baked
+      // contact-shadow line. Shade can exceed 1 by design (bags brighter than the flat role
+      // color) — instanceColor is a float buffer, nothing clips.
+      let shade = 1 - this.bagJitter + hashJitter(seed + 0.33) * 2 * this.bagJitter;
+      if (row === 0) shade *= 0.9;
+      const tint = new THREE.Color(colorHex).multiplyScalar(shade);
+      // compose() is the same T*R*S Object3D.updateMatrix uses, so poses match per-mesh bags.
+      batch.push({ matrix: new THREE.Matrix4().compose(_pos, _quat, _scale), tint });
     }
   }
 

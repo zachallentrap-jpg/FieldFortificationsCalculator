@@ -269,6 +269,21 @@ export function strataTexture(p: Palette): THREE.CanvasTexture {
   ctx.fillStyle = p.strata.base;
   ctx.fillRect(0, 0, S, S);
 
+  // Topsoil boundary band, pinned near the TOP of the tile: the terrain crust is only
+  // CRUST_FT (~0.8 ft) tall and samples just the top ~27% of this texture (v maps feet /
+  // STRATA_BAND_FT) — with all the wavy lines spread over the full tile, the crust's cut edge
+  // rendered as featureless base color (audit: "no strata banding under the grass"). This
+  // dark line at ~12% is the topsoil/subsoil boundary every roadside cut actually shows.
+  ctx.strokeStyle = p.strata.lines[1];
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  for (let x = -4; x <= S + 4; x += 4) {
+    const y = S * 0.12 + Math.sin(((x / S) * 3) * Math.PI * 2 + seed % 7) * 1.6;
+    if (x === -4) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
   const lineN = 2 + (hashJitter(seed + 2) > 0.4 ? 1 : 0);
   for (let i = 0; i < lineN; i++) {
     const s = seed + 20 + i * 13;
@@ -303,7 +318,11 @@ export function strataTexture(p: Palette): THREE.CanvasTexture {
 
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace; // see groundTopTexture — all engine color maps are sRGB
-  tex.wrapS = THREE.RepeatWrapping; // S only — v spans the block height exactly once (terrain.ts UVs)
+  // Both axes repeat: terrain.ts UV-maps strata faces in FEET (v = -y / STRATA_BAND_FT) so the
+  // band pattern runs at one physical scale across the thin surface crust AND the excavation
+  // under-shells descending below it, with no seam where they meet.
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
   sharedTextures.add(tex);
   strataCache.set(key, tex);
   return tex;

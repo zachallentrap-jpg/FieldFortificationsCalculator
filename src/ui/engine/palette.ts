@@ -103,7 +103,10 @@ const DAY: Palette = {
     // From front-high-right of the enemy side, so the frontal parapet throws its shadow back
     // INTO the fighting bay and the bay's interior wall catches light — the shadow teaches.
     sunFrom: [0.38, 0.8, -0.55],
-    ambientIntensity: 0.2, // floor high enough that pit floors/strata sides never crush to black
+    // Floor high enough that pit floors/strata sides never crush to black — re-raised after
+    // the thin-crust rework: deep excavation shells (the vehicle cuts especially) get NO
+    // direct key at their far walls, so ambient is the only thing telling their story.
+    ambientIntensity: 0.26,
     rimColor: 0xcfe0f0,
     rimIntensity: 0.25,
     rimFrom: [-0.7, 0.35, 0.65],
@@ -153,7 +156,7 @@ const NIGHT: Palette = {
     sunColor: 0xcfe0f2, // the moon
     sunIntensity: 0.85,
     sunFrom: [-0.45, 0.95, 0.35], // high and steep — long murky shadows would eat legibility
-    ambientIntensity: 0.55,
+    ambientIntensity: 0.62,
     rimColor: 0xffb37a, // UI amber, as if a red-lens light is near the position
     rimIntensity: 0.2,
     rimFrom: [0.7, 0.25, 0.6],

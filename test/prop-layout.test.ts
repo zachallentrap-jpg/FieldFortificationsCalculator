@@ -6,7 +6,8 @@
 // same cells.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bagWallLayout, doctrineBagDims } from '../src/render3d/propLayout';
+import { bagWallLayout, bagWallBond, doctrineBagDims } from '../src/render3d/propLayout';
+import type { BagCell } from '../src/render3d/propLayout';
 
 const bag = doctrineBagDims();
 
@@ -55,4 +56,66 @@ test('degenerate and hostile inputs never produce a broken grid', () => {
 
 test('deterministic: identical inputs, identical layout', () => {
   assert.deepEqual(bagWallLayout(6, 0.5, 3), bagWallLayout(6, 0.5, 3));
+});
+
+// ── masonry bond (bagWallBond) ────────────────────────────────────────────────────────────────
+
+function courseOf(c: BagCell): number {
+  return Math.round(c.dy / Math.max(0.01, c.h));
+}
+
+test('bond: every cell stays inside the wall envelope', () => {
+  for (const [w, h, d] of [[6, 0.5, 3], [4, 1.0, 0.75], [12, 2, 3], [2.2, 0.66, 1.05]] as [number, number, number][]) {
+    for (const c of bagWallBond(w, h, d)) {
+      assert.ok(c.dx - c.w / 2 >= -w / 2 - 1e-9 && c.dx + c.w / 2 <= w / 2 + 1e-9, `run extent for ${w}x${h}x${d}`);
+      assert.ok(c.dz - c.d / 2 >= -d / 2 - 1e-9 && c.dz + c.d / 2 <= d / 2 + 1e-9, `thickness extent for ${w}x${h}x${d}`);
+      assert.ok(c.dy >= -1e-9 && c.dy + c.h <= h + 1e-9, `height extent for ${w}x${h}x${d}`);
+      for (const v of [c.dx, c.dy, c.dz, c.w, c.h, c.d]) assert.ok(Number.isFinite(v));
+      assert.ok(c.w > 0 && c.h > 0 && c.d > 0);
+    }
+  }
+});
+
+test('bond: stretcher courses break joints — no vertical joint continues into the next course', () => {
+  // A thin (all-stretcher) wall: consecutive courses must not share interior joint positions.
+  const cells = bagWallBond(6, 1.0, 0.75);
+  const jointsByCourse = new Map<number, Set<string>>();
+  for (const c of cells) {
+    const r = courseOf(c);
+    let set = jointsByCourse.get(r);
+    if (!set) jointsByCourse.set(r, (set = new Set()));
+    for (const edge of [c.dx - c.w / 2, c.dx + c.w / 2]) {
+      if (Math.abs(Math.abs(edge) - 3) > 1e-6) set.add(edge.toFixed(3)); // interior joints only
+    }
+  }
+  const courses = [...jointsByCourse.keys()].sort((a, b) => a - b);
+  assert.ok(courses.length >= 2, 'wall has multiple courses');
+  for (let i = 1; i < courses.length; i++) {
+    const prev = jointsByCourse.get(courses[i - 1]!)!;
+    const cur = jointsByCourse.get(courses[i]!)!;
+    for (const j of cur) assert.ok(!prev.has(j), `joint ${j} continues from course ${courses[i - 1]} into ${courses[i]}`);
+  }
+});
+
+test('bond: thick walls alternate header courses; thin walls never turn a bag', () => {
+  const parapet = bagWallBond(6, 1.0, 3); // 3 ft thick — headers fit
+  assert.ok(parapet.some((c) => c.header), 'thick wall lays header courses');
+  for (const c of parapet) {
+    assert.equal(c.header, courseOf(c) % 2 === 1, 'headers exactly on odd courses');
+  }
+  const facing = bagWallBond(6, 1.0, 0.75); // one bag thick — a turned bag would overhang
+  assert.ok(facing.every((c) => !c.header), 'thin wall stays all-stretcher');
+});
+
+test('bond: staggered courses fill the run exactly with half-bags at the ends', () => {
+  const cells = bagWallBond(6, 1.0, 0.75).filter((c) => courseOf(c) === 1);
+  const total = cells.reduce((s, c) => s + c.w, 0);
+  const perLayer = new Map<string, number>();
+  for (const c of cells) perLayer.set(c.dz.toFixed(3), (perLayer.get(c.dz.toFixed(3)) ?? 0) + c.w);
+  for (const [, span] of perLayer) assert.ok(Math.abs(span - 6) < 1e-9, 'staggered course spans the full run');
+  assert.ok(total > 0);
+});
+
+test('bond: deterministic', () => {
+  assert.deepEqual(bagWallBond(6, 0.5, 3), bagWallBond(6, 0.5, 3));
 });

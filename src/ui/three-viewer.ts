@@ -319,7 +319,7 @@ let ROLE_COLOR: Record<BoxRole, number> = activePalette.role;
 // Both live inside one returned Group so a caller positions/rotates ONE object and the outline
 // can never drift from its mesh — positioning the mesh alone (leaving a sibling outline at its
 // default transform) was the exact bug behind the vehicle-ramp render (see DECISIONS D20).
-function addToonMesh(parent: THREE.Group, geometry: THREE.BufferGeometry, colorHex: number, opts?: { opacity?: number; map?: THREE.Texture }): THREE.Group {
+function addToonMesh(parent: THREE.Group, geometry: THREE.BufferGeometry, colorHex: number, opts?: { opacity?: number; map?: THREE.Texture; noOutline?: boolean }): THREE.Group {
   const mat = new THREE.MeshToonMaterial({ color: colorHex, gradientMap: toonGradient() });
   if (opts?.opacity !== undefined) {
     mat.transparent = true;
@@ -333,7 +333,7 @@ function addToonMesh(parent: THREE.Group, geometry: THREE.BufferGeometry, colorH
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   const wrapper = new THREE.Group();
-  if (!opts?.opacity) {
+  if (!opts?.opacity && !opts?.noOutline) {
     const outline = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0x16130d, side: THREE.BackSide }));
     outline.scale.multiplyScalar(1.035);
     wrapper.add(outline);
@@ -760,7 +760,12 @@ function buildPartInner(group: THREE.Group, part: Part3, bags: SandbagBatcher): 
         } else if (part.role === 'ground' || part.role === 'bayFloor' || part.role === 'rampBerm' || (part.role === 'bayWall' && part.finish === 'earth')) {
           map = dirtTexture();
         }
-        const opts = part.role === 'camoNet' ? { opacity: 0.4 } : map ? { map } : undefined;
+        // Interior surfaces (bay walls/floors, ramp treads) skip the outline shell: they sit
+        // INSIDE an excavation against earth, so a silhouette shell only ever shows as stray
+        // black hairlines where their tops break grade at the hole mouth. Outlines are for
+        // free-standing silhouettes (parapets are bags, no shells; berms/covers keep theirs).
+        const interior = part.role === 'bayWall' || part.role === 'bayFloor' || part.role === 'sump';
+        const opts = part.role === 'camoNet' ? { opacity: 0.4 } : { ...(map ? { map } : {}), ...(interior ? { noOutline: true } : {}) };
         const wrapper = addToonMesh(group, geometry, tint, opts);
         wrapper.position.set(part.x, part.y, part.z);
       }
@@ -776,7 +781,10 @@ function buildPartInner(group: THREE.Group, part: Part3, bags: SandbagBatcher): 
       const radiusTop = Math.max(0.05, part.radiusTop ?? part.radius);
       const geometry = new THREE.CylinderGeometry(radiusTop, radiusBottom, Math.max(0.05, part.height), 24);
       const map = part.role === 'bayFloor' ? dirtTexture() : undefined;
-      const wrapper = addToonMesh(group, geometry, ROLE_COLOR[part.role], map ? { map } : undefined);
+      // Same interior rule as the box path: pit floors/sumps sit inside the excavation — an
+      // outline shell only leaks hairlines where they break grade.
+      const cylInterior = part.role === 'bayFloor' || part.role === 'sump';
+      const wrapper = addToonMesh(group, geometry, ROLE_COLOR[part.role], { ...(map ? { map } : {}), ...(cylInterior ? { noOutline: true } : {}) });
       wrapper.position.set(part.x, part.y, part.z);
       if (part.label) {
         const label = labelSprite(part.label);

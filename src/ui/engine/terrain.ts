@@ -1,9 +1,10 @@
-// One honest earth block with REAL holes cut through it (diorama engine). The old terrain was a
-// picture-frame of flat green slabs around a single rectangle — compound T/L footprints ended up
-// under solid ground bands. This module extrudes the actual footprint from the pure TerrainSpec:
-// a rounded outer slab, every excavation cut out of it, grass painted on top and dark strata
-// soil on every cut face. No outline shell on purpose — the dark soil side IS the base edge
-// (museum-diorama look), where the old inflated shell read as a heavy black picture frame.
+// Thin-crust earth slab + per-hole excavation shells (diorama engine). The ground is a CRUST —
+// under a foot of solid soil with grass on top and the soil type showing on every cut edge —
+// NOT a solid block extruded past the deepest hole (the first engine build did that, and every
+// excavation read as a shaft into an opaque cube instead of a hole with a shape). Each hole
+// continues BELOW the crust as its own earthen shell: a strata-textured tube one shovel-width
+// thick hugging the hole's contour, closed by a floor slab, so the dug volume is visible from
+// outside the diorama — the classic cross-section-illustration read.
 //
 // Cutaway contract: materials are PLAIN MeshToonMaterial instances — no onBeforeCompile tricks —
 // because the viewer assigns material.clippingPlanes after every rebuild and that must just work.
@@ -68,6 +69,54 @@ function holeContour(h: TerrainHole): THREE.Vector2[] {
   if (h.kind === 'rect') return roundedRectPts(h.x, h.z, h.w, h.d, 0.2);
   if (h.kind === 'circle') return circlePts(h.x, h.z, h.r);
   return h.pts.map(([x, z]) => new THREE.Vector2(x, z));
+}
+
+// The hole's contour pushed OUTWARD by t — the under-shell's outer skin. Rect/circle offset
+// exactly; poly holes (the T/L unions from scene3d) are rectilinear with alternating
+// axis-parallel edges, so the offset is the classic shifted-edge intersection: every edge
+// slides t along its outward normal and consecutive (perpendicular) edges re-intersect at
+// one coordinate each. Returns null only for a non-rectilinear poly — no such producer
+// exists today, and the caller just skips that shell rather than guessing.
+function offsetContour(h: TerrainHole, t: number): THREE.Vector2[] | null {
+  if (h.kind === 'rect') return roundedRectPts(h.x, h.z, h.w + 2 * t, h.d + 2 * t, 0.2 + t);
+  if (h.kind === 'circle') return circlePts(h.x, h.z, h.r + t);
+  const pts = h.pts.map(([x, z]) => new THREE.Vector2(x, z));
+  if (pts.length < 4) return null;
+  // Signed area sign → winding; outward normal of a directed edge is its right side for CCW
+  // (positive-area) loops in this x/z plan basis, left side for CW.
+  let area2 = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i]!;
+    const b = pts[(i + 1) % pts.length]!;
+    area2 += a.x * b.y - b.x * a.y;
+  }
+  const outSign = area2 > 0 ? 1 : -1;
+  // Shift each edge's fixed coordinate outward; each vertex then takes its x from whichever
+  // adjacent edge is vertical and its z from the horizontal one.
+  const shifted: Array<{ vertical: boolean; c: number }> = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i]!;
+    const b = pts[(i + 1) % pts.length]!;
+    const dx = b.x - a.x;
+    const dz = b.y - a.y;
+    const vertical = Math.abs(dx) < 1e-6;
+    if (!vertical && Math.abs(dz) > 1e-6) return null; // diagonal edge — not rectilinear
+    // Right-of-direction normal: (dz, -dx) normalized ⇒ for a vertical edge (0,dz) it's
+    // (dz,0); for a horizontal edge (dx,0) it's (0,-dx).
+    shifted.push(
+      vertical
+        ? { vertical, c: a.x + outSign * Math.sign(dz) * t }
+        : { vertical, c: a.y - outSign * Math.sign(dx) * t },
+    );
+  }
+  const out: THREE.Vector2[] = [];
+  for (let i = 0; i < pts.length; i++) {
+    const prev = shifted[(i + pts.length - 1) % pts.length]!;
+    const cur = shifted[i]!;
+    if (prev.vertical === cur.vertical) return null; // rectilinear loops must alternate V/H
+    out.push(prev.vertical ? new THREE.Vector2(prev.c, cur.c) : new THREE.Vector2(cur.c, prev.c));
+  }
+  return out;
 }
 
 // ── scatter helpers ────────────────────────────────────────────────────────────────────────────
@@ -139,12 +188,26 @@ function rockGeometry(): THREE.BufferGeometry {
 
 // ── the terrain build ──────────────────────────────────────────────────────────────────────────
 
+// Crust thickness: the solid surface layer the user actually sees soil in. Real topsoil-over-
+// subsoil reads at 6-12 inches; 0.8 ft sits in that band and gives the strata texture room for
+// one band line on the cut edge.
+const CRUST_FT = 0.8;
+// Under-shell wall thickness — one shovel-width of earth around the dug volume.
+const SHELL_FT = 0.6;
+// Vertical feet per strata-texture repeat, shared by the crust edge and every shell face so
+// the bands run continuously across the crust→shell seam.
+const STRATA_BAND_FT = 3;
+
+// Strata-face UV convention (crust sides + shells): u drifts with x+z so parallel faces don't
+// tile in lockstep; v maps world y in FEET (texture repeats every STRATA_BAND_FT).
+function strataUv(uv: THREE.BufferAttribute, i: number, x: number, y: number, z: number): void {
+  uv.setXY(i, (x + z) * 0.12, -y / STRATA_BAND_FT);
+}
+
 export function buildTerrain(spec: TerrainSpec, p: Palette, opts: { scatter: boolean }): TerrainBuild {
   const group = new THREE.Group();
   const o = spec.outer;
-
-  const maxHoleDepth = spec.holes.reduce((m, h) => Math.max(m, h.depth), 0);
-  const blockDepth = Math.max(2.5, maxHoleDepth + 1.0);
+  const perSceneGeos: THREE.BufferGeometry[] = [];
 
   // Winding contract: outer CCW, every hole CW (opposite), enforced via isClockWise — see the
   // contour-helper header for why extrude can't be trusted to fix this itself.
@@ -155,10 +218,11 @@ export function buildTerrain(spec: TerrainSpec, p: Palette, opts: { scatter: boo
 
   // curveSegments is inert for these pre-sampled straight-segment contours; kept at the spec'd
   // value in case a future contour ever carries real curves.
-  const geo = new THREE.ExtrudeGeometry(shape, { depth: blockDepth, bevelEnabled: false, curveSegments: 24 });
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: CRUST_FT, bevelEnabled: false, curveSegments: 24 });
+  perSceneGeos.push(geo);
 
   // rotateX(π/2) sends local (x, y, z) → world (x, −z, y): the z=0 cap (normal −z) becomes the
-  // TOP cap at y=0 facing +y, the extrusion runs DOWN to y=−blockDepth, and shape.y — authored
+  // TOP cap at y=0 facing +y, the extrusion runs DOWN to y=−CRUST_FT, and shape.y — authored
   // as plan z above — lands on world z unchanged. So +z(plan) = +z(world) and the enemy stays
   // at −z, matching the canvas orientation documented in textures.ts.
   geo.rotateX(Math.PI / 2);
@@ -166,11 +230,36 @@ export function buildTerrain(spec: TerrainSpec, p: Palette, opts: { scatter: boo
   // ExtrudeGeometry emits non-indexed triangles in two groups (0 = both caps, 1 = every side
   // wall: the outer skirt AND the hole interiors). Rewrite UVs per GROUP, not by y alone — the
   // side walls' TOP vertices also sit at y=0, and handing those the grass mapping would smear a
-  // grass/strata blend down the whole first course of every cut face.
+  // grass/strata blend down the whole first course of every cut face. The BOTTOM cap is split
+  // out of group 0 into a third material slot: with a thin crust its underside is visible from
+  // plenty of angles between the crust and the shells, and grass down there reads as a bug —
+  // it renders strata instead (soil under the turf, exactly the story the crust is telling).
   const pos = geo.getAttribute('position') as THREE.BufferAttribute;
   const uv = geo.getAttribute('uv') as THREE.BufferAttribute;
   const minX = o.x - o.w / 2;
   const maxZ = o.z + o.d / 2;
+  const capsGroup = geo.groups.find((g) => g.materialIndex === 0);
+  if (capsGroup) {
+    // Both caps live in one contiguous group, top cap's triangles first (all at y=0), bottom
+    // cap's after (all at y=-CRUST_FT). Find the boundary by scanning y; if the caps ever
+    // interleave (a future three.js change), the scan degrades to "no split" — grass underside,
+    // the old accepted behavior — rather than mis-texturing the top.
+    let split = capsGroup.start + capsGroup.count;
+    for (let i = capsGroup.start; i < capsGroup.start + capsGroup.count; i++) {
+      if (pos.getY(i) < -CRUST_FT / 2) { split = i; break; }
+    }
+    let clean = true;
+    for (let i = split; i < capsGroup.start + capsGroup.count; i++) {
+      if (pos.getY(i) > -CRUST_FT / 2) { clean = false; break; }
+    }
+    if (clean && split < capsGroup.start + capsGroup.count && split % 3 === 0) {
+      const end = capsGroup.start + capsGroup.count;
+      geo.clearGroups();
+      geo.addGroup(capsGroup.start, split - capsGroup.start, 0); // top cap — grass
+      geo.addGroup(split, end - split, 2); // bottom cap — strata
+      geo.addGroup(end, pos.count - end, 1); // sides (group 1 always follows the caps)
+    }
+  }
   for (const g of geo.groups) {
     for (let i = g.start; i < g.start + g.count; i++) {
       const x = pos.getX(i);
@@ -181,25 +270,59 @@ export function buildTerrain(spec: TerrainSpec, p: Palette, opts: { scatter: boo
         // orientation contract in textures.ts (canvas top row = minZ = enemy side, flipY on).
         uv.setXY(i, (x - minX) / o.w, (maxZ - z) / o.d);
       } else {
-        // Sides — and the bottom cap, which group 0 renders with the grass map (never seen from
-        // any normal angle; accepted). u drifts with x+z so parallel faces don't tile in
-        // lockstep; v spans the block height once so the strata bands run horizontally.
-        uv.setXY(i, (x + z) * 0.12, -y / blockDepth);
+        strataUv(uv, i, x, y, z);
       }
     }
   }
   uv.needsUpdate = true;
 
   const groundTex = groundTopTexture(spec, p);
-  // DoubleSide on BOTH terrain materials: the cutaway clips this block open, and a single-sided
+  // DoubleSide on ALL terrain materials: the cutaway clips these open, and a single-sided
   // shell reads as a paper-thin sheet over a void — with interior faces rendered, the section
-  // reads as solid (shadowed) earth. Cost is one extra fragment pass on a single big mesh.
+  // reads as solid (shadowed) earth.
   const capsMat = new THREE.MeshToonMaterial({ color: 0xffffff, map: groundTex, gradientMap: toonGradient(), side: THREE.DoubleSide });
   const sidesMat = new THREE.MeshToonMaterial({ color: 0xffffff, map: strataTexture(p), gradientMap: toonGradient(), side: THREE.DoubleSide });
-  const earth = new THREE.Mesh(geo, [capsMat, sidesMat]);
+  const earth = new THREE.Mesh(geo, [capsMat, sidesMat, sidesMat]);
   earth.receiveShadow = true;
   earth.castShadow = false;
   group.add(earth);
+
+  // ── Excavation under-shells: the hole's shape, visible below the crust ──────────────────────
+  // Each hole deeper than the crust continues down as a strata-skinned tube (outer contour =
+  // hole offset one shovel-width out) closed by a floor slab — from outside, the dug volume
+  // reads as a real shape descending under the turf instead of vanishing into a solid block.
+  for (const h of spec.holes) {
+    if (h.depth <= CRUST_FT + 0.05) continue;
+    const outerPts = offsetContour(h, SHELL_FT);
+    if (!outerPts) continue; // non-rectilinear poly (no producer today) — skip, never guess
+    const tubeShape = new THREE.Shape(oriented(outerPts.map((v) => v.clone()), false));
+    tubeShape.holes.push(new THREE.Path(oriented(holeContour(h), true)));
+    const tubeGeo = new THREE.ExtrudeGeometry(tubeShape, { depth: h.depth - CRUST_FT, bevelEnabled: false, curveSegments: 24 });
+    tubeGeo.rotateX(Math.PI / 2);
+    tubeGeo.translate(0, -CRUST_FT, 0);
+    // 0.7 ft thick: deep enough to swallow the grenade-sump cylinders that hang 0.6 ft below
+    // the bay floor, so nothing pokes out of the plug's underside at low view angles.
+    const floorShape = new THREE.Shape(oriented(outerPts.map((v) => v.clone()), false));
+    const floorGeo = new THREE.ExtrudeGeometry(floorShape, { depth: 0.7, bevelEnabled: false, curveSegments: 24 });
+    floorGeo.rotateX(Math.PI / 2);
+    floorGeo.translate(0, -h.depth, 0);
+    for (const sg of [tubeGeo, floorGeo]) {
+      perSceneGeos.push(sg);
+      const sPos = sg.getAttribute('position') as THREE.BufferAttribute;
+      const sUv = sg.getAttribute('uv') as THREE.BufferAttribute;
+      for (let i = 0; i < sPos.count; i++) {
+        strataUv(sUv, i, sPos.getX(i), sPos.getY(i), sPos.getZ(i));
+      }
+      sUv.needsUpdate = true;
+      const mesh = new THREE.Mesh(sg, sidesMat);
+      mesh.receiveShadow = true;
+      // castShadow stays OFF, same as the crust: a shadow-casting shell plunges its own
+      // interior (and the treads/floor inside it) into pitch black — the toon look wants the
+      // keylight reaching into excavations, exactly like the pre-crust solid block behaved.
+      mesh.castShadow = false;
+      group.add(mesh);
+    }
+  }
 
   const perSceneMats: THREE.Material[] = [capsMat, sidesMat];
   const instanced: THREE.InstancedMesh[] = [];
@@ -293,13 +416,13 @@ export function buildTerrain(spec: TerrainSpec, p: Palette, opts: { scatter: boo
     group,
     dispose(): void {
       // Owns: the per-scene ground canvas (NOT in sharedTextures — nothing else will free it),
-      // the extrude geometry, and every material created above. Does NOT own: the strata/blade
-      // textures, the toon gradient, or the instanced template geometries — those live in the
-      // shared registries and survive rebuilds (material.dispose() never touches maps, so the
-      // shared maps are safe here too). InstancedMesh.dispose() frees only the per-instance
-      // matrix/color buffers.
+      // the crust + under-shell extrude geometries, and every material created above. Does NOT
+      // own: the strata/blade textures, the toon gradient, or the instanced template geometries
+      // — those live in the shared registries and survive rebuilds (material.dispose() never
+      // touches maps, so the shared maps are safe here too). InstancedMesh.dispose() frees only
+      // the per-instance matrix/color buffers.
       groundTex.dispose();
-      geo.dispose();
+      for (const g of perSceneGeos) g.dispose();
       for (const m of perSceneMats) m.dispose();
       for (const m of instanced) m.dispose();
     },
