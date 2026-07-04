@@ -56,6 +56,18 @@ export interface Ring3 {
   outerR: number; innerR: number; height: number;
   role: BoxRole;
 }
+export interface Frame3 {
+  // A smooth rounded-rectangle annulus, extruded and beveled into a single continuous MOUNDED
+  // berm — one piece with rounded corners and a sloped top edge, not 4 separate flat-topped
+  // boxes meeting at hard seams (the earlier box-ring read as stacked Lego slabs, not a real
+  // earth parapet). Used for every earth-mode parapet on a rect-family position.
+  kind: 'frame';
+  x: number; z: number; // center
+  outerL: number; outerW: number; // outer footprint
+  holeL: number; holeW: number; // inner hole footprint (matches the excavation exactly)
+  height: number;
+  role: BoxRole;
+}
 export interface Wedge3 {
   kind: 'wedge'; // flat translucent sector-of-fire fan on the ground
   x: number; z: number;
@@ -77,7 +89,7 @@ export type BoxRole =
   | 'ground' | 'parapet' | 'earthParapet' | 'bayWall' | 'bayFloor' | 'cover' | 'engineeredCover'
   | 'stringer' | 'platform' | 'firingStep' | 'sump' | 'camoNet' | 'rampBerm';
 
-export type Part3 = Box3 | Cyl3 | Ring3 | Wedge3 | Arrow3 | Figure3;
+export type Part3 = Box3 | Cyl3 | Ring3 | Frame3 | Wedge3 | Arrow3 | Figure3;
 
 // ── Terrain spec (pure data) ─────────────────────────────────────────────────
 // The renderer's terrain path cuts REAL holes into one earth block instead of tiling flat
@@ -142,7 +154,7 @@ const ROLE_STAGE: Record<BoxRole, number> = {
 // Exported so the renderer can tag built meshes with their construction stage (the stage
 // scrubber's rise-in animation needs to know which parts JUST appeared).
 export function partStage(part: Part3): number {
-  if (part.kind === 'box' || part.kind === 'cyl' || part.kind === 'ring') return ROLE_STAGE[part.role] ?? 0;
+  if (part.kind === 'box' || part.kind === 'cyl' || part.kind === 'ring' || part.kind === 'frame') return ROLE_STAGE[part.role] ?? 0;
   return 0; // arrow / wedge / figure / dimLeader are orientation aids — always shown
 }
 
@@ -304,10 +316,22 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     // vertical surfaces — a normal rear parapet is exactly the kind of obstruction that could
     // reflect the backblast back at the crew. Structurally these positions need a wide open rear,
     // not a taller wall, so the gap covers most of the bay's width instead of a person-sized slot.
+    // This gap is for the EXCAVATION (a real 4+ ft cut needs a way down) — the shallow ~0.5 ft
+    // earth mound above it doesn't need its own separate gap; it's low enough to step over
+    // anywhere, including on the ATGM's backblast side (a 6-inch dirt lip isn't the "hard
+    // reflecting surface" the backblast concern is about — that's a real risk for a tall
+    // sandbag wall, which is why the bunker's ring below still gets one).
     const isAtgm = result.inputs.positionType === 'atgm_javelin';
     const entranceGap = isAtgm ? p.holeL * 0.85 : Math.min(3, p.holeL * 0.4);
     pushGroundFrame(parts, 0, 0, p.outerL + 4, p.outerW + 4, p.holeL, p.holeW);
-    pushRing(parts, 0, 0, p.holeL, p.holeW, p.parapetW, parapetH, entranceGap, ringMode);
+    if (ringMode === 'earth') {
+      // One continuous mounded berm — rounded corners, sloped/beveled cross-section — instead
+      // of 4 flat-topped boxes meeting at hard square seams (the "different shaped square
+      // blocks of dirt" a real parapet never looks like).
+      parts.push({ kind: 'frame', x: 0, z: 0, outerL: p.holeL + 2 * p.parapetW, outerW: p.holeW + 2 * p.parapetW, holeL: p.holeL, holeW: p.holeW, height: parapetH, role: 'earthParapet' });
+    } else {
+      pushRing(parts, 0, 0, p.holeL, p.holeW, p.parapetW, parapetH, entranceGap);
+    }
     // Earth-parapet rifle/crew positions get the sandbag firing rest(s) at the aperture — the
     // only concentrated bags on an otherwise-dirt parapet.
     pushFiringRests(parts, p.holeL, p.holeW, p.parapetW, parapetH, restCount);
@@ -497,42 +521,32 @@ function pushGroundFrame(parts: Part3[], cx: number, cz: number, outerL: number,
   }
 }
 
-// A rectangular ring of walls (front/rear/left/right) around a hole — used for the parapet.
-// `mode` picks what it's BUILT FROM (research-verified, see parapetModeFor): 'earth' renders
-// mounded SPOIL (role 'earthParapet' → dirt) — the correct construction for a rifle/crew/mortar
-// position, where the protective mass is the dug dirt and the only bags are the firing rest;
-// 'sandbag' renders stacked bags (role 'parapet') — only the bunker/OP is built that way.
+// A rectangular ring of SANDBAG walls (front/rear/left/right) around a hole — only the bunker/
+// OP (parapetMode 'sandbag') is actually built this way; every earth-mode position uses the
+// single continuous Frame3 mound instead (see the rect-family branch above).
 //
 // rearGapFt (default 0 = fully closed, for secondary bays like an inverted-T's connecting
 // trench that don't need their own entrance) splits the REAR wall — the side away from the
 // enemy, +z per the plan's front=-z convention — into two segments with a centered gap, wide
-// enough for a person to pass through. A fully closed 4-sided box was the previous shape here;
-// every real fighting position needs a way in and out, and doctrine consistently puts that
-// entrance at the rear, never through the frontal parapet that's actually facing the threat.
-function pushRing(parts: Part3[], cx: number, cz: number, l: number, w: number, thick: number, height: number, rearGapFt = 0, mode: 'earth' | 'sandbag' = 'sandbag'): void {
+// enough for a person to pass through. A real built-up sandbag wall is tall enough that a
+// walking gap matters (unlike the low earth mound elsewhere), and doctrine puts that entrance
+// at the rear, never through the frontal parapet that's actually facing the threat.
+function pushRing(parts: Part3[], cx: number, cz: number, l: number, w: number, thick: number, height: number, rearGapFt = 0): void {
   const hl = l / 2;
   const hw = w / 2;
-  const role: BoxRole = mode === 'earth' ? 'earthParapet' : 'parapet';
-  // Earth parapets carry finish 'earth' so the renderer skins them with the dirt material — a
-  // low, flat-topped mounded spoil berm — instead of tiled sandbags. No taper: a dirt parapet
-  // is LOW and WIDE (doctrine ~3 ft of earth thickness, ~0.5 ft tall — "the soldier presents a
-  // low silhouette"), and flaring its short top outward read as a tilted flap, not a mound.
-  // Sandbag walls stay square too (the batcher renders them as tiled bags).
-  const box = (x: number, y: number, z: number, bw: number, bh: number, bd: number): Box3 =>
-    mode === 'earth' ? { kind: 'box', x, y, z, w: bw, h: bh, d: bd, role, finish: 'earth' } : { kind: 'box', x, y, z, w: bw, h: bh, d: bd, role };
-  parts.push(box(cx, height / 2, cz - hw - thick / 2, l + 2 * thick, height, thick)); // front
+  parts.push({ kind: 'box', x: cx, y: height / 2, z: cz - hw - thick / 2, w: l + 2 * thick, h: height, d: thick, role: 'parapet' }); // front
   if (rearGapFt > 0 && rearGapFt < l) {
     const gapHalf = rearGapFt / 2;
     // Same total span as the un-gapped rear wall (l + 2*thick, reaching the outer corners where
     // the side walls meet it) minus the gap, split into two segments that flank the opening.
     const segW = hl + thick - gapHalf;
-    parts.push(box(cx - hl - thick + segW / 2, height / 2, cz + hw + thick / 2, segW, height, thick));
-    parts.push(box(cx + hl + thick - segW / 2, height / 2, cz + hw + thick / 2, segW, height, thick));
+    parts.push({ kind: 'box', x: cx - hl - thick + segW / 2, y: height / 2, z: cz + hw + thick / 2, w: segW, h: height, d: thick, role: 'parapet' });
+    parts.push({ kind: 'box', x: cx + hl + thick - segW / 2, y: height / 2, z: cz + hw + thick / 2, w: segW, h: height, d: thick, role: 'parapet' });
   } else {
-    parts.push(box(cx, height / 2, cz + hw + thick / 2, l + 2 * thick, height, thick)); // rear
+    parts.push({ kind: 'box', x: cx, y: height / 2, z: cz + hw + thick / 2, w: l + 2 * thick, h: height, d: thick, role: 'parapet' }); // rear
   }
-  parts.push(box(cx - hl - thick / 2, height / 2, cz, thick, height, w)); // left
-  parts.push(box(cx + hl + thick / 2, height / 2, cz, thick, height, w)); // right
+  parts.push({ kind: 'box', x: cx - hl - thick / 2, y: height / 2, z: cz, w: thick, h: height, d: w, role: 'parapet' }); // left
+  parts.push({ kind: 'box', x: cx + hl + thick / 2, y: height / 2, z: cz, w: thick, h: height, d: w, role: 'parapet' }); // right
 }
 
 // The firing rest: a low sandbag course at the front of the parapet where the weapon sits — the

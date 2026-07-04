@@ -120,6 +120,24 @@ test('bay-wall taper never exceeds the bay\'s own size — walls cannot flare in
   }
 });
 
+test('earth-mode rect-family positions get ONE continuous frame part, not 4 separate boxes', () => {
+  // The regression this pins: a real parapet is one piled, rounded, sloped mound — not 4 flat
+  // boxes meeting at hard square corners (user-reported: "different shaped square blocks of
+  // dirt"). Every earth-mode position now emits exactly one 'frame' part for its parapet.
+  for (const positionType of ['one_man', 'two_man', 'mg_crew', 'fifty_cal', 'atgm_javelin', 'connecting_trench']) {
+    const r = compute(defaultInputs({ positionType, revetment: 'none' }));
+    const scene = buildScene3D(r);
+    const frames = scene.parts.filter((p) => p.kind === 'frame' && p.role === 'earthParapet');
+    const parapetBoxes = scene.parts.filter((p) => p.kind === 'box' && p.role === 'earthParapet');
+    assert.equal(frames.length, 1, positionType + ' has exactly one continuous parapet frame');
+    assert.equal(parapetBoxes.length, 0, positionType + ' has no leftover box-ring parapet segments');
+  }
+  // The bunker is the one class that stays a real built sandbag ring (4 boxes, unchanged).
+  const bunker = buildScene3D(compute(defaultInputs({ positionType: 'bunker_op_cp' })));
+  assert.equal(bunker.parts.filter((p) => p.kind === 'frame').length, 0, 'bunker has no earth frame');
+  assert.ok(bunker.parts.filter((p) => p.kind === 'box' && p.role === 'parapet').length >= 4, 'bunker keeps its sandbag box ring');
+});
+
 test('a revetted wall never tapers, regardless of how steep the soil would otherwise require', () => {
   const r = compute(defaultInputs({ soil: 'sand', revetment: 'sandbag_facing' }));
   const scene = buildScene3D(r);

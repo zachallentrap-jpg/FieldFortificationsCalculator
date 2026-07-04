@@ -499,20 +499,26 @@ function buildWedge(group: THREE.Group, x: number, z: number, radius: number, le
   group.add(mesh);
 }
 
-// A smooth annulus (circular parapet) — one extruded ring mesh, no segment seams.
+// A smooth annulus (circular parapet) — one extruded ring mesh, no segment seams. Bevelled top
+// (and bottom) edge so it reads as a piled MOUND, not a flat-topped block — a real earth
+// parapet has a sloped cross-section, and a hard flat top/edge looks like poured concrete.
 function ringGeo(x: number, z: number, outerR: number, innerR: number, height: number): THREE.ExtrudeGeometry {
   const shape = new THREE.Shape();
   shape.absarc(0, 0, outerR, 0, Math.PI * 2, false);
   const hole = new THREE.Path();
   hole.absarc(0, 0, innerR, 0, Math.PI * 2, true);
   shape.holes.push(hole);
-  const geo = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false, curveSegments: 32 });
+  const bevelSize = Math.min(0.12, Math.max(0.02, (outerR - innerR) * 0.35));
+  const bevelThickness = Math.min(height * 0.45, bevelSize);
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: height, bevelEnabled: true, bevelThickness, bevelSize, bevelSegments: 3, curveSegments: 32,
+  });
   geo.rotateX(-Math.PI / 2); // extrude was along +Z; lay it flat so it extrudes along +Y (up)
   geo.translate(x, 0, z);
   return geo;
 }
-function buildRing(group: THREE.Group, x: number, z: number, outerR: number, innerR: number, height: number, colorHex: number): void {
-  const mat = new THREE.MeshToonMaterial({ color: colorHex, gradientMap: toonGradient() });
+function buildRing(group: THREE.Group, x: number, z: number, outerR: number, innerR: number, height: number, colorHex: number, map?: THREE.Texture): void {
+  const mat = new THREE.MeshToonMaterial({ color: colorHex, gradientMap: toonGradient(), ...(map ? { map } : {}) });
   const mesh = new THREE.Mesh(ringGeo(x, z, outerR, innerR, height), mat);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
@@ -527,6 +533,69 @@ function buildRing(group: THREE.Group, x: number, z: number, outerR: number, inn
   const wrapper = new THREE.Group();
   wrapper.add(outline, mesh);
   group.add(wrapper);
+}
+
+// A rounded-rectangle point loop (plan feet), centered at the local origin — used to build the
+// earth-parapet frame's outer AND inner (hole) contours. Same corner-rounding technique as the
+// terrain crust's hole contours (engine/terrain.ts), ported locally rather than imported since
+// the two modules sit in different architectural layers (pure descriptor vs Three.js builder).
+function roundedRectLoop(w: number, d: number, r: number): THREE.Vector2[] {
+  const rr = Math.min(r, w / 2 - 0.01, d / 2 - 0.01);
+  const hw = w / 2;
+  const hd = d / 2;
+  if (rr <= 0) {
+    return [new THREE.Vector2(-hw, -hd), new THREE.Vector2(hw, -hd), new THREE.Vector2(hw, hd), new THREE.Vector2(-hw, hd)];
+  }
+  const path = new THREE.Path();
+  path.moveTo(-hw + rr, -hd);
+  path.lineTo(hw - rr, -hd);
+  path.absarc(hw - rr, -hd + rr, rr, -Math.PI / 2, 0, false);
+  path.lineTo(hw, hd - rr);
+  path.absarc(hw - rr, hd - rr, rr, 0, Math.PI / 2, false);
+  path.lineTo(-hw + rr, hd);
+  path.absarc(-hw + rr, hd - rr, rr, Math.PI / 2, Math.PI, false);
+  path.lineTo(-hw, -hd + rr);
+  path.absarc(-hw + rr, -hd + rr, rr, Math.PI, Math.PI * 1.5, false);
+  const pts = path.getPoints(6);
+  if (pts.length > 1 && pts[0]!.distanceTo(pts[pts.length - 1]!) < 1e-6) pts.pop();
+  return pts;
+}
+
+// A smooth rounded-rectangle annulus (earth parapet) — one continuous, beveled MOUND, replacing
+// the old 4-separate-boxes ring that read as stacked slabs meeting at hard square seams (a real
+// parapet is one piled berm with rounded corners and a sloped cross-section, never distinct
+// rectangular blocks). Both rectangles are symmetric about the shared center, so the local-Y
+// sign flip from the rotateX(-π/2) lay-flat step (see ringGeo) leaves the shape unchanged.
+function frameGeo(x: number, z: number, outerL: number, outerW: number, holeL: number, holeW: number, height: number): THREE.ExtrudeGeometry {
+  const outerPts = roundedRectLoop(outerL, outerW, Math.min(outerL, outerW) * 0.12);
+  if (THREE.ShapeUtils.isClockWise(outerPts)) outerPts.reverse(); // outer contour must be CCW
+  const holePts = roundedRectLoop(holeL, holeW, Math.min(holeL, holeW) * 0.12);
+  if (!THREE.ShapeUtils.isClockWise(holePts)) holePts.reverse(); // hole must wind the OPPOSITE way
+  const shape = new THREE.Shape(outerPts);
+  shape.holes.push(new THREE.Path(holePts));
+  const annulusHalf = Math.min(outerL - holeL, outerW - holeW) / 2;
+  const bevelSize = Math.min(0.12, Math.max(0.02, annulusHalf * 0.35));
+  const bevelThickness = Math.min(height * 0.45, bevelSize);
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: height, bevelEnabled: true, bevelThickness, bevelSize, bevelSegments: 3, curveSegments: 12,
+  });
+  geo.rotateX(-Math.PI / 2); // extrude was along +Z; lay it flat so it extrudes along +Y (up)
+  geo.translate(x, 0, z);
+  return geo;
+}
+function buildFrame(group: THREE.Group, x: number, z: number, outerL: number, outerW: number, holeL: number, holeW: number, height: number, colorHex: number, map?: THREE.Texture): void {
+  const mat = new THREE.MeshToonMaterial({ color: colorHex, gradientMap: toonGradient(), ...(map ? { map } : {}) });
+  const mesh = new THREE.Mesh(frameGeo(x, z, outerL, outerW, holeL, holeW, height), mat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  // Hairline-expanded outline, not a uniform scale — same rationale as buildRing's (a uniformly
+  // scaled wide flat annulus inflates radially AND downward into a fat black skirt at the base).
+  const outline = new THREE.Mesh(
+    frameGeo(x, z, outerL + 0.1, outerW + 0.1, Math.max(0.1, holeL - 0.1), Math.max(0.1, holeW - 0.1), height + 0.04),
+    new THREE.MeshBasicMaterial({ color: 0x16130d, side: THREE.BackSide }),
+  );
+  outline.position.y = -0.02;
+  group.add(outline, mesh);
 }
 
 // A sloped earthen excavation face: the vertices on the OUTER side (away from the hole, along
@@ -829,9 +898,16 @@ function buildPartInner(group: THREE.Group, part: Part3, bags: SandbagBatcher): 
       }
       break;
     }
-    case 'ring':
-      buildRing(group, part.x, part.z, part.outerR, part.innerR, part.height, ROLE_COLOR[part.role]);
+    case 'ring': {
+      const map = part.role === 'earthParapet' ? dirtTexture() : undefined;
+      buildRing(group, part.x, part.z, part.outerR, part.innerR, part.height, ROLE_COLOR[part.role], map);
       break;
+    }
+    case 'frame': {
+      const map = part.role === 'earthParapet' ? dirtTexture() : undefined;
+      buildFrame(group, part.x, part.z, part.outerL, part.outerW, part.holeL, part.holeW, part.height, ROLE_COLOR[part.role], map);
+      break;
+    }
     case 'wedge':
       buildWedge(group, part.x, part.z, part.radius, part.leftDeg, part.rightDeg);
       break;
