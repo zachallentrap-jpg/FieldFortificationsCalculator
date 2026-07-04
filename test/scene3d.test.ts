@@ -86,16 +86,22 @@ test('each revetment choice tags the excavation wall with its own distinct finis
 });
 
 test('unrevetted wall taper scales with the soil\'s real wallSlopeRatio — steeper soil ⇒ more taper', () => {
+  // Hasty (shallow) so the flare stays below the parapet-footprint clamp and the soil ordering
+  // is observable — a deep cut in slumping soil saturates the clamp (and is doctrinally revetted
+  // anyway, since sand/gravel are revetForced), which would erase the distinction.
   const taperFor = (soil: string): number => {
-    const r = compute(defaultInputs({ soil, revetment: 'none' }));
+    const r = compute(defaultInputs({ soil, standard: 'hasty', revetment: 'none' }));
     const scene = buildScene3D(r);
     const wall = scene.parts.find((p) => p.kind === 'box' && p.role === 'bayWall') as { taperAmount?: number } | undefined;
     return wall?.taperAmount ?? 0;
   };
-  // rock/frozen (0.1 ratio) barely slope; sand/gravel (1.0 ratio, forced revetment) slope hard.
-  assert.ok(taperFor('rock') < taperFor('loam'), 'rock < loam');
-  assert.ok(taperFor('loam') < taperFor('sand'), 'loam < sand');
-  assert.ok(taperFor('rock') > 0, 'even a "stable" soil still shows SOME taper, never a hard 0');
+  // Researched face angles: rock/frozen are VERTICAL (ratio 0 ⇒ no taper); loam moderate (0.65);
+  // clay steeper-but-still-sloped (0.75); sand/gravel slump wide (1.48). Not the old 0.1
+  // placeholder that gave "stable" rock a near-vertical-but-nonzero taper.
+  assert.equal(taperFor('rock'), 0, 'intact rock cuts vertical — no taper');
+  assert.equal(taperFor('frozen'), 0, 'frozen ground cuts vertical while frozen');
+  assert.ok(taperFor('loam') < taperFor('clay'), 'loam < clay');
+  assert.ok(taperFor('clay') < taperFor('sand'), 'clay (steep) < sand (slumped)');
 });
 
 test('a revetted wall never tapers, regardless of how steep the soil would otherwise require', () => {

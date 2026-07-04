@@ -352,13 +352,19 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
   const earthRoof = s.coverOn && s.roofPath === 'earth_on_stringers';
   const engineeredRoof = s.roofPath === 'engineered_required';
   if (earthRoof && geo.shape !== 'vehicle_ramp') {
-    const coverY = p.parapetW * 0 + s.coverT / 2 + 0.15;
-    parts.push({ kind: 'box', x: 0, y: coverY, z: 0, w: p.holeL + 2, h: s.coverT, d: p.holeW + 2, role: 'cover', label: 'Roof cover', finish: 'sandbag' });
+    // Setback (the "dead-man" bearing shelf): the roof's stringers must land on UNDISTURBED
+    // earth back from the hole edge, ≥1 ft (one helmet) OR ¼ of the cut depth, whichever is
+    // greater (ATP 5-238 / FM 5-103, both source-verified). The old flat +1 ft per side was
+    // right for a shallow 4-ft cut but far too little for a deep one — the cover would bear on
+    // the spoil lip and collapse the model's own load path.
+    const setback = Math.max(1.0, 0.25 * s.depthOfCut);
+    const coverY = s.coverT / 2 + 0.15;
+    parts.push({ kind: 'box', x: 0, y: coverY, z: 0, w: p.holeL + 2 * setback, h: s.coverT, d: p.holeW + 2 * setback, role: 'cover', label: 'Roof cover', finish: 'sandbag' });
     const n = Math.max(1, Math.min(s.stringers, 8));
     for (let i = 0; i < n; i++) {
       const frac = n === 1 ? 0.5 : i / (n - 1);
-      const sx = -halfL - 1 + frac * (p.holeL + 2);
-      parts.push({ kind: 'box', x: sx, y: coverY - s.coverT / 2 - 0.15, z: 0, w: 0.35, h: 0.3, d: p.holeW + 2, role: 'stringer' });
+      const sx = -halfL - setback + frac * (p.holeL + 2 * setback);
+      parts.push({ kind: 'box', x: sx, y: coverY - s.coverT / 2 - 0.15, z: 0, w: 0.35, h: 0.3, d: p.holeW + 2 * setback, role: 'stringer' });
     }
   } else if (engineeredRoof && geo.shape !== 'vehicle_ramp') {
     parts.push({ kind: 'box', x: 0, y: 1.4, z: 0, w: p.holeL + 1.5, h: 0.2, d: p.holeW + 1.5, role: 'engineeredCover', label: 'Engineered roof — see engineer' });
@@ -368,13 +374,20 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
   if (p.platform) {
     parts.push({ kind: 'box', x: 0, y: -s.depthOfCut + s.platformDepth / 2, z: -halfW + p.platform.W / 2, w: p.platform.L, h: s.platformDepth, d: p.platform.W, role: 'platform', label: 'Standing platform' });
   } else if (s.firingStepOn) {
-    const ledgeH = Math.min(0.8, s.depthOfCut * 0.25);
+    // A firing step / elbow rest is a 6-8 in ledge at the front of the hole (ATP 5-254,
+    // source-verified) — not the up-to-9.6 in the old depth×0.25 produced on a deep cut.
+    const ledgeH = Math.min(0.67, Math.max(0.5, s.depthOfCut * 0.15));
     parts.push({ kind: 'box', x: 0, y: -ledgeH / 2, z: -halfW + 0.4, w: Math.min(p.holeL * 0.6, p.holeL - 0.5), h: ledgeH, d: 0.8, role: 'firingStep', label: 'Step up' });
   }
 
   // ── Sumps (grenade catch pits) ────────────────────────────────────────────
+  // A grenade sump is a dug CHANNEL at the floor, ~3 ft long × 6 in wide (FM 5-103), that a
+  // grenade rolls into — an elongated trough reads as that, where the old vertical cylinder
+  // read as a post-hole. Runs along the frontage at each sump mark; its bottom stays inside the
+  // terrain floor plug (0.7 ft thick) so nothing pokes out underneath.
   for (const sump of p.sumps) {
-    parts.push({ kind: 'cyl', x: sump.xFt, y: -s.depthOfCut - 0.3, z: sump.yFt, radius: 0.4, height: 0.6, role: 'sump', label: 'Grenade sump' });
+    const sumpL = Math.min(2.8, Math.max(1.0, p.holeL * 0.5));
+    parts.push({ kind: 'box', x: sump.xFt, y: -s.depthOfCut - 0.25, z: sump.yFt, w: sumpL, h: 0.5, d: 0.5, role: 'sump', label: 'Grenade sump' });
   }
 
   // ── Camouflage net (translucent plane above the position) ────────────────

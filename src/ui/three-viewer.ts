@@ -385,38 +385,69 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 // a miniature figurine (a saturated primary would steal focus from the fortification being
 // taught — red stays reserved for hazards/ENEMY), with one small blaze band so it stays
 // findable at a glance.
+// A blocky low-poly SOLDIER for scale — boots, split legs, a shouldered torso with a chest
+// harness, arms, a head, and a helmet. The old figure was four stacked capsules that read as a
+// bowling pin; a real human silhouette (limbs that separate, shoulders, a helmet) is what makes
+// "~5'10" tall" legible at a glance. Proportions are ~7.5 heads tall, faces the enemy (−z).
+// Every part goes through addToonMesh so its outline defines the limb against the body — the
+// same cel look the rest of the diorama uses.
 function buildFigure(group: THREE.Group, x: number, z: number, heightFt: number): void {
   const f = activePalette.figure;
-  const legH = heightFt * 0.46;
-  const torsoH = heightFt * 0.34;
-  const headR = heightFt * 0.09;
-  const torsoR = heightFt * 0.12;
-  const torso = new THREE.Mesh(
-    new THREE.CapsuleGeometry(torsoR, torsoH, 4, 10),
-    new THREE.MeshToonMaterial({ color: f.torso, gradientMap: toonGradient() }),
-  );
-  torso.position.set(x, legH + torsoH / 2 + torsoR, z);
-  const legs = new THREE.Mesh(
-    new THREE.CapsuleGeometry(torsoR * 0.7, legH * 0.7, 4, 8),
-    new THREE.MeshToonMaterial({ color: f.legs, gradientMap: toonGradient() }),
-  );
-  legs.position.set(x, legH * 0.5 + torsoR * 0.7, z);
-  const head = new THREE.Mesh(
-    new THREE.SphereGeometry(headR, 12, 10),
-    new THREE.MeshToonMaterial({ color: f.skin, gradientMap: toonGradient() }),
-  );
-  head.position.set(x, legH + torsoH + torsoR + headR * 0.9, z);
-  const blaze = new THREE.Mesh(
-    new THREE.CylinderGeometry(torsoR * 1.04, torsoR * 1.04, torsoH * 0.18, 10),
-    new THREE.MeshToonMaterial({ color: f.blaze, gradientMap: toonGradient() }),
-  );
-  blaze.position.set(x, legH + torsoH * 0.72 + torsoR, z);
-  for (const m of [legs, torso, head, blaze]) { m.castShadow = true; m.receiveShadow = true; }
-  group.add(legs, torso, head, blaze);
+  const H = heightFt;
+  const rig = new THREE.Group();
+  const helmetCol = new THREE.Color(f.torso).multiplyScalar(0.72).getHex();
+  const bootCol = 0x2a2118;
+
+  const part = (w: number, h: number, d: number, col: number, px: number, py: number, pz: number): void => {
+    const wrap = addToonMesh(rig, new THREE.BoxGeometry(Math.max(0.02, w), Math.max(0.02, h), Math.max(0.02, d)), col);
+    wrap.position.set(x + px, py, z + pz);
+  };
+
+  const legSep = 0.055 * H;
+  const legW = 0.085 * H, legD = 0.10 * H;
+  const bootH = 0.05 * H;
+  const legH = 0.42 * H;
+  const hipY = bootH + legH;
+  // boots (toes forward, toward the enemy at −z)
+  part(legW * 1.1, bootH, legD * 1.5, bootCol, -legSep, bootH / 2, -0.03 * H);
+  part(legW * 1.1, bootH, legD * 1.5, bootCol, legSep, bootH / 2, -0.03 * H);
+  // legs
+  part(legW, legH, legD, f.legs, -legSep, bootH + legH / 2, 0);
+  part(legW, legH, legD, f.legs, legSep, bootH + legH / 2, 0);
+  // pelvis
+  part(0.20 * H, 0.08 * H, 0.15 * H, f.legs, 0, hipY + 0.03 * H, 0);
+  // torso (shoulders wider than hips) — biacromial breadth ≈ 0.24 × stature (ANSUR II male),
+  // so the shoulders don't read cartoonishly wide.
+  const torsoW = 0.24 * H, torsoH = 0.28 * H, torsoD = 0.15 * H;
+  const torsoY = hipY + 0.04 * H + torsoH / 2;
+  part(torsoW, torsoH, torsoD, f.torso, 0, torsoY, 0);
+  // chest harness / blaze band — the pop of color that separates the figure from the earthworks
+  part(torsoW * 1.03, 0.07 * H, torsoD * 1.05, f.blaze, 0, torsoY + 0.03 * H, 0);
+  const shoulderY = torsoY + torsoH / 2;
+  // arms at the sides — a shade darker than the jacket so the limb reads as separate from the
+  // chest (touching same-color blocks merged into one wide torso).
+  const armCol = new THREE.Color(f.torso).multiplyScalar(0.85).getHex();
+  const armW = 0.07 * H, armH = 0.30 * H, armD = 0.08 * H;
+  const armX = torsoW / 2 + armW / 2;
+  part(armW, armH, armD, armCol, -armX, shoulderY - armH / 2, 0);
+  part(armW, armH, armD, armCol, armX, shoulderY - armH / 2, 0);
+  part(armW, 0.05 * H, armD, f.skin, -armX, shoulderY - armH, 0);
+  part(armW, 0.05 * H, armD, f.skin, armX, shoulderY - armH, 0);
+  // neck + head
+  part(0.07 * H, 0.04 * H, 0.07 * H, f.skin, 0, shoulderY + 0.02 * H, 0);
+  const headH = 0.13 * H;
+  const headY = shoulderY + 0.04 * H + headH / 2;
+  part(0.13 * H, headH, 0.13 * H, f.skin, 0, headY, 0);
+  // helmet — a low flat cap sitting on the crown, forehead showing below (a taller dome
+  // toon-shaded into two dark lobes and read like goggles). Brim over the brow to finish it.
+  const helmet = addToonMesh(rig, new THREE.SphereGeometry(0.078 * H, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), helmetCol);
+  helmet.position.set(x, headY + headH * 0.34, z);
+  helmet.scale.set(1.12, 0.62, 1.18);
+  part(0.15 * H, 0.025 * H, 0.05 * H, helmetCol, 0, headY + headH * 0.36, -0.07 * H); // brim
+  group.add(rig);
+
   const label = labelSprite('For scale (~5\'-10")');
-  // Snug above the head, not floating 0.6 ft over it — the old offset pushed the label past the
-  // top frame edge at the default camera on several positions (audit: label clipped/missing).
-  label.position.set(x, legH + torsoH + torsoR * 2 + headR * 2 + 0.15, z);
+  label.position.set(x, headY + headH + 0.5, z);
   group.add(label);
 }
 

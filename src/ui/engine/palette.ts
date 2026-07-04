@@ -9,6 +9,8 @@
 // in both themes — red is reserved for hazards/orientation, matching the 2D token system.
 
 import type { BoxRole } from '../../render3d/scene3d';
+import { soils } from '../../doctrine/soils';
+import type { FaceLook } from '../../doctrine/soils';
 
 export type Theme3D = 'day' | 'night';
 
@@ -62,6 +64,9 @@ export interface Palette {
   bagJitter: number;
   /** Terrain scatter density multipliers — rocky soils grow rocks, sand loses grass. */
   scatterMul: { tuft: number; rock: number };
+  /** Excavation-face character — drives the strata texture's banding (smooth sand vs layered
+   *  rock vs ice-veined frozen). 'planar' is the neutral loam/silt default. */
+  faceLook: FaceLook;
   light: LightRig;
 }
 
@@ -94,6 +99,7 @@ const DAY: Palette = {
   figure: { torso: 0x6b7250, legs: 0x4e5442, skin: 0xd9a87c, blaze: 0xe8722d },
   bagJitter: 0.06,
   scatterMul: { tuft: 1, rock: 1 },
+  faceLook: 'planar',
   light: {
     hemiSky: 0xdcebfa,
     hemiGround: 0x8a7350,
@@ -146,6 +152,7 @@ const NIGHT: Palette = {
   figure: { torso: 0x4e5442, legs: 0x33372c, skin: 0x9a7f63, blaze: 0xd96a35 },
   bagJitter: 0.05,
   scatterMul: { tuft: 1, rock: 1 },
+  faceLook: 'planar',
   light: {
     // Night runs a HIGHER proportional floor than day — the palette colors already carry the
     // darkness (hue-shifted blue-slate values), so the rig's job is legibility, not gloom.
@@ -277,8 +284,12 @@ function nightLook(d: SoilLook): SoilLook {
  */
 export function paletteFor(theme: Theme3D, soil: string): Palette {
   const base = palette(theme);
+  // faceLook rides the doctrine soil row, not the SOIL_DAY color table — loam/silt/sandy_loam
+  // have no color override (they return the base palette) but still carry 'planar', and the
+  // five distinct soils carry their own (cone/stony/blocky/stratified/iceblocky).
+  const faceLook = soils[soil]?.faceLook ?? 'planar';
   const day = SOIL_DAY[soil];
-  if (!day) return base;
+  if (!day) return { ...base, faceLook };
   const look = theme === 'night' ? nightLook(day) : day;
   return {
     ...base,
@@ -288,5 +299,6 @@ export function paletteFor(theme: Theme3D, soil: string): Palette {
     spoilFleck: look.spoilFleck,
     strata: look.strata,
     scatterMul: look.scatterMul,
+    faceLook,
   };
 }

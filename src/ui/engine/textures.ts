@@ -249,10 +249,24 @@ export function groundTopTexture(spec: TerrainSpec, p: Palette): THREE.CanvasTex
 
 const strataCache = new Map<string, THREE.CanvasTexture>();
 
+// Excavation-face character per soil (research §1): a smooth loose cone (sand), a stony cone
+// (gravel), a blocky cohesive cut (clay), heavy bedding layers (rock), ice-veined blocks
+// (frozen), or the neutral planar loam/silt cut. Drives the strata banding + speck density so
+// the dug face reads as the material picked, not just a recolor of the same texture.
+const FACE_STRATA: Record<string, { bands: number; pebbles: number; hard: boolean; ice?: boolean }> = {
+  cone: { bands: 0, pebbles: 4, hard: false },
+  stony: { bands: 1, pebbles: 36, hard: false },
+  blocky: { bands: 3, pebbles: 10, hard: true },
+  stratified: { bands: 5, pebbles: 18, hard: true },
+  iceblocky: { bands: 3, pebbles: 8, hard: true, ice: true },
+  planar: { bands: 2, pebbles: 14, hard: false },
+};
+
 export function strataTexture(p: Palette): THREE.CanvasTexture {
-  const key = p.strata.base;
+  const key = p.strata.base + ':' + p.faceLook;
   const hit = strataCache.get(key);
   if (hit) return hit;
+  const face = FACE_STRATA[p.faceLook] ?? FACE_STRATA.planar!;
 
   const S = 128;
   const canvas = document.createElement('canvas');
@@ -284,17 +298,20 @@ export function strataTexture(p: Palette): THREE.CanvasTexture {
   }
   ctx.stroke();
 
-  const lineN = 2 + (hashJitter(seed + 2) > 0.4 ? 1 : 0);
+  // Bedding lines: count + straightness per face character. Rock lays many nearly-flat bands
+  // (hard); sand lays none (a loose cone has no strata); the rest sit between.
+  const lineN = face.bands;
   for (let i = 0; i < lineN; i++) {
     const s = seed + 20 + i * 13;
     const yBase = S * ((i + 0.7 + hashJitter(s + 1) * 0.25) / (lineN + 0.9));
-    const amp = 1.5 + hashJitter(s + 2) * 2.5;
+    // 'hard' faces (rock/clay/frozen) run near-flat bedding lines; softer soils undulate.
+    const amp = face.hard ? 0.6 + hashJitter(s + 2) * 0.9 : 1.5 + hashJitter(s + 2) * 2.5;
     // WHOLE wave counts so the left/right edges meet exactly — this texture repeats on S, and a
     // fractional wave would print a visible seam every tile.
     const waves = 2 + Math.round(hashJitter(s + 3));
     const phase = hashJitter(s + 4) * Math.PI * 2;
     ctx.strokeStyle = i % 2 === 0 ? p.strata.lines[0] : p.strata.lines[1];
-    ctx.lineWidth = 3 + hashJitter(s + 5) * 2;
+    ctx.lineWidth = (face.hard ? 3.5 : 3) + hashJitter(s + 5) * 2;
     ctx.beginPath();
     // Overdraw 4px past both edges: the periodic y() keeps the curve continuous across the
     // seam, and the rounded stroke ends fall outside the tile.
@@ -306,14 +323,33 @@ export function strataTexture(p: Palette): THREE.CanvasTexture {
     ctx.stroke();
   }
 
-  // Sparse pebble specks, kept off the right/bottom edge so the S-repeat seam never clips one.
-  for (let i = 0; i < 14; i++) {
+  // Clasts/specks: dense stony scatter for gravel, almost none for smooth sand. Kept off the
+  // right/bottom edge so the S-repeat seam never clips one.
+  for (let i = 0; i < face.pebbles; i++) {
     const s = seed + 300 + i * 17;
     ctx.fillStyle = i % 2 === 0 ? p.strata.lines[1] : p.strata.lines[0];
     const x = Math.floor(hashJitter(s + 1) * (S - 4));
     const y = Math.floor(hashJitter(s + 2) * (S - 4));
-    const sz = 1 + Math.round(hashJitter(s + 3) * 2);
+    const sz = 1 + Math.round(hashJitter(s + 3) * (p.faceLook === 'stony' ? 3 : 2));
     ctx.fillRect(x, y, sz, sz);
+  }
+
+  // Frozen ground: pale ice lenses/veins threading the face — the one cue that reads "frozen"
+  // rather than just "grey dirt".
+  if (face.ice) {
+    ctx.strokeStyle = 'rgba(232,240,248,0.7)';
+    for (let i = 0; i < 4; i++) {
+      const s = seed + 900 + i * 23;
+      const yB = S * (0.25 + hashJitter(s) * 0.7);
+      ctx.lineWidth = 1 + hashJitter(s + 1) * 1.2;
+      ctx.beginPath();
+      for (let x = -4; x <= S + 4; x += 4) {
+        const y = yB + Math.sin((x / S) * 2 * Math.PI * 2 + hashJitter(s + 2) * 6) * (0.8 + hashJitter(s + 3));
+        if (x === -4) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    }
   }
 
   const tex = new THREE.CanvasTexture(canvas);
