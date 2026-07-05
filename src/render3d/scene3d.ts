@@ -21,7 +21,7 @@
 // 2D renderer and BOM already consult.
 
 import { soils } from '../doctrine/soils';
-import { revetments } from '../doctrine/materials';
+import { revetments, sandbag } from '../doctrine/materials';
 import { positions, parapetModeFor } from '../doctrine/positions';
 import type { GeometryModel } from '../engine/geometry';
 import type { Result } from '../engine/types';
@@ -41,6 +41,9 @@ export interface Box3 {
   taperAxis?: 0 | 2;
   taperSign?: 1 | -1;
   taperAmount?: number;
+  // Sheared top for the vehicle access ramp: the box's top face tilts so its −z edge sits
+  // `shearDrop` feet below its +z edge — a continuous grade the vehicle drives, not a staircase.
+  shearDrop?: number;
 }
 export interface Cyl3 {
   kind: 'cyl';
@@ -57,14 +60,19 @@ export interface Ring3 {
   role: BoxRole;
 }
 export interface Frame3 {
-  // A smooth rounded-rectangle annulus, extruded and beveled into a single continuous MOUNDED
-  // berm — one piece with rounded corners and a sloped top edge, not 4 separate flat-topped
-  // boxes meeting at hard seams (the earlier box-ring read as stacked Lego slabs, not a real
-  // earth parapet). Used for every earth-mode parapet on a rect-family position.
+  // A smooth rounded, beveled, single-piece MOUNDED berm shaped like a U: dirt piled on the
+  // front and both flanks, the REAR left with NO parapet at all — a fighting position's rear is
+  // always a clear escape/resupply lane, never berm'd shut (research-verified; replaces both
+  // the earlier closed 4-box ring AND a later closed rounded-annulus version, neither of which
+  // matched real construction). `frontZ` is the U's inner-front boundary: set back from the
+  // hole's own front edge by the front sandbag rest's depth (see pushFrontSandbagRest), so the
+  // dirt mass starts right behind those bags instead of overlapping them — 0 when there's no
+  // rest (a connecting trench has no directional aperture to rest a weapon on).
   kind: 'frame';
   x: number; z: number; // center
-  outerL: number; outerW: number; // outer footprint
   holeL: number; holeW: number; // inner hole footprint (matches the excavation exactly)
+  parapetW: number; // the mound's own thickness, front + both flanks
+  frontZ: number; // inner-front boundary, negative, at or forward of −holeW/2
   height: number;
   role: BoxRole;
 }
@@ -87,7 +95,7 @@ export interface Figure3 {
 
 export type BoxRole =
   | 'ground' | 'parapet' | 'earthParapet' | 'bayWall' | 'bayFloor' | 'cover' | 'engineeredCover'
-  | 'stringer' | 'platform' | 'firingStep' | 'sump' | 'camoNet' | 'rampBerm';
+  | 'stringer' | 'platform' | 'firingStep' | 'entryStep' | 'sump' | 'camoNet' | 'rampBerm';
 
 export type Part3 = Box3 | Cyl3 | Ring3 | Frame3 | Wedge3 | Arrow3 | Figure3;
 
@@ -142,6 +150,7 @@ const ROLE_STAGE: Record<BoxRole, number> = {
   bayWall: 1,
   platform: 2,
   firingStep: 2,
+  entryStep: 2, // graded way down, cut during the deliberate dig
   sump: 3, // revet & sump
   parapet: 4, // front protection (sandbag firing rest, or bunker sandbag walls)
   earthParapet: 4, // mounded spoil parapet — same construction stage as the sandbag parapet
@@ -169,7 +178,7 @@ function finite(n: number): number {
 // the bottom of buildScene3D can size itself to what's actually drawn, not the un-exaggerated
 // depth — otherwise the reset camera frames the model as if it were 3x shallower than it reads,
 // leaving the deep end of the ramp mostly out of frame.
-const RELIEF_EXAGGERATION = 3;
+const RELIEF_EXAGGERATION = 2;
 
 // What the excavation FACE is actually built from, straight from the operator's own revetment
 // choice — the same doctrine row the BOM already reads. 'panel' covers two distinct doctrinal
@@ -214,7 +223,6 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
   const position = positions[result.inputs.positionType];
   const parapetMode = position ? parapetModeFor(position) : 'earth';
   const ringMode: 'earth' | 'sandbag' = parapetMode === 'sandbag' ? 'sandbag' : 'earth';
-  const restCount = position && position.sectorsOfFire && parapetMode === 'earth' ? (position.crewSize >= 2 ? 2 : 1) : 0;
 
   // ── Footprint by shape (§ each design gets a distinct silhouette) ────────────
   if (geo.shape === 'circular') {
@@ -254,39 +262,36 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     // the deep end of a long ramp hanging past its edge with nothing rendered underneath.
     const rampZCenter = -runLen / 2;
     pushGroundFrame(parts, 0, rampZCenter, p.outerL + 4, runLen + 6, p.holeL, runLen);
-    // A ramp descending from grade to full depth, built as a stepped "staircase" of plain
-    // boxes — the same proven box primitive every other part uses (a single continuously
-    // sloped/rotated extrude turned out fragile: see DECISIONS D20). Cartoon-appropriate too.
+    // A graded access RAMP descending from grade to full depth, then a LEVEL firing PAN the
+    // vehicle parks on. Doctrine (FM 5-103): a deliberate vehicle defilade is a graded ramp into
+    // a level position — NOT a flight of steps (a tank drives a continuous grade, never treads).
+    // The ramp box's top is SHEARED (see shearDrop) into one continuous slope; the pan is a flat
+    // floor slab. Both are the same proven box primitive every other part uses.
     //
     // A vehicle-defilade cut is doctrinally SHALLOW relative to how WIDE it is (a few feet of
     // depth across a footprint tens of feet wide) — rendered at true scale under a camera framed
     // to fit that width, the relief all but disappears. RELIEF_EXAGGERATION is a display-only
     // convention (the same idea as vertical exaggeration on a terrain-relief model): it multiplies
-    // the STAIRCASE'S visual depth only, purely inside this 3D descriptor. It never touches
-    // depthOfCut itself, so every real number (BOM, labor, the 2D plan/section) is unaffected —
-    // this view alone is allowed to be honest about shape at the cost of being literal about scale.
+    // the CUT'S visual depth only, purely inside this 3D descriptor. It never touches depthOfCut
+    // itself, so every real number (BOM, labor, the 2D plan/section) is unaffected — this view
+    // alone is allowed to be honest about shape at the cost of being literal about scale.
     const depthEx = s.depthOfCut * RELIEF_EXAGGERATION;
-    const steps = 6;
-    const stepLen = runLen / steps;
-    const base = -(depthEx + 1); // shared floor so consecutive treads never gap
-    for (let i = 0; i < steps; i++) {
-      // i=0's top sits flush with grade (0); the LAST tread reaches the (exaggerated) full
-      // depth — no gap at the entry, and the deepest point still reads clearly as a real cut.
-      const topY = -(i / (steps - 1)) * depthEx;
-      const zNear = -i * stepLen; // nearer the entry (grade)
-      const zFar = -(i + 1) * stepLen; // nearer the parked end (full depth)
-      parts.push({
-        kind: 'box',
-        x: 0,
-        y: (topY + base) / 2,
-        z: (zNear + zFar) / 2,
-        w: p.holeL,
-        h: topY - base,
-        d: stepLen + 0.05, // tiny overlap so treads never show a hairline gap
-        role: 'bayFloor',
-        finish: 'earth',
-      });
-    }
+    const base = -(depthEx + 1); // shared floor so ramp and pan never gap
+    const rampLen = runLen * 0.65; // grade in — the DOMINANT feature so it reads as a ramp, not a wall
+    const panLen = runLen - rampLen; // level position the vehicle sits on
+    // Ramp: full-height box from z=0 (entry) to z=-rampLen, top sheared from grade (0) at the +z
+    // entry edge down to -depthEx at the ramp/pan break.
+    parts.push({
+      kind: 'box', x: 0, y: base / 2, z: -rampLen / 2,
+      w: p.holeL, h: -base, d: rampLen,
+      role: 'bayFloor', finish: 'earth', shearDrop: depthEx,
+    });
+    // Pan: the level floor at -depthEx from the ramp break to the deep (front) end.
+    parts.push({
+      kind: 'box', x: 0, y: (-depthEx + base) / 2, z: -(rampLen + runLen) / 2,
+      w: p.holeL, h: -depthEx - base, d: panLen,
+      role: 'bayFloor', finish: 'earth',
+    });
     // Doctrine (FM 5-103): for a DELIBERATE vehicle position defeating kinetic-energy threats,
     // "the spoil is flattened out or hauled away" — a tall piled berm is explicitly the WRONG
     // technique here (it gives a false sense of security against KE rounds, which a parapet
@@ -325,17 +330,35 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     const entranceGap = isAtgm ? p.holeL * 0.85 : Math.min(3, p.holeL * 0.4);
     pushGroundFrame(parts, 0, 0, p.outerL + 4, p.outerW + 4, p.holeL, p.holeW);
     if (ringMode === 'earth') {
-      // One continuous mounded berm — rounded corners, sloped/beveled cross-section — instead
-      // of 4 flat-topped boxes meeting at hard square seams (the "different shaped square
-      // blocks of dirt" a real parapet never looks like).
-      parts.push({ kind: 'frame', x: 0, z: 0, outerL: p.holeL + 2 * p.parapetW, outerW: p.holeW + 2 * p.parapetW, holeL: p.holeL, holeW: p.holeW, height: parapetH, role: 'earthParapet' });
+      // A U, not a ring: dirt piled on the front and both flanks, ONE continuous mounded piece
+      // (rounded, beveled cross-section — not 4 flat-topped boxes meeting at hard square seams).
+      // The REAR is left with NO parapet at all — a fighting position's rear is always a clear
+      // escape/resupply lane, never berm'd shut.
+      //
+      // A real firing position (sectorsOfFire) gets the ONLY concentrated sandbag on the whole
+      // parapet: one course across the full frontage, 2 bags deep, right at the hole's edge —
+      // the stable rifle rest the dirt mound is then piled around and behind (its inner-front
+      // boundary sits BEHIND the bags, so dirt starts right where they end). A connecting trench
+      // has no directional aperture to rest a weapon on, so its mound sits flush at the hole edge.
+      const hasAperture = position?.sectorsOfFire === true;
+      const bagDepth = hasAperture ? frontSandbagRestDepth() : 0;
+      // The dirt is built up AROUND the bags for head protection — it must never sit shorter
+      // than the rest it's supposedly piled around, or the bags would stick up past the mound.
+      const moundH = hasAperture ? Math.max(parapetH, sandbag.frontWallHeight.value) : parapetH;
+      parts.push({
+        kind: 'frame', x: 0, z: 0,
+        holeL: p.holeL, holeW: p.holeW, parapetW: p.parapetW, height: moundH, role: 'earthParapet',
+        frontZ: -(p.holeW / 2 + bagDepth),
+      });
+      if (hasAperture) pushFrontSandbagRest(parts, p.holeL, p.holeW);
     } else {
       pushRing(parts, 0, 0, p.holeL, p.holeW, p.parapetW, parapetH, entranceGap);
     }
-    // Earth-parapet rifle/crew positions get the sandbag firing rest(s) at the aperture — the
-    // only concentrated bags on an otherwise-dirt parapet.
-    pushFiringRests(parts, p.holeL, p.holeW, p.parapetW, parapetH, restCount);
     pushBayBox(parts, 0, 0, p.holeL, p.holeW, s.depthOfCut, wallT, finish, slopeRatio, picketSpacing, p.parapetW, entranceGap);
+    // A graded way DOWN at the rear entrance: a short flight of earth steps from grade to floor,
+    // so a deep hole isn't a sheer drop you'd have to jump into. Only when the cut is deep enough
+    // to warrant it and there's a rear opening to descend through.
+    pushEntrySteps(parts, p.holeL, p.holeW, s.depthOfCut, entranceGap, wallT);
 
     // Hole envelopes expand past the excavation by the wall taper (bare sloped earth flares
     // OUTWARD toward the top — same formula as pushBayBox's taperAmount, INCLUDING the bay-size
@@ -448,8 +471,13 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
   // halfL + parapetW, so the old halfL + 2 planted the figure ON the ring (legs clipping
   // through the bag courses — flagged by three separate audit frames). It stands on grass
   // beside the position, where a scale reference actually reads as one.
+  // l_shape digs a crew/ammo arm on the +x side (armX = halfL + armLen/2), so the usual +x
+  // figure position lands IN that arm's trench — mirror it to the clear -x side there. Every
+  // other shape keeps the figure on +x beside the position.
   const figureX = geo.shape === 'circular'
     ? Math.max(p.outerL, p.outerW) / 2 + 1.5
+    : geo.shape === 'l_shape'
+    ? -(halfL + p.parapetW + 1.3)
     : halfL + p.parapetW + 1.3;
   parts.push({ kind: 'figure', x: figureX, z: 1.5, heightFt: 5.83 });
 
@@ -554,14 +582,46 @@ function pushRing(parts: Part3[], cx: number, cz: number, l: number, w: number, 
 // grazing fire logs or sandbags"; §5-238 front retaining wall "2 filled sandbags in-depth").
 // One rest for a single-sector position, two bracketing the sector for a crew/two-man. Sits on
 // the front berm, facing the enemy (-z).
-function pushFiringRests(parts: Part3[], holeL: number, holeW: number, parapetW: number, parapetH: number, count: number): void {
-  if (count <= 0) return;
-  const restH = 0.4; // one low course
-  const z = -(holeW / 2 + parapetW * 0.5); // on the front berm, toward the enemy
-  const y = parapetH + restH / 2 - 0.05; // resting on the berm top
-  const xs = count === 1 ? [0] : [-holeL * 0.28, holeL * 0.28];
-  for (const x of xs) {
-    parts.push({ kind: 'box', x, y, z, w: 1.6, h: restH, d: parapetW * 0.7, role: 'parapet' });
+// The front sandbag rest: doctrine's real firing-position construction (ATP 3-21.8 §5-238,
+// "front retaining wall...10 inches high (2 filled sandbags in-depth)") is a SINGLE course of
+// bags spanning the FULL frontage, laid flat two-deep front-to-back, ~10 in tall — a stable
+// shelf to lay the rifle on. It sits directly against the hole's front edge, at grade (bags on
+// the ground, not floating on a berm), and the earth U-mound is built up around and behind it
+// afterward (see the 'open' Frame3 in buildScene3D's rect-family branch) — this is the ONLY
+// concentrated sandbag on an otherwise-dirt parapet. `bagDepthFt` (2 bag-widths) is returned so
+// the caller can set the U-mound's front boundary flush against the bags' outer face.
+function frontSandbagRestDepth(): number {
+  return 2 * sandbag.W.value;
+}
+function pushFrontSandbagRest(parts: Part3[], holeL: number, holeW: number): void {
+  const depth = frontSandbagRestDepth();
+  const height = sandbag.frontWallHeight.value;
+  parts.push({ kind: 'box', x: 0, y: height / 2, z: -(holeW / 2 + depth / 2), w: holeL, h: height, d: depth, role: 'parapet' });
+}
+
+// A short flight of earth steps at the REAR entrance (+z), descending from grade to the bay
+// floor — a graded way in, not a sheer 4-ft drop. Each step is a solid earth block from its
+// tread top down to the floor, stacked so consecutive treads read as a staircase carved in the
+// dirt. Only emitted for a cut deep enough to need it, and only where there's a rear opening
+// (gapW) to descend through. The steps hug x=0 (centered in the rear gap) and march forward
+// (−z) into the bay as they drop.
+function pushEntrySteps(parts: Part3[], holeL: number, holeW: number, depth: number, gapW: number, wallT: number): void {
+  // Only a WALK-IN position earns a stair: a deep cut, a rear opening, AND enough front-to-back
+  // room to fit the treads and still leave a floor to stand on. A tight rifle position's
+  // front-to-back run is intentionally shallow (a narrow slot — see doctrine/positions.ts) —
+  // stuffing a staircase in there would eat the whole floor, so it's a drop-in instead. A roomy
+  // position (the bunker's 8 ft) earns the stair; a two-man's 2 ft does not.
+  const n = 2;
+  const tread = 0.5; // z-run of each step, shallower than a full 1-ft stair tread
+  if (depth <= 2.0 || gapW <= 0 || holeW < n * tread + 2.5) return;
+  const hw = holeW / 2;
+  const stepW = Math.min(gapW * 0.85, holeL * 0.5);
+  const riser = depth / (n + 1);
+  for (let i = 0; i < n; i++) {
+    const topY = -(i + 1) * riser; // this tread's top, descending from grade
+    const h = depth + topY; // solid block down to the floor (topY is negative)
+    const z = hw - wallT - (i + 0.5) * tread; // march forward from the rear inner wall
+    parts.push({ kind: 'box', x: 0, y: topY - h / 2, z, w: stepW, h, d: tread + 0.02, role: 'entryStep', finish: 'earth' });
   }
 }
 

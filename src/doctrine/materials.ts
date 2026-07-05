@@ -11,7 +11,7 @@ export interface Sandbag {
   W: Provenance<number>;
   H: Provenance<number>;
   wasteFactor: Provenance<number>; // ×count for burst/misfilled bags
-  bagsPerRest: Provenance<number>; // bags in one firing-line weapon rest (aperture)
+  frontWallHeight: Provenance<number>; // height of the front firing-rest sandbag course
   basicLoad: Provenance<number>; // sandbags a soldier carries as a starting set
 }
 export const sandbag: Sandbag = {
@@ -19,10 +19,11 @@ export const sandbag: Sandbag = {
   W: P(0.75, { unit: 'ft', note: 'filled bag width (illustrative)' }),
   H: P(0.33, { unit: 'ft', note: 'filled bag thickness (illustrative)' }),
   wasteFactor: P(1.15, { note: 'sandbag waste factor (illustrative)' }),
-  // An earth-parapet rifle position bags ONLY the firing rest at the aperture — a low course
-  // ~2-3 bags wide × 2 deep (ATP 3-21.8 §5-238 front retaining wall, "2 filled sandbags
-  // in-depth"). ~5 bags per rest, not the full parapet ring.
-  bagsPerRest: P(5, { note: 'bags in one firing-line weapon rest (illustrative)' }),
+  // An earth-parapet rifle/crew position bags ONLY the firing rest: ONE course spanning the
+  // full frontage, laid 2 bags deep (front-to-back), ~10 in tall — ATP 3-21.8 §5-238 "front
+  // retaining wall...at least 10 inches high (2 filled sandbags in-depth)". The dirt U-mound is
+  // built up around and behind it; this is the only concentrated sandbag on the parapet.
+  frontWallHeight: P(0.83, { unit: 'ft', note: '~10 in front retaining-wall course height (illustrative)' }),
   // Each soldier carries ~5-7 sandbags as a starting set (ATP 3-21.8 note after §5-260,
   // "five to seven sandbags") — a design needing far more implies on-site fill / resupply.
   basicLoad: P(7, { note: 'sandbags carried per soldier (illustrative)' }),

@@ -336,6 +336,7 @@ function addToonMesh(parent: THREE.Group, geometry: THREE.BufferGeometry, colorH
   if (!opts?.opacity && !opts?.noOutline) {
     const outline = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ color: 0x16130d, side: THREE.BackSide }));
     outline.scale.multiplyScalar(1.035);
+    outline.userData.isOutline = true; // hidden under cutaway — its black backfaces would ink the section
     wrapper.add(outline);
   }
   wrapper.add(mesh);
@@ -502,7 +503,7 @@ function buildWedge(group: THREE.Group, x: number, z: number, radius: number, le
 // A smooth annulus (circular parapet) — one extruded ring mesh, no segment seams. Bevelled top
 // (and bottom) edge so it reads as a piled MOUND, not a flat-topped block — a real earth
 // parapet has a sloped cross-section, and a hard flat top/edge looks like poured concrete.
-function ringGeo(x: number, z: number, outerR: number, innerR: number, height: number): THREE.ExtrudeGeometry {
+function ringGeo(x: number, z: number, outerR: number, innerR: number, height: number, rough?: boolean): THREE.ExtrudeGeometry {
   const shape = new THREE.Shape();
   shape.absarc(0, 0, outerR, 0, Math.PI * 2, false);
   const hole = new THREE.Path();
@@ -515,86 +516,122 @@ function ringGeo(x: number, z: number, outerR: number, innerR: number, height: n
   });
   geo.rotateX(-Math.PI / 2); // extrude was along +Z; lay it flat so it extrudes along +Y (up)
   geo.translate(x, 0, z);
+  // Only the parapet mound gets roughened, never the thin flat ground annulus (rough is
+  // omitted there) — a few hundredths of a foot of noise would swallow a 0.05 ft-tall disc.
+  if (rough) roughenMound(geo, 0.05);
   return geo;
 }
-function buildRing(group: THREE.Group, x: number, z: number, outerR: number, innerR: number, height: number, colorHex: number, map?: THREE.Texture): void {
+function buildRing(group: THREE.Group, x: number, z: number, outerR: number, innerR: number, height: number, colorHex: number, map?: THREE.Texture, rough?: boolean): void {
   const mat = new THREE.MeshToonMaterial({ color: colorHex, gradientMap: toonGradient(), ...(map ? { map } : {}) });
-  const mesh = new THREE.Mesh(ringGeo(x, z, outerR, innerR, height), mat);
+  const mesh = new THREE.Mesh(ringGeo(x, z, outerR, innerR, height, rough), mat);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   // Outline is a HAIRLINE-EXPANDED second ring, not a 1.035-scaled shell: uniform scaling a
   // wide flat annulus inflates it radially AND downward into a fat black skirt at the base
   // (audit: "thick solid-black band rings the torus — reads as a broken outline slab").
   const outline = new THREE.Mesh(
-    ringGeo(x, z, outerR + 0.05, Math.max(0.05, innerR - 0.05), height + 0.04),
+    ringGeo(x, z, outerR + 0.05, Math.max(0.05, innerR - 0.05), height + 0.04, rough),
     new THREE.MeshBasicMaterial({ color: 0x16130d, side: THREE.BackSide }),
   );
   outline.position.y = -0.02;
+  outline.userData.isOutline = true;
   const wrapper = new THREE.Group();
   wrapper.add(outline, mesh);
   group.add(wrapper);
 }
 
-// A rounded-rectangle point loop (plan feet), centered at the local origin — used to build the
-// earth-parapet frame's outer AND inner (hole) contours. Same corner-rounding technique as the
-// terrain crust's hole contours (engine/terrain.ts), ported locally rather than imported since
-// the two modules sit in different architectural layers (pure descriptor vs Three.js builder).
-function roundedRectLoop(w: number, d: number, r: number): THREE.Vector2[] {
-  const rr = Math.min(r, w / 2 - 0.01, d / 2 - 0.01);
-  const hw = w / 2;
-  const hd = d / 2;
-  if (rr <= 0) {
-    return [new THREE.Vector2(-hw, -hd), new THREE.Vector2(hw, -hd), new THREE.Vector2(hw, hd), new THREE.Vector2(-hw, hd)];
+// Real dirt is never a perfectly smooth CAD extrude — nudge a mound's crown into gentle, coarse
+// lumps instead of leaving the beveled top dead-flat (a user complaint: "vaguely rounded but not
+// in the shape of real dirt at all"). The noise is keyed off a COARSE (~0.4 ft) quantization of
+// WORLD (x,z) — not vertex index or a continuous function — so vertices that coincide in space
+// (cap vs. adjacent side-wall vertices, or the same spot on the main mesh vs. its outline shell)
+// always draw the identical offset, which is what keeps the lumps seamless instead of cracked.
+// The offset fades to ZERO at the base (grade) so the mound still sits flush with the ground —
+// only the crown undulates, matching how real piled dirt actually settles.
+function roughenMound(geo: THREE.BufferGeometry, amp: number): void {
+  const pos = geo.getAttribute('position') as THREE.BufferAttribute;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
   }
-  const path = new THREE.Path();
-  path.moveTo(-hw + rr, -hd);
-  path.lineTo(hw - rr, -hd);
-  path.absarc(hw - rr, -hd + rr, rr, -Math.PI / 2, 0, false);
-  path.lineTo(hw, hd - rr);
-  path.absarc(hw - rr, hd - rr, rr, 0, Math.PI / 2, false);
-  path.lineTo(-hw + rr, hd);
-  path.absarc(-hw + rr, hd - rr, rr, Math.PI / 2, Math.PI, false);
-  path.lineTo(-hw, -hd + rr);
-  path.absarc(-hw + rr, -hd + rr, rr, Math.PI, Math.PI * 1.5, false);
-  const pts = path.getPoints(6);
-  if (pts.length > 1 && pts[0]!.distanceTo(pts[pts.length - 1]!) < 1e-6) pts.pop();
-  return pts;
+  const span = Math.max(1e-6, maxY - minY);
+  const cell = 0.4;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    const w = Math.max(0, (y - minY) / span - 0.3) / 0.7; // 0 below 30% height, ramps to 1 at the crown
+    if (w <= 0) continue;
+    const gx = Math.round(pos.getX(i) / cell);
+    const gz = Math.round(pos.getZ(i) / cell);
+    const n = hashJitter(gx * 92821 + gz * 68917 + 5) - 0.5; // deterministic, position-keyed
+    pos.setY(i, y + n * amp * w);
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
 }
 
-// A smooth rounded-rectangle annulus (earth parapet) — one continuous, beveled MOUND, replacing
-// the old 4-separate-boxes ring that read as stacked slabs meeting at hard square seams (a real
-// parapet is one piled berm with rounded corners and a sloped cross-section, never distinct
-// rectangular blocks). Both rectangles are symmetric about the shared center, so the local-Y
-// sign flip from the rotateX(-π/2) lay-flat step (see ringGeo) leaves the shape unchanged.
-function frameGeo(x: number, z: number, outerL: number, outerW: number, holeL: number, holeW: number, height: number): THREE.ExtrudeGeometry {
-  const outerPts = roundedRectLoop(outerL, outerW, Math.min(outerL, outerW) * 0.12);
-  if (THREE.ShapeUtils.isClockWise(outerPts)) outerPts.reverse(); // outer contour must be CCW
-  const holePts = roundedRectLoop(holeL, holeW, Math.min(holeL, holeW) * 0.12);
-  if (!THREE.ShapeUtils.isClockWise(holePts)) holePts.reverse(); // hole must wind the OPPOSITE way
-  const shape = new THREE.Shape(outerPts);
-  shape.holes.push(new THREE.Path(holePts));
-  const annulusHalf = Math.min(outerL - holeL, outerW - holeW) / 2;
-  const bevelSize = Math.min(0.12, Math.max(0.02, annulusHalf * 0.35));
-  const bevelThickness = Math.min(height * 0.45, bevelSize);
+// The U-shaped earth parapet: a single simple (non-self-intersecting) 8-point polygon tracing
+// dirt piled on the front and both flanks, with the REAR left completely open — no hole, no
+// second contour, just one "staple"/parenthesis outline. Points go: down the inner-left face,
+// across the inner-front face, up the inner-right face, jump OUT at the open rear end of the
+// right arm, down the outer-right face (continuing past the hole's front line to the bulged
+// front-outer depth), across the outer-front face, up the outer-left face, jump back IN at the
+// open rear end of the left arm. Corners stay rectilinear — the bevel (below) softens every
+// edge, and roughenMound breaks up the rest, so no arc math is needed here.
+function uFrameLoop(holeL: number, holeW: number, parapetW: number, frontZ: number): THREE.Vector2[] {
+  const hl = holeL / 2;
+  const hzRear = holeW / 2; // open rear end — flush with the hole's own rear edge
+  const hzFrontOuter = -frontZ + parapetW; // bulged front-outer depth
+  // uFrameGeo's geo.rotateX(-Math.PI / 2) (below) negates this shape's own Y axis when it maps
+  // it to world Z (the extrude's Z becomes world Y/height; this shape's Y becomes world -Z) — so
+  // every Z-like coordinate here is entered NEGATED, or the bulge would land at the rear (open,
+  // friendly side) instead of the front (aperture, enemy side). Caught by comparing the built
+  // mesh's world bounding box against hand-derived front/rear Z values — they came out mirrored.
+  return [
+    new THREE.Vector2(-hl, -hzRear), // rear-left-inner
+    new THREE.Vector2(-hl, -frontZ), // front-left-inner
+    new THREE.Vector2(hl, -frontZ), // front-right-inner
+    new THREE.Vector2(hl, -hzRear), // rear-right-inner
+    new THREE.Vector2(hl + parapetW, -hzRear), // rear-right-outer (jump)
+    new THREE.Vector2(hl + parapetW, hzFrontOuter), // front-right-outer
+    new THREE.Vector2(-hl - parapetW, hzFrontOuter), // front-left-outer
+    new THREE.Vector2(-hl - parapetW, -hzRear), // rear-left-outer (jump back to close)
+  ];
+}
+function uFrameGeo(x: number, z: number, holeL: number, holeW: number, parapetW: number, frontZ: number, height: number): THREE.ExtrudeGeometry {
+  const shape = new THREE.Shape(uFrameLoop(holeL, holeW, parapetW, frontZ));
+  // A real piled-dirt mound has no hard edge at all — its whole cross-section is a slope. The
+  // old 0.12 ft cap was imperceptible against a 3 ft-wide, ~1 ft-tall mound (read as a poured
+  // slab); bevelSize now scales with the mound's own thickness/height so the "flat top" all but
+  // disappears and the silhouette reads as sloped earth.
+  const bevelSize = Math.min(0.9, Math.max(0.08, parapetW * 0.45));
+  const bevelThickness = Math.min(height * 0.75, bevelSize);
   const geo = new THREE.ExtrudeGeometry(shape, {
-    depth: height, bevelEnabled: true, bevelThickness, bevelSize, bevelSegments: 3, curveSegments: 12,
+    depth: height, bevelEnabled: true, bevelThickness, bevelSize, bevelSegments: 5, curveSegments: 1,
   });
   geo.rotateX(-Math.PI / 2); // extrude was along +Z; lay it flat so it extrudes along +Y (up)
   geo.translate(x, 0, z);
+  roughenMound(geo, 0.12);
   return geo;
 }
-function buildFrame(group: THREE.Group, x: number, z: number, outerL: number, outerW: number, holeL: number, holeW: number, height: number, colorHex: number, map?: THREE.Texture): void {
+function buildUFrame(group: THREE.Group, x: number, z: number, holeL: number, holeW: number, parapetW: number, frontZ: number, height: number, colorHex: number, map?: THREE.Texture): void {
   const mat = new THREE.MeshToonMaterial({ color: colorHex, gradientMap: toonGradient(), ...(map ? { map } : {}) });
-  const mesh = new THREE.Mesh(frameGeo(x, z, outerL, outerW, holeL, holeW, height), mat);
+  const mesh = new THREE.Mesh(uFrameGeo(x, z, holeL, holeW, parapetW, frontZ, height), mat);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   // Hairline-expanded outline, not a uniform scale — same rationale as buildRing's (a uniformly
-  // scaled wide flat annulus inflates radially AND downward into a fat black skirt at the base).
+  // scaled wide flat mound inflates radially AND downward into a fat black skirt at the base).
+  // Every OUTER-facing edge (both flanks, the front, the two rear open ends) pushes out;
+  // hole-facing inner edges (left/right hole faces, the inner-front face against the sandbags)
+  // pull IN toward center — frontZ is negative, so "pull in" means LESS negative (+0.05).
   const outline = new THREE.Mesh(
-    frameGeo(x, z, outerL + 0.1, outerW + 0.1, Math.max(0.1, holeL - 0.1), Math.max(0.1, holeW - 0.1), height + 0.04),
+    uFrameGeo(x, z, Math.max(0.1, holeL - 0.1), holeW + 0.1, parapetW + 0.1, frontZ + 0.05, height + 0.04),
     new THREE.MeshBasicMaterial({ color: 0x16130d, side: THREE.BackSide }),
   );
   outline.position.y = -0.02;
+  outline.userData.isOutline = true;
   group.add(outline, mesh);
 }
 
@@ -619,6 +656,29 @@ function taperOuterFace(geometry: THREE.BufferGeometry, axis: 0 | 2, sign: 1 | -
     if (Math.sign(v) === sign) {
       const heightFrac = (pos.getY(i) - minY) / span; // 0 at bottom (unchanged), 1 at top
       pos.setComponent(i, axis, v + sign * amount * heightFrac);
+    }
+  }
+  pos.needsUpdate = true;
+  geometry.computeVertexNormals();
+}
+
+// A sheared top face for the vehicle access ramp: the top-face vertices tilt so the −z (deep)
+// edge drops `drop` feet below the +z (entry) edge — one continuous grade instead of a
+// staircase. Only the top face moves; the bottom and sides stay put, so the box remains a
+// simple watertight wedge. Same direct-vertex approach as taperOuterFace.
+function shearTopZ(geometry: THREE.BufferGeometry, drop: number): void {
+  const pos = geometry.getAttribute('position') as THREE.BufferAttribute;
+  let minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i); const z = pos.getZ(i);
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+    if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+  }
+  const zSpan = Math.max(1e-6, maxZ - minZ);
+  for (let i = 0; i < pos.count; i++) {
+    if (pos.getY(i) > maxY - 1e-4) {
+      const frac = (maxZ - pos.getZ(i)) / zSpan; // 0 at +z entry edge, 1 at −z deep edge
+      pos.setY(i, pos.getY(i) - drop * frac);
     }
   }
   pos.needsUpdate = true;
@@ -851,6 +911,8 @@ function buildPartInner(group: THREE.Group, part: Part3, bags: SandbagBatcher): 
         if ((part.role === 'bayWall' || part.role === 'earthParapet') && part.taperAmount) {
           taperOuterFace(geometry, part.taperAxis ?? 2, part.taperSign ?? 1, part.taperAmount);
         }
+        // The vehicle access ramp's floor is a sheared wedge (continuous grade, not steps).
+        if (part.shearDrop) shearTopZ(geometry, part.shearDrop);
         let map: THREE.Texture | undefined;
         let tint = ROLE_COLOR[part.role];
         if (part.role === 'bayWall' && part.finish === 'corrugated') {
@@ -860,16 +922,17 @@ function buildPartInner(group: THREE.Group, part: Part3, bags: SandbagBatcher): 
           tint = 0xffffff;
         } else if (
           part.role === 'ground' || part.role === 'bayFloor' || part.role === 'rampBerm' ||
-          part.role === 'earthParapet' || (part.role === 'bayWall' && part.finish === 'earth')
+          part.role === 'earthParapet' || part.role === 'entryStep' || (part.role === 'bayWall' && part.finish === 'earth')
         ) {
-          // Earth parapet = mounded dirt (spoil), same material as the ground/berm.
+          // Earth parapet = mounded dirt (spoil), same material as the ground/berm. Entry steps
+          // are cut earth too.
           map = dirtTexture();
         }
-        // Interior surfaces (bay walls/floors, ramp treads) skip the outline shell: they sit
-        // INSIDE an excavation against earth, so a silhouette shell only ever shows as stray
-        // black hairlines where their tops break grade at the hole mouth. Outlines are for
+        // Interior surfaces (bay walls/floors, ramp treads, entry steps) skip the outline shell:
+        // they sit INSIDE an excavation against earth, so a silhouette shell only ever shows as
+        // stray black hairlines where their tops break grade at the hole mouth. Outlines are for
         // free-standing silhouettes (parapets are bags, no shells; berms/covers keep theirs).
-        const interior = part.role === 'bayWall' || part.role === 'bayFloor' || part.role === 'sump';
+        const interior = part.role === 'bayWall' || part.role === 'bayFloor' || part.role === 'sump' || part.role === 'entryStep';
         const opts = part.role === 'camoNet' ? { opacity: 0.4 } : { ...(map ? { map } : {}), ...(interior ? { noOutline: true } : {}) };
         const wrapper = addToonMesh(group, geometry, tint, opts);
         wrapper.position.set(part.x, part.y, part.z);
@@ -899,13 +962,14 @@ function buildPartInner(group: THREE.Group, part: Part3, bags: SandbagBatcher): 
       break;
     }
     case 'ring': {
-      const map = part.role === 'earthParapet' ? dirtTexture() : undefined;
-      buildRing(group, part.x, part.z, part.outerR, part.innerR, part.height, ROLE_COLOR[part.role], map);
+      const isEarth = part.role === 'earthParapet';
+      const map = isEarth ? dirtTexture() : undefined;
+      buildRing(group, part.x, part.z, part.outerR, part.innerR, part.height, ROLE_COLOR[part.role], map, isEarth);
       break;
     }
     case 'frame': {
       const map = part.role === 'earthParapet' ? dirtTexture() : undefined;
-      buildFrame(group, part.x, part.z, part.outerL, part.outerW, part.holeL, part.holeW, part.height, ROLE_COLOR[part.role], map);
+      buildUFrame(group, part.x, part.z, part.holeL, part.holeW, part.parapetW, part.frontZ, part.height, ROLE_COLOR[part.role], map);
       break;
     }
     case 'wedge':
@@ -998,7 +1062,12 @@ export function createThreeViewer(): ThreeViewer {
   // Cool counter-light with NO shadows: on toon materials a rim like this pushes a band-step
   // highlight along silhouettes so the black outline shells read as deliberate ink.
   const rim = new THREE.DirectionalLight(0xffffff, 0.25);
-  scene.add(hemi, sun, ambient, rim);
+  // Section fill: OFF except in cutaway. The clip plane opens the model toward +z (the camera's
+  // default side), so nothing in the base rig lights the freshly-exposed interior faces — a
+  // cut position read as a black hollow. This warm, shadowless key shines from above-behind the
+  // camera INTO the opened half so the floor, walls, stringers and OHC underside are legible.
+  const sectionLight = new THREE.DirectionalLight(0xffe9cf, 0);
+  scene.add(hemi, sun, ambient, rim, sectionLight);
 
   // Sky dome + fog (engine/sky.ts) — a painted 3-stop backdrop, not a photo sky: real dioramas
   // sit in front of a lit painted backdrop, and a photo sky would make the toon geometry look
@@ -1010,6 +1079,11 @@ export function createThreeViewer(): ThreeViewer {
   // tiered by device. 'low' falls back to the plain renderer path (current behavior).
   const pipeline = createPipeline(renderer, scene, camera, detectTier());
 
+  // Cutaway state: read by applyLightRig (ambient bump + section fill) and set by applyCutaway.
+  // applyCutaway runs first in update(), then applyLightRig, so the flag is current when the rig
+  // reads it. Toggling Cutaway re-runs update() → both, so the section fill tracks the button.
+  let cutawayOn = false;
+
   function applyLightRig(size: number): void {
     const L = activePalette.light;
     hemi.color.set(L.hemiSky);
@@ -1018,10 +1092,17 @@ export function createThreeViewer(): ThreeViewer {
     sun.color.set(L.sunColor);
     sun.intensity = L.sunIntensity;
     sun.position.set(L.sunFrom[0] * size * 1.6, L.sunFrom[1] * size * 1.6, L.sunFrom[2] * size * 1.6);
-    ambient.intensity = L.ambientIntensity;
+    // Cutaway lifts the ambient floor a step so the exposed interior never crushes to black.
+    ambient.intensity = L.ambientIntensity + (cutawayOn ? 0.14 : 0);
     rim.color.set(L.rimColor);
     rim.intensity = L.rimIntensity;
     rim.position.set(L.rimFrom[0] * size * 1.6, L.rimFrom[1] * size * 1.6, L.rimFrom[2] * size * 1.6);
+    // Section fill aims from above and BEHIND the camera's default +z vantage, straight into the
+    // opened half. Warm in day, cooler moonlight at night (tied to the key color). Only lit when
+    // a section is open.
+    sectionLight.color.set(L.sunColor);
+    sectionLight.intensity = cutawayOn ? 0.85 : 0;
+    sectionLight.position.set(size * 0.35, size * 1.0, size * 1.5);
     // Fit the shadow frustum to the model, not a fixed box — too big wastes map resolution
     // (blocky shadows), too small clips them.
     const ext = size * 0.85;
@@ -1107,16 +1188,35 @@ export function createThreeViewer(): ThreeViewer {
   }
 
   // Apply the cutaway clip to every material in the parts + terrain groups (after each rebuild).
+  // Three coupled changes make a section read as SOLID rather than a black hollow:
+  //   1. clip the near half (the plane) — the actual cut;
+  //   2. double-side the lit toon materials so a clipped box shows its interior back-faces as
+  //      solid shaded earth instead of see-through nothing (terrain is already DoubleSide);
+  //   3. hide the black BackSide outline shells — their interiors face the camera through every
+  //      cut and would ink whole regions solid black.
+  // Materials + outlines are rebuilt every update() and this runs every update(), so there is no
+  // restore bookkeeping: when `on` is false we simply set FrontSide / visible again.
   function applyCutaway(on: boolean): void {
+    cutawayOn = on;
     const planes = on ? [cutPlane] : [];
-    for (const root of [partsGroup, terrainGroup]) {
-      root.traverse((child) => {
-        if (child instanceof THREE.Mesh) {
-          const mats = Array.isArray(child.material) ? child.material : [child.material];
-          for (const m of mats) if (m) m.clippingPlanes = planes;
-        }
-      });
-    }
+    // Parts: clip + double-side the lit toon materials + hide the black outline shells.
+    partsGroup.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      if (child.userData.isOutline) { child.visible = !on; return; }
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      for (const m of mats) {
+        if (!m) continue;
+        m.clippingPlanes = planes;
+        if (m instanceof THREE.MeshToonMaterial) m.side = on ? THREE.DoubleSide : THREE.FrontSide;
+      }
+    });
+    // Terrain: clip only — its materials are ALREADY DoubleSide by contract (a single-sided
+    // shell reads as paper-thin over a void), so leave `side` untouched.
+    terrainGroup.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return;
+      const mats = Array.isArray(child.material) ? child.material : [child.material];
+      for (const m of mats) if (m) m.clippingPlanes = planes;
+    });
   }
 
   // Theme boot: paint the sky, aim the lights, set fog + exposure for the default day look.
@@ -1228,13 +1328,17 @@ export function createThreeViewer(): ThreeViewer {
       if (useTerrain && model.terrain) {
         const spec = opts.stage !== undefined && opts.stage < 1 ? { ...model.terrain, holes: [] } : model.terrain;
         const scatter = pipeline.tier === 'high';
-        const key = JSON.stringify(spec) + '|' + theme + '|' + scatter + '|' + result.inputs.soil;
+        // While a cutaway is open, extrude the crust as a solid block down past the deepest hole
+        // so the clipped section reads as full-height solid earth (see buildTerrain's sectionDepth).
+        const maxHole = spec.holes.reduce((m, h) => Math.max(m, h.depth), 0);
+        const sectionDepth = model.cutaway && maxHole > 0.8 ? maxHole + 1.5 : undefined;
+        const key = JSON.stringify(spec) + '|' + theme + '|' + scatter + '|' + result.inputs.soil + '|sec' + (sectionDepth ?? 0);
         if (key !== terrainKey) {
           terrainKey = key;
           terrainDispose?.();
           disposeObject(terrainGroup);
           terrainGroup.clear();
-          const t = buildTerrain(spec, activePalette, { scatter });
+          const t = buildTerrain(spec, activePalette, { scatter, sectionDepth });
           terrainDispose = t.dispose;
           terrainGroup.add(t.group);
         }

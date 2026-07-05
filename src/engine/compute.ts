@@ -243,8 +243,12 @@ function computeCalc(raw: Inputs): Calc {
   // count; a 'berm' (vehicle) bills none. The parapet's protective mass is charged to spoil
   // for every mode via fillDemand below — the earlier model double-counted it as ~190 bags.
   const parapetMode = parapetModeFor(position);
-  const restsPerPosition = position.sectorsOfFire ? (position.crewSize >= 2 ? 2 : 1) : 0;
-  const bagsAperture = ceilInt(restsPerPosition * sandbag.bagsPerRest.value * waste);
+  // ONE continuous front sandbag course spanning the full frontage, 2 bags deep, at doctrine
+  // height (ATP 3-21.8 §5-238) — not a handful of discrete "rests." Only a real firing position
+  // gets one (sectorsOfFire); mortar pits (different shape branch) and connecting trenches have
+  // no directional aperture to rest a weapon on.
+  const frontRestVol = position.sectorsOfFire ? holeL * (2 * sandbag.W.value) * sandbag.frontWallHeight.value : 0;
+  const bagsAperture = ceilInt((frontRestVol / bagVol) * waste);
   const bagsParapet =
     parapetMode === 'berm' ? 0 :
     parapetMode === 'sandbag' ? ceilInt((parapetRing / bagVol) * waste) :

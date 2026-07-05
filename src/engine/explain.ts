@@ -146,10 +146,13 @@ export function buildDerivations(calc: Calc): Derivation[] {
           }
         : {
             key: 'sandbagsParapet',
-            label: 'Sandbags — firing rest',
-            formula: 'ceil(restsPerPosition × bagsPerRest × wasteFactor)',
+            label: 'Sandbags — front firing rest',
+            formula: 'ceil(frontage × 2×bagWidth × restHeight ÷ bagVolume × wasteFactor)',
             operands: [
-              op('bagsPerRest', sandbag.bagsPerRest.value, 'ea', sandbag.bagsPerRest),
+              op('frontage', calc.holeL, 'ft'),
+              op('bagWidth', sandbag.W.value, 'ft', sandbag.W),
+              op('restHeight', sandbag.frontWallHeight.value, 'ft', sandbag.frontWallHeight),
+              op('bagVolume', calc.bagVol, 'ft³', sandbag.L),
               op('wasteFactor', calc.waste, '×', sandbag.wasteFactor),
             ],
             result: calc.bagsParapet,

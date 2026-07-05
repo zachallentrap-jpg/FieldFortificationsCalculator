@@ -204,9 +204,16 @@ function strataUv(uv: THREE.BufferAttribute, i: number, x: number, y: number, z:
   uv.setXY(i, (x + z) * 0.12, -y / STRATA_BAND_FT);
 }
 
-export function buildTerrain(spec: TerrainSpec, p: Palette, opts: { scatter: boolean }): TerrainBuild {
+// sectionDepth (set only while the cutaway is open): extrude the crust as a SOLID block to this
+// depth instead of a thin CRUST_FT shell, so the clipped section face reads as full-height solid
+// earth (grass line down to below the floor) rather than a thin lid over a hollow. The excavation
+// holes still punch through; their sub-floor pocket is filled by an extended floor plug (below),
+// and the descending tube shells are skipped (redundant inside a solid block).
+export function buildTerrain(spec: TerrainSpec, p: Palette, opts: { scatter: boolean; sectionDepth?: number }): TerrainBuild {
   const group = new THREE.Group();
   const o = spec.outer;
+  const section = opts.sectionDepth !== undefined && opts.sectionDepth > CRUST_FT;
+  const blockDepth = section ? opts.sectionDepth! : CRUST_FT;
   const perSceneGeos: THREE.BufferGeometry[] = [];
 
   // Winding contract: outer CCW, every hole CW (opposite), enforced via isClockWise — see the
@@ -217,8 +224,9 @@ export function buildTerrain(spec: TerrainSpec, p: Palette, opts: { scatter: boo
   }
 
   // curveSegments is inert for these pre-sampled straight-segment contours; kept at the spec'd
-  // value in case a future contour ever carries real curves.
-  const geo = new THREE.ExtrudeGeometry(shape, { depth: CRUST_FT, bevelEnabled: false, curveSegments: 24 });
+  // value in case a future contour ever carries real curves. Depth is CRUST_FT normally, or the
+  // full section depth while a cutaway is open (see sectionDepth above).
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: blockDepth, bevelEnabled: false, curveSegments: 24 });
   perSceneGeos.push(geo);
 
   // rotateX(π/2) sends local (x, y, z) → world (x, −z, y): the z=0 cap (normal −z) becomes the
@@ -295,18 +303,28 @@ export function buildTerrain(spec: TerrainSpec, p: Palette, opts: { scatter: boo
     if (h.depth <= CRUST_FT + 0.05) continue;
     const outerPts = offsetContour(h, SHELL_FT);
     if (!outerPts) continue; // non-rectilinear poly (no producer today) — skip, never guess
-    const tubeShape = new THREE.Shape(oriented(outerPts.map((v) => v.clone()), false));
-    tubeShape.holes.push(new THREE.Path(oriented(holeContour(h), true)));
-    const tubeGeo = new THREE.ExtrudeGeometry(tubeShape, { depth: h.depth - CRUST_FT, bevelEnabled: false, curveSegments: 24 });
-    tubeGeo.rotateX(Math.PI / 2);
-    tubeGeo.translate(0, -CRUST_FT, 0);
-    // 0.7 ft thick: deep enough to swallow the grenade-sump cylinders that hang 0.6 ft below
-    // the bay floor, so nothing pokes out of the plug's underside at low view angles.
+    const shellGeos: THREE.ExtrudeGeometry[] = [];
+    // In section mode the crust IS the solid block — the descending tube shell would sit inside
+    // it and z-fight, so skip it and rely on the block's own cut faces for the strata read.
+    if (!section) {
+      const tubeShape = new THREE.Shape(oriented(outerPts.map((v) => v.clone()), false));
+      tubeShape.holes.push(new THREE.Path(oriented(holeContour(h), true)));
+      const tubeGeo = new THREE.ExtrudeGeometry(tubeShape, { depth: h.depth - CRUST_FT, bevelEnabled: false, curveSegments: 24 });
+      tubeGeo.rotateX(Math.PI / 2);
+      tubeGeo.translate(0, -CRUST_FT, 0);
+      shellGeos.push(tubeGeo);
+    }
+    // Floor plug closes the hole bottom. Normally 0.7 ft thick — deep enough to swallow the
+    // grenade-sump cylinders that hang 0.6 ft below the bay floor. In section mode it extends all
+    // the way to the block bottom so the sub-floor pocket is solid earth, not a hollow under the
+    // cut floor.
+    const plugThick = section ? Math.max(0.7, blockDepth - h.depth) : 0.7;
     const floorShape = new THREE.Shape(oriented(outerPts.map((v) => v.clone()), false));
-    const floorGeo = new THREE.ExtrudeGeometry(floorShape, { depth: 0.7, bevelEnabled: false, curveSegments: 24 });
+    const floorGeo = new THREE.ExtrudeGeometry(floorShape, { depth: plugThick, bevelEnabled: false, curveSegments: 24 });
     floorGeo.rotateX(Math.PI / 2);
     floorGeo.translate(0, -h.depth, 0);
-    for (const sg of [tubeGeo, floorGeo]) {
+    shellGeos.push(floorGeo);
+    for (const sg of shellGeos) {
       perSceneGeos.push(sg);
       const sPos = sg.getAttribute('position') as THREE.BufferAttribute;
       const sUv = sg.getAttribute('uv') as THREE.BufferAttribute;

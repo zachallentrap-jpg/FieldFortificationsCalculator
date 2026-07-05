@@ -82,9 +82,10 @@ const DAY: Palette = {
     stringer: 0x6b5138,
     platform: 0x6b5138,
     firingStep: 0x6b5138,
+    entryStep: 0x8a6a48, // cut-earth steps — same dirt tone as the bay wall
     sump: 0x241b12,
     camoNet: 0x55694a,
-    rampBerm: 0xbfa87c,
+    rampBerm: 0xa2805a, // flattened spoil — dirt-brown, not the tan sandbag/plank tone
   },
   grass: { base: '#86A05C', dark: '#6E8A4C', light: '#9AB36E', dry: '#A39A66' },
   wornRing: '#9A7B50',
@@ -139,9 +140,10 @@ const NIGHT: Palette = {
     stringer: 0x52493c,
     platform: 0x52493c,
     firingStep: 0x52493c,
+    entryStep: 0x6e6456, // cut-earth steps — night dirt tone
     sump: 0x241c12,
     camoNet: 0x46554a,
-    rampBerm: 0x8a8272,
+    rampBerm: 0x6e6456, // flattened spoil — dirt-brown, matches the night earth parapet
   },
   grass: { base: '#54645A', dark: '#46544C', light: '#66786A', dry: '#5E5B4A' },
   wornRing: '#75665A',

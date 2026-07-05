@@ -161,6 +161,9 @@ function openCompare(): void {
   showOverlay(compareOverlay(results));
 }
 function openPlan(): void {
+  // Reopening must reflect CURRENT inputs, not the position lastPlan was computed for —
+  // otherwise the table shows elapsed-hours for a threat/soil the user has since changed.
+  if (lastPlan) lastPlan = planForTime({ availableHours: planHours, teamSize: planTeam, base: store.getState().inputs });
   showOverlay(planOverlay(lastPlan, planHours, planTeam));
 }
 

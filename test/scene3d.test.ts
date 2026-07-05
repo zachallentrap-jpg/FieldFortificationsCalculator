@@ -145,6 +145,42 @@ test('a revetted wall never tapers, regardless of how steep the soil would other
   for (const w of walls) assert.equal((w as { taperAmount?: number }).taperAmount, undefined);
 });
 
+test('a deep walk-in position gets a graded entry stair; a tight fighting hole does not', () => {
+  // Regression guard for R6. The bunker is deep AND roomy front-to-back (8 ft) → walk-in stair.
+  const deep = buildScene3D(compute(defaultInputs({ positionType: 'bunker_op_cp' })));
+  const steps = deep.parts.filter((p) => p.kind === 'box' && p.role === 'entryStep') as Array<{ y: number; h: number; z: number }>;
+  assert.ok(steps.length >= 2, 'a deep walk-in cut has ≥2 entry steps');
+  for (const s of steps) {
+    assert.ok(s.y + s.h / 2 < 0, 'every step top is below grade');
+    assert.ok(s.z > 0, 'entry steps sit at the rear (+z), the entrance side');
+  }
+  // A 2-ft-deep (front-to-back) fighting hole is a drop-in — a staircase would eat the whole
+  // floor, so it gets none.
+  const tight = buildScene3D(compute(defaultInputs({ positionType: 'two_man', revetment: 'none' })));
+  assert.equal(tight.parts.filter((p) => p.kind === 'box' && p.role === 'entryStep').length, 0, 'a tight fighting hole has no entry steps');
+  // Entry steps are a deliberate-stage feature (stage 2): absent during the hasty scrape.
+  const hasty = buildScene3D(compute(defaultInputs({ positionType: 'bunker_op_cp' })), { stage: 1 });
+  assert.equal(hasty.parts.filter((p) => p.kind === 'box' && p.role === 'entryStep').length, 0, 'no entry steps at the hasty stage');
+});
+
+test('the vehicle position is a graded ramp into a level pan, not a staircase', () => {
+  // Regression guard for R7: the floor is exactly two boxes — one sheared ramp + one flat pan.
+  const scene = buildScene3D(compute(defaultInputs({ positionType: 'vehicle_hull_defilade' })));
+  const floors = scene.parts.filter((p) => p.kind === 'box' && p.role === 'bayFloor') as Array<{ shearDrop?: number }>;
+  assert.equal(floors.length, 2, 'exactly two floor parts: one graded ramp + one level pan');
+  const ramps = floors.filter((f) => (f.shearDrop ?? 0) > 0);
+  assert.equal(ramps.length, 1, 'exactly one sheared ramp with a real grade');
+});
+
+test('the L-shape scale figure stands clear of the +x crew arm (on the −x side)', () => {
+  // Regression guard for R9: fifty_cal / atgm_javelin dig a +x arm, so the figure moves to −x.
+  for (const positionType of ['fifty_cal', 'atgm_javelin']) {
+    const scene = buildScene3D(compute(defaultInputs({ positionType })));
+    const fig = scene.parts.find((p) => p.kind === 'figure') as { x: number } | undefined;
+    assert.ok(fig && fig.x < 0, positionType + ' figure is on the clear −x side');
+  }
+});
+
 test('empty config (degenerate hole) reports hasAnything:false with no parts', () => {
   // Force a degenerate geometry the same way render/geometry.ts would flag as nothing-to-draw.
   const r = compute(defaultInputs());

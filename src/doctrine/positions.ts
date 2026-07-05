@@ -72,7 +72,11 @@ export const positions: Record<string, PositionRow> = {
     label: 'One-man fighting position',
     shape: 'rect',
     volumeModel: 'prism',
-    hole: { L: ft(4.0, 'frontage (illustrative)'), W: ft(2.0, 'front-to-back'), D: ft(4.0, 'armpit-deep') },
+    // Front-to-back (W) is doctrinally LONGER than frontage (L), not the reverse: a narrow
+    // frontage keeps the silhouette small toward the enemy, while the extra front-to-back room
+    // lets the soldier move/duck back and fit prone — the position is a slot facing the enemy,
+    // not a wide box. (The previous L=4/W=2 had this backwards.)
+    hole: { L: ft(2.5, 'frontage (illustrative)'), W: ft(4.0, 'front-to-back'), D: ft(4.0, 'armpit-deep') },
     grenadeSumps: 1,
     elbowHoles: 2,
     storageCompartment: false,
