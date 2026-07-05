@@ -138,6 +138,23 @@ test('earth-mode rect-family positions get ONE continuous frame part, not 4 sepa
   assert.ok(bunker.parts.filter((p) => p.kind === 'box' && p.role === 'parapet').length >= 4, 'bunker keeps its sandbag box ring');
 });
 
+test('firing positions close the parapet on all four sides; a connecting trench stays open (task #26, ATP 3-21.8)', () => {
+  // ATP 3-21.8 specifies front, flank, AND rear retaining walls — no primary source (Army or
+  // USMC) was found describing an intentionally open rear. A connecting trench is the exception:
+  // it has no directional aperture because it IS the through-corridor doctrine routes movement
+  // through, so walling its rear would block its own purpose.
+  for (const positionType of ['one_man', 'two_man', 'mg_crew', 'fifty_cal', 'atgm_javelin']) {
+    const r = compute(defaultInputs({ positionType, revetment: 'none' }));
+    const frame = buildScene3D(r).parts.find((p) => p.kind === 'frame' && p.role === 'earthParapet') as { closedRear: boolean } | undefined;
+    assert.ok(frame, positionType + ' has an earth parapet frame');
+    assert.equal(frame!.closedRear, true, positionType + ' closes the rear per ATP 3-21.8');
+  }
+  const trench = buildScene3D(compute(defaultInputs({ positionType: 'connecting_trench', revetment: 'none' })));
+  const trenchFrame = trench.parts.find((p) => p.kind === 'frame' && p.role === 'earthParapet') as { closedRear: boolean } | undefined;
+  assert.ok(trenchFrame, 'connecting trench has an earth parapet frame');
+  assert.equal(trenchFrame!.closedRear, false, 'a connecting trench stays open — it is the through-corridor, not a self-contained position');
+});
+
 test('a revetted wall never tapers, regardless of how steep the soil would otherwise require', () => {
   const r = compute(defaultInputs({ soil: 'sand', revetment: 'sandbag_facing' }));
   const scene = buildScene3D(r);

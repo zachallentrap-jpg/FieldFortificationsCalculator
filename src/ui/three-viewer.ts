@@ -572,14 +572,25 @@ function roughenMound(geo: THREE.BufferGeometry, amp: number): void {
   geo.computeVertexNormals();
 }
 
-// The U-shaped earth parapet: a single simple (non-self-intersecting) 8-point polygon tracing
+// The earth parapet's plan shape. Two variants, selected by `closedRear`:
+//
+// OPEN (connecting trench only): a single simple (non-self-intersecting) 8-point polygon tracing
 // dirt piled on the front and both flanks, with the REAR left completely open — no hole, no
 // second contour, just one "staple"/parenthesis outline. Points go: down the inner-left face,
 // across the inner-front face, up the inner-right face, jump OUT at the open rear end of the
 // right arm, down the outer-right face (continuing past the hole's front line to the bulged
 // front-outer depth), across the outer-front face, up the outer-left face, jump back IN at the
-// open rear end of the left arm. Corners stay rectilinear — the bevel (below) softens every
-// edge, and roughenMound breaks up the rest, so no arc math is needed here.
+// open rear end of the left arm.
+//
+// CLOSED (every position with a firing aperture): ATP 3-21.8 specifies front, flank, AND rear
+// retaining walls — doctrine research found no primary source for an intentionally open rear
+// (movement between positions is via connecting trenches, not a gap in the parapet). This is a
+// true ring: an outer rectangle contour plus an inner hole contour (the hole's own footprint,
+// inset at the front by the sandbag rest's depth same as the open case). THREE.Shape requires a
+// hole to be wound OPPOSITE the outer contour to subtract correctly — outer is CCW, hole is CW.
+//
+// Both variants keep corners rectilinear — the bevel (below) softens every edge, and
+// roughenMound breaks up the rest, so no arc math is needed here.
 function uFrameLoop(holeL: number, holeW: number, parapetW: number, frontZ: number): THREE.Vector2[] {
   const hl = holeL / 2;
   const hzRear = holeW / 2; // open rear end — flush with the hole's own rear edge
@@ -600,8 +611,38 @@ function uFrameLoop(holeL: number, holeW: number, parapetW: number, frontZ: numb
     new THREE.Vector2(-hl - parapetW, -hzRear), // rear-left-outer (jump back to close)
   ];
 }
-function uFrameGeo(x: number, z: number, holeL: number, holeW: number, parapetW: number, frontZ: number, height: number): THREE.ExtrudeGeometry {
-  const shape = new THREE.Shape(uFrameLoop(holeL, holeW, parapetW, frontZ));
+function closedFrameLoops(holeL: number, holeW: number, parapetW: number, frontZ: number): { outer: THREE.Vector2[]; hole: THREE.Vector2[] } {
+  const hl = holeL / 2;
+  const hzRear = holeW / 2;
+  const hzFrontOuter = -frontZ + parapetW; // same bulged front-outer depth as the open shape
+  const ohw = hl + parapetW;
+  const rearOuter = -(hzRear + parapetW); // rear now bulges outward by parapetW too, closing the ring
+  return {
+    outer: [
+      // CCW in shape space (same Y-negation convention as uFrameLoop, see its comment).
+      new THREE.Vector2(-ohw, rearOuter),
+      new THREE.Vector2(ohw, rearOuter),
+      new THREE.Vector2(ohw, hzFrontOuter),
+      new THREE.Vector2(-ohw, hzFrontOuter),
+    ],
+    hole: [
+      // CW (opposite the outer contour) — required by THREE.Shape for the hole to subtract.
+      new THREE.Vector2(-hl, -hzRear),
+      new THREE.Vector2(-hl, -frontZ),
+      new THREE.Vector2(hl, -frontZ),
+      new THREE.Vector2(hl, -hzRear),
+    ],
+  };
+}
+function uFrameGeo(x: number, z: number, holeL: number, holeW: number, parapetW: number, frontZ: number, height: number, closedRear: boolean): THREE.ExtrudeGeometry {
+  let shape: THREE.Shape;
+  if (closedRear) {
+    const { outer, hole } = closedFrameLoops(holeL, holeW, parapetW, frontZ);
+    shape = new THREE.Shape(outer);
+    shape.holes.push(new THREE.Path(hole));
+  } else {
+    shape = new THREE.Shape(uFrameLoop(holeL, holeW, parapetW, frontZ));
+  }
   // A real piled-dirt mound has no hard edge at all — its whole cross-section is a slope. The
   // old 0.12 ft cap was imperceptible against a 3 ft-wide, ~1 ft-tall mound (read as a poured
   // slab); bevelSize now scales with the mound's own thickness/height so the "flat top" all but
@@ -616,18 +657,19 @@ function uFrameGeo(x: number, z: number, holeL: number, holeW: number, parapetW:
   roughenMound(geo, 0.12);
   return geo;
 }
-function buildUFrame(group: THREE.Group, x: number, z: number, holeL: number, holeW: number, parapetW: number, frontZ: number, height: number, colorHex: number, map?: THREE.Texture): void {
+function buildUFrame(group: THREE.Group, x: number, z: number, holeL: number, holeW: number, parapetW: number, frontZ: number, height: number, closedRear: boolean, colorHex: number, map?: THREE.Texture): void {
   const mat = new THREE.MeshToonMaterial({ color: colorHex, gradientMap: toonGradient(), ...(map ? { map } : {}) });
-  const mesh = new THREE.Mesh(uFrameGeo(x, z, holeL, holeW, parapetW, frontZ, height), mat);
+  const mesh = new THREE.Mesh(uFrameGeo(x, z, holeL, holeW, parapetW, frontZ, height, closedRear), mat);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   // Hairline-expanded outline, not a uniform scale — same rationale as buildRing's (a uniformly
   // scaled wide flat mound inflates radially AND downward into a fat black skirt at the base).
-  // Every OUTER-facing edge (both flanks, the front, the two rear open ends) pushes out;
-  // hole-facing inner edges (left/right hole faces, the inner-front face against the sandbags)
-  // pull IN toward center — frontZ is negative, so "pull in" means LESS negative (+0.05).
+  // Every OUTER-facing edge (both flanks, the front, and the rear — open ends when !closedRear,
+  // the rear wall's own outer face when closedRear) pushes out; hole-facing inner edges
+  // (left/right hole faces, the inner-front face against the sandbags) pull IN toward center —
+  // frontZ is negative, so "pull in" means LESS negative (+0.05).
   const outline = new THREE.Mesh(
-    uFrameGeo(x, z, Math.max(0.1, holeL - 0.1), holeW + 0.1, parapetW + 0.1, frontZ + 0.05, height + 0.04),
+    uFrameGeo(x, z, Math.max(0.1, holeL - 0.1), holeW + 0.1, parapetW + 0.1, frontZ + 0.05, height + 0.04, closedRear),
     new THREE.MeshBasicMaterial({ color: 0x16130d, side: THREE.BackSide }),
   );
   outline.position.y = -0.02;
@@ -969,7 +1011,7 @@ function buildPartInner(group: THREE.Group, part: Part3, bags: SandbagBatcher): 
     }
     case 'frame': {
       const map = part.role === 'earthParapet' ? dirtTexture() : undefined;
-      buildUFrame(group, part.x, part.z, part.holeL, part.holeW, part.parapetW, part.frontZ, part.height, ROLE_COLOR[part.role], map);
+      buildUFrame(group, part.x, part.z, part.holeL, part.holeW, part.parapetW, part.frontZ, part.height, part.closedRear, ROLE_COLOR[part.role], map);
       break;
     }
     case 'wedge':

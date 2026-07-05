@@ -60,20 +60,26 @@ export interface Ring3 {
   role: BoxRole;
 }
 export interface Frame3 {
-  // A smooth rounded, beveled, single-piece MOUNDED berm shaped like a U: dirt piled on the
-  // front and both flanks, the REAR left with NO parapet at all — a fighting position's rear is
-  // always a clear escape/resupply lane, never berm'd shut (research-verified; replaces both
-  // the earlier closed 4-box ring AND a later closed rounded-annulus version, neither of which
-  // matched real construction). `frontZ` is the U's inner-front boundary: set back from the
-  // hole's own front edge by the front sandbag rest's depth (see pushFrontSandbagRest), so the
-  // dirt mass starts right behind those bags instead of overlapping them — 0 when there's no
-  // rest (a connecting trench has no directional aperture to rest a weapon on).
+  // A smooth rounded, beveled, single-piece MOUNDED berm around the fighting hole. `frontZ` is
+  // the inner-front boundary: set back from the hole's own front edge by the front sandbag
+  // rest's depth (see pushFrontSandbagRest), so the dirt mass starts right behind those bags
+  // instead of overlapping them — 0 when there's no rest.
+  //
+  // closedRear: ATP 3-21.8 specifies a REAR retaining wall too ("at least 10 inches high"),
+  // alongside front and flank walls — doctrine research (this project's task #26) found no
+  // Army or USMC primary source describing an intentionally open/unwalled rear; inter-position
+  // movement is via connecting trenches, not a gap in the parapet. So every position WITH a
+  // firing aperture gets a fully closed ring. A connecting trench itself is the exception: it
+  // has no directional aperture (sectorsOfFire false) because it IS the through-corridor
+  // doctrine routes movement through — walling its rear would block its own purpose, so it
+  // keeps the open-ended, flush-mound shape.
   kind: 'frame';
   x: number; z: number; // center
   holeL: number; holeW: number; // inner hole footprint (matches the excavation exactly)
-  parapetW: number; // the mound's own thickness, front + both flanks
+  parapetW: number; // the mound's own thickness, front + both flanks (+ rear when closedRear)
   frontZ: number; // inner-front boundary, negative, at or forward of −holeW/2
   height: number;
+  closedRear: boolean;
   role: BoxRole;
 }
 export interface Wedge3 {
@@ -205,7 +211,13 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
   let terrainOuter = { x: 0, z: 0, w: 20, d: 20 };
   const halfL = p.holeL / 2;
   const halfW = p.holeW / 2;
-  const wallT = Math.max(0.3, p.parapetW * 0.35); // visual wall thickness for the excavation sides
+  // Visual wall thickness for the excavation sides. Capped at a fraction of the hole's OWN
+  // smallest dimension — uncapped, this ate the entire floor on compact positions (a one-man's
+  // 2.5 ft frontage left just 0.4 ft of clear floor between the two side walls: the parapet
+  // mound and the excavation walls share the same earth finish/color, so from above it read as
+  // "the parapet swallows the hole"). 0.2× keeps ≥60% of the smallest span open on every
+  // position, from the one-man's 2.5 ft frontage up to the bunker's 8 ft.
+  const wallT = Math.min(Math.max(0.3, p.parapetW * 0.35), Math.max(0.15, Math.min(p.holeL, p.holeW) * 0.2));
 
   const finish = wallFinishFor(result);
   const soilRow = soils[result.inputs.soil];
@@ -330,10 +342,11 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     const entranceGap = isAtgm ? p.holeL * 0.85 : Math.min(3, p.holeL * 0.4);
     pushGroundFrame(parts, 0, 0, p.outerL + 4, p.outerW + 4, p.holeL, p.holeW);
     if (ringMode === 'earth') {
-      // A U, not a ring: dirt piled on the front and both flanks, ONE continuous mounded piece
-      // (rounded, beveled cross-section — not 4 flat-topped boxes meeting at hard square seams).
-      // The REAR is left with NO parapet at all — a fighting position's rear is always a clear
-      // escape/resupply lane, never berm'd shut.
+      // One continuous mounded piece (rounded, beveled cross-section — not 4 flat-topped boxes
+      // meeting at hard square seams), closed on all four sides per ATP 3-21.8 (front, flank,
+      // AND rear retaining walls) for any position with a firing aperture. A connecting trench
+      // is the one exception — it has no aperture because it IS the through-corridor doctrine
+      // routes movement through, so it keeps an open-ended mound instead of walling itself shut.
       //
       // A real firing position (sectorsOfFire) gets the ONLY concentrated sandbag on the whole
       // parapet: one course across the full frontage, 2 bags deep, right at the hole's edge —
@@ -349,6 +362,7 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
         kind: 'frame', x: 0, z: 0,
         holeL: p.holeL, holeW: p.holeW, parapetW: p.parapetW, height: moundH, role: 'earthParapet',
         frontZ: -(p.holeW / 2 + bagDepth),
+        closedRear: hasAperture,
       });
       if (hasAperture) pushFrontSandbagRest(parts, p.holeL, p.holeW);
     } else {
