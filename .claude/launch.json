@@ -8,9 +8,9 @@
         "run",
         "dev",
         "--",
-        "--host",
         "--port",
-        "5173"
+        "5173",
+        "--strictPort"
       ],
       "port": 5173
     },
@@ -21,7 +21,6 @@
         "run",
         "dev",
         "--",
-        "--host",
         "--port",
         "5183",
         "--strictPort"
@@ -35,7 +34,6 @@
         "run",
         "dev",
         "--",
-        "--host",
         "--port",
         "5179",
         "--strictPort"
@@ -49,7 +47,6 @@
         "run",
         "dev",
         "--",
-        "--host",
         "--port",
         "5197",
         "--strictPort"
@@ -63,7 +60,6 @@
         "run",
         "dev",
         "--",
-        "--host",
         "--port",
         "5277",
         "--strictPort"
@@ -91,7 +87,6 @@
         "run",
         "dev",
         "--",
-        "--host",
         "--port",
         "5289",
         "--strictPort"
@@ -105,7 +100,6 @@
         "run",
         "dev",
         "--",
-        "--host",
         "--port",
         "5271",
         "--strictPort"
@@ -119,12 +113,37 @@
         "run",
         "dev",
         "--",
-        "--host",
         "--port",
         "5211",
         "--strictPort"
       ],
       "port": 5211
+    },
+    {
+      "name": "plan2d",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5361",
+        "--strictPort"
+      ],
+      "port": 5361
+    },
+    {
+      "name": "realism2",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5331",
+        "--strictPort"
+      ],
+      "port": 5331
     },
     {
       "name": "3dfixes",
@@ -133,7 +152,6 @@
         "run",
         "dev",
         "--",
-        "--host",
         "--port",
         "5307",
         "--strictPort"
@@ -147,12 +165,25 @@
         "run",
         "dev",
         "--",
-        "--host",
         "--port",
         "5261",
         "--strictPort"
       ],
       "port": 5261
+    },
+    {
+      "name": "commandhub-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/zacharytraphagen/CommandHub-Led", "start"],
+      "port": 7813,
+      "env": { "PORT": "7813" }
+    },
+    {
+      "name": "commandhub-verify2",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "/Users/zacharytraphagen/CommandHub-Led", "start"],
+      "port": 7852,
+      "env": { "PORT": "7852" }
     }
   ]
 }
