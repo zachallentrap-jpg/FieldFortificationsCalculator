@@ -1,0 +1,19 @@
+<!doctype html>
+<!-- Dev-only prop gallery (NOT part of the build — vite only builds index.html).
+     Open /props.html on the dev server to eyeball every Blender-authored prop at a
+     representative real-world size, on a slow turntable. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>SAP-1 prop gallery (dev only)</title>
+    <style>
+      body { margin: 0; background: #f4f2ec; font-family: system-ui, sans-serif; }
+      #bar { padding: 8px 12px; font-size: 13px; color: #444; }
+      canvas { display: block; }
+    </style>
+  </head>
+  <body>
+    <div id="bar">Asset gallery — every prop in <code>src/assets/models/</code>, rendered with the app's shading. Drag to rotate, scroll to zoom. Re-run <code>scripts/make_lumber.py</code>-style Blender scripts to update; changes hot-reload here.</div>
+    <script type="module" src="./props-gallery.ts"></script>
+  </body>
+</html>

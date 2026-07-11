@@ -1,6 +1,6 @@
 // Dev-only preview harness (not shipped): renders sample plan/section SVGs and a self-
 // contained HTML preview (tokens.css inlined) so the drawing visual system can be eyeballed.
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { compute } from '../src/engine/compute';
 import { drawPlan } from '../src/render/drawPlan';
@@ -23,7 +23,8 @@ const cards: [string, string][] = [
   ['Section — bunker vs contact-burst (ENGINEERED, honest)', drawSection(bunker)],
 ];
 
-const outDir = process.argv[2] ?? '.';
+const outDir = process.argv[2] ?? '.samples';
+mkdirSync(outDir, { recursive: true });
 const tokens = readFileSync(fileURLToPath(new URL('../src/ui/tokens.css', import.meta.url)), 'utf8');
 
 writeFileSync(outDir + '/plan.svg', drawPlan(mg));
