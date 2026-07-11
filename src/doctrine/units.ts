@@ -55,3 +55,14 @@ export function fmtVolume(ft3: number, unit: UnitSystem): string {
 export function toDisplayLength(ft: number, unit: UnitSystem): number {
   return unit === 'metric' ? round(ft * M_PER_FT, 3) : round(ft, 2);
 }
+
+// BOM quantities carry their own raw unit string ('ft³', 'ft', or 'ea' — engine/materials.ts).
+// Converts the volume/length ones for metric display; 'ea' counts are unit-system-independent.
+// Returns the unrounded converted value — each caller applies its own display precision, same
+// as it already does for every other number. Shared by the BOM panel, job sheet, and CSV export
+// so all three agree.
+export function fmtBomQty(raw: number, rawUnit: string, unit: UnitSystem): { qty: number; unit: string } {
+  if (unit === 'metric' && rawUnit === 'ft³') return { qty: raw * M3_PER_FT3, unit: 'm³' };
+  if (unit === 'metric' && rawUnit === 'ft') return { qty: raw * M_PER_FT, unit: 'm' };
+  return { qty: raw, unit: rawUnit };
+}

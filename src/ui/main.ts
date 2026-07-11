@@ -20,7 +20,7 @@ import { jobSheet } from '../render/jobSheet';
 import { toCsv } from '../render/csv';
 import { drawPlan } from '../render/drawPlan';
 import { drawSection } from '../render/drawSection';
-import { scenariosOverlay, missionOverlay, compareOverlay, planOverlay, doctrineOverlay, scheduleOverlay } from '../layout/tools';
+import { scenariosOverlay, scenarioSaveOverlay, scenarioDeleteConfirmOverlay, missionOverlay, compareOverlay, planOverlay, doctrineOverlay, scheduleOverlay } from '../layout/tools';
 import { computeStages, scheduleStages, type Schedule } from '../engine/stages';
 import { ScenarioStore, makeScenario, duplicateScenario } from '../state/scenarios';
 import { createStorageAdapter } from '../state/persistence';
@@ -393,23 +393,22 @@ document.addEventListener('click', (e) => {
     case 'overlay-close': hideOverlay(); break;
     // ── Scenarios ──
     case 'scenarios': openScenarios(); break;
-    case 'scenario-save': {
-      const name = window.prompt('Scenario name:');
-      if (name !== null) {
-        const id = newId();
-        const finalName = name.trim() || 'Untitled';
-        scenarioStore
-          .save(makeScenario(id, finalName, store.getState().inputs, new Date().toISOString()))
-          .then(() => {
-            store.setState({ activeScenarioId: id, activeScenarioName: finalName });
-            showToast('Saved "' + finalName + '" on this device.');
-            openScenarios();
-          })
-          .catch((e: unknown) => {
-            store.setState({ lastError: 'Scenario save failed: ' + String(e) });
-            showToast('Save FAILED — device storage unavailable. Export a settings file instead.');
-          });
-      }
+    case 'scenario-save': showOverlay(scenarioSaveOverlay()); break;
+    case 'scenario-save-confirm': {
+      const nameEl = document.getElementById('scenario-save-name') as HTMLInputElement | null;
+      const id = newId();
+      const finalName = (nameEl?.value ?? '').trim() || 'Untitled';
+      scenarioStore
+        .save(makeScenario(id, finalName, store.getState().inputs, new Date().toISOString()))
+        .then(() => {
+          store.setState({ activeScenarioId: id, activeScenarioName: finalName });
+          showToast('Saved "' + finalName + '" on this device.');
+          openScenarios();
+        })
+        .catch((e: unknown) => {
+          store.setState({ lastError: 'Scenario save failed: ' + String(e) });
+          showToast('Save FAILED — device storage unavailable. Export a settings file instead.');
+        });
       break;
     }
     case 'scenario-load': {
@@ -426,10 +425,15 @@ document.addEventListener('click', (e) => {
       });
       break;
     }
-    case 'scenario-delete': {
+    case 'scenario-delete-ask': {
       const id = actionEl.dataset['id'];
       const name = actionEl.dataset['name'] ?? 'this scenario';
-      if (id && window.confirm('Delete "' + name + '"? This cannot be undone.')) {
+      if (id) showOverlay(scenarioDeleteConfirmOverlay(id, name));
+      break;
+    }
+    case 'scenario-delete-confirm': {
+      const id = actionEl.dataset['id'];
+      if (id) {
         scenarioStore.remove(id).then(() => {
           if (store.getState().activeScenarioId === id) store.setState({ activeScenarioId: null, activeScenarioName: null });
           openScenarios();
@@ -440,7 +444,7 @@ document.addEventListener('click', (e) => {
     case 'scenario-export': scenarioStore.list().then((list) => { download('sap1-scenarios.json', JSON.stringify(list, null, 2), 'application/json'); showToast(list.length + ' scenario(s) exported as a file.'); }); break;
     case 'scenario-import': pickFile((text) => {
       const r = scenarioStore.parseImportMany(text);
-      if (!r.ok) { window.alert('Import failed: ' + r.error); return; }
+      if (!r.ok) { showToast('Import failed: ' + r.error); return; }
       Promise.all(r.value.map((s) => scenarioStore.save(s))).then(() => {
         showToast(r.value.length + ' scenario(s) imported.');
         openScenarios();

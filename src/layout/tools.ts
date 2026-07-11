@@ -44,7 +44,7 @@ export function scenariosOverlay(scenarios: Scenario[], activeId: string | null)
             '<span class="scn-actions">' +
             '<button type="button" class="btn" data-action="scenario-load" data-id="' + esc(s.id) + '">Load</button>' +
             '<button type="button" class="btn" data-action="scenario-duplicate" data-id="' + esc(s.id) + '">Duplicate</button>' +
-            '<button type="button" class="btn" data-action="scenario-delete" data-id="' + esc(s.id) + '" data-name="' + esc(s.name) + '">Delete</button>' +
+            '<button type="button" class="btn" data-action="scenario-delete-ask" data-id="' + esc(s.id) + '" data-name="' + esc(s.name) + '">Delete</button>' +
             '</span></li>',
         )
         .join('')
@@ -57,6 +57,30 @@ export function scenariosOverlay(scenarios: Scenario[], activeId: string | null)
     '<button type="button" class="btn" data-action="scenario-export">Export all</button></div>' +
     '<ul class="scn-list">' + rows + '</ul>' +
     '<p class="tool-note">Scenarios are stored on this device only.</p></div>'
+  );
+}
+
+// A name prompt for saving the current setup — replaces window.prompt so it can't silently
+// no-op in embedded/preview contexts and matches the app's own visual language.
+export function scenarioSaveOverlay(): string {
+  return (
+    '<div class="tools"><h2>Save current setup</h2>' +
+    '<label class="ctrl mini save-name-field">Name' +
+    '<input type="text" id="scenario-save-name" value="Untitled" autofocus></label>' +
+    '<div class="tool-actions">' +
+    '<button type="button" class="btn btn-primary" data-action="scenario-save-confirm">Save</button>' +
+    '<button type="button" class="btn" data-action="scenarios">Cancel</button></div></div>'
+  );
+}
+
+// A confirm step for a destructive action — replaces window.confirm for the same reason.
+export function scenarioDeleteConfirmOverlay(id: string, name: string): string {
+  return (
+    '<div class="tools"><h2>Delete "' + esc(name) + '"?</h2>' +
+    '<p class="tool-note">This cannot be undone.</p>' +
+    '<div class="tool-actions">' +
+    '<button type="button" class="btn btn-danger" data-action="scenario-delete-confirm" data-id="' + esc(id) + '">Delete</button>' +
+    '<button type="button" class="btn" data-action="scenarios">Cancel</button></div></div>'
   );
 }
 

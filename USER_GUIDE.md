@@ -12,7 +12,7 @@ Every input carries a plain-language explanation, not just its name — the doct
 
 - It is **not** a substitute for current engineer publications or the engineer's judgment.
 - It performs **no** authoritative-value lookup and **fabricates no** shielding thickness, roof or stringer load, standoff, or parapet thickness. Every one of those numbers is a flagged placeholder.
-- While any placeholder figure remains, a red **NOT FOR FIELD USE — illustrative placeholder data** banner sits under every drawing's header. Individual placeholder-derived numbers are marked **(PH)**. The banner clears only when zero placeholders remain — that is, only after a qualified user has replaced the values with real, verified ones.
+- While any placeholder figure remains, a red **NOT FOR FIELD USE — placeholder data** badge sits in the topbar next to the app name, on every screen. It clears only when zero placeholders remain — that is, only after a qualified user has replaced the values with real, verified ones. The exact count (and how many are safety-critical) is always visible in **Status**, and the **Doctrine values** tool shows which specific figures are still placeholders.
 - **Handling is CUI.** Clear this tool with your S-6 / information-management shop before you field it or share exported files.
 
 The safety-critical values — shielding thickness, roof and stringer load and span, standoff, and parapet/retaining thickness — never get invented. For the heaviest threats they are not even estimated: the app hands the roof to an engineer instead (see "The engineered-roof case" below).
@@ -107,7 +107,7 @@ Picking a class jumps the caliber dropdown to the first round in that class; pic
 
 ## Reading the drawings
 
-You get three views — **Plan**, **Section A–A**, and **Isometric** — that share one visual language: a dark header bar per view, numbered callout discs tied to a single legend, dimensions in one accent color, and the NOT FOR FIELD USE banner while placeholders remain. Every header also reminds you: **not to scale — dimensions govern.** Read the numbers, not the pixels.
+You get three views — **Plan**, **Section A–A**, and **Isometric** — that share one visual language: a dark header bar per view, numbered callout discs tied to a single legend, and dimensions in one accent color (the NOT FOR FIELD USE badge lives once, in the topbar, not repeated per view). Every header also reminds you: **not to scale — dimensions govern.** Read the numbers, not the pixels.
 
 ### The shared legend and numbered callouts
 
@@ -127,7 +127,7 @@ The plan looks down on the position: the parapet ring, the fighting bay cut into
 
 ### Section A–A — the cut, the roof, the scale figure
 
-The section is the front-to-back vertical slice taken along the A–A line, with **FRONT on the left** to match the plan. You see the earth mass with the bay cut out of it, the spoil-filled parapets, the firing step or platform, a grenade sump notch, and — if you have overhead cover — the roof on its stringers, set back from the front edge to leave a firing gap. A standing figure (~5'-10" reference) and a scale bar give real-world scale. Dimensions cover depth of cut, front-to-back, parapet height, roof setback, and cover thickness. Any dimension derived from a placeholder shows **(PH)**.
+The section is the front-to-back vertical slice taken along the A–A line, with **FRONT on the left** to match the plan. You see the earth mass with the bay cut out of it, the spoil-filled parapets, the firing step or platform, a grenade sump notch, and — if you have overhead cover — the roof on its stringers, set back from the front edge to leave a firing gap. A standing figure (~5'-10" reference) and a scale bar give real-world scale. Dimensions cover depth of cut, front-to-back, parapet height, roof setback, and cover thickness. The drawings show dimensions only — check **Status** or **Doctrine values** for which figures are still placeholders.
 
 ### The engineered-roof case — never a made-up number
 
@@ -187,7 +187,7 @@ Mission BOM combines several positions into one materials list and tells you wha
 - Enter an **On hand** quantity for any line.
 - **Clear** — empties the mission set.
 
-**What you see:** a table with each material's total **Need**, an editable **On hand** field, and the resulting **Short** (need minus on-hand; shortfalls are highlighted). Placeholder-derived lines are tagged **(PH)**. Below the table, total man-hours and elapsed time for the whole mission (with your team size). Empty, it tells you to add positions first.
+**What you see:** a table with each material's total **Need**, an editable **On hand** field, and the resulting **Short** (need minus on-hand; shortfalls are highlighted). Below the table, total man-hours and elapsed time for the whole mission (with your team size). Empty, it tells you to add positions first.
 
 ---
 
@@ -238,7 +238,7 @@ Exports carry the app / schema / doctrine version stamps. Remember the CUI handl
 
 **Diagnostics** (the **Diag** button) opens an offline snapshot for troubleshooting or a bug report: the app / schema / doctrine versions, the placeholder counts (how many remain, and how many of those are safety-critical), the last error if any, and a flat statement that the app is **offline by design** — it makes no network calls, ever. If a view ever fails to draw, it degrades to an error card instead of crashing, and that error shows up here.
 
-**Help** (the **Help** button) opens a plain-language explainer of every input — Type, Standard, Soil, Threat, Revetment, the feature toggles, Positions / Team size, Units, and the tap-a-number trace — all offline. It repeats the core caveat: everything runs on illustrative placeholder data, and numbers marked **(PH)** are not authoritative until confirmed against current pubs.
+**Help** (the **Help** button) opens a plain-language explainer of every input — Type, Standard, Soil, Threat, Revetment, the feature toggles, Positions / Team size, Units, and the tap-a-number trace — all offline. It repeats the core caveat: everything runs on illustrative placeholder data, and operands marked **placeholder** in the trace are not authoritative until confirmed against current pubs.
 
 ---
 

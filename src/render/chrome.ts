@@ -131,7 +131,7 @@ export function scaleBar(xPx: number, yPx: number, proj: Projector, unit: UnitSy
 // Built from plain rounded primitives (circle head, pill-shaped torso, two pill legs) so it
 // unmistakably reads as "a person" at a glance — a hand-rolled outline path here previously
 // tapered to points at both the top AND bottom, which read as a blob rather than a figure.
-export function standingFigure(xPx: number, groundYpx: number, proj: Projector): string {
+export function standingFigure(xPx: number, groundYpx: number, proj: Projector, unit: UnitSystem): string {
   const hPx = Math.max(18, proj.lenPx(REF_FIGURE_FT));
   const headR = Math.max(2.2, hPx * 0.08);
   const topY = groundYpx - hPx;
@@ -148,7 +148,7 @@ export function standingFigure(xPx: number, groundYpx: number, proj: Projector):
     el('rect', { x: xPx - torsoW / 2, y: torsoTop, width: torsoW, height: torsoH, rx: torsoW / 2 }),
     el('rect', { x: xPx - legGap / 2 - legW, y: legTop, width: legW, height: legH, rx: legW / 2 }),
     el('rect', { x: xPx + legGap / 2, y: legTop, width: legW, height: legH, rx: legW / 2 }),
-    textEl(xPx + torsoW / 2 + 6, topY + hPx * 0.5, 'ref ~5\'-10"', {
+    textEl(xPx + torsoW / 2 + 6, topY + hPx * 0.5, 'ref ~' + fmtLength(REF_FIGURE_FT, unit), {
       fill: 'var(--ink-soft)', 'font-size': 9.5, 'font-family': 'ui-monospace, monospace',
     }),
   );

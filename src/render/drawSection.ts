@@ -137,7 +137,7 @@ export function drawSection(result: Result): string {
   }
 
   // ── Standing figure (scale) + scale bar ────────────────────────────────────────
-  parts.push(standingFigure(px(-halfBay * 0.35, 0)[0], px(0, s.depthOfCut)[1], proj));
+  parts.push(standingFigure(px(-halfBay * 0.35, 0)[0], px(0, s.depthOfCut)[1], proj, unit));
   parts.push(scaleBar(gL[0] + 20, H - LEGEND_H - 24, proj, unit)); // clear of the LEGEND heading (see drawPlan)
 
   // ── Dimensions ─────────────────────────────────────────────────────────────────

@@ -10,7 +10,7 @@ import { drawSection } from './drawSection';
 import { DAY_TOKENS_CSS } from './print-tokens';
 import { APP_VERSION } from '../version';
 import { positions } from '../doctrine/positions';
-import { fmtLength } from '../doctrine/units';
+import { fmtLength, fmtBomQty } from '../doctrine/units';
 import { getFillState } from '../doctrine/io';
 import { computeStages } from '../engine/stages';
 import type { Result } from '../engine/types';
@@ -72,12 +72,15 @@ export function jobSheet(result: Result, meta: JobSheetMeta): string {
     '<tr><td>Volume model</td><td class="n">' + esc(result.fidelity.volume) + '</td></tr>';
 
   const bomRows = result.bom
-    .map(
-      (l) =>
+    .map((l) => {
+      const per = fmtBomQty(l.qtyPerPosition, l.unit, unit);
+      const total = fmtBomQty(l.qtyTotal, l.unit, unit);
+      return (
         '<tr><td>' + esc(l.label) + '</td>' +
-        '<td class="n">' + num(l.qtyPerPosition) + '</td>' +
-        '<td class="n">' + num(l.qtyTotal) + '</td><td>' + esc(l.unit) + '</td></tr>',
-    )
+        '<td class="n">' + num(per.qty) + '</td>' +
+        '<td class="n">' + num(total.qty) + '</td><td>' + esc(total.unit) + '</td></tr>'
+      );
+    })
     .join('');
 
   const lab = result.labor;

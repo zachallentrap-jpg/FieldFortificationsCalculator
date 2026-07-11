@@ -3,7 +3,7 @@
 // button carrying data-trace=<key>; main.ts opens that derivation. Numbers formatted through
 // the unit layer (feet-internal, display-converted).
 
-import { fmtLength, fmtVolume } from '../doctrine/units';
+import { fmtLength, fmtVolume, fmtBomQty } from '../doctrine/units';
 import { positions } from '../doctrine/positions';
 import type { GeometryModel } from '../engine/geometry';
 import type { Result, Derivation, ValidationIssue } from '../engine/types';
@@ -88,13 +88,17 @@ const BOM_TRACE: Record<string, string> = {
 
 export function bomPanel(result: Result): string {
   if (result.bom.length === 0) return '';
+  const sys = result.inputs.unit;
   const rows = result.bom
-    .map(
-      (l) =>
+    .map((l) => {
+      const per = fmtBomQty(l.qtyPerPosition, l.unit, sys);
+      const total = fmtBomQty(l.qtyTotal, l.unit, sys);
+      return (
         '<tr><td>' + esc(l.label) + '</td><td class="n">' +
-        val(num(l.qtyPerPosition), BOM_TRACE[l.id]) +
-        '</td><td class="n">' + num(l.qtyTotal) + '</td><td>' + esc(l.unit) + '</td></tr>',
-    )
+        val(num(per.qty), BOM_TRACE[l.id]) +
+        '</td><td class="n">' + num(total.qty) + '</td><td>' + esc(total.unit) + '</td></tr>'
+      );
+    })
     .join('');
   return (
     '<section class="panel"><h2>Materials list (Bill of Materials)</h2><table class="bom">' +
@@ -150,20 +154,30 @@ export function summaryBar(result: Result): string {
   );
 }
 
-// The tap-to-explain body for one derivation.
+// The tap-to-explain body for one derivation. Placeholder operands get a hoverable badge
+// naming their source note (§12) — the app's core honesty mechanic: you can always see which
+// inputs to a number are not yet real doctrine.
 export function traceHtml(d: Derivation): string {
+  const anyPlaceholder = d.operands.some((o) => o.placeholder);
   const operands = d.operands
-    .map(
-      (o) =>
-        '<li><span class="op-name">' + esc(o.name) + '</span>' +
+    .map((o) => {
+      const badge = o.placeholder
+        ? '<span class="op-placeholder" title="' + esc(o.source ?? 'unverified placeholder') + '">placeholder</span>'
+        : '';
+      return (
+        '<li><span class="op-name">' + esc(o.name) + badge + '</span>' +
         '<span class="op-val">' + num(o.value) + (o.unit ? ' ' + esc(o.unit) : '') + '</span>' +
-        '</li>',
-    )
+        '</li>'
+      );
+    })
     .join('');
+  const footer = anyPlaceholder
+    ? '<p class="trace-footer">Marked operands are illustrative placeholders — confirm against current pubs before use.</p>'
+    : '';
   return (
     '<div class="trace"><h3>' + esc(d.label) + '</h3>' +
     '<code class="formula">' + esc(d.formula) + '</code>' +
     '<div class="trace-result">= ' + num(d.result) + ' ' + esc(d.unit) + '</div>' +
-    '<ul class="operands">' + operands + '</ul></div>'
+    '<ul class="operands">' + operands + '</ul>' + footer + '</div>'
   );
 }

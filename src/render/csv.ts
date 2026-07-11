@@ -3,6 +3,7 @@
 // A metadata header carries scenario/date. Per-position AND total columns.
 // Pure — the date is passed in (the engine never reads a clock).
 
+import { fmtBomQty } from '../doctrine/units';
 import type { Result } from '../engine/types';
 
 function field(v: string | number): string {
@@ -40,7 +41,9 @@ export function toCsv(result: Result, meta: CsvMeta): string {
 
   lines.push(row('Section', 'Item', 'Unit', 'Per position', 'Total'));
   for (const l of result.bom) {
-    lines.push(row('BOM', l.label, l.unit, l.qtyPerPosition, l.qtyTotal));
+    const per = fmtBomQty(l.qtyPerPosition, l.unit, result.inputs.unit);
+    const total = fmtBomQty(l.qtyTotal, l.unit, result.inputs.unit);
+    lines.push(row('BOM', l.label, total.unit, per.qty, total.qty));
   }
   lines.push('');
 

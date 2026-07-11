@@ -57,7 +57,8 @@ html.sheet-open { overflow: hidden; }
 
 /* ── Hamburger menu — plain <details>, keyboard + SR friendly ─────────────────── */
 .menu { position: relative; }
-.menu-summary { list-style: none; cursor: pointer; font-size: 14px; }
+.menu-summary { list-style: none; cursor: pointer; font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+.menu-summary svg { width: 16px; height: 16px; flex: none; }
 .menu-summary::-webkit-details-marker { display: none; }
 .menu-summary::after { content: ' ▾'; font-size: 10px; opacity: 0.7; }
 .menu[open] .menu-summary { background: var(--surface-2); }
@@ -101,8 +102,11 @@ html.sheet-open { overflow: hidden; }
 
 /* ── Body layouts ───────────────────────────────────────────────────────────── */
 /* padding-bottom clears the persistent .bottom-toolbar (now present on every screen size, not
-   just mobile) so the last row of content is never hidden underneath it. */
-.app-body { padding: 12px; padding-bottom: 64px; gap: 12px; }
+   just mobile) so the last row of content is never hidden underneath it. The toolbar itself is
+   ~52-56px tall (44px tap target + padding); this leaves real headroom rather than the ~9px
+   margin a tighter value works out to, so small toolbar-height variations (safe-area insets,
+   label wrapping) can't tip it into actual overlap. */
+.app-body { padding: 12px; padding-bottom: 92px; gap: 12px; }
 .layout-desktop { display: grid; grid-template-columns: 320px minmax(0, 1fr) 340px; align-items: start; }
 .layout-tablet { display: grid; grid-template-columns: 300px minmax(0, 1fr); align-items: start; }
 .layout-mobile { display: block; padding-bottom: 76px; }
@@ -182,7 +186,8 @@ table.bom td.n { text-align: right; font-variant-numeric: tabular-nums; }
 }
 .tbtn:hover:not(:disabled) { background: var(--surface-2); }
 .tbtn:disabled { opacity: 0.35; cursor: default; }
-.tbtn-icon { font-size: 18px; line-height: 1; }
+.tbtn-icon { font-size: 18px; line-height: 1; display: flex; }
+.tbtn-icon svg { width: 20px; height: 20px; }
 .tbtn-label { font-size: 10px; font-weight: 600; letter-spacing: 0.2px; }
 
 /* ── Mobile bottom sheet ────────────────────────────────────────────────────── */
@@ -227,6 +232,11 @@ table.bom td.n { text-align: right; font-variant-numeric: tabular-nums; }
 .operands li { display: flex; gap: 10px; align-items: baseline; font-size: 13px; }
 .op-name { flex: 1; color: var(--ink-soft); }
 .op-val { font-variant-numeric: tabular-nums; font-weight: 600; }
+.op-placeholder {
+  margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 10px; font-weight: 700;
+  letter-spacing: 0.3px; background: var(--banner-bg); color: var(--banner-text); cursor: help;
+}
+.trace-footer { margin: 10px 0 0; font-size: 12px; color: var(--ink-soft); }
 .help dl { display: grid; grid-template-columns: minmax(90px, auto) 1fr; gap: 6px 12px; margin: 12px 0 0; }
 .help dt { font-weight: 700; }
 .help dd { margin: 0; color: var(--ink-soft); }
@@ -236,6 +246,12 @@ table.bom td.n { text-align: right; font-variant-numeric: tabular-nums; }
 .tools h2 { margin-top: 0; }
 .tool-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 12px; align-items: flex-end; }
 .tool-note { color: var(--ink-soft); font-size: 12px; margin: 10px 0 0; }
+.save-name-field { display: block; margin: 10px 0; }
+.save-name-field input { display: block; width: 100%; margin-top: 4px; min-height: 34px; padding: 5px 8px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); color: var(--ink); font: inherit; }
+.btn-primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+.btn-primary:hover { opacity: 0.9; }
+.btn-danger { background: var(--banner-bg); color: var(--banner-text); border-color: var(--banner-bg); }
+.btn-danger:hover { opacity: 0.9; }
 .tools .empty { color: var(--ink-soft); font-size: 13px; }
 .tools table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .tools th, .tools td { text-align: left; padding: 5px 7px; border-bottom: 1px solid var(--border); vertical-align: middle; }
