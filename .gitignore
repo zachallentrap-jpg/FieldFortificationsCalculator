@@ -4,3 +4,8 @@ dist/
 .DS_Store
 .vite/
 coverage/
+dist-woodframe/
+dist-standalone/
+__pycache__/
+*.pyc
+.samples/

@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test \"test/**/*.test.ts\"",
     "verify": "npm run typecheck && npm run test && npm run check:offline",
-    "build": "vite build && node --import tsx scripts/build-standalone.ts && npm run check:offline",
+    "build": "vite build && vite build -c vite.standalone.config.ts && node --import tsx scripts/build-standalone.ts && npm run check:offline",
     "build:standalone": "node --import tsx scripts/build-standalone.ts",
     "check:offline": "node --import tsx scripts/check-offline.ts",
     "build:woodframe": "vite build -c vite.woodframe.config.ts"

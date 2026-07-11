@@ -8,14 +8,20 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const DIST = fileURLToPath(new URL('../dist', import.meta.url));
-const indexPath = join(DIST, 'index.html');
+// The suite build (vite.config.ts) is multi-page and shares chunks between tools, which an
+// HTML-level inliner can't fold into one file. Prefer the dedicated single-chunk build
+// (vite.standalone.config.ts → dist-standalone/) when present; fall back to dist/ for the
+// legacy single-page pipeline.
+const SINGLE = fileURLToPath(new URL('../dist-standalone', import.meta.url));
+const SRC = existsSync(join(SINGLE, 'index.html')) ? SINGLE : DIST;
+const indexPath = join(SRC, 'index.html');
 
 if (!existsSync(indexPath)) {
-  console.error('build-standalone: dist/index.html not found — run `vite build` first.');
+  console.error('build-standalone: index.html not found — run `vite build -c vite.standalone.config.ts` first.');
   process.exit(1);
 }
 
-const resolve = (ref: string): string => join(DIST, ref.replace(/^\.?\//, ''));
+const resolve = (ref: string): string => join(SRC, ref.replace(/^\.?\//, ''));
 let html = readFileSync(indexPath, 'utf8');
 
 // Inline every module script by src (there is one bundled chunk; zero dynamic imports).

@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 
 // SAP-1 is offline-first. Vite is a dev/build-time dependency only; nothing here
@@ -9,7 +10,7 @@ import { defineConfig, type Plugin } from 'vite';
 // algorithm it implements) — inert text, never dereferenced, but the offline gate (§2.3)
 // is deliberately strict about ANY external URL surviving into dist/, comments included.
 // Strip the scheme so the citation stays readable as plain text but is no longer a URL.
-function stripVendorCitationUrls(): Plugin {
+export function stripVendorCitationUrls(): Plugin {
   const PATTERN = /https?:\/\/(jcgt\.org)/g;
   return {
     name: 'strip-vendor-citation-urls',
@@ -32,6 +33,14 @@ export default defineConfig({
     assetsInlineLimit: 100_000_000, // inline all assets; we ship zero external requests
     chunkSizeWarningLimit: 1000, // the 3D library is the bulk of this; expected, not a code-split candidate for a single-file artifact
     rollupOptions: {
+      // The suite is multi-page: one deploy ships the hub plus every tool. Adding a tool =
+      // one more input here + one more card in hub.html. build-standalone.ts still inlines
+      // dist/index.html (SAP-1); the offline gate scans ALL emitted pages.
+      input: {
+        index: fileURLToPath(new URL('src/ui/index.html', import.meta.url)),
+        hub: fileURLToPath(new URL('src/ui/hub.html', import.meta.url)),
+        woodframe: fileURLToPath(new URL('src/ui/woodframe.html', import.meta.url)),
+      },
       output: {
         // Deterministic, hashless names so the standalone inliner has stable targets.
         entryFileNames: 'assets/[name].js',

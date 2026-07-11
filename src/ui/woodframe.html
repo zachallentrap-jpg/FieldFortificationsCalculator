@@ -1,0 +1,70 @@
+<!doctype html>
+<!-- TIMBER-1 — wood-frame construction assistant (companion to SAP-1). Standalone page:
+     dev-served at /woodframe.html; publishable on its own via `npm run build:woodframe`
+     (outputs to dist-woodframe/, independent of the main app build).
+     Design: docs/TIMBER1_3D_SYSTEM_DESIGN.md — every pane (3D, stage panel, member card,
+     cut list, layout strips) is a projection of the engine's FrameModel (src/timber/*). -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TIMBER-1 — wood-frame construction</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #f4f2ec; font-family: system-ui, sans-serif; color: #2b2419; }
+      header { padding: 8px 14px; display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; border-bottom: 1px solid #ddd6c8; }
+      header h1 { font-size: 16px; margin: 0; }
+      header .sub { font-size: 12px; color: #6b6250; }
+      #toolbar { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 14px; align-items: center; }
+      #toolbar .grp { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+      #toolbar .grp b { font-size: 11px; color: #6b6250; margin-right: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+      button.chip { min-height: 30px; padding: 4px 10px; border: 1px solid #c9c0ad; border-radius: 8px; background: #fbf9f4; font-size: 12px; cursor: pointer; }
+      button.chip.on { background: #2b2419; color: #fbf9f4; border-color: #2b2419; }
+      main { display: flex; gap: 0; align-items: stretch; }
+      #viewport { flex: 1; min-width: 0; position: relative; }
+      #viewport canvas { display: block; width: 100%; }
+      aside { width: 340px; max-width: 45vw; border-left: 1px solid #ddd6c8; padding: 10px 12px; font-size: 12.5px; overflow-y: auto; }
+      aside h2 { font-size: 13px; margin: 4px 0 6px; }
+      aside table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      aside td, aside th { padding: 2px 4px; text-align: left; border-bottom: 1px solid #eee7d8; }
+      aside td.num, aside th.num { text-align: right; font-variant-numeric: tabular-nums; }
+      #memberCard { background: #fbf9f4; border: 1px solid #c9c0ad; border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; display: none; }
+      #memberCard dt { font-weight: 600; font-size: 11px; color: #6b6250; margin-top: 5px; }
+      #memberCard dd { margin: 0; }
+      #stageNote { color: #6b6250; margin: 2px 0 8px; }
+      #strips { padding: 10px 14px; }
+      #strips details { margin-bottom: 8px; }
+      #strips .stripScroll { overflow-x: auto; background: #fbf9f4; border: 1px solid #ddd6c8; border-radius: 8px; }
+      footer { padding: 8px 14px 16px; font-size: 11px; color: #6b6250; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>TIMBER-1 — wood-frame construction</h1>
+      <span class="sub">FM 5-426 TO framing · every piece is an engine Member — tap one for its card · doctrine cites (PH) pending page verification</span>
+      <a href="./hub.html" style="margin-left:auto; font-size:12px; color:#6b6250">⌂ Combat Engineer Toolkit</a>
+    </header>
+    <div id="toolbar">
+      <div class="grp" id="views"><b>View</b></div>
+      <div class="grp" id="stages"><b>Stage</b></div>
+    </div>
+    <main>
+      <div id="viewport"></div>
+      <aside>
+        <div id="memberCard"></div>
+        <h2 id="stageTitle"></h2>
+        <div id="stageNote"></div>
+        <div id="stageBom"></div>
+      </aside>
+    </main>
+    <section id="strips">
+      <h2 style="font-size:13px">Plate layout strips — marks to pencil on the plates (X stud · K king · J jack · C cripple)</h2>
+      <div id="stripsBody"></div>
+    </section>
+    <footer>
+      TO construction per FM 5-426 (public release). Labor factors are placeholders pending Table C-1 verification.
+      Occupied or permanent structures follow local building code and qualified review.
+    </footer>
+    <script type="module" src="./woodframe-scene.ts"></script>
+  </body>
+</html>

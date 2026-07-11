@@ -2,11 +2,24 @@
 // after the first load — and it makes ZERO external requests (same-origin only). Not used by
 // the single-file file:// artifact (SWs don't run from file://); that's the standalone's job.
 // Plain JS on purpose: shipped verbatim from public/ so it registers at the app scope root.
-const CACHE = 'sap1-v1';
-const CORE = ['./', './index.html', './manifest.webmanifest', './icons/icon.svg'];
+const CACHE = 'sap1-v2';
+const CORE = [
+  './',
+  './index.html',
+  './hub.html',
+  './woodframe.html',
+  './assets/index.js',
+  './assets/index.css',
+  './assets/three-viewer.js',
+  './assets/woodframe.js',
+  './manifest.webmanifest',
+  './icons/icon.svg',
+];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)).catch(() => undefined));
+  // No .catch here on purpose: a failed precache (bad network, a missing CORE entry) must fail
+  // install so the browser retries rather than activating a SW with an empty/partial cache.
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(CORE)));
   self.skipWaiting();
 });
 
@@ -27,11 +40,19 @@ self.addEventListener('fetch', (e) => {
         hit ||
         fetch(e.request)
           .then((res) => {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => undefined);
+            if (res.ok) {
+              const copy = res.clone();
+              caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => undefined);
+            }
             return res;
           })
-          .catch(() => caches.match('./index.html')),
+          .catch(async () => {
+            // Only navigations fall back to a full page; a failed asset request must surface as
+            // a network error, not HTML served with a JS/CSS content type.
+            if (e.request.mode !== 'navigate') return Response.error();
+            const own = await caches.match(e.request, { ignoreSearch: true });
+            return own || (await caches.match('./index.html')) || Response.error();
+          }),
     ),
   );
 });

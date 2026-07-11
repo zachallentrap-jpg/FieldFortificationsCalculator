@@ -1,0 +1,59 @@
+<!doctype html>
+<!-- Combat Engineer Toolkit — suite hub. One deploy ships every tool: SAP-1 (survivability
+     positions) at ./index.html, TIMBER-1 (wood-frame construction) at ./woodframe.html.
+     Adding a future tool = one more card here + one more rollup input in vite.config.ts. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Combat Engineer Toolkit</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #f4f2ec; font-family: system-ui, sans-serif; color: #2b2419; }
+      header { padding: 26px 20px 10px; text-align: center; }
+      header h1 { margin: 0; font-size: 26px; letter-spacing: 0.02em; }
+      header p { margin: 6px 0 0; color: #6b6250; font-size: 14px; }
+      .badge { display: inline-block; margin-top: 10px; background: #7a1f1a; color: #fbf9f4; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; padding: 4px 10px; border-radius: 999px; }
+      main { display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; padding: 26px 20px 10px; max-width: 1080px; margin: 0 auto; }
+      a.card, div.card { width: 310px; min-height: 190px; border: 1px solid #c9c0ad; border-radius: 14px; background: #fbf9f4; padding: 16px 18px; text-decoration: none; color: inherit; display: flex; flex-direction: column; box-shadow: 0 2px 8px rgba(43, 36, 25, 0.06); }
+      a.card:hover { border-color: #2b2419; box-shadow: 0 4px 14px rgba(43, 36, 25, 0.14); }
+      .card .tag { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: #6b6250; }
+      .card h2 { margin: 6px 0 8px; font-size: 18px; }
+      .card p { margin: 0; font-size: 13px; color: #4b4436; line-height: 1.45; flex: 1; }
+      .card .doc { margin-top: 12px; font-size: 11px; color: #6b6250; }
+      div.card.ghost { border-style: dashed; color: #9b917c; align-items: center; justify-content: center; text-align: center; }
+      footer { text-align: center; padding: 18px 20px 30px; font-size: 11px; color: #6b6250; max-width: 720px; margin: 0 auto; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>COMBAT ENGINEER TOOLKIT</h1>
+      <p>Field planning tools — offline-first, doctrine-cited, every drawing generated from the same math.</p>
+      <span class="badge">NOT FOR FIELD USE — practice data pending doctrine verification</span>
+    </header>
+    <main>
+      <a class="card" href="./index.html">
+        <span class="tag">SAP-1</span>
+        <h2>Survivability Position Planner</h2>
+        <p>Fighting positions and defilades: dimensions, spoil, sandbags, revetments, overhead cover,
+           labor — with plan/section drawings and a drag-to-rotate 3D model.</p>
+        <span class="doc">Doctrine: survivability position references (placeholder data)</span>
+      </a>
+      <a class="card" href="./woodframe.html">
+        <span class="tag">TIMBER-1</span>
+        <h2>Wood-Frame Construction</h2>
+        <p>Theater-of-operations framing: floor, walls, and roof generated member-by-member — build
+           stages, cut lists, man-hours, and plate layout strips, all from one frame model.</p>
+        <span class="doc">Doctrine: FM 5-426 (public release, cites pending verification)</span>
+      </a>
+      <div class="card ghost">
+        <p>Next tool goes here —<br />bridging, culverts, demolition calcs…<br />
+        one card + one page per tool.</p>
+      </div>
+    </main>
+    <footer>
+      Single offline bundle: every tool ships in one deploy with zero external requests.
+      Occupied or permanent structures follow local building code and qualified review.
+    </footer>
+  </body>
+</html>
