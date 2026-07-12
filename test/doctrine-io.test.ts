@@ -8,6 +8,7 @@ import '../src/doctrine/index';
 import { exportDoctrine, importDoctrine, getFillState, resetFillState } from '../src/doctrine/io';
 import { counts, all } from '../src/doctrine/registry';
 import { compute } from '../src/engine/compute';
+import type { GeometryModel } from '../src/engine/geometry';
 import { topbarHasFieldUseBadge } from '../src/layout/shell';
 import { doctrineOverlay } from '../src/layout/tools';
 import { MemoryAdapter } from '../src/state/persistence';
@@ -96,12 +97,66 @@ test('THE promise: a full fill drives the banner to zero end to end', () => {
 test('a persisted fill survives a reload (save → fresh boot → re-apply)', async () => {
   const adapter = new MemoryAdapter();
   importDoctrine(fullFill());
-  await saveFill(adapter, { author: 'S-3', date: '2026-07-02' });
+  const saved = await saveFill(adapter, { author: 'S-3', date: '2026-07-02' });
+  assert.equal(saved, true, 'saveFill reports success on a working adapter');
   restore(); // simulate a fresh boot: doctrine back to all-placeholder
   assert.ok(counts().placeholder > 0);
   const applied = await restoreFill(adapter);
   assert.ok(applied > 0, 'fill re-applied on boot');
   assert.equal(counts().placeholder, 0, 'banner clear restored from storage');
+  restore();
+});
+
+test('saveFill reports failure when storage actually fails — the caller must not claim it saved', async () => {
+  const failingAdapter = {
+    get: async () => null,
+    set: async () => { throw new Error('quota exceeded'); },
+    remove: async () => undefined,
+    keys: async () => [],
+  };
+  importDoctrine(fullFill());
+  const saved = await saveFill(failingAdapter);
+  assert.equal(saved, false, 'saveFill must report the failure, not swallow it into an unconditional success');
+  restore();
+});
+
+test('sandbags_parapet BOM line stays flagged when the leaf it ACTUALLY depends on is still a placeholder', () => {
+  // A doctrine fill can be done leaf-by-leaf (io.ts explicitly allows partial entries[]) — fill
+  // everything EXCEPT sandbag.frontWallHeight, which is what actually feeds the earth-mode
+  // aperture-rest bag count (materials.ts used to check parapet.W/H instead, which don't feed
+  // this formula at all, and never checked frontWallHeight — a false "fully confirmed" negative).
+  const entries = all().map((e) => ({ path: e.path, value: e.value, status: 'DOCTRINE', source: 'FM 5-103 (test fixture)' }));
+  const target = entries.find((e) => e.path.endsWith('frontWallHeight'));
+  assert.ok(target, 'sandbag.frontWallHeight is a registered leaf');
+  target!.status = 'PLACEHOLDER';
+  const r = importDoctrine({ ...exportDoctrine(), entries });
+  assert.ok(r.ok, 'partial fill imports');
+  // one_man: earth-mode parapet, sectorsOfFire true → bagsParapet is the aperture-rest formula.
+  const line = compute(defaultInputs()).bom.find((b) => b.id === 'sandbags_parapet');
+  assert.ok(line, 'sandbags_parapet line present');
+  assert.equal(line!.fromPlaceholder, true, 'must still be flagged — frontWallHeight is the leaf that actually feeds this line');
+  restore();
+});
+
+test('the "setback" dimension stays flagged when depthOfCut — not standoff — is still a placeholder', () => {
+  // bunker_op_cp/deliberate/ind-mtr-81: depthOfCut-derived term (setbackDepthFrac × depth =
+  // 1.625 ft) binds over the threat's own standoff (1.25 ft), so depthOfCut's placeholder-ness
+  // must flow into the setback dim — geometry.ts used to OR in only overhead.setbackMin (the
+  // threat==='none' fallback, not the leaf actually used once a real threat is picked) and
+  // setbackDepthFrac, never depthOfCut's own placeholder flag.
+  const entries = all().map((e) => ({ path: e.path, value: e.value, status: 'DOCTRINE', source: 'FM 5-103 (test fixture)' }));
+  const depthEntry = entries.find((e) => e.path.endsWith('bunker_op_cp.hole.D'));
+  const depthMulEntry = entries.find((e) => e.path.endsWith('deliberate.depthMul'));
+  assert.ok(depthEntry && depthMulEntry, 'both depth-feeding leaves are registered');
+  depthEntry!.status = 'PLACEHOLDER';
+  depthMulEntry!.status = 'PLACEHOLDER';
+  const r = importDoctrine({ ...exportDoctrine(), entries });
+  assert.ok(r.ok, 'partial fill imports');
+  const result = compute(defaultInputs({ positionType: 'bunker_op_cp', standard: 'deliberate', threat: 'ind-mtr-81' }));
+  const geo = result.geometry as GeometryModel;
+  const setback = geo.dims.find((d) => d.key === 'setback');
+  assert.ok(setback, 'setback dim present');
+  assert.equal(setback!.placeholder, true, 'must still be flagged — depthOfCut (the binding term here) is still a placeholder');
   restore();
 });
 

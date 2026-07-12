@@ -142,9 +142,16 @@ export function generateWalls(input: WallsInput): Member[] {
       if (o.sillHeightFt > 0) {
         const sillTop = t + o.sillHeightFt;
         emit('sill', '2x4', o.widthFt, (left + right) / 2, sillTop - t / 2, 'flat', { nailing: '2-16d ea end (PH)' });
-        for (const s of gridXs) {
-          if (!(s > left + t && s < right - t)) continue;
-          emit('cripple', '2x4', sillTop - 2 * t, s, t + (sillTop - 2 * t) / 2, 'vertical');
+        // Guarded the same way the above-header cripple below is (cripLen > 0.05) — a low sill
+        // (e.g. a crawlspace/basement vent under 1.5" above the sole plate) drove this negative
+        // or to exactly zero with no guard, unlike its structurally-identical sibling two lines
+        // down.
+        const belowSillCripLen = sillTop - 2 * t;
+        if (belowSillCripLen > 0.05) {
+          for (const s of gridXs) {
+            if (!(s > left + t && s < right - t)) continue;
+            emit('cripple', '2x4', belowSillCripLen, s, t + belowSillCripLen / 2, 'vertical');
+          }
         }
       }
       const cripBase = headBottom + headerDepthFt;

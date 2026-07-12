@@ -261,7 +261,9 @@ export function planOverlay(plan: PlanResult | null, hours: number, team: number
           (o, i) =>
             // Plain-language names, never raw enum ids (§ the app's own selects say "Pickets & wire").
             '<tr><td>' + esc(standards[o.standard]?.label ?? o.standard) + '</td><td>' + (o.overheadCover ? (o.roofPath === 'engineered_required' ? 'engineered' : 'cover') : '—') + '</td>' +
-            '<td>' + esc(revetments[o.revetment]?.label ?? o.revetment) + '</td><td class="n">' + num(o.elapsedHours) + ' hr</td>' +
+            '<td>' + esc(revetments[o.revetment]?.label ?? o.revetment) +
+            (o.hasErrors ? ' <span class="op-placeholder" title="This combination fails one of the app’s own validation checks — see Things to double-check after using it.">doctrine issue</span>' : '') +
+            '</td><td class="n">' + num(o.elapsedHours) + ' hr</td>' +
             '<td><button type="button" class="btn" data-action="plan-apply" data-idx="' + i + '">Use</button></td></tr>',
         )
         .join('')
