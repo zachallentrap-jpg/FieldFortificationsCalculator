@@ -127,28 +127,43 @@ export function scaleBar(xPx: number, yPx: number, proj: Projector, unit: UnitSy
   );
 }
 
-// ── Standing figure (a simple cartoon person + labeled reference height) ──────────
-// Built from plain rounded primitives (circle head, pill-shaped torso, two pill legs) so it
-// unmistakably reads as "a person" at a glance — a hand-rolled outline path here previously
-// tapered to points at both the top AND bottom, which read as a blob rather than a figure.
+// ── Standing figure (a schematic person + labeled reference height) ──────────────
+// Human proportions (head ~1/7.5 of height, shoulders ~0.26H, waist ~0.15H, legs ~50% of
+// height), not the previous uniform-width pill torso + thick sausage legs, which read as a
+// shapeless blob rather than a person — especially at odd sizes (e.g. a tall figure in a
+// shallow, narrow trench, where the whole body reads at once, has nowhere to hide a bad shape.
 export function standingFigure(xPx: number, groundYpx: number, proj: Projector, unit: UnitSystem): string {
   const hPx = Math.max(18, proj.lenPx(REF_FIGURE_FT));
-  const headR = Math.max(2.2, hPx * 0.08);
+  const headR = Math.max(2, hPx * 0.065);
+  const neckGap = hPx * 0.015;
   const topY = groundYpx - hPx;
-  const torsoTop = topY + headR * 2.1;
-  const torsoW = Math.max(3, hPx * 0.2);
-  const torsoH = hPx * 0.4;
-  const legTop = torsoTop + torsoH - 1;
+  const shoulderY = topY + headR * 2 + neckGap;
+  const shoulderW = Math.max(4, hPx * 0.26);
+  const waistW = Math.max(2.6, hPx * 0.15);
+  const torsoH = hPx * 0.3;
+  const waistY = shoulderY + torsoH * 0.65;
+  const hipY = shoulderY + torsoH;
+  const legTop = hipY;
   const legH = groundYpx - legTop;
-  const legW = torsoW * 0.42;
-  const legGap = torsoW * 0.14;
+  const legW = Math.max(1.8, hPx * 0.08);
+  const legGap = hPx * 0.03;
+  // Shoulders-to-waist taper drawn as one polygon (not a uniform rect) so the torso reads as a
+  // body, not a capsule.
+  const torso = [
+    [xPx - shoulderW / 2, shoulderY],
+    [xPx + shoulderW / 2, shoulderY],
+    [xPx + waistW / 2, waistY],
+    [xPx + waistW / 2, hipY],
+    [xPx - waistW / 2, hipY],
+    [xPx - waistW / 2, waistY],
+  ].map((pt) => pt.join(',')).join(' ');
   return group(
-    { class: 'figure', opacity: '0.72', fill: 'var(--ink-soft)' },
+    { class: 'figure', opacity: '0.75', fill: 'var(--ink-soft)' },
     el('circle', { cx: xPx, cy: topY + headR, r: headR }),
-    el('rect', { x: xPx - torsoW / 2, y: torsoTop, width: torsoW, height: torsoH, rx: torsoW / 2 }),
+    el('polygon', { points: torso }),
     el('rect', { x: xPx - legGap / 2 - legW, y: legTop, width: legW, height: legH, rx: legW / 2 }),
     el('rect', { x: xPx + legGap / 2, y: legTop, width: legW, height: legH, rx: legW / 2 }),
-    textEl(xPx + torsoW / 2 + 6, topY + hPx * 0.5, 'ref ~' + fmtLength(REF_FIGURE_FT, unit), {
+    textEl(xPx + shoulderW / 2 + 6, topY + hPx * 0.5, 'ref ~' + fmtLength(REF_FIGURE_FT, unit), {
       fill: 'var(--ink-soft)', 'font-size': 9.5, 'font-family': 'ui-monospace, monospace',
     }),
   );

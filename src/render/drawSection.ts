@@ -28,19 +28,24 @@ export function drawSection(result: Result): string {
   }
 
   const s = geo.section;
+  const isVehicle = geo.shape === 'vehicle_ramp';
   const earthRoof = s.coverOn && s.roofPath === 'earth_on_stringers';
   const engineered = s.roofPath === 'engineered_required';
   const halfBay = s.holeW / 2;
   const aboveTop = s.parapetH + (earthRoof ? s.coverT + 0.4 : 0) + (engineered ? 1.6 : 0);
   const margin = Math.max(1, s.parapetW);
+  const dm = new Map<string, DimSpec>(geo.dims.map((d) => [d.key, d]));
+  const dl = (k: string): string => fmtLength(dm.get(k)?.valueFt ?? 0, unit);
+  // A vehicle drives DOWN a graded ramp to reach the pit — the ramp run (§ ramp_run DimSpec,
+  // engine/geometry.ts) is the dominant rear-side excavation, not a mirror of the front berm.
+  const rampRunFt = isVehicle ? dm.get('ramp_run')?.valueFt ?? 0 : 0;
+  const rightExtentFt = isVehicle ? halfBay + rampRunFt + margin : halfBay + s.parapetW + margin;
 
   const proj = makeProjector(
-    { minX: -(halfBay + s.parapetW + margin), maxX: halfBay + s.parapetW + margin, minY: -(aboveTop + 0.9), maxY: s.depthOfCut + 1.0 },
+    { minX: -(halfBay + s.parapetW + margin), maxX: rightExtentFt, minY: -(aboveTop + 0.9), maxY: s.depthOfCut + 1.0 },
     { x: 0, y: HEADER_H + 20, w: W, h: H - LEGEND_H - (HEADER_H + 20), pad: 36 },
   );
   const px = (xf: number, yf: number): [number, number] => proj.toPx(xf, yf);
-  const dm = new Map<string, DimSpec>(geo.dims.map((d) => [d.key, d]));
-  const dl = (k: string): string => fmtLength(dm.get(k)?.valueFt ?? 0, unit);
 
   const used = new Set<string>();
   const parts: string[] = [];
@@ -48,7 +53,7 @@ export function drawSection(result: Result): string {
 
   // ── Earth mass below grade, then the bay excavation cut out of it ───────────────
   const gL = px(-(halfBay + s.parapetW + margin), 0);
-  const gR = px(halfBay + s.parapetW + margin, 0);
+  const gR = px(rightExtentFt, 0);
   const earthBottom = px(0, s.depthOfCut + 1.0)[1];
   parts.push(el('rect', { x: gL[0], y: gradeY, width: gR[0] - gL[0], height: earthBottom - gradeY, fill: 'url(#pat-earth)' }));
 
@@ -62,17 +67,37 @@ export function drawSection(result: Result): string {
   used.add('grade');
   parts.push(callout('grade', gL[0] + 18, gradeY - 10, used));
 
-  // ── Parapets (spoil-filled, front-left & rear-right) ───────────────────────────
+  // ── Front protection: earth parapet, or a dozed berm for vehicle positions ─────
   const paraFront = px(-(halfBay + s.parapetW), -s.parapetH);
-  const paraRear = px(halfBay, -s.parapetH);
   const paraW = proj.lenPx(s.parapetW);
   const paraH = proj.lenPx(s.parapetH);
   parts.push(el('rect', { x: paraFront[0], y: paraFront[1], width: paraW, height: paraH, fill: 'var(--draw-parapet)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
-  parts.push(el('rect', { x: paraRear[0], y: paraRear[1], width: paraW, height: paraH, fill: 'var(--draw-parapet)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
-  used.add('parapet');
-  parts.push(callout('parapet', ...px(-(halfBay + s.parapetW / 2), -s.parapetH * 0.5), used));
-  used.add('spoil');
-  parts.push(callout('spoil', ...px(halfBay + s.parapetW / 2, -s.parapetH * 0.5), used));
+  const frontKey = isVehicle ? 'berm' : 'parapet';
+  used.add(frontKey);
+  parts.push(callout(frontKey, ...px(-(halfBay + s.parapetW / 2), -s.parapetH * 0.5), used));
+
+  if (!isVehicle) {
+    // ── Rear parapet (spoil-filled, mirrors the front) ───────────────────────────
+    const paraRear = px(halfBay, -s.parapetH);
+    parts.push(el('rect', { x: paraRear[0], y: paraRear[1], width: paraW, height: paraH, fill: 'var(--draw-parapet)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
+    used.add('spoil');
+    parts.push(callout('spoil', ...px(halfBay + s.parapetW / 2, -s.parapetH * 0.5), used));
+  } else {
+    // ── Vehicle access ramp: a graded cut from grade down to the pit floor, not a mirrored
+    // parapet — the vehicle drives down it to reach the hull-down/turret-down position.
+    const rampPit = px(halfBay, 0);
+    const rampFloor = px(halfBay, s.depthOfCut);
+    const rampTop = px(halfBay + rampRunFt, 0);
+    parts.push(el('polygon', {
+      points: rampFloor[0] + ',' + rampFloor[1] + ' ' + rampTop[0] + ',' + rampTop[1] + ' ' + rampPit[0] + ',' + rampPit[1],
+      fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-cut)',
+    }));
+    used.add('ramp');
+    // Above grade, near the ramp's outer/top edge — clear of both the slope line and the
+    // ramp-run dimension (which sits below grade), so the two never collide.
+    parts.push(callout('ramp', rampTop[0] - 22, gradeY - 16, used));
+    parts.push(hDim(rampPit[0], rampTop[0], gradeY + 24, dl('ramp_run')));
+  }
 
   // ── Firing platform (crew-served) or firing-step ledge (rifle) ─────────────────
   if (s.hasPlatform) {
@@ -136,8 +161,28 @@ export function drawSection(result: Result): string {
     parts.push(callout('engineered', hzTL[0] + 14, hzTL[1] + hzH / 2, used));
   }
 
-  // ── Standing figure (scale) + scale bar ────────────────────────────────────────
-  parts.push(standingFigure(px(-halfBay * 0.35, 0)[0], px(0, s.depthOfCut)[1], proj, unit));
+  // ── Scale reference: a standing figure everywhere except vehicle positions, where a
+  // person makes no sense parked in the pit — a schematic hull+turret silhouette instead.
+  // Purely illustrative proportions (no doctrine vehicle-dimension exists to cite), so unlike
+  // standingFigure this carries no numeric "ref" claim.
+  if (!isVehicle) {
+    parts.push(standingFigure(px(-halfBay * 0.35, 0)[0], px(0, s.depthOfCut)[1], proj, unit));
+  } else {
+    const hullTopFt = -Math.min(s.parapetH * 0.6, s.depthOfCut * 0.25);
+    const hullBotFt = s.depthOfCut * 0.92;
+    const turretTopFt = hullTopFt - s.depthOfCut * 0.35;
+    const hullHalfWFt = halfBay * 0.85;
+    const turretHalfWFt = hullHalfWFt * 0.4;
+    const hullTL = px(-hullHalfWFt, hullTopFt);
+    const hullBR = px(hullHalfWFt, hullBotFt);
+    const turretTL = px(-turretHalfWFt, turretTopFt);
+    const turretBR = px(turretHalfWFt, hullTopFt);
+    parts.push(group(
+      { class: 'vehicle', opacity: '0.72', fill: 'var(--ink-soft)' },
+      el('rect', { x: hullTL[0], y: hullTL[1], width: hullBR[0] - hullTL[0], height: hullBR[1] - hullTL[1], rx: 4 }),
+      el('rect', { x: turretTL[0], y: turretTL[1], width: turretBR[0] - turretTL[0], height: turretBR[1] - turretTL[1], rx: 2 }),
+    ));
+  }
   parts.push(scaleBar(gL[0] + 20, H - LEGEND_H - 24, proj, unit)); // clear of the LEGEND heading (see drawPlan)
 
   // ── Dimensions ─────────────────────────────────────────────────────────────────

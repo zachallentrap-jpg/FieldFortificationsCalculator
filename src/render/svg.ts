@@ -67,6 +67,8 @@ export const CALLOUTS: Record<string, CalloutDef> = {
   engineered: { n: 10, label: 'Needs an engineer’s design (no roof shown)' },
   sectors: { n: 11, label: 'Sectors of fire' },
   enemy: { n: 12, label: 'Enemy direction' },
+  berm: { n: 13, label: 'Dozed dirt mound up front (berm)' },
+  ramp: { n: 14, label: 'Vehicle access ramp' },
 };
 
 // Disc sizes meet the legibility floor (--disc-min-px 16, --label-min-px 11).

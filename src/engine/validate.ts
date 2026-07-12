@@ -69,6 +69,13 @@ export function runValidation(calc: Calc): ValidationIssue[] {
     advisories.push(issue(CODES.COVER_NO_THREAT));
   }
 
+  // A mortar pit's whole purpose is high-angle fire out the top — a roof over it is a
+  // contradiction the app will still draw if asked (never silently refuse a request), but the
+  // operator should be told it doesn't make doctrinal sense.
+  if (calc.inputs.overheadCover && calc.inputs.positionType === 'mortar_pit') {
+    advisories.push(issue(CODES.COVER_MORTAR_INDIRECT));
+  }
+
   // Protection adequacy — "the cover as drawn is thinner than the threat needs." The overhead
   // cover is threat-sized (coverLeaf = the threat's full shielding requirement) then scaled by
   // the standard's coverMul, so a HASTY roof (0.75×) renders THINNER than that requirement.

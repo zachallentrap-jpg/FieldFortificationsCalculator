@@ -30,6 +30,7 @@ test('each validation code is reachable', () => {
     { threat: 'none', overheadCover: true }, // COVER_NO_THREAT
     { threat: 'sa-556', overheadCover: true, standard: 'hasty' }, // COVER_UNDER_THREAT (0.75x roof)
     { positionType: 'atgm_javelin' }, // ATGM_BACKBLAST
+    { positionType: 'mortar_pit', overheadCover: true, threat: 'sa-556' }, // COVER_MORTAR_INDIRECT
   ];
   for (const s of scenarios) for (const c of codesFor(s)) fired.add(c);
 

@@ -29,24 +29,31 @@ export function drawPlan(result: Result): string {
   }
 
   const p = geo.plan;
+  const isVehicle = geo.shape === 'vehicle_ramp';
+  // A through-route with no firing aperture (connecting_trench is the only rect-shaped position
+  // with sectorsOfFire false — mortar/vehicle are excluded by shape/isVehicle above) has no
+  // "enemy side" to face and stays open-ended in 3D too (scene3d.ts's closedRear); the ring,
+  // ENEMY arrow, and FRONT/REAR framing all assume a facing direction that doesn't apply here.
+  const isOpenCorridor = !p.sectors.present && geo.shape !== 'circular' && !isVehicle;
   const halfL = p.outerL / 2;
   const halfW = p.outerW / 2;
   const enemyMargin = Math.max(3, halfW * 0.7);
   const sidePad = Math.max(1.5, p.parapetW);
-  // The inverted-T's rear stem and the L-shape's side arm (see the shape-specific draw below)
-  // extend past the plain rectangle's own footprint — pad the projector bounds so they never
-  // clip off-canvas instead of sizing bounds only for the main bay.
+  const dm = new Map<string, DimSpec>(geo.dims.map((d) => [d.key, d]));
+  const dimLabel = (k: string): string => fmtLength(dm.get(k)?.valueFt ?? 0, unit);
+  // The inverted-T's rear stem, the L-shape's side arm, and a vehicle's access ramp (see the
+  // shape-specific draw below) extend past the plain rectangle's own footprint — pad the
+  // projector bounds so they never clip off-canvas instead of sizing bounds only for the bay.
   const stemLen = geo.shape === 'inverted_t' ? p.holeW * 1.1 : 0;
   const armLen = geo.shape === 'l_shape' ? Math.max(2.5, p.holeL * 0.6) : 0;
+  const rampRunFt = isVehicle ? dm.get('ramp_run')?.valueFt ?? 0 : 0;
+  const rampWidthFt = Math.min(p.holeL, p.holeW);
 
   const proj = makeProjector(
-    { minX: -halfL - sidePad, maxX: halfL + sidePad + armLen, minY: -halfW - enemyMargin, maxY: halfW + sidePad + 1 + stemLen },
+    { minX: -halfL - sidePad, maxX: halfL + sidePad + armLen, minY: -halfW - enemyMargin, maxY: halfW + sidePad + 1 + stemLen + rampRunFt },
     { x: 0, y: HEADER_H + 20, w: W, h: H - LEGEND_H - (HEADER_H + 20), pad: 30 },
   );
   const px = (xf: number, yf: number): [number, number] => proj.toPx(xf, yf);
-
-  const dm = new Map<string, DimSpec>(geo.dims.map((d) => [d.key, d]));
-  const dimLabel = (k: string): string => fmtLength(dm.get(k)?.valueFt ?? 0, unit);
 
   const used = new Set<string>();
   const parts: string[] = [];
@@ -84,14 +91,16 @@ export function drawPlan(result: Result): string {
       );
     }
   }
-  const arrowTop = px(0, -halfW - enemyMargin * 0.95);
-  const arrowBase = px(0, -halfW - 0.3);
-  parts.push(
-    el('line', { x1: arrowBase[0], y1: arrowBase[1], x2: arrowTop[0], y2: arrowTop[1], stroke: 'var(--enemy)', 'stroke-width': 3.4, 'marker-end': 'url(#mk-arrow)' }),
-    textEl(arrowTop[0], arrowTop[1] - 6, 'ENEMY', { fill: 'var(--enemy)', 'font-size': 12, 'font-weight': '700', 'text-anchor': 'middle', 'letter-spacing': '1' }),
-  );
-  used.add('enemy');
-  parts.push(callout('enemy', arrowBase[0] + 16, arrowBase[1] - 6, used));
+  if (!isOpenCorridor) {
+    const arrowTop = px(0, -halfW - enemyMargin * 0.95);
+    const arrowBase = px(0, -halfW - 0.3);
+    parts.push(
+      el('line', { x1: arrowBase[0], y1: arrowBase[1], x2: arrowTop[0], y2: arrowTop[1], stroke: 'var(--enemy)', 'stroke-width': 3.4, 'marker-end': 'url(#mk-arrow)' }),
+      textEl(arrowTop[0], arrowTop[1] - 6, 'ENEMY', { fill: 'var(--enemy)', 'font-size': 12, 'font-weight': '700', 'text-anchor': 'middle', 'letter-spacing': '1' }),
+    );
+    used.add('enemy');
+    parts.push(callout('enemy', arrowBase[0] + 16, arrowBase[1] - 6, used));
+  }
 
   // ── Parapet ring + fighting bay ────────────────────────────────────────────────
   // A round position (mortar pit) reads as a circle here, not a square — the plan view has to
@@ -103,11 +112,28 @@ export function drawPlan(result: Result): string {
     const c = px(0, 0);
     parts.push(el('circle', { cx: c[0], cy: c[1], r: proj.lenPx(rOuter), fill: 'var(--draw-parapet)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
     parts.push(el('circle', { cx: c[0], cy: c[1], r: proj.lenPx(rHole), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
+  } else if (isVehicle) {
+    // Vehicle defilade: a pan (no full ring — front berm only) with a graded access ramp
+    // extending REAR-ward, matching the 3D scene and the actual excavation doctrine (the ramp
+    // is the dominant cut, not a symmetric parapet ring, R1).
+    const hTL = px(-p.holeL / 2, -p.holeW / 2);
+    parts.push(el('rect', { x: hTL[0], y: hTL[1], width: proj.lenPx(p.holeL), height: proj.lenPx(p.holeW), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
+    const bermTL = px(-p.holeL / 2, -p.holeW / 2 - p.parapetW);
+    parts.push(el('rect', { x: bermTL[0], y: bermTL[1], width: proj.lenPx(p.holeL), height: proj.lenPx(p.parapetW), fill: 'var(--draw-parapet)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)', rx: 3 }));
+    const rampTL = px(-rampWidthFt / 2, p.holeW / 2);
+    parts.push(el('rect', { x: rampTL[0], y: rampTL[1], width: proj.lenPx(rampWidthFt), height: proj.lenPx(rampRunFt), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
   } else {
-    const oTL = px(-halfL, -halfW);
-    parts.push(
-      el('rect', { x: oTL[0], y: oTL[1], width: proj.lenPx(p.outerL), height: proj.lenPx(p.outerW), fill: 'var(--draw-parapet)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)', rx: 3 }),
-    );
+    if (!isOpenCorridor) {
+      // The L-shape's side arm (fifty_cal, atgm_javelin) extends past the bay's own right edge
+      // by armLen — widen the ring's right edge to fully contain it (plus its own protective
+      // margin) instead of a symmetric ±halfL box the arm would poke out of (R3).
+      const ringRightFt = geo.shape === 'l_shape' ? p.holeL / 2 + armLen + p.parapetW : halfL;
+      const oTL = px(-halfL, -halfW);
+      const oBR = px(ringRightFt, halfW);
+      parts.push(
+        el('rect', { x: oTL[0], y: oTL[1], width: oBR[0] - oTL[0], height: oBR[1] - oTL[1], fill: 'var(--draw-parapet)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)', rx: 3 }),
+      );
+    }
     const hTL = px(-p.holeL / 2, -p.holeW / 2);
     parts.push(
       el('rect', { x: hTL[0], y: hTL[1], width: proj.lenPx(p.holeL), height: proj.lenPx(p.holeW), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }),
@@ -125,8 +151,16 @@ export function drawPlan(result: Result): string {
       parts.push(el('rect', { x: aTL[0], y: aTL[1], width: proj.lenPx(armLen), height: proj.lenPx(armW), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
     }
   }
-  used.add('parapet');
-  parts.push(callout('parapet', ...px(0, -(halfW + p.holeW / 2) / 2), used));
+  if (isVehicle) {
+    used.add('berm');
+    parts.push(callout('berm', ...px(0, -p.holeW / 2 - p.parapetW / 2), used));
+    used.add('ramp');
+    parts.push(callout('ramp', ...px(0, p.holeW / 2 + rampRunFt / 2), used));
+    parts.push(vDim(px(0, p.holeW / 2)[1], px(0, p.holeW / 2 + rampRunFt)[1], px(rampWidthFt / 2, 0)[0] + 20, dimLabel('ramp_run')));
+  } else if (!isOpenCorridor) {
+    used.add('parapet');
+    parts.push(callout('parapet', ...px(0, -(halfW + p.holeW / 2) / 2), used));
+  }
   used.add('bay');
   parts.push(callout('bay', ...px(-p.holeL * 0.22, 0), used));
 
@@ -151,20 +185,25 @@ export function drawPlan(result: Result): string {
   }
 
   // ── A–A cut line (matches drawSection) ─────────────────────────────────────────
+  // Extends past the ramp for vehicles — halfW (from outerW) doesn't reach it (the ramp's
+  // rear extent is the ramp run, not a mirrored parapet margin).
+  const rearExtentFt = isVehicle ? p.holeW / 2 + rampRunFt : halfW;
   const cutTop = px(0, -halfW - 0.2);
-  const cutBot = px(0, halfW + 0.2);
+  const cutBot = px(0, rearExtentFt + 0.2);
   parts.push(el('line', { x1: cutTop[0], y1: cutTop[1], x2: cutBot[0], y2: cutBot[1], stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-dim)', 'stroke-dasharray': '10 4 3 4' }));
   parts.push(cutMarker(cutTop[0], cutTop[1] - 2), cutMarker(cutBot[0], cutBot[1] + 12));
 
-  // ── FRONT / REAR ───────────────────────────────────────────────────────────────
-  const frontLabel = px(halfL * 0.72, -halfW * 0.8);
-  const rearLabel = px(halfL * 0.72, halfW * 0.82);
-  parts.push(
-    // Full-strength ink: these sit ON the parapet fill, and the night theme's soft ink
-    // (#c76a45) is nearly the same hue as the night parapet (#b5622f) — invisible.
-    textEl(frontLabel[0], frontLabel[1], 'FRONT', { fill: 'var(--ink)', 'font-size': 10.5, 'font-weight': '700', 'text-anchor': 'middle', 'letter-spacing': '1' }),
-    textEl(rearLabel[0], rearLabel[1], 'REAR', { fill: 'var(--ink)', 'font-size': 10.5, 'font-weight': '700', 'text-anchor': 'middle', 'letter-spacing': '1' }),
-  );
+  // ── FRONT / REAR (meaningless for a through-route with no facing direction) ────
+  if (!isOpenCorridor) {
+    const frontLabel = px(halfL * 0.72, -halfW * 0.8);
+    const rearLabel = px(halfL * 0.72, halfW * 0.82);
+    parts.push(
+      // Full-strength ink: these sit ON the parapet fill, and the night theme's soft ink
+      // (#c76a45) is nearly the same hue as the night parapet (#b5622f) — invisible.
+      textEl(frontLabel[0], frontLabel[1], 'FRONT', { fill: 'var(--ink)', 'font-size': 10.5, 'font-weight': '700', 'text-anchor': 'middle', 'letter-spacing': '1' }),
+      textEl(rearLabel[0], rearLabel[1], 'REAR', { fill: 'var(--ink)', 'font-size': 10.5, 'font-weight': '700', 'text-anchor': 'middle', 'letter-spacing': '1' }),
+    );
+  }
 
   // ── Dimensions ─────────────────────────────────────────────────────────────────
   const bTL = px(-p.holeL / 2, p.holeW / 2);

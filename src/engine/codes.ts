@@ -67,6 +67,11 @@ export const CODES = {
     'advisory',
     'Roof overhead is on but no threat is selected — pick a caliber so the cover can be sized (none is added yet).',
   ),
+  COVER_MORTAR_INDIRECT: def(
+    'COVER_MORTAR_INDIRECT',
+    'advisory',
+    'A mortar fires up and out through the top of the pit — a sealed roof overhead blocks its own fire. Overhead cover here is drawn as requested, not doctrine.',
+  ),
   COVER_UNDER_THREAT: def(
     'COVER_UNDER_THREAT',
     'advisory',

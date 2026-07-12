@@ -7,6 +7,7 @@
 import { positions } from '../doctrine/positions';
 import { fmtLength } from '../doctrine/units';
 import type { Result } from '../engine/types';
+import type { GeometryModel } from '../engine/geometry';
 
 export type DrawView = 'plan' | 'section' | 'iso';
 
@@ -27,6 +28,10 @@ const VIEW_LABEL: Record<DrawView, string> = {
 export function describe(result: Result, view: DrawView): A11y {
   const posLabel = positions[result.inputs.positionType]?.label ?? result.inputs.positionType;
   const cutDepth = fmtLength(result.resolved.depthOfCut, result.inputs.unit);
+  const geo = result.geometry as GeometryModel;
+  // A through-route with no firing aperture (connecting_trench) has no enemy-facing side —
+  // the plan draws no ENEMY arrow or FRONT/REAR labels for it either (drawPlan.ts isOpenCorridor).
+  const isOpenCorridor = !geo.plan.sectors.present && geo.shape !== 'circular' && geo.shape !== 'vehicle_ramp';
 
   const features: string[] = [];
   if (result.cover.roofPath === 'earth_on_stringers') features.push('earth-on-stringers overhead cover');
@@ -37,11 +42,15 @@ export function describe(result: Result, view: DrawView): A11y {
 
   const featureText = features.length ? ' Features: ' + features.join(', ') + '.' : '';
   const title = VIEW_LABEL[view] + ' — ' + posLabel;
+  const facingText = isOpenCorridor
+    ? ' A through-route with no facing direction; no FRONT/REAR labels.'
+    : ' The enemy is toward the front (top of the plan); FRONT and REAR are labeled.';
   const desc =
     posLabel +
     ', excavated ' +
     cutDepth +
-    ' deep. The enemy is toward the front (top of the plan); FRONT and REAR are labeled.' +
+    ' deep.' +
+    facingText +
     featureText;
 
   return {
