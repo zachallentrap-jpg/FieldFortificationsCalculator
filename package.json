@@ -1,7 +1,7 @@
 {
-  "name": "sap1",
+  "name": "1371",
   "version": "1.0.0",
-  "description": "SAP-1 \u2014 Survivability Position Planner. Deterministic, offline, parametric planner for doctrinal combat-engineer survivability positions. Illustrative placeholder data; NOT FOR FIELD USE.",
+  "description": "1371 \u2014 combat engineer field planning tools: Survivability Positions and Wood-Frame Construction. Deterministic, offline. Illustrative placeholder data; NOT FOR FIELD USE.",
   "private": true,
   "type": "module",
   "license": "MIT",

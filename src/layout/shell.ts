@@ -143,9 +143,15 @@ function topbar(state: AppState, result: Result): string {
       viewRow,
   );
 
+  // Home link back to the 1371 hub. Suppressed in the single-file file:// artifact,
+  // which ships this tool alone — there is no hub page sitting next to it to link to.
+  const homeLink =
+    typeof location !== 'undefined' && location.protocol === 'file:'
+      ? ''
+      : '<a class="home-link" href="./index.html" title="All tools (1371)">⌂ 1371</a>';
   return (
     '<header class="topbar">' +
-    '<div class="brand"><strong>Fighting Position Planner</strong>' + badge + '</div>' +
+    '<div class="brand">' + homeLink + '<strong>Survivability Positions</strong>' + badge + '</div>' +
     hamburgerMenu +
     '</header>'
   );

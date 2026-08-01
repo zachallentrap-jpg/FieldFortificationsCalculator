@@ -362,3 +362,17 @@ option, implement it, and log it here.
   registered leaf now has a consumer. Placeholder count 283→293 (+2 SC). DEFERRED (documented,
   not built): the squad battle-position multi-position sketch (mission aggregation already covers
   the squad math) and the fine bonded-bag hero-model aesthetic (needs visual iteration).
+
+- **D36 — Rebrand: the parent app is "1371"; tools go by doctrine names.** The suite hub is now
+  the root page (`index.html`) under the name **1371**, presenting one chip per tool; the tools
+  drop their codenames in every user-visible surface and go by doctrine subject instead —
+  **Survivability Positions** (was SAP-1, now `survivability.html`) and **Wood-Frame
+  Construction** (was TIMBER-1, `woodframe.html`). Consequences: the standalone air-gap
+  artifact is `dist/survivability-standalone.html` (named `*-standalone` so it can never
+  collide with the suite build's own `survivability.html` page); export filenames are
+  `survivability-*` (was `sap1-*`); the SW cache key rotated (`ce1371-v3`) with the new
+  precache list; the hub carries the SW registration so the suite installs/works offline from
+  the root. Deliberately NOT renamed: IndexedDB name (`sap1`), session/theme storage keys, and
+  SVG a11y id prefixes — renaming storage identifiers would orphan users' saved scenarios for
+  zero user-visible gain — plus historical docs/design filenames (`TIMBER1_3D_SYSTEM_DESIGN.md`,
+  `SAP-1_drawing_reference.svg`), where the codenames remain as the record.

@@ -1,7 +1,7 @@
 {
-  "name": "Fighting Position Planner",
-  "short_name": "Position Planner",
-  "description": "Deterministic, offline planner for digging and building defensive positions. Illustrative placeholder data; not for field use.",
+  "name": "1371",
+  "short_name": "1371",
+  "description": "Combat engineer field planning tools — survivability positions and wood-frame construction. Deterministic, offline. Illustrative placeholder data; not for field use.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -1,6 +1,6 @@
 # Placeholder Policy
 
-> **NOT FOR FIELD USE.** SAP-1 ships on **illustrative placeholder data**. It performs no authoritative-value lookup and fabricates no shielding thickness, roof/stringer load/span, standoff, or parapet/retaining thickness. Every such value is a flagged `PLACEHOLDER` until a qualified user fills it against a **current engineer publication**, offline. This tool is **not** a substitute for current engineer pubs or the engineer's judgment.
+> **NOT FOR FIELD USE.** The 1371 Survivability Positions tool ships on **illustrative placeholder data**. It performs no authoritative-value lookup and fabricates no shielding thickness, roof/stringer load/span, standoff, or parapet/retaining thickness. Every such value is a flagged `PLACEHOLDER` until a qualified user fills it against a **current engineer publication**, offline. This tool is **not** a substitute for current engineer pubs or the engineer's judgment.
 >
 > **Handling is CUI.** Clear this tool and any doctrine files you build with it through your **S-6 / information-management shop** before you field it.
 
@@ -100,7 +100,7 @@ The only supported way to fill values lives in `src/doctrine/io.ts`. It is built
 ```jsonc
 {
   "doctrineVersion": 1,
-  "note": "SAP-1 doctrine export — values are ILLUSTRATIVE PLACEHOLDERS unless status is DOCTRINE. NOT FOR FIELD USE.",
+  "note": "1371 Survivability Positions doctrine export — values are ILLUSTRATIVE PLACEHOLDERS unless status is DOCTRINE. NOT FOR FIELD USE.",
   "entries": [
     {
       "path": "…",              // dotted path identifying the exact value

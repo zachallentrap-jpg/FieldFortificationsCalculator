@@ -13,7 +13,7 @@ export interface Diagnostics {
   placeholders: { total: number; remaining: number; safetyCriticalRemaining: number };
   fill: { contentHash: string; author?: string; date?: string } | null;
   lastError: string | null;
-  online: false; // SAP-1 makes no network calls, ever
+  online: false; // the app makes no network calls, ever
 }
 
 export function collectDiagnostics(lastError: string | null): Diagnostics {
@@ -34,7 +34,7 @@ export function diagnosticsText(d: Diagnostics): string {
     ? 'Doctrine fill: ' + d.fill.contentHash + (d.fill.author ? ' by ' + d.fill.author : '') + (d.fill.date ? ' on ' + d.fill.date : '')
     : 'Doctrine fill: none (all placeholders)';
   return (
-    'SAP-1 ' + d.appVersion + ' · schema ' + d.schemaVersion + ' · doctrine ' + d.doctrineVersion + '\n' +
+    '1371 Survivability Positions ' + d.appVersion + ' · schema ' + d.schemaVersion + ' · doctrine ' + d.doctrineVersion + '\n' +
     'Placeholders: ' + d.placeholders.remaining + ' / ' + d.placeholders.total +
     ' (safety-critical: ' + d.placeholders.safetyCriticalRemaining + ')\n' +
     fillLine + '\n' +

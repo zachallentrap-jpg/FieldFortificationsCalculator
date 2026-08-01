@@ -29,7 +29,7 @@ export interface CsvMeta {
 export function toCsv(result: Result, meta: CsvMeta): string {
   const lines: string[] = [];
 
-  lines.push(row('SAP-1 Survivability Position Planner'));
+  lines.push(row('1371 — Survivability Positions'));
   lines.push(row('Scenario', meta.scenario));
   lines.push(row('Date', meta.date));
   lines.push(row('Position', result.inputs.positionType));

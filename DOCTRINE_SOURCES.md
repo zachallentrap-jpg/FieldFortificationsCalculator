@@ -1,10 +1,10 @@
 # DOCTRINE_SOURCES.md — Placeholder Fill Checklist
 
 > **NOT FOR FIELD USE. CUI.**
-> SAP-1 ships on **ILLUSTRATIVE PLACEHOLDER** data. Nothing in this file is a
+> The 1371 Survivability Positions tool ships on **ILLUSTRATIVE PLACEHOLDER** data. Nothing in this file is a
 > doctrinal value, and nothing here is verified. Every quantitative constant
 > below is a `P()`-wrapped placeholder whose `status` is `PLACEHOLDER` and whose
-> `source` is `"TODO: confirm against current pub"`. SAP-1 performs **no**
+> `source` is `"TODO: confirm against current pub"`. The tool performs **no**
 > authoritative-value lookup and **fabricates no** shielding thickness, roof or
 > stringer load/span, standoff, or parapet/retaining thickness. The
 > "Current placeholder" column exists **only for traceability** so you can find

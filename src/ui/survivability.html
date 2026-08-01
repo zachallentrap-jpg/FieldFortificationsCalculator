@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en" data-theme="day">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="Survivability Positions — deterministic, offline planner for digging and building defensive positions. Illustrative placeholder data; not for field use." />
+    <meta name="theme-color" content="#16130d" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <title>Survivability Positions</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#app">Skip to planner</a>
+    <div id="root">
+      <div id="app"></div>
+    </div>
+    <!-- Polite live region for terse update announcements — aria-live on #app itself made
+         every input change re-announce the entire page to screen readers. -->
+    <div id="sr-status" class="visually-hidden" role="status" aria-live="polite"></div>
+    <div id="overlay" class="overlay" hidden>
+      <div class="overlay-card" role="dialog" aria-modal="true" aria-label="Detail">
+        <button type="button" class="overlay-close" data-action="overlay-close" aria-label="Close">Close</button>
+        <div id="overlay-body"></div>
+      </div>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

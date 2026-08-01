@@ -1,5 +1,6 @@
-# Replit config for SAP-1. The app is a fully static, offline-capable PWA (zero backend, zero
-# external requests); Vite builds it to dist/, and dist/sap1.html is a single-file air-gapped copy.
+# Replit config for 1371 (combat engineer toolkit). The app is a fully static, offline-capable
+# PWA (zero backend, zero external requests); Vite builds it to dist/, and
+# dist/survivability-standalone.html is a single-file air-gapped copy of the survivability tool.
 #
 # Deployment target = "autoscale": Replit's "Publish app" flow wants a persistent run command, so
 # a tiny ZERO-DEPENDENCY static server (scripts/serve.js, Node built-ins only) serves dist/ on

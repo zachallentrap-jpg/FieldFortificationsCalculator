@@ -1,6 +1,8 @@
-// Single-file build (§16). Inlines the Vite output (dist/index.html + its JS/CSS) into a
-// self-contained dist/sap1.html that runs from file:// with ZERO external requests — the true
-// air-gap artifact (service workers don't run from file://, so this is the offline fallback).
+// Single-file build (§16). Inlines the Vite output (survivability.html + its JS/CSS) into a
+// self-contained dist/survivability-standalone.html that runs from file:// with ZERO external
+// requests — the true air-gap artifact (service workers don't run from file://, so this is
+// the offline fallback). Named *-standalone so it never collides with the suite build's own
+// dist/survivability.html page.
 // Inline module scripts execute from file:// without CORS issues (CORS only applies to fetched
 // module resources, of which we have none — everything is bundled into one chunk).
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
@@ -13,11 +15,11 @@ const DIST = fileURLToPath(new URL('../dist', import.meta.url));
 // (vite.standalone.config.ts → dist-standalone/) when present; fall back to dist/ for the
 // legacy single-page pipeline.
 const SINGLE = fileURLToPath(new URL('../dist-standalone', import.meta.url));
-const SRC = existsSync(join(SINGLE, 'index.html')) ? SINGLE : DIST;
-const indexPath = join(SRC, 'index.html');
+const SRC = existsSync(join(SINGLE, 'survivability.html')) ? SINGLE : DIST;
+const indexPath = join(SRC, 'survivability.html');
 
 if (!existsSync(indexPath)) {
-  console.error('build-standalone: index.html not found — run `vite build -c vite.standalone.config.ts` first.');
+  console.error('build-standalone: survivability.html not found — run `vite build -c vite.standalone.config.ts` first.');
   process.exit(1);
 }
 
@@ -44,5 +46,5 @@ html = html.replace(/<link\b[^>]*\brel="stylesheet"[^>]*\bhref="([^"]+)"[^>]*>/g
 html = html.replace(/<link\b[^>]*\brel="modulepreload"[^>]*>/g, '');
 html = html.replace(/<link\b[^>]*\brel="manifest"[^>]*>/g, '');
 
-writeFileSync(join(DIST, 'sap1.html'), html);
-console.log('build-standalone: wrote dist/sap1.html (' + Math.round(html.length / 1024) + ' KB)');
+writeFileSync(join(DIST, 'survivability-standalone.html'), html);
+console.log('build-standalone: wrote dist/survivability-standalone.html (' + Math.round(html.length / 1024) + ' KB)');

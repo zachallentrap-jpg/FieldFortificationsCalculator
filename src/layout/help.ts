@@ -5,7 +5,7 @@ function item(term: string, def: string): string {
 
 export function helpHtml(): string {
   return (
-    '<div class="help"><h2>How to use SAP-1</h2>' +
+    '<div class="help"><h2>How to use the Survivability Positions planner</h2>' +
     '<dl>' +
     item('Type', 'The doctrinal position: one/two-man fighting positions, crew-served, vehicle defilade, mortar pit, bunker/OP-CP. Each has fixed geometry and features.') +
     item('Standard', 'Hasty → deliberate → reinforced. Scales depth, cover, and labor — a hasty position is faster and shallower; reinforced is deeper with more protection.') +

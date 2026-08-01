@@ -441,7 +441,7 @@ document.addEventListener('click', (e) => {
       }
       break;
     }
-    case 'scenario-export': scenarioStore.list().then((list) => { download('sap1-scenarios.json', JSON.stringify(list, null, 2), 'application/json'); showToast(list.length + ' scenario(s) exported as a file.'); }); break;
+    case 'scenario-export': scenarioStore.list().then((list) => { download('survivability-scenarios.json', JSON.stringify(list, null, 2), 'application/json'); showToast(list.length + ' scenario(s) exported as a file.'); }); break;
     case 'scenario-import': pickFile((text) => {
       const r = scenarioStore.parseImportMany(text);
       if (!r.ok) { showToast('Import failed: ' + r.error); return; }
@@ -454,7 +454,7 @@ document.addEventListener('click', (e) => {
     // ── Doctrine fill (placeholder burn-down) ──
     case 'doctrine': doctrineReport = null; pendingImport = null; openDoctrine(); break;
     case 'doctrine-export':
-      download('sap1-doctrine.json', JSON.stringify(exportDoctrine(), null, 2), 'application/json');
+      download('survivability-doctrine.json', JSON.stringify(exportDoctrine(), null, 2), 'application/json');
       showToast('Doctrine file exported — edit it offline against current pubs, then import it back.');
       break;
     case 'doctrine-import':
@@ -689,23 +689,23 @@ function download(name: string, text: string, mime: string): void {
 }
 function doCsv(): void {
   if (!lastResult) return;
-  download('sap1-bom.csv', toCsv(lastResult, meta()), 'text/csv;charset=utf-8');
-  showToast('Materials list downloaded (sap1-bom.csv).');
+  download('survivability-bom.csv', toCsv(lastResult, meta()), 'text/csv;charset=utf-8');
+  showToast('Materials list downloaded (survivability-bom.csv).');
 }
 function doExportJson(): void {
   if (!lastResult) return;
   // Export a VALID scenario file (id + name + inputs) — the old export wrote bare inputs,
   // which the importer rightly rejected: the app couldn't re-open its own file.
   const s = makeScenario(newId(), meta().scenario, lastResult.inputs, new Date().toISOString());
-  download('sap1-scenario.json', scenarioStore.exportJson(s), 'application/json');
-  showToast('Settings file downloaded (sap1-scenario.json).');
+  download('survivability-scenario.json', scenarioStore.exportJson(s), 'application/json');
+  showToast('Settings file downloaded (survivability-scenario.json).');
 }
 function doSvg(): void {
   if (!lastResult) return;
   // The renderers already produce standalone SVG strings — a plan + section download needs no
   // rasterization, stays fully offline, and drops into any range-card packet or briefing.
-  download('sap1-plan.svg', drawPlan(lastResult), 'image/svg+xml');
-  download('sap1-section.svg', drawSection(lastResult), 'image/svg+xml');
+  download('survivability-plan.svg', drawPlan(lastResult), 'image/svg+xml');
+  download('survivability-section.svg', drawSection(lastResult), 'image/svg+xml');
   showToast('Plan and section downloaded as SVG drawings.');
 }
 
@@ -723,7 +723,7 @@ function doPrint(): void {
   if (!w) {
     // Pop-up blocked (common on locked-down phones): deliver the job sheet as a file instead
     // of failing silently — the user still walks away with the printable document.
-    download('sap1-job-sheet.html', jobSheet(lastResult, meta()), 'text/html;charset=utf-8');
+    download('survivability-job-sheet.html', jobSheet(lastResult, meta()), 'text/html;charset=utf-8');
     showToast('Pop-up blocked — job sheet saved as an HTML file. Open it and print from there.');
     return;
   }

@@ -1,5 +1,5 @@
-// Printable job sheet (§10). A self-contained HTML document: repeating masthead (SAP-1,
-// scenario, date, APP_VERSION), inputs summary, the annotated plan + section (same
+// Printable job sheet (§10). A self-contained HTML document: repeating masthead (1371 —
+// Survivability Positions, scenario, date, APP_VERSION), inputs summary, the annotated plan + section (same
 // numbered-callout system), specs, BOM, labor, and a Prepared by / Verified by / Date block.
 // Page-break-safe via @media print rules. Pure — the date is passed in (the engine reads no
 // clock).
@@ -92,9 +92,9 @@ export function jobSheet(result: Result, meta: JobSheetMeta): string {
   return (
     '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width, initial-scale=1">' +
-    '<title>SAP-1 Job Sheet — ' + esc(meta.scenario) + '</title>' +
+    '<title>Survivability Positions Job Sheet — ' + esc(meta.scenario) + '</title>' +
     '<style>' + PRINT_CSS + '</style></head><body><div class="sheet">' +
-    '<div class="mast"><h1>SAP-1 — Survivability Position Planner</h1>' +
+    '<div class="mast"><h1>1371 — Survivability Positions</h1>' +
     '<div class="meta">' + esc(meta.scenario) + '<br>' + esc(meta.date) + ' · ' + esc(APP_VERSION) + '</div></div>' +
     fieldHeader() +
     '<section><div class="grid"><div><h2>Inputs</h2><table>' + inputRows + '</table></div>' +

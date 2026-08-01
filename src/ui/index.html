@@ -1,29 +1,49 @@
 <!doctype html>
-<html lang="en" data-theme="day">
+<!-- 1371 — the parent app. Opening the app lands here: a chip per tool, each named by its
+     doctrine subject — Survivability Positions (./survivability.html) and Wood-Frame
+     Construction (./woodframe.html). Adding a tool = one more chip here + one more rollup
+     input in vite.config.ts. No framework and no module script on purpose: the chips are
+     plain links, and the only JS is the service-worker registration that makes the suite
+     installable/offline from the root. -->
+<html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="color-scheme" content="light dark" />
-    <meta name="description" content="Fighting Position Planner — deterministic, offline planner for digging and building defensive positions. Illustrative placeholder data; not for field use." />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="1371 — combat engineer field planning tools. Deterministic, offline. Illustrative placeholder data; not for field use." />
     <meta name="theme-color" content="#16130d" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-    <title>Fighting Position Planner</title>
+    <title>1371</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; background: #f4f2ec; font-family: system-ui, sans-serif; color: #2b2419; }
+      header { padding: 52px 20px 8px; text-align: center; }
+      header h1 { margin: 0; font-size: 46px; letter-spacing: 0.16em; font-family: ui-monospace, monospace; }
+      header p { margin: 8px 0 0; color: #6b6250; font-size: 14px; }
+      .badge { display: inline-block; margin-top: 12px; background: #7a1f1a; color: #fbf9f4; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; padding: 4px 10px; border-radius: 999px; }
+      nav { flex: 1; display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; align-content: flex-start; padding: 34px 20px 10px; max-width: 860px; margin: 0 auto; width: 100%; }
+      a.chip { display: inline-flex; align-items: center; padding: 14px 24px; border: 1.5px solid #c9c0ad; border-radius: 999px; background: #fbf9f4; color: inherit; text-decoration: none; font-size: 16px; font-weight: 600; box-shadow: 0 2px 8px rgba(43, 36, 25, 0.06); }
+      a.chip:hover, a.chip:focus-visible { border-color: #2b2419; box-shadow: 0 4px 14px rgba(43, 36, 25, 0.14); }
+      footer { text-align: center; padding: 18px 20px 30px; font-size: 11px; color: #6b6250; max-width: 720px; margin: 0 auto; }
+    </style>
   </head>
   <body>
-    <a class="skip-link" href="#app">Skip to planner</a>
-    <div id="root">
-      <div id="app"></div>
-    </div>
-    <!-- Polite live region for terse update announcements — aria-live on #app itself made
-         every input change re-announce the entire page to screen readers. -->
-    <div id="sr-status" class="visually-hidden" role="status" aria-live="polite"></div>
-    <div id="overlay" class="overlay" hidden>
-      <div class="overlay-card" role="dialog" aria-modal="true" aria-label="Detail">
-        <button type="button" class="overlay-close" data-action="overlay-close" aria-label="Close">Close</button>
-        <div id="overlay-body"></div>
-      </div>
-    </div>
-    <script type="module" src="./main.ts"></script>
+    <header>
+      <h1>1371</h1>
+      <p>Combat engineer field planning tools — offline-first, doctrine-cited, every drawing generated from the same math.</p>
+      <span class="badge">NOT FOR FIELD USE — practice data pending doctrine verification</span>
+    </header>
+    <nav aria-label="Tools">
+      <a class="chip" href="./survivability.html">Survivability Positions</a>
+      <a class="chip" href="./woodframe.html">Wood-Frame Construction</a>
+    </nav>
+    <footer>
+      Single offline bundle: every tool ships in one deploy with zero external requests.
+      Occupied or permanent structures follow local building code and qualified review.
+    </footer>
+    <script>
+      if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0)
+        addEventListener('load', function () { navigator.serviceWorker.register('./sw.js').catch(function () {}); });
+    </script>
   </body>
 </html>

@@ -88,7 +88,7 @@ export function exportDoctrine(manifest?: { author?: string; date?: string }): D
   if (manifest?.date) m.date = manifest.date;
   return {
     doctrineVersion: DOCTRINE_VERSION,
-    note: 'SAP-1 doctrine export — values are ILLUSTRATIVE PLACEHOLDERS unless status is DOCTRINE. NOT FOR FIELD USE.',
+    note: '1371 Survivability Positions doctrine export — values are ILLUSTRATIVE PLACEHOLDERS unless status is DOCTRINE. NOT FOR FIELD USE.',
     manifest: m,
     entries,
   };

@@ -1,8 +1,15 @@
-# SAP-1 — Survivability Position Planner
+# 1371 — Combat Engineer Field Planning Tools
 
-SAP-1 is a deterministic, offline, private, parametric planner for doctrinal USMC/Army combat-engineer survivability positions — fighting positions, crew-served positions, vehicle defilade, bunkers, connecting trenches, and ATGM positions. You pick from dropdowns and toggles (position, threat, soil, standard, roof), and SAP-1 turns those inputs into dimensioned plan/section drawings that double as a **range card** (sectors of fire in degrees and mils, north arrow, scale bar, FPL), a real **drag-to-rotate 3D model** with a **construction-stage scrubber** and cutaway, a bill of materials, a labor estimate, a **priorities-of-work timeline** that answers "are we ready by stand-to," and a printable job sheet — all recomputed live as you change an input.
+**1371** is the parent app: a deterministic, offline, private suite of combat-engineer planning tools. Opening the app lands on the 1371 hub — a chip per tool, each named by its doctrine subject:
 
-The whole roadmap that produced the current tool — the multi-angle plan and the phase-by-phase execution — is in [`docs/EXECUTION_PLAN.md`](docs/EXECUTION_PLAN.md); the decisions are logged in [`DECISIONS.md`](DECISIONS.md).
+- **Survivability Positions** (`survivability.html`) — a parametric planner for doctrinal USMC/Army survivability positions: fighting positions, crew-served positions, vehicle defilade, bunkers, connecting trenches, and ATGM positions. You pick from dropdowns and toggles (position, threat, soil, standard, roof), and it turns those inputs into dimensioned plan/section drawings that double as a **range card** (sectors of fire in degrees and mils, north arrow, scale bar, FPL), a real **drag-to-rotate 3D model** with a **construction-stage scrubber** and cutaway, a bill of materials, a labor estimate, a **priorities-of-work timeline** that answers "are we ready by stand-to," and a printable job sheet — all recomputed live as you change an input.
+- **Wood-Frame Construction** (`woodframe.html`) — theater-of-operations framing per FM 5-426: floor, walls, and roof generated member-by-member, with build stages, cut lists, man-hours, and plate layout strips, all projections of one frame model.
+
+Adding a future tool = one more chip on the hub + one more rollup input in `vite.config.ts`.
+
+> **Naming note:** through initial development the survivability tool was code-named **SAP-1** and the wood-frame tool **TIMBER-1**. Older documents (`DECISIONS.md`, `docs/`) use those codenames; they refer to the tools above.
+
+The whole roadmap that produced the current suite — the multi-angle plan and the phase-by-phase execution — is in [`docs/EXECUTION_PLAN.md`](docs/EXECUTION_PLAN.md); the decisions are logged in [`DECISIONS.md`](DECISIONS.md).
 
 The interface leads with plain language everywhere (the technical term stays alongside in parentheses — e.g. "Dirt wall up front (parapet)") so it's usable without already knowing the jargon; the fixed doctrinal vocabulary the spec requires is never hidden, just never load-bearing for basic use.
 
@@ -10,9 +17,9 @@ The interface leads with plain language everywhere (the technical term stays alo
 
 > ## ⚠ NOT FOR FIELD USE — CUI handling
 >
-> **SAP-1 ships on illustrative placeholder data. Do not use it to build a real position.**
+> **The Survivability Positions tool ships on illustrative placeholder data. Do not use it to build a real position.**
 >
-> It is **not** a substitute for current engineer publications or the engineer's judgment. SAP-1 performs **no** authoritative-value lookup and fabricates **no** shielding thickness, roof/stringer load or span, standoff, or parapet/retaining thickness. Every such value is a flagged placeholder (`status: "PLACEHOLDER"`, `source: "TODO: confirm against current pub"`), and the safety-critical ones — shielding thickness, roof/stringer load and span, standoff, parapet and retaining thickness — are tagged `safetyCritical: true`.
+> It is **not** a substitute for current engineer publications or the engineer's judgment. It performs **no** authoritative-value lookup and fabricates **no** shielding thickness, roof/stringer load or span, standoff, or parapet/retaining thickness. Every such value is a flagged placeholder (`status: "PLACEHOLDER"`, `source: "TODO: confirm against current pub"`), and the safety-critical ones — shielding thickness, roof/stringer load and span, standoff, parapet and retaining thickness — are tagged `safetyCritical: true`.
 >
 > A data-driven **NOT FOR FIELD USE** banner is on until the count of remaining placeholders reaches zero. It clears only when a qualified user has replaced every placeholder with a real, verified value **offline** via doctrine import (`src/doctrine/io.ts`). Until then, treat every number on screen as a stand-in.
 >
@@ -26,7 +33,7 @@ The interface leads with plain language everywhere (the technical term stays alo
 - **Offline.** No runtime network requests, ever. The doctrine, engine, and state layers carry **zero runtime dependencies** (Vite and tsx are dev-only). A build gate (`scripts/check-offline.ts`) fails the build on any external URL in `dist/`, so the shipped artifact makes no outbound calls. The only allowlisted URLs are W3C SVG/XML namespace identifiers, which are never dereferenced over the network.
 - **Private.** No accounts, no analytics, no off-device logging. Your scenarios live in the browser (IndexedDB) and in files you explicitly export. Nothing leaves the machine unless you save it there yourself.
 
-## Threat model
+## Threat model (Survivability Positions)
 
 Threat is a **specific caliber, not a coarse bucket** — class → round: small arms / HMG (5.56, 7.62, 12.7/.50 cal, 14.5mm), indirect (mortar 60/81/120mm; artillery 105/122/152/155mm), direct-fire AT (RPG, recoilless, tank, contact-HE), and blast/overpressure (demolition/small IED, large VBIED) — each with its own placeholder shielding thickness, standoff, roof call, and cover material, so a bigger round drives more cover and more standoff.
 
@@ -46,7 +53,7 @@ Requires **Node ≥ 20**.
 
 ```bash
 npm install
-npm run dev        # Vite dev server
+npm run dev        # Vite dev server — opens on the 1371 hub
 npm run verify     # typecheck + all tests + offline gate
 ```
 
@@ -55,13 +62,13 @@ npm run verify     # typecheck + all tests + offline gate
 ## Build & deliver
 
 ```bash
-npm run build      # produces the installable PWA in dist/ AND dist/sap1.html, then runs the offline gate
+npm run build      # produces the installable PWA in dist/ AND dist/survivability-standalone.html, then runs the offline gate
 ```
 
-The build ships **two** ways to run SAP-1 offline; use whichever your environment allows.
+The build ships **two** ways to run 1371 offline; use whichever your environment allows.
 
-- **Installable PWA (`dist/`).** A static build with a web app manifest and a service worker. Served over **http(s) or localhost**, it installs as an app and runs fully offline after first load. This is the normal path — including the Replit static deployment (`.replit` sets `deploymentTarget = "static"`, `publicDir = "dist"`, and `build = npm ci && npm run build`).
-- **Single self-contained file (`dist/sap1.html`).** One HTML file with everything inlined — the **air-gap fallback**. It runs directly from `file://` with no server at all. Service workers do not run from `file://`, so this is the copy for a truly disconnected machine: put the one file on the box and open it in a browser.
+- **Installable PWA (`dist/`).** A static build with a web app manifest and a service worker. Served over **http(s) or localhost**, it installs as an app and runs fully offline after first load: the 1371 hub at `index.html`, chipping out to `survivability.html` and `woodframe.html`. This is the normal path — including the Replit deployment (see `.replit`).
+- **Single self-contained file (`dist/survivability-standalone.html`).** One HTML file with the Survivability Positions tool and everything it needs inlined — the **air-gap fallback**. It runs directly from `file://` with no server at all. Service workers do not run from `file://`, so this is the copy for a truly disconnected machine: put the one file on the box and open it in a browser. (`npm run build:woodframe` produces the equivalent standalone page for Wood-Frame Construction in `dist-woodframe/`.)
 
 Both are produced by the same `npm run build`, and both pass the `check:offline` gate (no external URLs in `dist/`).
 
@@ -69,5 +76,5 @@ Both are produced by the same `npm run build`, and both pass the `check:offline`
 
 - [`PLACEHOLDER_POLICY.md`](PLACEHOLDER_POLICY.md) — the placeholder / provenance regime and how the NOT FOR FIELD USE banner clears.
 - [`DOCTRINE_SOURCES.md`](DOCTRINE_SOURCES.md) — what a qualified user must confirm, and against which publications, before fielding.
-- [`USER_GUIDE.md`](USER_GUIDE.md) — how to use the planner: inputs, drawings, exports, scenarios, mission rollup, comparison, and time-available planning.
+- [`USER_GUIDE.md`](USER_GUIDE.md) — how to use the Survivability Positions planner: inputs, drawings, exports, scenarios, mission rollup, comparison, and time-available planning.
 - [`DECISIONS.md`](DECISIONS.md) — the design decisions behind the engine, the safety invariants, and the offline / private posture.

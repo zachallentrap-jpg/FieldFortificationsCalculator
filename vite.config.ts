@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig, type Plugin } from 'vite';
 
-// SAP-1 is offline-first. Vite is a dev/build-time dependency only; nothing here
+// 1371 is offline-first. Vite is a dev/build-time dependency only; nothing here
 // pulls a runtime dependency into doctrine/ engine/ state/. `base: './'` keeps every
 // asset reference relative so the PWA build works from any path and the standalone
 // inliner (scripts/build-standalone.ts) can fold it into a single file:// artifact.
@@ -33,12 +33,13 @@ export default defineConfig({
     assetsInlineLimit: 100_000_000, // inline all assets; we ship zero external requests
     chunkSizeWarningLimit: 1000, // the 3D library is the bulk of this; expected, not a code-split candidate for a single-file artifact
     rollupOptions: {
-      // The suite is multi-page: one deploy ships the hub plus every tool. Adding a tool =
-      // one more input here + one more card in hub.html. build-standalone.ts still inlines
-      // dist/index.html (SAP-1); the offline gate scans ALL emitted pages.
+      // The suite is multi-page: opening the app lands on the 1371 hub (index.html), which
+      // chips out to every tool. Adding a tool = one more input here + one more chip in
+      // index.html. build-standalone.ts inlines dist-standalone/survivability.html; the
+      // offline gate scans ALL emitted pages.
       input: {
         index: fileURLToPath(new URL('src/ui/index.html', import.meta.url)),
-        hub: fileURLToPath(new URL('src/ui/hub.html', import.meta.url)),
+        survivability: fileURLToPath(new URL('src/ui/survivability.html', import.meta.url)),
         woodframe: fileURLToPath(new URL('src/ui/woodframe.html', import.meta.url)),
       },
       output: {

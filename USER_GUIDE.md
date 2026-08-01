@@ -1,6 +1,6 @@
-# SAP-1 — Survivability Position Planner: Operator Guide
+# Survivability Positions (1371) — Operator Guide
 
-SAP-1 turns a few dropdowns and toggles into dimensioned drawings, a real drag-to-rotate 3D model, a bill of materials, and a labor estimate for a doctrinal survivability position — a fighting position, a crew-served position, vehicle defilade, or a bunker/OP-CP. You pick the position, the standard, the soil, and the threat; it draws the plan, the section, and a 3D model you can turn with your mouse or finger, lists what you need, and tells you how long it takes. Everything runs on your device with no network.
+The Survivability Positions tool (part of the 1371 combat-engineer suite) turns a few dropdowns and toggles into dimensioned drawings, a real drag-to-rotate 3D model, a bill of materials, and a labor estimate for a doctrinal survivability position — a fighting position, a crew-served position, vehicle defilade, or a bunker/OP-CP. You pick the position, the standard, the soil, and the threat; it draws the plan, the section, and a 3D model you can turn with your mouse or finger, lists what you need, and tells you how long it takes. Everything runs on your device with no network.
 
 Every input carries a plain-language explanation, not just its name — the doctrinal term is always there too (in parentheses), but you never have to already know it to use the tool.
 
@@ -8,7 +8,7 @@ Every input carries a plain-language explanation, not just its name — the doct
 
 ## READ THIS FIRST — NOT FOR FIELD USE
 
-**SAP-1 ships on illustrative placeholder data. It is not for field use.**
+**This tool ships on illustrative placeholder data. It is not for field use.**
 
 - It is **not** a substitute for current engineer publications or the engineer's judgment.
 - It performs **no** authoritative-value lookup and **fabricates no** shielding thickness, roof or stringer load, standoff, or parapet thickness. Every one of those numbers is a flagged placeholder.
@@ -23,10 +23,10 @@ The safety-critical values — shielding thickness, roof and stringer load and s
 
 ## Getting on the tool
 
-There are two ways to run SAP-1, both fully offline:
+There are two ways to run the tool, both fully offline:
 
 - **Installed app (PWA).** Served over http(s) or localhost. It installs, caches itself, and runs offline after first load. Use this on a device you can serve the app to.
-- **Single file (`sap1.html`).** One self-contained file you open directly from disk (`file://`). This is the air-gap fallback — it needs no server. (Service workers don't run from `file://`, so the installed-app offline caching doesn't apply here; the single file simply *is* the whole app.)
+- **Single file (`survivability-standalone.html`).** One self-contained file you open directly from disk (`file://`). This is the air-gap fallback — it needs no server. (Service workers don't run from `file://`, so the installed-app offline caching doesn't apply here; the single file simply *is* the whole app.)
 
 Either way, no data leaves the device. The Diagnostics panel confirms it: **Network: offline by design.**
 
@@ -34,7 +34,7 @@ Either way, no data leaves the device. The Diagnostics panel confirms it: **Netw
 
 ## The three layouts and the Auto / override switch
 
-SAP-1 arranges itself for the screen you're on. There are three layouts, chosen automatically from width, pointer type, and orientation. A **Layout** dropdown at the right end of the top bar lets you force one.
+The app arranges itself for the screen you're on. There are three layouts, chosen automatically from width, pointer type, and orientation. A **Layout** dropdown at the right end of the top bar lets you force one.
 
 **What you do:** nothing, normally — leave the layout picker on **Auto**. To lock a layout (e.g. force the desktop three-region view on a large tablet), pick **Mobile**, **Tablet**, or **Desktop** from that dropdown. A manual choice always wins over Auto until you set it back.
 
@@ -101,7 +101,7 @@ The threat is a **specific round**, chosen in two steps:
 
 Picking a class jumps the caliber dropdown to the first round in that class; picking **None** clears the threat.
 
-**Why the specific round matters:** the threat's *size* is the dominant protection variable, so SAP-1 makes you choose the actual round, not a coarse bucket. Each round carries its own placeholder cover thickness, standoff, roof call, and cover material. A bigger round means more cover and more standoff — switching, say, 81mm to 155mm actually moves the cover thickness, the setback, and the BOM. The hint under the picker says it plainly: **Size drives cover thickness, standoff & roof.** (The caliber in millimeters is just the round's name — it is not one of the placeholder numbers you'd confirm against a pub.)
+**Why the specific round matters:** the threat's *size* is the dominant protection variable, so the planner makes you choose the actual round, not a coarse bucket. Each round carries its own placeholder cover thickness, standoff, roof call, and cover material. A bigger round means more cover and more standoff — switching, say, 81mm to 155mm actually moves the cover thickness, the setback, and the BOM. The hint under the picker says it plainly: **Size drives cover thickness, standoff & roof.** (The caliber in millimeters is just the round's name — it is not one of the placeholder numbers you'd confirm against a pub.)
 
 ---
 
@@ -142,7 +142,7 @@ The engine emits zero cover thickness for these threats, by design. If you need 
 
 Where the plan and section are precise measured drawings, the third view is a real, interactive 3D model you can drag to rotate, scroll or pinch to zoom, built from the exact same numbers. Every position type gets its own real shape — a rectangular one/two-man hole, the inverted-T trench of an MG position, the L-shaped alcove of a .50-cal position, a round mortar pit, or a ramp cut for vehicle defilade — plus a small figure standing next to it for scale, and floating labels ("Dirt wall up front", "Enemy direction"...) so a glance tells you what you're looking at. Click **Reset view** to recenter the camera; it never resets on its own just because you changed an input.
 
-It carries **no dimensions** on purpose — the plan and section still govern measurement. If your device has no WebGL (rare), SAP-1 automatically falls back to a flat 2.5D schematic instead — nothing breaks, it just draws differently.
+It carries **no dimensions** on purpose — the plan and section still govern measurement. If your device has no WebGL (rare), the app automatically falls back to a flat 2.5D schematic instead — nothing breaks, it just draws differently.
 
 **The materials you see are the materials in the bill of materials — nothing is decoration.** The parapet and any earthen roof are always shown as stacked sandbags, because that's what they actually are per doctrine. The dug-out walls show whatever you picked for Revetment: sandbag facing tiles the same way as the parapet, Pickets & wire shows visibly open posts and wire (not a solid wall), and Corrugated metal / Timber & plywood each get their own distinct texture. Pick **Revetment: None** and the wall goes back to bare, sloped earth — how steep the slope looks depends on the Soil you picked (sand and gravel slope hard and require a revetment; clay and rock barely slope at all).
 
@@ -171,7 +171,7 @@ Scenarios let you keep named configurations and move them between devices. Open 
 - **Save current…** — names and stores the current inputs. You're prompted for a name.
 - **Load** / **Delete** — on each saved scenario in the list. Loading replaces your current inputs (and resets undo history to that point).
 - **Import JSON** — pick a scenario `.json` file from disk. It's re-validated before it loads; a bad file is refused with a message rather than corrupting anything.
-- **Export all** — downloads every saved scenario as one `sap1-scenarios.json` file.
+- **Export all** — downloads every saved scenario as one `survivability-scenarios.json` file.
 
 Scenarios live **on this device only** (in the browser's IndexedDB), as the panel notes. Corrupt or unreadable rows are skipped silently, never loaded blindly.
 
@@ -219,8 +219,8 @@ This is the inverse question: given the time and crew you have, what's the most 
 All three exports are produced locally; you click to download or print. Nothing is uploaded.
 
 - **Print** — opens a printable **job sheet** for the current position (the dimensioned drawings, specs, BOM, and labor in a print-friendly page) and sends it to your printer / PDF.
-- **CSV** — downloads the bill of materials as **`sap1-bom.csv`** (RFC-4180 CSV, safe to open in a spreadsheet).
-- **JSON** — downloads the current inputs as **`sap1-scenario.json`** — the portable configuration you can re-import later or on another device.
+- **CSV** — downloads the bill of materials as **`survivability-bom.csv`** (RFC-4180 CSV, safe to open in a spreadsheet).
+- **JSON** — downloads the current inputs as **`survivability-scenario.json`** — the portable configuration you can re-import later or on another device.
 
 Exports carry the app / schema / doctrine version stamps. Remember the CUI handling caveat before you move any exported file off the device.
 
@@ -244,4 +244,4 @@ Exports carry the app / schema / doctrine version stamps. Remember the CUI handl
 
 ## The short version
 
-Pick a position, a standard, a soil, and a specific threat round. Read the drawings by their dimensions and legend, not their pixels. Tap any number to see how it was derived and whether it rests on a placeholder. Use Scenarios, Mission BOM, Compare, and Plan to work across many positions and constraints; export a job sheet, CSV, or JSON when you're done. And until a qualified user has replaced the placeholder values offline and the red banner has cleared, treat every figure as illustrative — **SAP-1 is not for field use, and its handling is CUI.**
+Pick a position, a standard, a soil, and a specific threat round. Read the drawings by their dimensions and legend, not their pixels. Tap any number to see how it was derived and whether it rests on a placeholder. Use Scenarios, Mission BOM, Compare, and Plan to work across many positions and constraints; export a job sheet, CSV, or JSON when you're done. And until a qualified user has replaced the placeholder values offline and the red banner has cleared, treat every figure as illustrative — **this tool is not for field use, and its handling is CUI.**
