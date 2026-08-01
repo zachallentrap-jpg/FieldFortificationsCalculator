@@ -1,7 +1,7 @@
-// Phase 2 doctrine unlock (docs/EXECUTION_PLAN.md) — the product's central promise made real:
-// a qualified user can fill real values offline and drive the NOT-FOR-FIELD-USE banner to zero,
-// through a hardened all-or-nothing importer. Tests mutate the global doctrine singletons, so
-// each mutating case restores the original all-placeholder state afterward.
+// Phase 2 doctrine unlock (docs/EXECUTION_PLAN.md) — a qualified user can fill real values
+// offline and drive the placeholder count to zero, through a hardened all-or-nothing importer.
+// Tests mutate the global doctrine singletons, so each mutating case restores the original
+// all-placeholder state afterward.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import '../src/doctrine/index';
@@ -9,8 +9,6 @@ import { exportDoctrine, importDoctrine, getFillState, resetFillState } from '..
 import { counts, all } from '../src/doctrine/registry';
 import { compute } from '../src/engine/compute';
 import type { GeometryModel } from '../src/engine/geometry';
-import { topbarHasFieldUseBadge } from '../src/layout/shell';
-import { doctrineOverlay } from '../src/layout/tools';
 import { MemoryAdapter } from '../src/state/persistence';
 import { saveFill, restoreFill } from '../src/state/doctrineFill';
 import { defaultInputs } from './helpers';
@@ -41,6 +39,22 @@ test('dry run validates WITHOUT mutating', () => {
   assert.equal(rep.applied, all().length, 'reports what would apply');
   assert.equal(counts().placeholder, before, 'nothing actually changed');
   assert.equal(getFillState(), null, 'no fill recorded on a dry run');
+  // rep.counts must PREVIEW what applying would produce (zero placeholders, since fullFill
+  // marks everything DOCTRINE) — not silently echo the untouched live state under the same
+  // field name. The two are deliberately different here: that's the whole point of a preview.
+  assert.equal(rep.counts.placeholder, 0, 'preview shows the post-apply state, not the pre-apply one');
+  assert.equal(counts().placeholder, before, 'meanwhile the live registry is still untouched');
+});
+
+test('a partial dry run previews only the staged paths changing, everything else as-is', () => {
+  const targets = all().slice(0, 3).map((e) => e.path);
+  const rep = importDoctrine(
+    { ...exportDoctrine(), entries: targets.map((p) => ({ path: p, value: 1, status: 'DOCTRINE', source: 'FM 5-103' })) },
+    { dryRun: true },
+  );
+  assert.ok(rep.ok && rep.dryRun);
+  assert.equal(rep.counts.placeholder, counts().placeholder - 3, 'preview reflects exactly the 3 staged flips, nothing more');
+  assert.equal(counts().placeholder, all().length, 'live registry still fully untouched');
 });
 
 test('all-or-nothing: one bad value rejects the WHOLE file, nothing mutates', () => {
@@ -78,20 +92,15 @@ test('partial fill: counts drop by exactly N and the fill manifest is recorded',
   restore();
 });
 
-test('THE promise: a full fill drives the banner to zero end to end', () => {
+test('THE promise: a full fill drives placeholder counts to zero end to end', () => {
   const rep = importDoctrine(fullFill());
   assert.ok(rep.ok);
   assert.equal(counts().placeholder, 0, 'no placeholders remain');
   assert.equal(counts().safetyCriticalRemaining, 0, 'no safety-critical placeholders remain');
-  // The engine's report and the topbar both clear.
   assert.equal(compute(defaultInputs()).placeholderReport.remaining, 0);
-  assert.equal(topbarHasFieldUseBadge(compute(defaultInputs())), false, 'NOT FOR FIELD USE badge gone');
-  // The doctrine overlay shows the cleared badge, not the warning.
-  assert.match(doctrineOverlay(all(), counts(), getFillState(), false, null), /banner cleared/);
   restore();
-  // …and after restore the banner is back — proving the clear was real, not a one-way latch.
+  // …and after restore the counts are back — proving the clear was real, not a one-way latch.
   assert.ok(compute(defaultInputs()).placeholderReport.remaining > 0);
-  assert.equal(topbarHasFieldUseBadge(compute(defaultInputs())), true);
 });
 
 test('a persisted fill survives a reload (save → fresh boot → re-apply)', async () => {

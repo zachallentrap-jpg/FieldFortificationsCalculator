@@ -223,6 +223,19 @@
       "runtimeArgs": ["--prefix", "/Users/zacharytraphagen/CommandHub-Led", "start"],
       "port": 7852,
       "env": { "PORT": "7852" }
+    },
+    {
+      "name": "cutawaycheck",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5451",
+        "--strictPort"
+      ],
+      "port": 5451
     }
   ]
 }

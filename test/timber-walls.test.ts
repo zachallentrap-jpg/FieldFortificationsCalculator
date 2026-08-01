@@ -71,6 +71,22 @@ test('each opening is fully framed: 2 kings, 2 jacks, doubled header; windows ad
   assert.equal(east.filter((m) => m.role === 'header').length, 2);
 });
 
+test('an opening flush with a wall corner never places a king/jack stud outside the wall run', () => {
+  // offsetFt:0 (flush with the wall's own start) used to push the king stud 2.25" past x=0,
+  // outside the wall entirely — a member with no wall left to nail it to.
+  const flush: WallsInput = {
+    lengthFt: 20, widthFt: 16, wallHeightFt: 8, studSpacingIn: 16,
+    openings: [{ wall: 'S', offsetFt: 0, widthFt: 3, heightFt: 6.7, sillHeightFt: 0 }],
+  };
+  const members = generateWalls(flush);
+  const runFt = flush.lengthFt;
+  for (const role of ['kingStud', 'jackStud'] as const) {
+    for (const m of members.filter((mm) => mm.wall === 'S' && mm.role === role)) {
+      assert.ok(m.position[0] >= 0 && m.position[0] <= runFt, `${m.id}: x=${m.position[0]} outside [0,${runFt}]`);
+    }
+  }
+});
+
 test('stage integrity: wall framing is stage 5, cap plates stage 6, union covers the model', () => {
   const members = generateWalls(golden);
   for (const m of members) {

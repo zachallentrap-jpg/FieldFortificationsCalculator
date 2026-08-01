@@ -952,6 +952,11 @@ function buildPartInner(group: THREE.Group, part: Part3, bags: SandbagBatcher): 
         // Both the sloped bay wall AND the mounded earth parapet flare their outer face.
         if ((part.role === 'bayWall' || part.role === 'earthParapet') && part.taperAmount) {
           taperOuterFace(geometry, part.taperAxis ?? 2, part.taperSign ?? 1, part.taperAmount);
+          // Corner posts additionally flare a second, independent axis so their outer tip meets
+          // both adjacent walls' flares flush instead of leaving a triangular void between them.
+          if (part.taperAxis2 !== undefined && part.taperSign2 !== undefined) {
+            taperOuterFace(geometry, part.taperAxis2, part.taperSign2, part.taperAmount);
+          }
         }
         // The vehicle access ramp's floor is a sheared wedge (continuous grade, not steps).
         if (part.shearDrop) shearTopZ(geometry, part.shearDrop);

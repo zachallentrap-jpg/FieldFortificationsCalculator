@@ -120,6 +120,40 @@ test('bay-wall taper never exceeds the bay\'s own size — walls cannot flare in
   }
 });
 
+test('flared bay walls get a double-tapered corner post — no void where two walls meet', () => {
+  // The regression this pins (docs/REALISM_PASS_3D_PLAN.md R4): each bay wall only tapers its
+  // OWN outer face (front/rear flare on z, left/right flare on x), so a flared excavation left a
+  // triangular gap at all 4 corners — nothing occupied the diagonal between two adjacent walls'
+  // flared edges. A corner post, double-tapered (same amount, both axes), fills it.
+  // Scoped to single-bay shapes (one pushBayBox call ⇒ unambiguously 4 corners) — an L-shape/
+  // inverted-T's extra arm calls pushBayBox again for its own 4, which this test isn't about.
+  for (const positionType of ['one_man', 'two_man', 'connecting_trench', 'bunker_op_cp']) {
+    const r = compute(defaultInputs({ positionType, soil: 'loam', standard: 'reinforced', revetment: 'none' }));
+    const scene = buildScene3D(r);
+    const walls = scene.parts.filter((p) => p.kind === 'box' && p.role === 'bayWall') as Array<{
+      x: number; z: number; w: number; d: number;
+      taperAxis?: 0 | 2; taperSign?: 1 | -1; taperAmount?: number;
+      taperAxis2?: 0 | 2; taperSign2?: 1 | -1;
+    }>;
+    const edges = walls.filter((w) => w.taperAxis2 === undefined);
+    const corners = walls.filter((w) => w.taperAxis2 !== undefined);
+    assert.equal(corners.length, 4, positionType + ' needs exactly 4 corner posts');
+    for (const c of corners) {
+      assert.ok((c.taperAmount ?? 0) > 0, positionType + ' corner post must actually flare');
+      const alongZ = edges.find((w) => w.taperAxis === c.taperAxis && w.taperSign === c.taperSign);
+      const alongX = edges.find((w) => w.taperAxis === c.taperAxis2 && w.taperSign === c.taperSign2);
+      assert.ok(alongZ, positionType + ' corner post has a matching front/rear wall');
+      assert.ok(alongX, positionType + ' corner post has a matching left/right wall');
+      // Same row/column as each neighbor (post sits exactly at their shared corner) and the same
+      // taper magnitude (so the flared tips actually meet, not just the unflared base).
+      assert.ok(Math.abs(c.z - alongZ!.z) < 1e-6, positionType + ' post z aligns with its front/rear wall');
+      assert.ok(Math.abs(c.x - alongX!.x) < 1e-6, positionType + ' post x aligns with its left/right wall');
+      assert.equal(c.taperAmount, alongZ!.taperAmount, positionType + ' post tapers exactly as much as the front/rear wall');
+      assert.equal(c.taperAmount, alongX!.taperAmount, positionType + ' post tapers exactly as much as the left/right wall');
+    }
+  }
+});
+
 test('earth-mode rect-family positions get ONE continuous frame part, not 4 separate boxes', () => {
   // The regression this pins: a real parapet is one piled, rounded, sloped mound — not 4 flat
   // boxes meeting at hard square corners (user-reported: "different shaped square blocks of

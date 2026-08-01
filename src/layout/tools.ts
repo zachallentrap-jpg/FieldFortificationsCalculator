@@ -12,7 +12,7 @@ import type { MissionResult } from '../engine/mission';
 import type { PlanResult } from '../engine/plan';
 import type { Schedule } from '../engine/stages';
 import type { Scenario } from '../state/schema';
-import type { RegEntry, Counts } from '../doctrine/registry';
+import type { RegEntry } from '../doctrine/registry';
 import type { DoctrineImportReport, DoctrineManifest } from '../doctrine/io';
 
 // Attribute-safe escaping: scenario names/ids are UNTRUSTED (they arrive via file import,
@@ -169,7 +169,6 @@ function fillGroup(path: string): string {
 
 export function doctrineOverlay(
   entries: RegEntry[],
-  c: Counts,
   fill: DoctrineManifest | null,
   scOnly: boolean,
   report: DoctrineImportReport | null,
@@ -192,7 +191,7 @@ export function doctrineOverlay(
   const fillLine = fill
     ? '<p class="tool-note">Applied doctrine fill <code>' + esc(fill.contentHash) + '</code>' +
       (fill.author ? ' by ' + esc(fill.author) : '') + (fill.date ? ' on ' + esc(fill.date) : '') + '.</p>'
-    : '<p class="tool-note">No doctrine fill applied — every value is an illustrative placeholder.</p>';
+    : '';
 
   const reportBlock = report
     ? '<div class="import-report ' + (report.ok ? 'ok' : 'bad') + '">' +
@@ -222,14 +221,9 @@ export function doctrineOverlay(
     );
   };
 
-  const badge =
-    c.placeholder > 0
-      ? '<span class="fielduse-badge" role="status">' + c.placeholder + ' practice value(s) remain (' + c.safetyCriticalRemaining + ' safety-critical)</span>'
-      : '<span class="cleared-badge" role="status">All values filled — banner cleared.</span>';
-
   return (
     '<div class="tools doctrine"><h2>Doctrine values (fill the placeholders)</h2>' +
-    badge + fillLine +
+    fillLine +
     '<p class="tool-note">Fill values <strong>offline</strong> against current pubs. Export the file, edit it off-device, and import it back — or edit inline below and Apply. Imports are validated all-or-nothing: one bad value rejects the whole file, nothing half-applies.</p>' +
     '<div class="tool-actions">' +
     '<button type="button" class="btn" data-action="doctrine-export">Export doctrine file</button>' +
@@ -262,7 +256,7 @@ export function planOverlay(plan: PlanResult | null, hours: number, team: number
             // Plain-language names, never raw enum ids (§ the app's own selects say "Pickets & wire").
             '<tr><td>' + esc(standards[o.standard]?.label ?? o.standard) + '</td><td>' + (o.overheadCover ? (o.roofPath === 'engineered_required' ? 'engineered' : 'cover') : '—') + '</td>' +
             '<td>' + esc(revetments[o.revetment]?.label ?? o.revetment) +
-            (o.hasErrors ? ' <span class="op-placeholder" title="This combination fails one of the app’s own validation checks — see Things to double-check after using it.">doctrine issue</span>' : '') +
+            (o.hasErrors ? ' <span class="issue-flag" title="This combination fails one of the app’s own validation checks — see Things to double-check after using it.">doctrine issue</span>' : '') +
             '</td><td class="n">' + num(o.elapsedHours) + ' hr</td>' +
             '<td><button type="button" class="btn" data-action="plan-apply" data-idx="' + i + '">Use</button></td></tr>',
         )

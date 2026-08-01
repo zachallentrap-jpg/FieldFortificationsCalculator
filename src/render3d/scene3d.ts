@@ -41,6 +41,11 @@ export interface Box3 {
   taperAxis?: 0 | 2;
   taperSign?: 1 | -1;
   taperAmount?: number;
+  // A second, independent taper (same amount, the other axis) for the small corner posts that
+  // fill the void where two adjacent tapered bay walls meet — each wall only flares along its
+  // own axis, so the diagonal corner between them is otherwise never covered by either face.
+  taperAxis2?: 0 | 2;
+  taperSign2?: 1 | -1;
   // Sheared top for the vehicle access ramp: the box's top face tilts so its −z edge sits
   // `shearDrop` feet below its +z edge — a continuous grade the vehicle drives, not a staircase.
   shearDrop?: number;
@@ -711,4 +716,31 @@ function pushBayBox(
   }
   parts.push(wall(cx - hl + wallT / 2, cz, wallT, w, 0, -1)); // left — outer face is -x
   parts.push(wall(cx + hl - wallT / 2, cz, wallT, w, 0, 1)); // right — outer face is +x
+
+  // Corner posts: each wall above tapers along ONE axis only, so a flared bay otherwise leaves a
+  // triangular void at all 4 corners where two faces should meet. A small wallT×wallT post,
+  // double-tapered (same amount, both axes) so its own flare meets each adjacent wall's flare
+  // flush, fills exactly that gap. Only needed when there's a flare to fill.
+  if (taperAmount > 0) {
+    const corner = (x: number, z: number, signX: 1 | -1, signZ: 1 | -1): Box3 => ({
+      kind: 'box',
+      x,
+      y: -depth / 2 + gradeMargin / 2,
+      z,
+      w: wallT,
+      h,
+      d: wallT,
+      role: 'bayWall',
+      finish,
+      taperAxis: 2,
+      taperSign: signZ,
+      taperAmount,
+      taperAxis2: 0,
+      taperSign2: signX,
+    });
+    parts.push(corner(cx - hl + wallT / 2, cz - hw + wallT / 2, -1, -1)); // front-left
+    parts.push(corner(cx + hl - wallT / 2, cz - hw + wallT / 2, 1, -1)); // front-right
+    parts.push(corner(cx - hl + wallT / 2, cz + hw - wallT / 2, -1, 1)); // rear-left
+    parts.push(corner(cx + hl - wallT / 2, cz + hw - wallT / 2, 1, 1)); // rear-right
+  }
 }

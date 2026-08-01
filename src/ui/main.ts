@@ -25,7 +25,7 @@ import { computeStages, scheduleStages, type Schedule } from '../engine/stages';
 import { ScenarioStore, makeScenario, duplicateScenario } from '../state/scenarios';
 import { createStorageAdapter } from '../state/persistence';
 import { saveSession, restoreSession } from '../state/session';
-import { all as allDoctrine, counts as doctrineCounts } from '../doctrine/registry';
+import { all as allDoctrine } from '../doctrine/registry';
 import { exportDoctrine, importDoctrine, getFillState } from '../doctrine/io';
 import { DOCTRINE_VERSION } from '../version';
 import { saveFill, restoreFill } from '../state/doctrineFill';
@@ -62,7 +62,7 @@ let doctrineReport: import('../doctrine/io').DoctrineImportReport | null = null;
 let pendingImport: unknown = null; // a dry-run-validated file awaiting the user's Apply
 
 function openDoctrine(): void {
-  showOverlay(doctrineOverlay(allDoctrine(), doctrineCounts(), getFillState(), doctrineScOnly, doctrineReport));
+  showOverlay(doctrineOverlay(allDoctrine(), getFillState(), doctrineScOnly, doctrineReport));
 }
 
 function persistSession(): void {
