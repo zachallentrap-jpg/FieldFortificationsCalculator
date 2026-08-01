@@ -362,3 +362,35 @@ option, implement it, and log it here.
   registered leaf now has a consumer. Placeholder count 283→293 (+2 SC). DEFERRED (documented,
   not built): the squad battle-position multi-position sketch (mission aggregation already covers
   the squad math) and the fine bonded-bag hero-model aesthetic (needs visual iteration).
+
+- **D36 — TIMBER-1 accuracy pass + the FM 5-426 lesson set (foundations, framed openings,
+  stairs, bracing).** The wood-frame model was geometrically plausible but not layout-true;
+  this pass makes the geometry teach what the manual teaches. Accuracy: walls now stand
+  INSIDE the floor edge (sole-plate outside face flush with the rim plane — they previously
+  straddled the building line, overhanging half a plate), studs/joists/rafters sit on the
+  true OC layout grid (end members edge-flush, interior members on exact 16"/24" multiples,
+  so panel edges land on centers and the plate strips show the doctrinal 15 1/4" first
+  mark), joists fit between rim joists, rafters are shortened half the ridge thickness (the
+  FM layout sequence, test-asserted), the ridge board's top is flush with the rafter planes
+  (it used to poke through the roof), roof sheathing lies ON the rafter planes with the top
+  course ripped instead of overlapped (it used to be buried inside the rafters — the visible
+  bug), ceiling joists and collar ties nail BESIDE their rafters, gable studs stop at the
+  rafter underside, cap plates lap at corners. Lessons, all live-switchable from a Model
+  toolbar and regenerated through the same single Member[]: foundation triad (piers on pad
+  footers / continuous wall on strip footings with anchor-bolt sills all around / full
+  basement — deep walls, slab, girder columns, ~1 ft exposed concrete); the framed stair
+  opening (double trimmers, double headers — the south pair bearing on the girder — and tail
+  joists) with a straight stair whose riser/tread math follows the FM range (risers ≈ 7.5",
+  treads = risers − 1, opening length derived from the 80" headroom line, straight run
+  skipped gracefully when the plan is too small); the same framing-at-openings pattern
+  repeated at the attic scuttle so the vocabulary transfers; 1x4 let-in corner bracing at
+  45° where openings allow (steeper where crowded, skipped where there is no room, faces a
+  hair proud so the let-in reads); and cross bridging (1x3 diagonal pairs, bottom-nailing
+  note deferred until after subfloor per the manual) vs solid full-depth blocking. Concrete
+  members carry provenance like lumber (nominal "conc …", PH-flagged cites, a PH per-LF
+  labor rate so foundation stages report man-hours) and render as plain gray boxes — the
+  BOM/labor deltas between foundations are visible in the stage panel, which is the
+  leaders' half of the lesson. Every role gained a one-line plain-language "what it does"
+  on the Member Card (§11.1 posture: a 1371 meeting the term for the first time). All of it
+  stays inside the placeholder regime — no new fabricated doctrine values, every cite still
+  (PH) pending page verification.

@@ -7,6 +7,8 @@ import { STAGES } from './types';
 
 // Nominal section board-feet per lineal foot (nominal w×d ÷ 12).
 const BF_PER_LF: Record<string, number> = {
+  '1x3': (1 * 3) / 12,
+  '1x4': (1 * 4) / 12,
   '2x4': (2 * 4) / 12,
   '2x6': (2 * 6) / 12,
   '2x8': (2 * 8) / 12,
@@ -46,6 +48,7 @@ export interface BomSummary {
 // verification — design doc §8 keeps these DOCTRINE-UNVERIFIED and visibly footnoted).
 const MH_PER_BF = 0.055; // (PH)
 const MH_PER_PANEL = 0.5; // (PH)
+const MH_PER_CONC_LF = 0.15; // (PH) concrete form/pour per lineal foot of wall/footing/slab run
 
 const eighth = (inches: number): number => Math.round(inches * 8) / 8;
 
@@ -82,6 +85,7 @@ export function bomSummary(members: Member[]): BomSummary {
     const lines = cutList(ofStage);
     const bf = lines.reduce((a, l) => a + l.boardFeet, 0);
     const panels = ofStage.filter((m) => m.nominal.includes('panel')).length;
+    const concLf = ofStage.filter((m) => m.nominal.includes('conc')).reduce((a, m) => a + m.cutLength / 12, 0);
     stages.push({
       stage: s.id,
       name: s.name,
@@ -89,7 +93,7 @@ export function bomSummary(members: Member[]): BomSummary {
       boardFeet: bf,
       panels,
       memberCount: ofStage.length,
-      manHours: bf * MH_PER_BF + panels * MH_PER_PANEL,
+      manHours: bf * MH_PER_BF + panels * MH_PER_PANEL + concLf * MH_PER_CONC_LF,
     });
   }
   return {

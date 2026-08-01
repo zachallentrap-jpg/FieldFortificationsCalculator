@@ -7,7 +7,11 @@ export type MemberRole =
   | 'sill' | 'girder' | 'post' | 'joist' | 'rimJoist' | 'bridging' | 'subfloor'
   | 'solePlate' | 'stud' | 'cripple' | 'jackStud' | 'kingStud' | 'header'
   | 'topPlate' | 'capPlate' | 'brace' | 'rafter' | 'ridge' | 'collarTie'
-  | 'sheathingPanel' | 'roofPanel' | 'siding';
+  | 'sheathingPanel' | 'roofPanel' | 'siding'
+  // Foundation options (FM 5-426 foundations, PH pages) and framed-opening/stair teaching roles.
+  | 'foundationWall' | 'footing' | 'slab'
+  | 'trimmerJoist' | 'headerJoist' | 'tailJoist'
+  | 'stringer' | 'tread';
 
 export type WallId = 'N' | 'S' | 'E' | 'W';
 
@@ -49,6 +53,8 @@ export interface Member {
 
 // Dressed sizes, inches (FM 5-426 Table 2-1 values for common dimension lumber).
 export const DRESSED: Record<string, { w: number; d: number }> = {
+  '1x3': { w: 0.75, d: 2.5 },
+  '1x4': { w: 0.75, d: 3.5 },
   '2x4': { w: 1.5, d: 3.5 },
   '2x6': { w: 1.5, d: 5.5 },
   '2x8': { w: 1.5, d: 7.25 },
