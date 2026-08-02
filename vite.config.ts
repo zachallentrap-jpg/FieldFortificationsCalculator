@@ -26,6 +26,16 @@ export default defineConfig({
   base: './',
   publicDir: '../../public',
   plugins: [stripVendorCitationUrls()],
+  server: {
+    // Vite 6 rejects any Host header it does not recognise, which makes the dev server
+    // unreachable from a cloud workspace: Replit hands out a per-session hostname like
+    // <uuid>-<slug>.kirk.replit.dev, so it can never be listed literally. Allowing the
+    // suffix covers every session without opening the server to arbitrary hosts.
+    //
+    // Dev only. The deployed path is `build:suite` + scripts/serve-suite.mjs, which is a
+    // plain static file server with no host check at all — production was never affected.
+    allowedHosts: ['.replit.dev', '.repl.co', '.picard.replit.dev', 'localhost'],
+  },
   build: {
     outDir: '../../dist',
     emptyOutDir: true,
