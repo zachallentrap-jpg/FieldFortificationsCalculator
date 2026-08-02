@@ -1,0 +1,37 @@
+# SAP-2 CI — stood up as the first sap2 commit (blueprint B43).
+# Gate suites join `npm run verify` as they land (G-1..G-13, G-16); the pinned-browser
+# G-14 job activates when sap2/test/browser/ exists (slim by design — most DOM semantics
+# run under happy-dom in the node job).
+name: sap2
+on:
+  push:
+    paths: ['sap2/**', '.github/workflows/sap2.yml']
+  pull_request:
+    paths: ['sap2/**', '.github/workflows/sap2.yml']
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sap2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: sap2/.nvmrc
+          cache: npm
+          cache-dependency-path: sap2/package-lock.json
+      - run: npm ci
+      - run: npm run verify
+  browser:
+    # G-14 placeholder: activates when the first browser-only test lands.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: G-14 pending
+        run: |
+          if [ -d sap2/test/browser ]; then
+            echo "::error::sap2/test/browser exists but the G-14 job is still a stub — wire the pinned-browser container now"
+            exit 1
+          fi
+          echo "G-14 not yet stood up (no sap2/test/browser) — nothing to run"
