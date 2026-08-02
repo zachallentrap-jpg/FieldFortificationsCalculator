@@ -1,5 +1,30 @@
 # SAP-1 — Survivability Position Planner
 
+> ## 🪦 DEPRECATED — v1 is end-of-life; SAP-2 replaces it
+>
+> **This tree (SAP-1) is frozen.** It receives critical fixes only; all development
+> has moved to the ground-up rebuild in [`sap2/`](sap2/), governed by
+> [`docs/SAP2_BLUEPRINT.md`](docs/SAP2_BLUEPRINT.md).
+>
+> **Why it was retired — the seed hazard, named plainly:** SAP-1 ships **295
+> plausible-looking illustrative placeholder values** (dimensions, shielding
+> thicknesses, standoffs, labor rates) adjacent to real publication citations. Every
+> one is flagged `PLACEHOLDER` and a NOT-FOR-FIELD-USE banner covers the app, but the
+> values *look* real, and a screenshot, a crop, or a stripped export can outlive the
+> banner. SAP-2 removes the hazard class entirely: it **ships empty** — no doctrinal
+> magnitude exists anywhere in its source or artifacts; values exist only in
+> owner-entered, cited, verified, commissioned fill files, and every output is
+> stamped with its data's provenance state.
+>
+> **Do not use SAP-1 to plan a real position. Do not treat any number in this tree
+> as doctrine.**
+>
+> Archival identity: this tree's final v1-only state is commit
+> `6edb208f4beb0ae2efd438bc8ac36ed4739bd016` (2026-08-01). Remaining EOL steps that
+> are owner actions, per blueprint §2.11: (1) take down or replace the live Replit
+> static deployment; (2) push an archival tag at the commit above (suggested:
+> `git tag v1-archival 6edb208 && git push origin v1-archival`).
+
 SAP-1 is a deterministic, offline, private, parametric planner for doctrinal USMC/Army combat-engineer survivability positions — fighting positions, crew-served positions, vehicle defilade, bunkers, connecting trenches, and ATGM positions. You pick from dropdowns and toggles (position, threat, soil, standard, roof), and SAP-1 turns those inputs into dimensioned plan/section drawings that double as a **range card** (sectors of fire in degrees and mils, north arrow, scale bar, FPL), a real **drag-to-rotate 3D model** with a **construction-stage scrubber** and cutaway, a bill of materials, a labor estimate, a **priorities-of-work timeline** that answers "are we ready by stand-to," and a printable job sheet — all recomputed live as you change an input.
 
 The whole roadmap that produced the current tool — the multi-angle plan and the phase-by-phase execution — is in [`docs/EXECUTION_PLAN.md`](docs/EXECUTION_PLAN.md); the decisions are logged in [`DECISIONS.md`](DECISIONS.md).
