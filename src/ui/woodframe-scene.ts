@@ -7,7 +7,7 @@
 // the scene never edits itself, so the model on screen is always exactly what the spec says.
 
 import { generateStructure, type StructureModel } from '../timber/families/index';
-import type { StructureSpec, BuildingSpec, RoofSpec, FoundationSpec } from '../timber/spec';
+import type { StructureSpec, BuildingSpec, RoofSpec, FoundationSpec, OpeningSpec, OpeningKind, OpeningFill } from '../timber/spec';
 import { normalizeSpec } from '../timber/normalize';
 import { familyById, type FamilyId } from '../timber/catalog';
 import { onPropAssetsReady } from './three-viewer';
@@ -317,7 +317,14 @@ function renderConfigPanel(): void {
     </details>`)
     .join('');
 
-  panel.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-path]').forEach((el) => {
+  // `input[data-path], select[data-path]` — NOT `[data-path]`. The openings row is a <div> that
+  // carries data-path to say which spec branch it edits, and the bare selector matched it too.
+  // `change` bubbles, so every keystroke committed inside the openings editor re-entered this
+  // handler with `el` = that div, fell through to the final `setPath(spec, path, el.value)`, and
+  // wrote `undefined` over `stories.0.openings` — silently deleting every door and window in the
+  // building the moment you adjusted one of them. It was there before this editor was rewritten;
+  // the old one just never re-rendered afterwards, so nothing on screen contradicted itself.
+  panel.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input[data-path], select[data-path]').forEach((el) => {
     el.addEventListener('change', () => {
       const path = el.dataset.path!;
       const spec = current!.spec as BuildingSpec;
@@ -341,6 +348,89 @@ function renderConfigPanel(): void {
   renderOpeningsEditor();
 }
 
+// ── Openings ────────────────────────────────────────────────────────────────
+//
+// The first version of this editor put six controls on one line per opening: a type popup and
+// five bare number boxes under a header strip. With four windows on a wall it was a grid of
+// twenty unlabelled numbers, the header only lined up with the first row, and the owner asked
+// why adding a door was so hard when it should be trivial. It should be, so:
+//
+//   · ADDING IS ONE CLICK. "+ Door" makes a real 3'0" x 6'8" door in the first gap wide enough
+//     to hold it. Nothing has to be typed for the result to be correct and buildable.
+//   · A PLACED OPENING READS AS A SENTENCE. Collapsed, a row says what it is, how big, and
+//     where — in feet and inches, not decimal feet. No column headers to look up.
+//   · EDITING IS NAMED FIELDS, not a row of boxes, and only the ones that apply: a door has no
+//     sill, so a door never shows one.
+//   · WHAT IS WRONG SAYS SO, on the row: off the end of the wall, or overlapping its neighbour.
+
+const OPENING_KINDS: { kind: OpeningKind; label: string; widthFt: number; heightFt: number; sillHeightFt: number; fill: OpeningFill }[] = [
+  // Sizes are the standard-design rough openings this tool already ships in its presets, so
+  // "+ Door" produces the same door the GP building's own drawing calls for.
+  { kind: 'door', label: 'Door', widthFt: 3, heightFt: 6.7, sillHeightFt: 0, fill: 'door-ledged' },
+  { kind: 'window', label: 'Window', widthFt: 3, heightFt: 3.5, sillHeightFt: 3.5, fill: 'window-shutter' },
+  { kind: 'vent', label: 'Vent', widthFt: 1.5, heightFt: 1, sillHeightFt: 6.5, fill: 'vent-screen' },
+];
+
+/** Decimal feet as a carpenter reads them: 6.7 ft is 6'-8", not "6.7". */
+function ftIn(ft: number): string {
+  const total = Math.round(ft * 12);
+  const f = Math.trunc(total / 12);
+  const i = Math.abs(total % 12);
+  return i === 0 ? `${f}'` : `${f}'-${i}"`;
+}
+
+/** How long this wall runs, which is what an offset is measured along. */
+function wallRunFt(spec: BuildingSpec, wall: string): number {
+  return wall === 'S' || wall === 'N' ? spec.dims.lengthFt : spec.dims.widthFt;
+}
+
+/**
+ * Where to put a new opening: the middle of the widest clear stretch, keeping a corner post's
+ * worth of wall at each end. Dropping every new opening at a fixed offset would stack them on
+ * top of each other, and then the FIRST thing the user has to do is fix the tool's mess.
+ */
+function placeInGap(list: OpeningSpec[], runFt: number, widthFt: number): number {
+  const margin = 0.5;
+  const taken = [...list].map((o) => [o.offsetFt, o.offsetFt + o.widthFt] as const).sort((a, b) => a[0] - b[0]);
+  let best = margin;
+  let bestSpan = -1;
+  let cursor = margin;
+  for (const [a, b] of [...taken, [runFt - margin, runFt - margin] as const]) {
+    const span = a - cursor;
+    if (span > bestSpan) {
+      bestSpan = span;
+      best = cursor + Math.max(0, (span - widthFt) / 2);
+    }
+    cursor = Math.max(cursor, b + margin);
+  }
+  // Every gap is too small: park it at the left margin and let the row's own warning say so.
+  return Math.round(Math.max(margin, Math.min(best, runFt - widthFt - margin)) * 4) / 4;
+}
+
+/**
+ * Plain-language complaint about one opening, or null when it is fine.
+ *
+ * Deliberately short. `normalizeSpec` already slides an opening back inside its wall, clamps
+ * width/height/sill to their spec ranges, and drops one too wide to fit — with a message each
+ * time — so those states never reach a row here and a warning about them would be dead code
+ * pretending to be a safety net. OVERLAP is the one thing normalization does not touch (order
+ * is preserved verbatim under TD5, and silently reordering someone's wall would be worse), so
+ * it is the one thing the row has to say out loud.
+ */
+function openingProblem(o: OpeningSpec, i: number, list: OpeningSpec[]): string | null {
+  for (let k = 0; k < list.length; k++) {
+    const b = list[k]!;
+    if (k === i) continue;
+    if (o.offsetFt < b.offsetFt + b.widthFt - 1e-6 && b.offsetFt < o.offsetFt + o.widthFt - 1e-6) {
+      return `overlaps the ${esc(b.kind)} at ${ftIn(b.offsetFt)} — the framing will collide`;
+    }
+  }
+  return null;
+}
+
+/** Which opening is expanded for editing. One at a time — the panel is 328 px wide. */
+let openOpening: string | null = null;
+
 function renderOpeningsEditor(): void {
   const host = document.getElementById('openingsEditor');
   if (!host || !current) return;
@@ -348,52 +438,114 @@ function renderOpeningsEditor(): void {
   const story = spec.stories?.[0];
   if (!story) return;
   const walls: [string, string][] = [['S', 'Front (S)'], ['N', 'Rear (N)'], ['E', 'Right (E)'], ['W', 'Left (W)']];
+
+  const fieldsFor = (o: OpeningSpec): { key: keyof OpeningSpec; label: string; step: number; min: number }[] => [
+    { key: 'widthFt', label: 'Width', step: 0.25, min: 0.5 },
+    { key: 'heightFt', label: 'Height', step: 0.25, min: 0.5 },
+    { key: 'offsetFt', label: 'From left corner', step: 0.25, min: 0 },
+    // A door's sill is zero by definition — the opening starts at the sole plate — so showing
+    // the field would only offer a way to make the model wrong.
+    ...(o.kind === 'door' ? [] : [{ key: 'sillHeightFt' as const, label: 'Sill height', step: 0.25, min: 0 }]),
+  ];
+
   host.innerHTML = walls
     .map(([w, label]) => {
       const list = story.openings[w as 'S'] ?? [];
+      const runFt = wallRunFt(spec, w);
       const rows = list
-        .map(
-          (o, i) => `<div class="op" data-wall="${w}" data-i="${i}">
-            <select data-op="kind">${['door', 'window', 'vent', 'screen', 'hatch'].map((k) => `<option${o.kind === k ? ' selected' : ''}>${k}</option>`).join('')}</select>
-            <input type="number" data-op="offsetFt" value="${o.offsetFt}" step="0.25" inputmode="decimal" aria-label="offset" />
-            <input type="number" data-op="widthFt" value="${o.widthFt}" step="0.25" inputmode="decimal" aria-label="width" />
-            <input type="number" data-op="heightFt" value="${o.heightFt}" step="0.25" inputmode="decimal" aria-label="height" />
-            <input type="number" data-op="sillHeightFt" value="${o.sillHeightFt}" step="0.25" inputmode="decimal" aria-label="sill" />
-            <button data-op="remove" type="button" aria-label="Remove opening">×</button>
-          </div>`,
-        )
+        .map((o, i) => {
+          const id = `${w}-${i}`;
+          const open = openOpening === id;
+          const kindLabel = OPENING_KINDS.find((k) => k.kind === o.kind)?.label ?? o.kind;
+          const problem = openingProblem(o, i, list);
+          const editor = open
+            ? `<div class="op-edit">${fieldsFor(o)
+                .map(
+                  (f) => `<label class="op-field"><span>${f.label}</span>
+                    <input type="number" data-op="${f.key}" value="${Number(o[f.key] ?? 0)}"
+                      step="${f.step}" min="${f.min}" inputmode="decimal" />
+                    <em>ft</em></label>`,
+                )
+                .join('')}
+                <button class="op-del" data-op="remove" type="button">Remove this ${esc(kindLabel.toLowerCase())}</button>
+              </div>`
+            : '';
+          return `<div class="op${open ? ' op--open' : ''}${problem ? ' op--bad' : ''}" data-wall="${w}" data-i="${i}" data-id="${id}">
+            <button class="op-sum" data-toggle="${id}" type="button" aria-expanded="${open}">
+              <span class="op-kind">${esc(kindLabel)}</span>
+              <span class="op-size">${ftIn(o.widthFt)} × ${ftIn(o.heightFt)}</span>
+              <span class="op-at">${ftIn(o.offsetFt)} from left</span>
+              <span class="op-chev" aria-hidden="true">${open ? '▾' : '›'}</span>
+            </button>
+            ${problem ? `<p class="op-warn">${esc(problem)}</p>` : ''}
+            ${editor}
+          </div>`;
+        })
         .join('');
-      return `<div class="op-wall"><h4>${esc(label)}</h4>
-        <div class="op-head"><span>type</span><span>from left</span><span>width</span><span>height</span><span>sill</span><span></span></div>
-        ${rows}
-        <button class="chip add" data-add="${w}" type="button">+ add opening</button></div>`;
+      return `<section class="op-wall">
+        <h4>${esc(label)}<span class="op-run">${ftIn(runFt)} wall</span></h4>
+        ${rows || '<p class="op-none">No openings — a solid wall.</p>'}
+        <div class="op-add">${OPENING_KINDS.map((k) => `<button class="chip" data-add="${w}" data-kind="${k.kind}" type="button">+ ${esc(k.label)}</button>`).join('')}</div>
+      </section>`;
     })
     .join('');
 
   host.querySelectorAll<HTMLButtonElement>('[data-add]').forEach((el) => {
     el.addEventListener('click', () => {
       const w = el.dataset.add as 'S';
-      const list = story.openings[w] ?? [];
-      story.openings[w] = [...list, { kind: 'window', offsetFt: 2, widthFt: 3, heightFt: 3.5, sillHeightFt: 3 }];
+      const preset = OPENING_KINDS.find((k) => k.kind === el.dataset.kind)!;
+      // Re-read through `current` rather than the captured story: `regenerate()` swaps
+      // `current.spec` for the normalized copy, so anything closed over here is one edit stale.
+      const live = (current!.spec as BuildingSpec).stories[0]!;
+      const list = live.openings[w] ?? [];
+      live.openings[w] = [
+        ...list,
+        {
+          kind: preset.kind,
+          offsetFt: placeInGap(list, wallRunFt(spec, w), preset.widthFt),
+          widthFt: preset.widthFt,
+          heightFt: preset.heightFt,
+          sillHeightFt: preset.sillHeightFt,
+          fill: preset.fill,
+        },
+      ];
+      // Open the one just added: the common next move is to slide it, and a row that appears
+      // already unfolded is the difference between "added" and "added, now find it".
+      openOpening = `${w}-${(live.openings[w] ?? []).length - 1}`;
       regenerate();
       renderConfigPanel();
     });
   });
-  host.querySelectorAll<HTMLElement>('.op').forEach((opEl) => {
+
+  host.querySelectorAll<HTMLButtonElement>('[data-toggle]').forEach((el) => {
+    el.addEventListener('click', () => {
+      openOpening = openOpening === el.dataset.toggle ? null : el.dataset.toggle!;
+      renderOpeningsEditor();
+    });
+  });
+
+  host.querySelectorAll<HTMLElement>('.op--open').forEach((opEl) => {
     const w = opEl.dataset.wall as 'S';
     const i = Number(opEl.dataset.i);
-    opEl.querySelectorAll<HTMLInputElement | HTMLSelectElement>('[data-op]').forEach((field) => {
-      if (field.dataset.op === 'remove') return;
+    opEl.querySelectorAll<HTMLInputElement>('input[data-op]').forEach((field) => {
       field.addEventListener('change', () => {
-        const list = story.openings[w]!;
-        const key = field.dataset.op as 'offsetFt';
-        const value = field instanceof HTMLSelectElement ? field.value : Number(field.value);
-        (list[i] as unknown as Record<string, unknown>)[key] = value;
+        const n = Number(field.value);
+        if (!Number.isFinite(n)) {
+          field.classList.add('blocked');
+          return;
+        }
+        field.classList.remove('blocked');
+        const live = (current!.spec as BuildingSpec).stories[0]!;
+        if (!live.openings[w]?.[i]) return;
+        (live.openings[w]![i] as unknown as Record<string, unknown>)[field.dataset.op!] = n;
         regenerate();
+        renderOpeningsEditor(); // refresh the summary line and any warning
       });
     });
-    opEl.querySelector<HTMLButtonElement>('[data-op="remove"]')!.addEventListener('click', () => {
-      story.openings[w] = (story.openings[w] ?? []).filter((_, k) => k !== i);
+    opEl.querySelector<HTMLButtonElement>('[data-op="remove"]')?.addEventListener('click', () => {
+      const live = (current!.spec as BuildingSpec).stories[0]!;
+      live.openings[w] = (live.openings[w] ?? []).filter((_, k) => k !== i);
+      openOpening = null;
       regenerate();
       renderConfigPanel();
     });

@@ -205,8 +205,8 @@ export interface SpecPathDef {
 }
 
 export const SPEC_PATH_DEFS: readonly SpecPathDef[] = [
-  { path: 'dims.lengthFt', label: 'Length', min: 4, max: 60, step: 0.5, cite: 'engine envelope' },
-  { path: 'dims.widthFt', label: 'Width', min: 4, max: 24, step: 0.5, cite: 'engine envelope (multi-girder > 24 ft is IN-later)' },
+  { path: 'dims.lengthFt', label: 'Length', min: 4, max: 60, step: 0.5, cite: '4–60 ft — what this generator will lay out' },
+  { path: 'dims.widthFt', label: 'Width', min: 4, max: 24, step: 0.5, cite: '4–24 ft — a wider span needs a second girder line, which is not built yet' },
   { path: 'stories.0.wallHeightFt', label: 'Wall height', min: 6, max: 12, step: 0.5, cite: 'FM 5-426 ch. 6 (PH)' },
   { path: 'stories.1.wallHeightFt', label: 'Second-story wall height', min: 6, max: 12, step: 0.5, cite: 'FM 5-426 ch. 6 (PH)' },
   { path: 'roof.risePer12', label: 'Roof pitch', min: 0, max: 12, step: 1, cite: 'FM 5-426 framing-square method (PH)' },

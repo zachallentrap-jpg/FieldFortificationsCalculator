@@ -499,6 +499,50 @@ option, implement it, and log it here.
   equation exists ONCE and feeds both the renderer and the raycast filter, so clicking through
   a cut selects what you see; stage scrubbing toggles visibility rather than rebuilding; and
   `unlockToCustom` preserves the family (a tower stays a tower) with a per-family test.
+## 2026-08-02 — Adding a window should be one click, and editing one should not delete them all
+
+The openings editor put six controls on a line — a type popup and five bare number inputs —
+under a header strip that only lined up with the first row. Four windows on a wall was twenty
+anonymous numbers. The owner's note was "why are the adding things so confusing, should be
+incredibly simple", which is the correct standard, so it was rebuilt around four rules:
+
+- **Adding is one click.** `+ Door` `+ Window` `+ Vent` each place a real rough opening at the
+  standard-design size the presets already use (a door is 3'-0" x 6'-8"), positioned in the
+  middle of the widest clear stretch of that wall. Nothing has to be typed for the result to be
+  correct, and a new opening never lands on top of an existing one — having the tool's first
+  act be making a mess the user has to clean up is worse than not helping at all.
+- **A placed opening reads as a sentence**, in feet and inches: "Door · 3' x 6'-8" · 12'-3" from
+  left". No column headers to look up, no decimal feet to convert.
+- **Editing is named fields**, one row unfolded at a time, and only the fields that apply — a
+  door has no sill, so a door never shows a sill box.
+- **Only the warning that can actually happen.** `normalizeSpec` already slides an opening back
+  inside its wall and drops one too wide to fit, with a message each time, so a row warning
+  about those would be decoration. Overlap is the one condition normalization deliberately does
+  NOT fix (TD5 keeps opening order verbatim, and silently reordering someone's wall is worse),
+  so overlap is what the row says out loud, naming the neighbour it collides with.
+
+**And the bug the rewrite exposed.** `renderConfigPanel` wired its controls with
+`panel.querySelectorAll('[data-path]')`. The openings editor's container is a `<div>` that also
+carries `data-path`, to say which spec branch it edits. `change` bubbles — so committing a value
+anywhere inside the openings editor re-entered the config handler with `el` bound to that div,
+fell through to the final `setPath(spec, path, el.value)`, and wrote **undefined over
+`stories.0.openings`**. Every door and window in the building disappeared the moment you
+adjusted one of them: 741 members to 625, no error, no message. It had been shipping since the
+panel was written; the old editor simply never re-rendered itself afterwards, so nothing on
+screen contradicted the model and the deletion was only visible if you were counting members.
+The selector is now `input[data-path], select[data-path]`.
+
+Two smaller repairs came with it: the per-opening handlers re-read `current.spec` instead of
+closing over `stories[0]` (which `regenerate()` replaces with the normalized copy on every
+edit, so anything captured is one edit stale), and `dims.lengthFt` / `dims.widthFt` lost their
+"engine envelope (multi-girder > 24 ft is IN-later)" hint, which was a note to ourselves printed
+where a Marine reads what the limit means.
+
+**The lesson:** an attribute that means "this element identifies a spec path" and a selector
+that means "this element edits a spec path" are different claims, and using one attribute for
+both let a container impersonate a control. Wire handlers to the tags that can actually hold a
+value.
+
 ## 2026-08-02 — "What the heck are these boards on the roof?"
 
 Driving the deployed build, the owner pointed at the roof of the GP building. It was covered
