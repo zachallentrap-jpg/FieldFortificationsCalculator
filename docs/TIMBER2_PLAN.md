@@ -926,6 +926,15 @@ Replaces the naive 4-substring scan (which would trip on `Math.round` and miss `
 
 ### 6.5 Doc reciprocity (blocker fix)
 
+> **STATUS — executed at T0 (2026-08-02).** Both edits are merged in
+> `docs/SAP2_BLUEPRINT.md`: (a) the §5 TIMBER row now points here and enumerates which
+> SAP-2 gate classes apply to `src/timber` (offline/determinism/doc-integrity YES;
+> ship-empty/watermark/commissioning NO — replaced by LS-GATE); (b) R5b carries the
+> `bunker_op_cp` ↔ `crib-bunker` reconciliation entry condition. **Owner ack: PENDING —
+> the owner directed T0's execution, but has not separately confirmed the boundary
+> call itself. T1 must not start until that ack is recorded here.** This is the one T0
+> item a session cannot complete alone.
+
 `docs/SAP2_BLUEPRINT.md` currently binds TIMBER to a "rebuilt inside the regime
 (timber.* leaves)" re-entry bar and logs TIMBER as an escaped failure class. **TD1:**
 this plan's §6.1 boundary supersedes that row. At T0, `SAP2_BLUEPRINT.md` is edited
@@ -992,9 +1001,17 @@ asset basenames, wired into verify (minor fix — "no new images" becomes verifi
 stale `public/sw.js` (§5.6). (6) Copy this plan to `docs/TIMBER2_PLAN.md` (the living
 copy; progress table lives there). (7) Copy the four source designs to
 `docs/timber2-design/` so every "design-X §N" citation resolves in-repo (gap-1 fix).
-**Acceptance:** CI runs and is green on a no-op PR; goldens committed and hashed;
-check-assets green; both doc edits merged with the owner's ack line; the four design
-docs committed beside the plan; deployed toolkit byte-identical except sw.js removal.
+(8) **Added during execution** — `check:offline` hardened with `--require-dist` and run
+AFTER `build:suite` in CI, plus `test/gate-offline.test.ts`. The first green CI run
+exposed that the in-`verify` offline gate scans a `dist/` that does not exist yet on a
+fresh checkout, printing "nothing to scan (pass)": the offline guarantee was unenforced
+while the badge was green. See DECISIONS.md 2026-08-02.
+**Acceptance:** CI runs and is green on a no-op PR **and its logs show each gate
+measuring something** — a gate that reports success over an absent or empty subject
+counts as red, not green (this is what item 8 fixes; apply the same question to every
+gate added later); goldens committed and hashed; check-assets green; both doc edits
+merged with the owner's ack line; the four design docs committed beside the plan;
+deployed toolkit byte-identical except sw.js removal.
 **Demo:** none (infrastructure).
 **Descope ladder:** nothing cuttable — T0 is the floor.
 
@@ -1281,8 +1298,9 @@ npm run typecheck                                   # tsc --noEmit
 npm test                                            # node --test, test/*.test.ts
 node --import tsx --test test/timber2-*.test.ts     # focused TIMBER-2 suites
 node --import tsx --test test/timber-*.test.ts      # legacy suites (git-diff-empty rule)
-npm run verify                                      # typecheck + tests + check:offline (+ check-assets after T0)
+npm run verify                                      # typecheck + tests + check:offline (SKIPs with no dist/ — see verify:full)
 npm run build:suite                                 # THE deploy build — green at every merge to main
+npm run verify:full                                 # verify + build:suite + check:assets + STRICT offline gate (what CI runs)
 npm run dev                                         # vite dev; open /woodframe.html
 npm run update:thumb-goldens                        # rewrites test/goldens/thumbs/ (same-PR rule)
 ```

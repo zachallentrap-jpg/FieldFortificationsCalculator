@@ -394,3 +394,43 @@ option, implement it, and log it here.
   on the Member Card (§11.1 posture: a 1371 meeting the term for the first time). All of it
   stays inside the placeholder regime — no new fabricated doctrine values, every cite still
   (PH) pending page verification.
+
+## 2026-08-02 — The offline gate was passing without checking anything
+
+The first run of `.github/workflows/toolkit.yml` (TIMBER-2 T0) came back green on all
+four check runs. Reading the logs rather than the badge showed one line worth the whole
+exercise:
+
+    > sap1@1.0.0 check:offline
+    check-offline: dist/ not present yet — nothing to scan (pass).
+
+`npm run verify` runs `check:offline` third, before `build:suite` has produced anything.
+On a developer's machine that usually finds a stale `dist/` and prints "scanned 11
+file(s)". On CI's fresh checkout there is no `dist/` at all, so the gate scanned **zero
+files and reported a pass**. The offline guarantee — "ships offline, zero external
+requests", one of this toolkit's load-bearing claims — was not being enforced anywhere in
+CI, and the green badge said otherwise.
+
+Fixed in three parts:
+
+1. **`scripts/check-offline.ts` gained `--require-dist`**, under which "nothing to scan"
+   is a hard failure. The lenient default survives for local ergonomics (`npm run verify`
+   on a clean tree shouldn't demand a build first), but it now prints `SKIPPED — … this is
+   not a pass` instead of the word "pass". Wording was the whole bug.
+2. **The vacuum's second shape is closed too**: a `dist/` that exists but holds no
+   scannable text files (empty, or all binary) used to report "scanned 0 file(s), zero
+   external URLs" — the same no-op in a different hat. Also fatal under `--require-dist`.
+3. **CI and `verify:full` run the strict form AFTER `build:suite`**, against the real
+   artifact, as a separately named step so a failure points at itself.
+
+`scripts/check-offline.ts` also gained `--dir=<path>` purely so the gate could be tested,
+which it never had been. `test/gate-offline.test.ts` now pins six properties: strict mode
+fails on both vacuum shapes; lenient mode says SKIPPED and never says PASS; a real
+external URL and a protocol-relative host still fail with the offender named; and the W3C
+`xmlns` allowlist still passes clean SVG. Without these, softening the strict path back
+into a pass would be silent again.
+
+The general lesson, recorded because it will recur: **a gate that cannot distinguish
+"checked and clean" from "checked nothing" is not a gate.** Every gate this repo adds
+should be asked what it prints when its subject is absent. T0's own acceptance criterion
+was "CI runs and is green" — green was true and meant less than it appeared to.

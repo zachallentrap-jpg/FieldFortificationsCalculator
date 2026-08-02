@@ -926,7 +926,7 @@ re-entry bar where one exists).
 | Squad battle-position sketch | IN-later (R8, optional) | Needs azimuths + real fills + rollup; entry gate defined (§7 R8) |
 | Protective wire | OUT | Re-entry: post-R7, with fill data, if wanted |
 | Hub/suite page | OUT | One product, one name; a hub returns only when a second regime-passing tool exists |
-| TIMBER-1 | OUT (archived with v1) | Re-entry bar: rebuilt inside the regime (`timber.*` leaves, same gates) — whole-tree scoping makes outside-the-regime impossible |
+| TIMBER (wood-frame construction) | **SUPERSEDED — see `docs/TIMBER2_PLAN.md`** (edited at TIMBER-2 T0 per its §6.5; reciprocity blocker) | This row previously said "OUT (archived with v1)" with a re-entry bar of "rebuilt inside the regime (`timber.*` leaves, same gates)". **That is no longer the boundary.** TIMBER ships in the same toolkit under its OWN governing plan and its OWN safety posture (working defaults WITH `(PH)` cites + LS-GATE review stamps), because carpentry cut lists are not safety-of-life shielding numbers and the ship-empty regime would make the tool useless without buying a matching amount of protection. **Which SAP-2 gate classes apply to `src/timber`: offline gate — YES; determinism — YES; doc-integrity/cite discipline — YES. Ship-empty, watermark states, commissioning ceremony — NO, replaced by LS-GATE (TIMBER-2 §6.2).** The regime wall is enforced in code: no import from `sap2/**` under `src/timber/**` (TIMBER-2 invariant I-13). |
 | Quiz/PDF/DXF/i18n/terrain/productivity curves | OUT | v1's cuts, still correct |
 | Conditions-of-use acceptance gate (first-run typed acknowledgment, re-shown on fill-class change) | IN-core (R0) | The qualified-user flow's enforcement point; wording counsel-routed (§2.9 flag 1) |
 | Structural-stability checks (soil bearing, sandbag-wall stability, revetment structural sizing) | OUT (SME-routed) | Beyond estimating-model fidelity — `REVET_HEIGHT_LIMIT` is the only structural validation; the fidelity line + PENDING stamp carry the difference; re-entry only with SME-provided models. `retainingWall.*` leaves gain that consumer or are deleted at the R1 freeze — no valueless leaf survives |
@@ -1098,6 +1098,16 @@ reference-device pass re-run (scene population changed).
 
 ### R5a — Breadth II: fifty_cal, mortar_pit, connecting_trench (**L**)
 ### R5b — Breadth III: atgm_javelin, bunker_op_cp (**L**)
+
+**Entry condition (added at TIMBER-2 T0 per its §6.5(b) — reciprocity):** before
+`bunker_op_cp` is built, **reconcile it with TIMBER-2's `crib-bunker` family**
+(TIMBER-2 §2.7, the normative boundary). The two tools must not model the same
+structure twice with different numbers. The stated line: **TIMBER-2 builds the WOOD
+structure** (posts, caps, stringers, lagging, entrance framing) sized against a
+**user-stated** `designCoverDepthFt` treated as a design dead load; **SAP-2 owns the
+protective-earth sizing** (cover thickness against a threat) under its fill regime.
+`designCoverDepthFt` never serializes off-device. If the reconciliation finds real
+overlap, resolve it in a `DECISIONS.md` entry BEFORE either side ships the geometry.
 
 Tranched so the first three reveal the real per-position mini-slice cost before the
 two hardest geometries. Position truths carried: π/4 mortar volume, open-corridor
