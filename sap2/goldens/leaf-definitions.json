@@ -1,0 +1,1350 @@
+{
+ "atgm.backblast.clearance": {
+  "meaningVersion": 1,
+  "defHash": "1425c801b86bc1ae"
+ },
+ "body.armpit.approxFt": {
+  "meaningVersion": 1,
+  "defHash": "b797b1f370597343"
+ },
+ "body.armpit.phrase": {
+  "meaningVersion": 1,
+  "defHash": "6d7f4d77f69e1fb7"
+ },
+ "body.boot_length.approxFt": {
+  "meaningVersion": 1,
+  "defHash": "16bc43c7ba36b12e"
+ },
+ "body.boot_length.phrase": {
+  "meaningVersion": 1,
+  "defHash": "4be5dd5b847cb168"
+ },
+ "body.chest.approxFt": {
+  "meaningVersion": 1,
+  "defHash": "bd19761199ed3f51"
+ },
+ "body.chest.phrase": {
+  "meaningVersion": 1,
+  "defHash": "dba3371ae9a10aad"
+ },
+ "body.e_tool_length.approxFt": {
+  "meaningVersion": 1,
+  "defHash": "a1f2231c23ed6ca6"
+ },
+ "body.e_tool_length.phrase": {
+  "meaningVersion": 1,
+  "defHash": "26dbcce954fdc482"
+ },
+ "body.knee.approxFt": {
+  "meaningVersion": 1,
+  "defHash": "19b3e06dd0810d27"
+ },
+ "body.knee.phrase": {
+  "meaningVersion": 1,
+  "defHash": "0339b55b30df48d1"
+ },
+ "body.rifle_length.approxFt": {
+  "meaningVersion": 1,
+  "defHash": "aeec28742c263266"
+ },
+ "body.rifle_length.phrase": {
+  "meaningVersion": 1,
+  "defHash": "c552ce0500bacf80"
+ },
+ "body.waist.approxFt": {
+  "meaningVersion": 1,
+  "defHash": "ae1d3b9faa170411"
+ },
+ "body.waist.phrase": {
+  "meaningVersion": 1,
+  "defHash": "ec744b66ae112341"
+ },
+ "camo.drapeFactor": {
+  "meaningVersion": 1,
+  "defHash": "16bb3cf37be79f7c"
+ },
+ "check.one_man.camo": {
+  "meaningVersion": 1,
+  "defHash": "ab4e004bdf892938"
+ },
+ "check.one_man.deliberate": {
+  "meaningVersion": 1,
+  "defHash": "cd3fed7acc94dae7"
+ },
+ "check.one_man.hasty": {
+  "meaningVersion": 1,
+  "defHash": "c372e0fe42469cfb"
+ },
+ "check.one_man.overhead": {
+  "meaningVersion": 1,
+  "defHash": "e64bfb4e4afd3106"
+ },
+ "check.one_man.parapet": {
+  "meaningVersion": 1,
+  "defHash": "304004b82f864e32"
+ },
+ "check.one_man.revet_sump": {
+  "meaningVersion": 1,
+  "defHash": "5fbf11151bb86d54"
+ },
+ "check.one_man.security": {
+  "meaningVersion": 1,
+  "defHash": "c8a0589866af2361"
+ },
+ "excavation.swellFactor": {
+  "meaningVersion": 1,
+  "defHash": "5cf576013ed46b11"
+ },
+ "labor.adder.camo": {
+  "meaningVersion": 1,
+  "defHash": "cf3f142fbeab1c62"
+ },
+ "labor.adder.overhead": {
+  "meaningVersion": 1,
+  "defHash": "1e08341979328bf6"
+ },
+ "labor.adder.revet": {
+  "meaningVersion": 1,
+  "defHash": "fe8c65289b39bfc7"
+ },
+ "labor.adder.sump": {
+  "meaningVersion": 1,
+  "defHash": "a151afd14e8f0301"
+ },
+ "labor.base.atgm_javelin": {
+  "meaningVersion": 1,
+  "defHash": "b1ba73ae04c03dca"
+ },
+ "labor.base.bunker_op_cp": {
+  "meaningVersion": 1,
+  "defHash": "dffbab9b3709dfbb"
+ },
+ "labor.base.connecting_trench": {
+  "meaningVersion": 1,
+  "defHash": "43c31ea48e4e7db2"
+ },
+ "labor.base.fifty_cal": {
+  "meaningVersion": 1,
+  "defHash": "655985dda1c30fe7"
+ },
+ "labor.base.mg_crew": {
+  "meaningVersion": 1,
+  "defHash": "34092bbe9facf5bd"
+ },
+ "labor.base.mortar_pit": {
+  "meaningVersion": 1,
+  "defHash": "9d57c8f1a54cf9cc"
+ },
+ "labor.base.one_man": {
+  "meaningVersion": 1,
+  "defHash": "4ddf9c4f096fbfc9"
+ },
+ "labor.base.two_man": {
+  "meaningVersion": 1,
+  "defHash": "c50bc54bf514d05b"
+ },
+ "labor.base.vehicle_hull_defilade": {
+  "meaningVersion": 1,
+  "defHash": "fd6a2f77773b955e"
+ },
+ "labor.base.vehicle_turret_defilade": {
+  "meaningVersion": 1,
+  "defHash": "76c0b327cff5c881"
+ },
+ "labor.split.deliberate": {
+  "meaningVersion": 1,
+  "defHash": "be74a10acf2d3084"
+ },
+ "labor.split.hasty": {
+  "meaningVersion": 1,
+  "defHash": "f6b65d88fe198482"
+ },
+ "labor.split.parapet": {
+  "meaningVersion": 1,
+  "defHash": "003fef73dcb71099"
+ },
+ "labor.split.security": {
+  "meaningVersion": 1,
+  "defHash": "f5fc507096055dea"
+ },
+ "pos.atgm_javelin.crewSize": {
+  "meaningVersion": 1,
+  "defHash": "8ada391f26d90883"
+ },
+ "pos.atgm_javelin.elbowHoles": {
+  "meaningVersion": 1,
+  "defHash": "a8b192fd100732ba"
+ },
+ "pos.atgm_javelin.grenadeSumps": {
+  "meaningVersion": 1,
+  "defHash": "c66086c780d9c934"
+ },
+ "pos.atgm_javelin.hole.D": {
+  "meaningVersion": 1,
+  "defHash": "08ecb67315a4a44b"
+ },
+ "pos.atgm_javelin.hole.L": {
+  "meaningVersion": 1,
+  "defHash": "6bfc2f93f1abe2a9"
+ },
+ "pos.atgm_javelin.hole.W": {
+  "meaningVersion": 1,
+  "defHash": "cbe64f18d5781b0c"
+ },
+ "pos.atgm_javelin.platform.L": {
+  "meaningVersion": 1,
+  "defHash": "7fefd08c63da6c25"
+ },
+ "pos.atgm_javelin.platform.W": {
+  "meaningVersion": 1,
+  "defHash": "9311d047096b3238"
+ },
+ "pos.atgm_javelin.platform.depthBelowHole": {
+  "meaningVersion": 1,
+  "defHash": "ad5bc287a7586351"
+ },
+ "pos.bunker_op_cp.crewSize": {
+  "meaningVersion": 1,
+  "defHash": "b39094a627c551b8"
+ },
+ "pos.bunker_op_cp.elbowHoles": {
+  "meaningVersion": 1,
+  "defHash": "420810383b4ddc4b"
+ },
+ "pos.bunker_op_cp.grenadeSumps": {
+  "meaningVersion": 1,
+  "defHash": "aceeb69d730a7891"
+ },
+ "pos.bunker_op_cp.hole.D": {
+  "meaningVersion": 1,
+  "defHash": "534ccdc2341d8bfc"
+ },
+ "pos.bunker_op_cp.hole.L": {
+  "meaningVersion": 1,
+  "defHash": "8de70ac9a3c31aa4"
+ },
+ "pos.bunker_op_cp.hole.W": {
+  "meaningVersion": 1,
+  "defHash": "55e21f1b6f287b85"
+ },
+ "pos.connecting_trench.crewSize": {
+  "meaningVersion": 1,
+  "defHash": "1aac98bf9b59eb6e"
+ },
+ "pos.connecting_trench.elbowHoles": {
+  "meaningVersion": 1,
+  "defHash": "d4f67a2c648abfea"
+ },
+ "pos.connecting_trench.grenadeSumps": {
+  "meaningVersion": 1,
+  "defHash": "995a6c005c8fccb2"
+ },
+ "pos.connecting_trench.hole.D": {
+  "meaningVersion": 1,
+  "defHash": "f7047413a953ddcf"
+ },
+ "pos.connecting_trench.hole.L": {
+  "meaningVersion": 1,
+  "defHash": "0b983f690b49f977"
+ },
+ "pos.connecting_trench.hole.W": {
+  "meaningVersion": 1,
+  "defHash": "b8ce32b64761e64c"
+ },
+ "pos.fifty_cal.crewSize": {
+  "meaningVersion": 1,
+  "defHash": "ef9dd94163175a97"
+ },
+ "pos.fifty_cal.elbowHoles": {
+  "meaningVersion": 1,
+  "defHash": "3ccbbdc0d4074d4d"
+ },
+ "pos.fifty_cal.grenadeSumps": {
+  "meaningVersion": 1,
+  "defHash": "b85cc35db60712a6"
+ },
+ "pos.fifty_cal.hole.D": {
+  "meaningVersion": 1,
+  "defHash": "9953a9fab377679b"
+ },
+ "pos.fifty_cal.hole.L": {
+  "meaningVersion": 1,
+  "defHash": "57c6e7777288f532"
+ },
+ "pos.fifty_cal.hole.W": {
+  "meaningVersion": 1,
+  "defHash": "5e86827358c7cea8"
+ },
+ "pos.fifty_cal.platform.L": {
+  "meaningVersion": 1,
+  "defHash": "9a3bb4c3a121060a"
+ },
+ "pos.fifty_cal.platform.W": {
+  "meaningVersion": 1,
+  "defHash": "ce7157eb089333eb"
+ },
+ "pos.fifty_cal.platform.depthBelowHole": {
+  "meaningVersion": 1,
+  "defHash": "cff9c6e4a9245771"
+ },
+ "pos.mg_crew.crewSize": {
+  "meaningVersion": 1,
+  "defHash": "856df592776f6573"
+ },
+ "pos.mg_crew.elbowHoles": {
+  "meaningVersion": 1,
+  "defHash": "5d6f9750ee60106f"
+ },
+ "pos.mg_crew.grenadeSumps": {
+  "meaningVersion": 1,
+  "defHash": "d547faa20d35f976"
+ },
+ "pos.mg_crew.hole.D": {
+  "meaningVersion": 1,
+  "defHash": "b0070de3e090dd0f"
+ },
+ "pos.mg_crew.hole.L": {
+  "meaningVersion": 1,
+  "defHash": "92ac4b47d30351a4"
+ },
+ "pos.mg_crew.hole.W": {
+  "meaningVersion": 1,
+  "defHash": "a9d9aed1e9a730b1"
+ },
+ "pos.mg_crew.platform.L": {
+  "meaningVersion": 1,
+  "defHash": "983c9d01e9391361"
+ },
+ "pos.mg_crew.platform.W": {
+  "meaningVersion": 1,
+  "defHash": "ba9d22971011bbd4"
+ },
+ "pos.mg_crew.platform.depthBelowHole": {
+  "meaningVersion": 1,
+  "defHash": "98d720c246d00331"
+ },
+ "pos.mortar_pit.crewSize": {
+  "meaningVersion": 1,
+  "defHash": "7ec1848d513fd655"
+ },
+ "pos.mortar_pit.elbowHoles": {
+  "meaningVersion": 1,
+  "defHash": "aa2d0cc40e461562"
+ },
+ "pos.mortar_pit.grenadeSumps": {
+  "meaningVersion": 1,
+  "defHash": "a4672c630056c963"
+ },
+ "pos.mortar_pit.hole.D": {
+  "meaningVersion": 1,
+  "defHash": "6260bdce5cf82470"
+ },
+ "pos.mortar_pit.hole.L": {
+  "meaningVersion": 1,
+  "defHash": "2fbe458f6e0d01f8"
+ },
+ "pos.mortar_pit.hole.W": {
+  "meaningVersion": 1,
+  "defHash": "01ef2c6919097b1f"
+ },
+ "pos.one_man.crewSize": {
+  "meaningVersion": 1,
+  "defHash": "8a28f4095e6c9eec"
+ },
+ "pos.one_man.elbowHoles": {
+  "meaningVersion": 1,
+  "defHash": "f01452868e51d47a"
+ },
+ "pos.one_man.grenadeSumps": {
+  "meaningVersion": 1,
+  "defHash": "53c8122ace80effd"
+ },
+ "pos.one_man.hole.D": {
+  "meaningVersion": 1,
+  "defHash": "31cc9b627a32798a"
+ },
+ "pos.one_man.hole.L": {
+  "meaningVersion": 1,
+  "defHash": "2d447dff058f6d70"
+ },
+ "pos.one_man.hole.W": {
+  "meaningVersion": 1,
+  "defHash": "3cde043d0a0c5e3c"
+ },
+ "pos.two_man.crewSize": {
+  "meaningVersion": 1,
+  "defHash": "12377b77a0f8cb51"
+ },
+ "pos.two_man.elbowHoles": {
+  "meaningVersion": 1,
+  "defHash": "8661104610505c9c"
+ },
+ "pos.two_man.grenadeSumps": {
+  "meaningVersion": 1,
+  "defHash": "291d5219ac375fd0"
+ },
+ "pos.two_man.hole.D": {
+  "meaningVersion": 1,
+  "defHash": "2bae688773da0174"
+ },
+ "pos.two_man.hole.L": {
+  "meaningVersion": 1,
+  "defHash": "aac039ea04fb1605"
+ },
+ "pos.two_man.hole.W": {
+  "meaningVersion": 1,
+  "defHash": "49d4f6670edbd59c"
+ },
+ "pos.vehicle_hull_defilade.crewSize": {
+  "meaningVersion": 1,
+  "defHash": "4f4211ffb482a3c9"
+ },
+ "pos.vehicle_hull_defilade.elbowHoles": {
+  "meaningVersion": 1,
+  "defHash": "b758abb5b9396659"
+ },
+ "pos.vehicle_hull_defilade.grenadeSumps": {
+  "meaningVersion": 1,
+  "defHash": "667a7c517b260375"
+ },
+ "pos.vehicle_hull_defilade.hole.D": {
+  "meaningVersion": 1,
+  "defHash": "a8216a863de79040"
+ },
+ "pos.vehicle_hull_defilade.hole.L": {
+  "meaningVersion": 1,
+  "defHash": "a5daa6a2d141b6e0"
+ },
+ "pos.vehicle_hull_defilade.hole.W": {
+  "meaningVersion": 1,
+  "defHash": "2306aa67d186761f"
+ },
+ "pos.vehicle_turret_defilade.crewSize": {
+  "meaningVersion": 1,
+  "defHash": "6e2e70f4849192bd"
+ },
+ "pos.vehicle_turret_defilade.elbowHoles": {
+  "meaningVersion": 1,
+  "defHash": "007d2c059e3b7a80"
+ },
+ "pos.vehicle_turret_defilade.grenadeSumps": {
+  "meaningVersion": 1,
+  "defHash": "23642c1b25e31992"
+ },
+ "pos.vehicle_turret_defilade.hole.D": {
+  "meaningVersion": 1,
+  "defHash": "5783c24a5859cae6"
+ },
+ "pos.vehicle_turret_defilade.hole.L": {
+  "meaningVersion": 1,
+  "defHash": "d47aa130bbbd84ab"
+ },
+ "pos.vehicle_turret_defilade.hole.W": {
+  "meaningVersion": 1,
+  "defHash": "287a441bb49766f4"
+ },
+ "revet.pickets_wire.spacing": {
+  "meaningVersion": 1,
+  "defHash": "21fe967fb1129f84"
+ },
+ "revet.pickets_wire.wirePerPicket": {
+  "meaningVersion": 1,
+  "defHash": "71bbf1b88e009bb5"
+ },
+ "sandbag.H": {
+  "meaningVersion": 1,
+  "defHash": "4bde43fa354e632c"
+ },
+ "sandbag.L": {
+  "meaningVersion": 1,
+  "defHash": "c37e8d5ebe17accd"
+ },
+ "sandbag.W": {
+  "meaningVersion": 1,
+  "defHash": "31e5b0d1d985df96"
+ },
+ "sandbag.basicLoad": {
+  "meaningVersion": 1,
+  "defHash": "4921cf5a85a1c082"
+ },
+ "sandbag.frontWallDepthCount": {
+  "meaningVersion": 1,
+  "defHash": "5e26d6de7bb86c11"
+ },
+ "sandbag.frontWallHeight": {
+  "meaningVersion": 1,
+  "defHash": "57bcec6a995bb6ae"
+ },
+ "sandbag.wasteFactor": {
+  "meaningVersion": 1,
+  "defHash": "af9c80edcaae5483"
+ },
+ "shield.at-he-contact.clay": {
+  "meaningVersion": 1,
+  "defHash": "2f0e36c9c043f00e"
+ },
+ "shield.at-he-contact.concrete": {
+  "meaningVersion": 1,
+  "defHash": "ec53409e40fccea1"
+ },
+ "shield.at-he-contact.gravel": {
+  "meaningVersion": 1,
+  "defHash": "9b6e369957ef53c2"
+ },
+ "shield.at-he-contact.sand": {
+  "meaningVersion": 1,
+  "defHash": "3d2ec6a263bc1012"
+ },
+ "shield.at-he-contact.sandbagged_soil": {
+  "meaningVersion": 1,
+  "defHash": "c749f289600587cf"
+ },
+ "shield.at-he-contact.snow_ice": {
+  "meaningVersion": 1,
+  "defHash": "650c61c21299e323"
+ },
+ "shield.at-he-contact.soil": {
+  "meaningVersion": 1,
+  "defHash": "dd59cc7d11cf38be"
+ },
+ "shield.at-he-contact.steel": {
+  "meaningVersion": 1,
+  "defHash": "8d5b0d5df7cf84ad"
+ },
+ "shield.at-he-contact.timber": {
+  "meaningVersion": 1,
+  "defHash": "6e93ce94278f1439"
+ },
+ "shield.at-recoilless.clay": {
+  "meaningVersion": 1,
+  "defHash": "c2cc52fbd276c39c"
+ },
+ "shield.at-recoilless.concrete": {
+  "meaningVersion": 1,
+  "defHash": "04027ba74bc68671"
+ },
+ "shield.at-recoilless.gravel": {
+  "meaningVersion": 1,
+  "defHash": "1c6459ec339d2e0c"
+ },
+ "shield.at-recoilless.sand": {
+  "meaningVersion": 1,
+  "defHash": "728ca1aca1130795"
+ },
+ "shield.at-recoilless.sandbagged_soil": {
+  "meaningVersion": 1,
+  "defHash": "37b113f738b688f3"
+ },
+ "shield.at-recoilless.snow_ice": {
+  "meaningVersion": 1,
+  "defHash": "37c15c7f779700c6"
+ },
+ "shield.at-recoilless.soil": {
+  "meaningVersion": 1,
+  "defHash": "d47b6f329c72cd65"
+ },
+ "shield.at-recoilless.steel": {
+  "meaningVersion": 1,
+  "defHash": "599da4186d770f27"
+ },
+ "shield.at-recoilless.timber": {
+  "meaningVersion": 1,
+  "defHash": "7d3eda10e224372a"
+ },
+ "shield.at-rpg.clay": {
+  "meaningVersion": 1,
+  "defHash": "5f83d992ab4ae9ab"
+ },
+ "shield.at-rpg.concrete": {
+  "meaningVersion": 1,
+  "defHash": "ee544e48139bd753"
+ },
+ "shield.at-rpg.gravel": {
+  "meaningVersion": 1,
+  "defHash": "658884488f5d064d"
+ },
+ "shield.at-rpg.sand": {
+  "meaningVersion": 1,
+  "defHash": "a08f4b5c7e4b370e"
+ },
+ "shield.at-rpg.sandbagged_soil": {
+  "meaningVersion": 1,
+  "defHash": "1f4bd0998c5deee0"
+ },
+ "shield.at-rpg.snow_ice": {
+  "meaningVersion": 1,
+  "defHash": "6d9c56285e4d2d3c"
+ },
+ "shield.at-rpg.soil": {
+  "meaningVersion": 1,
+  "defHash": "1a54dd9798ad622f"
+ },
+ "shield.at-rpg.steel": {
+  "meaningVersion": 1,
+  "defHash": "937f3b212fb0920a"
+ },
+ "shield.at-rpg.timber": {
+  "meaningVersion": 1,
+  "defHash": "bb27196d4a1e9522"
+ },
+ "shield.at-tank.clay": {
+  "meaningVersion": 1,
+  "defHash": "7736469a547f11cd"
+ },
+ "shield.at-tank.concrete": {
+  "meaningVersion": 1,
+  "defHash": "55e78f34841a039f"
+ },
+ "shield.at-tank.gravel": {
+  "meaningVersion": 1,
+  "defHash": "5089d7f755714698"
+ },
+ "shield.at-tank.sand": {
+  "meaningVersion": 1,
+  "defHash": "ebf150176c36a587"
+ },
+ "shield.at-tank.sandbagged_soil": {
+  "meaningVersion": 1,
+  "defHash": "9d6416e35930bb31"
+ },
+ "shield.at-tank.snow_ice": {
+  "meaningVersion": 1,
+  "defHash": "49aa386b702480b4"
+ },
+ "shield.at-tank.soil": {
+  "meaningVersion": 1,
+  "defHash": "d5c80d35977e87b7"
+ },
+ "shield.at-tank.steel": {
+  "meaningVersion": 1,
+  "defHash": "37770d7cf969e4db"
+ },
+ "shield.at-tank.timber": {
+  "meaningVersion": 1,
+  "defHash": "fd3c07654e804cb6"
+ },
+ "shield.blast-demo.clay": {
+  "meaningVersion": 1,
+  "defHash": "b28eff3cf445f75a"
+ },
+ "shield.blast-demo.concrete": {
+  "meaningVersion": 1,
+  "defHash": "751870852b37be88"
+ },
+ "shield.blast-demo.gravel": {
+  "meaningVersion": 1,
+  "defHash": "a63fdb311b2c5827"
+ },
+ "shield.blast-demo.sand": {
+  "meaningVersion": 1,
+  "defHash": "e99efd9b0e455f6a"
+ },
+ "shield.blast-demo.sandbagged_soil": {
+  "meaningVersion": 1,
+  "defHash": "6fd51181641e033f"
+ },
+ "shield.blast-demo.snow_ice": {
+  "meaningVersion": 1,
+  "defHash": "3468f220ba186a6b"
+ },
+ "shield.blast-demo.soil": {
+  "meaningVersion": 1,
+  "defHash": "7135620df8fc9dbe"
+ },
+ "shield.blast-demo.steel": {
+  "meaningVersion": 1,
+  "defHash": "ad8e3cf60fc88b76"
+ },
+ "shield.blast-demo.timber": {
+  "meaningVersion": 1,
+  "defHash": "6c6af4b617da356c"
+ },
+ "shield.blast-vbied.clay": {
+  "meaningVersion": 1,
+  "defHash": "db5c92e114161607"
+ },
+ "shield.blast-vbied.concrete": {
+  "meaningVersion": 1,
+  "defHash": "85731dbb44df91e7"
+ },
+ "shield.blast-vbied.gravel": {
+  "meaningVersion": 1,
+  "defHash": "7a941ba7ff6d8b78"
+ },
+ "shield.blast-vbied.sand": {
+  "meaningVersion": 1,
+  "defHash": "62f4711c2ddf68b4"
+ },
+ "shield.blast-vbied.sandbagged_soil": {
+  "meaningVersion": 1,
+  "defHash": "db957374c40b194c"
+ },
+ "shield.blast-vbied.snow_ice": {
+  "meaningVersion": 1,
+  "defHash": "33675dd579123948"
+ },
+ "shield.blast-vbied.soil": {
+  "meaningVersion": 1,
+  "defHash": "bed30b32f246c987"
+ },
+ "shield.blast-vbied.steel": {
+  "meaningVersion": 1,
+  "defHash": "f424fba5f373791c"
+ },
+ "shield.blast-vbied.timber": {
+  "meaningVersion": 1,
+  "defHash": "bee7b82f89be3ca1"
+ },
+ "shield.ind-art-105.clay": {
+  "meaningVersion": 1,
+  "defHash": "60b8feb09d82b283"
+ },
+ "shield.ind-art-105.concrete": {
+  "meaningVersion": 1,
+  "defHash": "6a277983e00ad326"
+ },
+ "shield.ind-art-105.gravel": {
+  "meaningVersion": 1,
+  "defHash": "8c2755380ffda08b"
+ },
+ "shield.ind-art-105.sand": {
+  "meaningVersion": 1,
+  "defHash": "fb75331cceea5755"
+ },
+ "shield.ind-art-105.sandbagged_soil": {
+  "meaningVersion": 1,
+  "defHash": "fad817ec69bf920a"
+ },
+ "shield.ind-art-105.snow_ice": {
+  "meaningVersion": 1,
+  "defHash": "8271909e1e8c1ae9"
+ },
+ "shield.ind-art-105.soil": {
+  "meaningVersion": 1,
+  "defHash": "f1e8bb4b97259dba"
+ },
+ "shield.ind-art-105.steel": {
+  "meaningVersion": 1,
+  "defHash": "90afd6ef4581f83d"
+ },
+ "shield.ind-art-105.timber": {
+  "meaningVersion": 1,
+  "defHash": "31cdcf062e1240c7"
+ },
+ "shield.ind-art-122.clay": {
+  "meaningVersion": 1,
+  "defHash": "a5503e3f44fd210d"
+ },
+ "shield.ind-art-122.concrete": {
+  "meaningVersion": 1,
+  "defHash": "ba56128d5dd91482"
+ },
+ "shield.ind-art-122.gravel": {
+  "meaningVersion": 1,
+  "defHash": "464d6541196ec971"
+ },
+ "shield.ind-art-122.sand": {
+  "meaningVersion": 1,
+  "defHash": "9dd21d6e63195eaf"
+ },
+ "shield.ind-art-122.sandbagged_soil": {
+  "meaningVersion": 1,
+  "defHash": "6106e2f356a29509"
+ },
+ "shield.ind-art-122.snow_ice": {
+  "meaningVersion": 1,
+  "defHash": "f961e8c6ac05c293"
+ },
+ "shield.ind-art-122.soil": {
+  "meaningVersion": 1,
+  "defHash": "b719b42af6c7cbd8"
+ },
+ "shield.ind-art-122.steel": {
+  "meaningVersion": 1,
+  "defHash": "6650f11ab270b35b"
+ },
+ "shield.ind-art-122.timber": {
+  "meaningVersion": 1,
+  "defHash": "6c9a9a47b3067b5d"
+ },
+ "shield.ind-art-152.clay": {
+  "meaningVersion": 1,
+  "defHash": "f5ec59db165e0773"
+ },
+ "shield.ind-art-152.concrete": {
+  "meaningVersion": 1,
+  "defHash": "cf3840dd28aa55d2"
+ },
+ "shield.ind-art-152.gravel": {
+  "meaningVersion": 1,
+  "defHash": "f64608b6fe9bc93e"
+ },
+ "shield.ind-art-152.sand": {
+  "meaningVersion": 1,
+  "defHash": "be26790534de6bdf"
+ },
+ "shield.ind-art-152.sandbagged_soil": {
+  "meaningVersion": 1,
+  "defHash": "0620cf4b0f277bc1"
+ },
+ "shield.ind-art-152.snow_ice": {
+  "meaningVersion": 1,
+  "defHash": "86495f69c8b0e0af"
+ },
+ "shield.ind-art-152.soil": {
+  "meaningVersion": 1,
+  "defHash": "b7e394a89c06c3be"
+ },
+ "shield.ind-art-152.steel": {
+  "meaningVersion": 1,
+  "defHash": "e09e5df6895b6108"
+ },
+ "shield.ind-art-152.timber": {
+  "meaningVersion": 1,
+  "defHash": "bf299c034efd1c02"
+ },
+ "shield.ind-art-155.clay": {
+  "meaningVersion": 1,
+  "defHash": "4bdde073dc65f003"
+ },
+ "shield.ind-art-155.concrete": {
+  "meaningVersion": 1,
+  "defHash": "b722a49ef6456ddf"
+ },
+ "shield.ind-art-155.gravel": {
+  "meaningVersion": 1,
+  "defHash": "7b563107627efea7"
+ },
+ "shield.ind-art-155.sand": {
+  "meaningVersion": 1,
+  "defHash": "e13429a64abf9cd4"
+ },
+ "shield.ind-art-155.sandbagged_soil": {
+  "meaningVersion": 1,
+  "defHash": "36dcc4d4d681bfda"
+ },
+ "shield.ind-art-155.snow_ice": {
+  "meaningVersion": 1,
+  "defHash": "2bddcfb29fc9017e"
+ },
+ "shield.ind-art-155.soil": {
+  "meaningVersion": 1,
+  "defHash": "78e3fd26d6a115b4"
+ },
+ "shield.ind-art-155.steel": {
+  "meaningVersion": 1,
+  "defHash": "e23ac99eae54130d"
+ },
+ "shield.ind-art-155.timber": {
+  "meaningVersion": 1,
+  "defHash": "266474ae5a32bd24"
+ },
+ "shield.ind-mtr-120.clay": {
+  "meaningVersion": 1,
+  "defHash": "cde199e048dccc33"
+ },
+ "shield.ind-mtr-120.concrete": {
+  "meaningVersion": 1,
+  "defHash": "6a4895b38bd75caa"
+ },
+ "shield.ind-mtr-120.gravel": {
+  "meaningVersion": 1,
+  "defHash": "81fc01396491fc41"
+ },
+ "shield.ind-mtr-120.sand": {
+  "meaningVersion": 1,
+  "defHash": "bd74046aeb654cdb"
+ },
+ "shield.ind-mtr-120.sandbagged_soil": {
+  "meaningVersion": 1,
+  "defHash": "57a0f59b1380b421"
+ },
+ "shield.ind-mtr-120.snow_ice": {
+  "meaningVersion": 1,
+  "defHash": "59282a758da54b7d"
+ },
+ "shield.ind-mtr-120.soil": {
+  "meaningVersion": 1,
+  "defHash": "f045e540dfe6092b"
+ },
+ "shield.ind-mtr-120.steel": {
+  "meaningVersion": 1,
+  "defHash": "f34334f32431c1aa"
+ },
+ "shield.ind-mtr-120.timber": {
+  "meaningVersion": 1,
+  "defHash": "c3457f9c98bfaa96"
+ },
+ "shield.ind-mtr-60.clay": {
+  "meaningVersion": 1,
+  "defHash": "7dff0c3b9443c0e7"
+ },
+ "shield.ind-mtr-60.concrete": {
+  "meaningVersion": 1,
+  "defHash": "f991a8189ccc2d90"
+ },
+ "shield.ind-mtr-60.gravel": {
+  "meaningVersion": 1,
+  "defHash": "7a361dc1be35884c"
+ },
+ "shield.ind-mtr-60.sand": {
+  "meaningVersion": 1,
+  "defHash": "7e357d9baa875130"
+ },
+ "shield.ind-mtr-60.sandbagged_soil": {
+  "meaningVersion": 1,
+  "defHash": "4b955a1db0df91dd"
+ },
+ "shield.ind-mtr-60.snow_ice": {
+  "meaningVersion": 1,
+  "defHash": "c922f4ff34cbed01"
+ },
+ "shield.ind-mtr-60.soil": {
+  "meaningVersion": 1,
+  "defHash": "51c9e16603bfa501"
+ },
+ "shield.ind-mtr-60.steel": {
+  "meaningVersion": 1,
+  "defHash": "d8b911c47274c908"
+ },
+ "shield.ind-mtr-60.timber": {
+  "meaningVersion": 1,
+  "defHash": "0619f02e48e1811b"
+ },
+ "shield.ind-mtr-81.clay": {
+  "meaningVersion": 1,
+  "defHash": "9efc1dd0a37a8694"
+ },
+ "shield.ind-mtr-81.concrete": {
+  "meaningVersion": 1,
+  "defHash": "754061393f37b385"
+ },
+ "shield.ind-mtr-81.gravel": {
+  "meaningVersion": 1,
+  "defHash": "909fd2ef8ce91add"
+ },
+ "shield.ind-mtr-81.sand": {
+  "meaningVersion": 1,
+  "defHash": "60aed6ac8dd7f19e"
+ },
+ "shield.ind-mtr-81.sandbagged_soil": {
+  "meaningVersion": 1,
+  "defHash": "397767c9d5534f34"
+ },
+ "shield.ind-mtr-81.snow_ice": {
+  "meaningVersion": 1,
+  "defHash": "fa78784aa67b44f7"
+ },
+ "shield.ind-mtr-81.soil": {
+  "meaningVersion": 1,
+  "defHash": "42a8df0db88d34bd"
+ },
+ "shield.ind-mtr-81.steel": {
+  "meaningVersion": 1,
+  "defHash": "cbe202aff4208c6a"
+ },
+ "shield.ind-mtr-81.timber": {
+  "meaningVersion": 1,
+  "defHash": "9fdb5bd6590853b0"
+ },
+ "shield.sa-127.clay": {
+  "meaningVersion": 1,
+  "defHash": "3dd9b1d93f490b1e"
+ },
+ "shield.sa-127.concrete": {
+  "meaningVersion": 1,
+  "defHash": "4dbdf25d555b1ae9"
+ },
+ "shield.sa-127.gravel": {
+  "meaningVersion": 1,
+  "defHash": "40d719e6a6f9813b"
+ },
+ "shield.sa-127.sand": {
+  "meaningVersion": 1,
+  "defHash": "5aca77ed91547bf0"
+ },
+ "shield.sa-127.sandbagged_soil": {
+  "meaningVersion": 1,
+  "defHash": "ebc9eada5116a7ee"
+ },
+ "shield.sa-127.snow_ice": {
+  "meaningVersion": 1,
+  "defHash": "f81db6cc95014d70"
+ },
+ "shield.sa-127.soil": {
+  "meaningVersion": 1,
+  "defHash": "171ecd45b91d7fe2"
+ },
+ "shield.sa-127.steel": {
+  "meaningVersion": 1,
+  "defHash": "bb5a5cc541be0cf9"
+ },
+ "shield.sa-127.timber": {
+  "meaningVersion": 1,
+  "defHash": "413e6659e15ab12e"
+ },
+ "shield.sa-145.clay": {
+  "meaningVersion": 1,
+  "defHash": "9f5ad0fad0f26420"
+ },
+ "shield.sa-145.concrete": {
+  "meaningVersion": 1,
+  "defHash": "ab691225ba2c12f7"
+ },
+ "shield.sa-145.gravel": {
+  "meaningVersion": 1,
+  "defHash": "9ea22d36b7dea67a"
+ },
+ "shield.sa-145.sand": {
+  "meaningVersion": 1,
+  "defHash": "d6710aaf5d2981ec"
+ },
+ "shield.sa-145.sandbagged_soil": {
+  "meaningVersion": 1,
+  "defHash": "68f079b86e8dd50c"
+ },
+ "shield.sa-145.snow_ice": {
+  "meaningVersion": 1,
+  "defHash": "78b0a171f4844f1b"
+ },
+ "shield.sa-145.soil": {
+  "meaningVersion": 1,
+  "defHash": "ad39d85eb88ed5e8"
+ },
+ "shield.sa-145.steel": {
+  "meaningVersion": 1,
+  "defHash": "aca5970f7fd1a423"
+ },
+ "shield.sa-145.timber": {
+  "meaningVersion": 1,
+  "defHash": "1ec50800b87ab185"
+ },
+ "shield.sa-556.clay": {
+  "meaningVersion": 1,
+  "defHash": "f3a0cf47436f6aa6"
+ },
+ "shield.sa-556.concrete": {
+  "meaningVersion": 1,
+  "defHash": "cc36de504e71d1c5"
+ },
+ "shield.sa-556.gravel": {
+  "meaningVersion": 1,
+  "defHash": "a595183c47ac4740"
+ },
+ "shield.sa-556.sand": {
+  "meaningVersion": 1,
+  "defHash": "9fcde9e8b7158501"
+ },
+ "shield.sa-556.sandbagged_soil": {
+  "meaningVersion": 1,
+  "defHash": "3d801584e3ad5e10"
+ },
+ "shield.sa-556.snow_ice": {
+  "meaningVersion": 1,
+  "defHash": "50902002306a4fff"
+ },
+ "shield.sa-556.soil": {
+  "meaningVersion": 1,
+  "defHash": "b3be13aca06f0061"
+ },
+ "shield.sa-556.steel": {
+  "meaningVersion": 1,
+  "defHash": "ccb19018fa05074d"
+ },
+ "shield.sa-556.timber": {
+  "meaningVersion": 1,
+  "defHash": "71f62085559f6d6a"
+ },
+ "shield.sa-762.clay": {
+  "meaningVersion": 1,
+  "defHash": "5daea1c3f5bf9cba"
+ },
+ "shield.sa-762.concrete": {
+  "meaningVersion": 1,
+  "defHash": "a43df523319156f2"
+ },
+ "shield.sa-762.gravel": {
+  "meaningVersion": 1,
+  "defHash": "f73bf8164260e8b7"
+ },
+ "shield.sa-762.sand": {
+  "meaningVersion": 1,
+  "defHash": "4297ac2e4ad68318"
+ },
+ "shield.sa-762.sandbagged_soil": {
+  "meaningVersion": 1,
+  "defHash": "29e4a3e356e5b799"
+ },
+ "shield.sa-762.snow_ice": {
+  "meaningVersion": 1,
+  "defHash": "21fc5ca8a2707ff5"
+ },
+ "shield.sa-762.soil": {
+  "meaningVersion": 1,
+  "defHash": "fddb13fa3f7be6ad"
+ },
+ "shield.sa-762.steel": {
+  "meaningVersion": 1,
+  "defHash": "85d3f296cddafe9b"
+ },
+ "shield.sa-762.timber": {
+  "meaningVersion": 1,
+  "defHash": "12a98e25ea7ec578"
+ },
+ "soil.clay.digRateHand": {
+  "meaningVersion": 1,
+  "defHash": "c6c123abaa35025a"
+ },
+ "soil.clay.digRateMachine": {
+  "meaningVersion": 1,
+  "defHash": "d218c2894a3b9744"
+ },
+ "soil.clay.revetForced": {
+  "meaningVersion": 1,
+  "defHash": "23822953d096c873"
+ },
+ "soil.clay.wallSlope": {
+  "meaningVersion": 1,
+  "defHash": "2b0e69b784c6d72b"
+ },
+ "soil.frozen.digRateHand": {
+  "meaningVersion": 1,
+  "defHash": "ab6ea488af9673db"
+ },
+ "soil.frozen.digRateMachine": {
+  "meaningVersion": 1,
+  "defHash": "b559b2fed126f80e"
+ },
+ "soil.frozen.revetForced": {
+  "meaningVersion": 1,
+  "defHash": "5619adb345ca56b9"
+ },
+ "soil.frozen.wallSlope": {
+  "meaningVersion": 1,
+  "defHash": "9654c3613b83cb34"
+ },
+ "soil.gravel.digRateHand": {
+  "meaningVersion": 1,
+  "defHash": "928fc4a9190f69e6"
+ },
+ "soil.gravel.digRateMachine": {
+  "meaningVersion": 1,
+  "defHash": "b119c86426f1ea44"
+ },
+ "soil.gravel.revetForced": {
+  "meaningVersion": 1,
+  "defHash": "4cffbaf8a827fe1a"
+ },
+ "soil.gravel.wallSlope": {
+  "meaningVersion": 1,
+  "defHash": "f4ed3bc87f27da58"
+ },
+ "soil.loam.digRateHand": {
+  "meaningVersion": 1,
+  "defHash": "a3637f47e2a1cfca"
+ },
+ "soil.loam.digRateMachine": {
+  "meaningVersion": 1,
+  "defHash": "286781b172110bfe"
+ },
+ "soil.loam.revetForced": {
+  "meaningVersion": 1,
+  "defHash": "be47149505217ede"
+ },
+ "soil.loam.wallSlope": {
+  "meaningVersion": 1,
+  "defHash": "9cb4c5371a7eedce"
+ },
+ "soil.rock.digRateHand": {
+  "meaningVersion": 1,
+  "defHash": "64f5faf6a60bfb57"
+ },
+ "soil.rock.digRateMachine": {
+  "meaningVersion": 1,
+  "defHash": "95fa0a6f31b766af"
+ },
+ "soil.rock.revetForced": {
+  "meaningVersion": 1,
+  "defHash": "af5ebe0af01165e9"
+ },
+ "soil.rock.wallSlope": {
+  "meaningVersion": 1,
+  "defHash": "c96be58c10509bc4"
+ },
+ "soil.sand.digRateHand": {
+  "meaningVersion": 1,
+  "defHash": "2610fc92c4437b97"
+ },
+ "soil.sand.digRateMachine": {
+  "meaningVersion": 1,
+  "defHash": "64ba69fc6cf94666"
+ },
+ "soil.sand.revetForced": {
+  "meaningVersion": 1,
+  "defHash": "877fee33b93c08ac"
+ },
+ "soil.sand.wallSlope": {
+  "meaningVersion": 1,
+  "defHash": "ec9aa7fc3092c173"
+ },
+ "soil.sandy_loam.digRateHand": {
+  "meaningVersion": 1,
+  "defHash": "cfa49ffe27a08f2a"
+ },
+ "soil.sandy_loam.digRateMachine": {
+  "meaningVersion": 1,
+  "defHash": "54342f98ee838648"
+ },
+ "soil.sandy_loam.revetForced": {
+  "meaningVersion": 1,
+  "defHash": "41fa6a5615443342"
+ },
+ "soil.sandy_loam.wallSlope": {
+  "meaningVersion": 1,
+  "defHash": "277774a07ac51d7f"
+ },
+ "soil.silt.digRateHand": {
+  "meaningVersion": 1,
+  "defHash": "05cd1ed622f87d29"
+ },
+ "soil.silt.digRateMachine": {
+  "meaningVersion": 1,
+  "defHash": "f252c498bca4e202"
+ },
+ "soil.silt.revetForced": {
+  "meaningVersion": 1,
+  "defHash": "7e34a947da238a0c"
+ },
+ "soil.silt.wallSlope": {
+  "meaningVersion": 1,
+  "defHash": "0569de51614df5d6"
+ },
+ "standard.deliberate.coverMul": {
+  "meaningVersion": 1,
+  "defHash": "763f7fafda3f9786"
+ },
+ "standard.deliberate.depthMul": {
+  "meaningVersion": 1,
+  "defHash": "d15dd41346974b62"
+ },
+ "standard.deliberate.laborMul": {
+  "meaningVersion": 1,
+  "defHash": "718096404708e285"
+ },
+ "standard.hasty.coverMul": {
+  "meaningVersion": 1,
+  "defHash": "031f1d1a1dd5713c"
+ },
+ "standard.hasty.depthMul": {
+  "meaningVersion": 1,
+  "defHash": "f945783dfb0fb130"
+ },
+ "standard.hasty.laborMul": {
+  "meaningVersion": 1,
+  "defHash": "58b3832c5e207a23"
+ },
+ "standard.reinforced.coverMul": {
+  "meaningVersion": 1,
+  "defHash": "5de9205922e3f393"
+ },
+ "standard.reinforced.depthMul": {
+  "meaningVersion": 1,
+  "defHash": "31640bf105041ffa"
+ },
+ "standard.reinforced.laborMul": {
+  "meaningVersion": 1,
+  "defHash": "a4854c82fff30e6a"
+ },
+ "standoff.at-he-contact": {
+  "meaningVersion": 1,
+  "defHash": "a13d31cd1777af8a"
+ },
+ "standoff.at-recoilless": {
+  "meaningVersion": 1,
+  "defHash": "b794b8e6e5341a40"
+ },
+ "standoff.at-rpg": {
+  "meaningVersion": 1,
+  "defHash": "af2934806cececf6"
+ },
+ "standoff.at-tank": {
+  "meaningVersion": 1,
+  "defHash": "5b4d353aaf397710"
+ },
+ "standoff.blast-demo": {
+  "meaningVersion": 1,
+  "defHash": "5f1e546c957a6761"
+ },
+ "standoff.blast-vbied": {
+  "meaningVersion": 1,
+  "defHash": "985d09d7f6a5f854"
+ },
+ "standoff.ind-art-105": {
+  "meaningVersion": 1,
+  "defHash": "783ed2416c5c5a76"
+ },
+ "standoff.ind-art-122": {
+  "meaningVersion": 1,
+  "defHash": "d1e6f80568936553"
+ },
+ "standoff.ind-art-152": {
+  "meaningVersion": 1,
+  "defHash": "892533fe0dd5a96d"
+ },
+ "standoff.ind-art-155": {
+  "meaningVersion": 1,
+  "defHash": "77c448899036c50b"
+ },
+ "standoff.ind-mtr-120": {
+  "meaningVersion": 1,
+  "defHash": "1d213e174d08614b"
+ },
+ "standoff.ind-mtr-60": {
+  "meaningVersion": 1,
+  "defHash": "055e5cbce9ba8fe6"
+ },
+ "standoff.ind-mtr-81": {
+  "meaningVersion": 1,
+  "defHash": "ec0f5ae83b652b3e"
+ },
+ "standoff.sa-127": {
+  "meaningVersion": 1,
+  "defHash": "b1f54382d0f71776"
+ },
+ "standoff.sa-145": {
+  "meaningVersion": 1,
+  "defHash": "8bb23b6b1bc325f2"
+ },
+ "standoff.sa-556": {
+  "meaningVersion": 1,
+  "defHash": "8874fae4c6d495be"
+ },
+ "standoff.sa-762": {
+  "meaningVersion": 1,
+  "defHash": "c5ab34dd11f5cb25"
+ },
+ "sump.D": {
+  "meaningVersion": 1,
+  "defHash": "598a9226f30a1633"
+ },
+ "sump.L": {
+  "meaningVersion": 1,
+  "defHash": "1365a8faa8bc6312"
+ },
+ "sump.W": {
+  "meaningVersion": 1,
+  "defHash": "202c66cc714c3ea3"
+ },
+ "sump.gravelFt3": {
+  "meaningVersion": 1,
+  "defHash": "cd95458cb084174b"
+ },
+ "sump.rollInSlope": {
+  "meaningVersion": 1,
+  "defHash": "eaf7b1b1f956779f"
+ },
+ "vehicle.berm.H": {
+  "meaningVersion": 1,
+  "defHash": "9fcb9b5a30f203af"
+ }
+}
