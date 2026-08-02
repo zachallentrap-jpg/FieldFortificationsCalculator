@@ -22,6 +22,10 @@
   #banner { grid-area:banner; padding:8px 14px; border-radius:8px; background:#3c3f43; color:#fff; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
   #banner .state { font-weight:700; padding:2px 10px; border-radius:6px; background:var(--warn); }
   #banner .hash { font-family:monospace; font-size:12px; opacity:.85 }
+  #back-to-hub { color:#d8d4cc; text-decoration:none; font-size:13px; border:1px solid #55595e;
+                 padding:5px 11px; border-radius:6px; white-space:nowrap; }
+  #back-to-hub:hover { background:#4a4e52; color:#fff; }
+  #back-to-hub[hidden] { display:none; }
   #inputs { grid-area:inputs; background:var(--paper); border-radius:8px; padding:14px; overflow:auto; }
   #drawings { grid-area:drawings; background:var(--paper); border-radius:8px; padding:10px; overflow:auto; display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start; }
   #drawings svg { max-width:100%; height:auto; border:1px solid #ddd; }
@@ -35,6 +39,13 @@
   #canvas-socket { width:100%; min-height:40px; border:1px dashed #c8c4bb; border-radius:6px; display:grid; place-items:center; color:var(--muted); font-size:12px; }
   ul { margin:0; padding-left:18px; font-size:13px; } td, th { font-size:13px; padding:2px 8px 2px 0; text-align:left; }
   .error-card { background:#fdecea; border:1px solid var(--warn); color:var(--warn); padding:10px; border-radius:6px; font-size:13px; }
+  #update-bar { position:fixed; left:0; right:0; bottom:0; background:#1f6f43; color:#fff; padding:12px 16px;
+                display:flex; gap:14px; align-items:center; justify-content:center; flex-wrap:wrap; z-index:9;
+                box-shadow:0 -2px 12px rgba(0,0,0,.35); font-size:15px; }
+  #update-bar[hidden] { display:none; }
+  #update-bar button { background:#fff; color:#1f6f43; border-color:#fff; font-weight:700; }
+  #version-line { font-size:12px; color:#8b8f94; margin-top:10px; }
+  #version-line button { background:none; border:1px solid #55595e; color:#c9c6bf; font-size:12px; padding:4px 10px; }
   #conditions-overlay { position:fixed; inset:0; background:rgba(20,20,20,.75); display:grid; place-items:center; z-index:10; }
   #conditions-overlay[hidden] { display:none; }
   #conditions-overlay .sheet { background:#fff; max-width:560px; padding:22px; border-radius:10px; }
@@ -45,6 +56,7 @@
 <body>
 <div id="app">
   <header id="banner">
+    <a id="back-to-hub" href="../hub.html" hidden>⌂ Combat Engineer Toolkit</a>
     <h1>SAP-2 — Survivability Position Planner</h1>
     <span class="state" id="wm-state">BOOTING</span>
     <span id="wm-detail"></span>
@@ -75,6 +87,11 @@
 
     <h2 style="margin-top:18px">3D</h2>
     <div id="canvas-socket" data-retain>3D view arrives in R2b — this socket is permanent.</div>
+
+    <p id="version-line">
+      <span id="version-text">version — checking…</span><br />
+      <button id="check-updates" type="button" style="margin-top:6px">Check for updates</button>
+    </p>
   </section>
 
   <section id="drawings" aria-label="Drawings">
@@ -87,6 +104,12 @@
     <section aria-label="Materials"><h2>What you need</h2><table id="bom"></table></section>
     <section aria-label="Work"><h2>Work by stage</h2><table id="stages"></table></section>
   </div>
+</div>
+
+<div id="update-bar" role="status" hidden>
+  <strong>A new version of SAP-2 has shipped.</strong>
+  <span>Your work in progress is not affected.</span>
+  <button id="update-now" type="button">Update now</button>
 </div>
 
 <div id="conditions-overlay" hidden>

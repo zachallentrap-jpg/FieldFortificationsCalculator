@@ -16,10 +16,12 @@ channel = "stable-24_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-# v1 EOL (docs/SAP2_BLUEPRINT.md §2.11): the deployment serves ONLY the retirement
-# notice — the v1 app with its placeholder values is no longer published. The build
-# is dependency-free on purpose; scripts/serve.js (zero-dep) serves dist/.
-build = ["sh", "-c", "node scripts/build-retirement.mjs"]
+# Deploys the 1371 Combat Engineer Toolkit: hub at /, TIMBER-1 at /woodframe.html,
+# SAP-2 at /survivability/. SAP-1 is retired and is NOT built — its bundle carries
+# the 295 illustrative placeholder values (docs/SAP2_BLUEPRINT.md §2.11), so it must
+# not ship even as an unreferenced chunk. scripts/serve-suite.mjs (zero-dep) serves
+# dist/ with the cache headers the in-app update button depends on.
+build = ["sh", "-c", "npm ci && npm run build:suite"]
 run = ["sh", "-c", "npm run start"]
 
 [[ports]]
