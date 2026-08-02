@@ -926,6 +926,15 @@ Replaces the naive 4-substring scan (which would trip on `Math.round` and miss `
 
 ### 6.5 Doc reciprocity (blocker fix)
 
+> **STATUS — executed at T0 (2026-08-02).** Both edits are merged in
+> `docs/SAP2_BLUEPRINT.md`: (a) the §5 TIMBER row now points here and enumerates which
+> SAP-2 gate classes apply to `src/timber` (offline/determinism/doc-integrity YES;
+> ship-empty/watermark/commissioning NO — replaced by LS-GATE); (b) R5b carries the
+> `bunker_op_cp` ↔ `crib-bunker` reconciliation entry condition. **Owner ack: PENDING —
+> the owner directed T0's execution, but has not separately confirmed the boundary
+> call itself. T1 must not start until that ack is recorded here.** This is the one T0
+> item a session cannot complete alone.
+
 `docs/SAP2_BLUEPRINT.md` currently binds TIMBER to a "rebuilt inside the regime
 (timber.* leaves)" re-entry bar and logs TIMBER as an escaped failure class. **TD1:**
 this plan's §6.1 boundary supersedes that row. At T0, `SAP2_BLUEPRINT.md` is edited

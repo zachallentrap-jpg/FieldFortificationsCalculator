@@ -18,7 +18,10 @@
     "build:standalone": "node --import tsx scripts/build-standalone.ts",
     "check:offline": "node --import tsx scripts/check-offline.ts",
     "build:woodframe": "vite build -c vite.woodframe.config.ts",
-    "build:suite": "node scripts/build-suite.mjs"
+    "build:suite": "node scripts/build-suite.mjs",
+    "check:assets": "node --import tsx scripts/check-assets.ts",
+    "gen:frame-goldens": "node --import tsx scripts/gen-frame-goldens.ts",
+    "verify:full": "npm run verify && npm run build:suite && npm run check:assets"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

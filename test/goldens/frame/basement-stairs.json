@@ -1,0 +1,7311 @@
+{
+ "input": {
+  "lengthFt": 20,
+  "widthFt": 16,
+  "wallHeightFt": 8,
+  "studSpacingIn": 16,
+  "joistSpacingIn": 16,
+  "rafterSpacingIn": 16,
+  "risePer12": 4,
+  "overhangFt": 1,
+  "crawlFt": 1.5,
+  "openings": [],
+  "foundation": "basement",
+  "stairs": true
+ },
+ "members": [
+  {
+   "id": "FL-foundationWall-01",
+   "role": "foundationWall",
+   "nominal": "conc wall 8\"",
+   "actual": {
+    "w": 8,
+    "d": 94
+   },
+   "cutLength": 240,
+   "position": [
+    10,
+    -4.708333333333333,
+    0.3333333333333333
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "1/2\" anchor bolts @ ~6 ft into sill (PH)",
+   "doctrineRef": "FM 5-426 continuous-wall foundation (PH ch./page)"
+  },
+  {
+   "id": "FL-footing-01",
+   "role": "footing",
+   "nominal": "conc footing 16x8",
+   "actual": {
+    "w": 16,
+    "d": 8
+   },
+   "cutLength": 240,
+   "position": [
+    10,
+    -8.958333333333334,
+    0.3333333333333333
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "poured on undisturbed soil (PH)",
+   "doctrineRef": "FM 5-426 wall footing: width ~2x wall, depth ~wall thickness (PH page)"
+  },
+  {
+   "id": "FL-foundationWall-02",
+   "role": "foundationWall",
+   "nominal": "conc wall 8\"",
+   "actual": {
+    "w": 8,
+    "d": 94
+   },
+   "cutLength": 240,
+   "position": [
+    10,
+    -4.708333333333333,
+    15.666666666666666
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "1/2\" anchor bolts @ ~6 ft into sill (PH)",
+   "doctrineRef": "FM 5-426 continuous-wall foundation (PH ch./page)"
+  },
+  {
+   "id": "FL-footing-02",
+   "role": "footing",
+   "nominal": "conc footing 16x8",
+   "actual": {
+    "w": 16,
+    "d": 8
+   },
+   "cutLength": 240,
+   "position": [
+    10,
+    -8.958333333333334,
+    15.666666666666666
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "poured on undisturbed soil (PH)",
+   "doctrineRef": "FM 5-426 wall footing: width ~2x wall, depth ~wall thickness (PH page)"
+  },
+  {
+   "id": "FL-foundationWall-03",
+   "role": "foundationWall",
+   "nominal": "conc wall 8\"",
+   "actual": {
+    "w": 8,
+    "d": 94
+   },
+   "cutLength": 176,
+   "position": [
+    0.3333333333333333,
+    -4.708333333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "1/2\" anchor bolts @ ~6 ft into sill (PH)",
+   "doctrineRef": "FM 5-426 continuous-wall foundation (PH ch./page)"
+  },
+  {
+   "id": "FL-footing-03",
+   "role": "footing",
+   "nominal": "conc footing 16x8",
+   "actual": {
+    "w": 16,
+    "d": 8
+   },
+   "cutLength": 176,
+   "position": [
+    0.3333333333333333,
+    -8.958333333333334,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "poured on undisturbed soil (PH)",
+   "doctrineRef": "FM 5-426 wall footing: width ~2x wall, depth ~wall thickness (PH page)"
+  },
+  {
+   "id": "FL-foundationWall-04",
+   "role": "foundationWall",
+   "nominal": "conc wall 8\"",
+   "actual": {
+    "w": 8,
+    "d": 94
+   },
+   "cutLength": 176,
+   "position": [
+    19.666666666666668,
+    -4.708333333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "1/2\" anchor bolts @ ~6 ft into sill (PH)",
+   "doctrineRef": "FM 5-426 continuous-wall foundation (PH ch./page)"
+  },
+  {
+   "id": "FL-footing-04",
+   "role": "footing",
+   "nominal": "conc footing 16x8",
+   "actual": {
+    "w": 16,
+    "d": 8
+   },
+   "cutLength": 176,
+   "position": [
+    19.666666666666668,
+    -8.958333333333334,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "poured on undisturbed soil (PH)",
+   "doctrineRef": "FM 5-426 wall footing: width ~2x wall, depth ~wall thickness (PH page)"
+  },
+  {
+   "id": "FL-slab-01",
+   "role": "slab",
+   "nominal": "conc slab 4\"",
+   "actual": {
+    "w": 176,
+    "d": 4
+   },
+   "cutLength": 224,
+   "position": [
+    10,
+    -8.458333333333332,
+    8
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "poured against walls over vapor barrier (PH)",
+   "doctrineRef": "FM 5-426 basement slab (PH ch./page)"
+  },
+  {
+   "id": "FL-post-01",
+   "role": "post",
+   "nominal": "4x4",
+   "actual": {
+    "w": 3.5,
+    "d": 3.5
+   },
+   "cutLength": 82.25,
+   "position": [
+    6.743055555555556,
+    -4.864583333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "16d common (PH)",
+   "doctrineRef": "girder column on slab footing — steel column typical (PH); girder ends bear in wall pockets"
+  },
+  {
+   "id": "FL-post-02",
+   "role": "post",
+   "nominal": "4x4",
+   "actual": {
+    "w": 3.5,
+    "d": 3.5
+   },
+   "cutLength": 82.25,
+   "position": [
+    13.256944444444445,
+    -4.864583333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "16d common (PH)",
+   "doctrineRef": "girder column on slab footing — steel column typical (PH); girder ends bear in wall pockets"
+  },
+  {
+   "id": "FL-sill-01",
+   "role": "sill",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 240,
+   "position": [
+    10,
+    -0.7291666666666666,
+    0.22916666666666666
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    0,
+    0
+   ],
+   "stage": 2,
+   "grade": "No. 2 common",
+   "nailing": "1/2\" anchor bolts @ ~6 ft (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "FL-sill-02",
+   "role": "sill",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 240,
+   "position": [
+    10,
+    -0.7291666666666666,
+    15.770833333333334
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    0,
+    0
+   ],
+   "stage": 2,
+   "grade": "No. 2 common",
+   "nailing": "1/2\" anchor bolts @ ~6 ft (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "FL-sill-03",
+   "role": "sill",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 181,
+   "position": [
+    0.22916666666666666,
+    -0.7291666666666666,
+    8
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    1.5707963267948966,
+    0
+   ],
+   "stage": 2,
+   "grade": "No. 2 common",
+   "nailing": "1/2\" anchor bolts @ ~6 ft (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "FL-sill-04",
+   "role": "sill",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 181,
+   "position": [
+    19.770833333333332,
+    -0.7291666666666666,
+    8
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    1.5707963267948966,
+    0
+   ],
+   "stage": 2,
+   "grade": "No. 2 common",
+   "nailing": "1/2\" anchor bolts @ ~6 ft (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "FL-girder-01",
+   "role": "girder",
+   "nominal": "2x10",
+   "actual": {
+    "w": 1.5,
+    "d": 9.25
+   },
+   "cutLength": 240,
+   "position": [
+    10,
+    -1.0520833333333333,
+    7.875
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "stage": 2,
+   "grade": "No. 2 common",
+   "nailing": "16d @ 16\" staggered, both faces (PH)",
+   "doctrineRef": "FM 5-426 Table 6-1 built-up girder (PH: fixed 3-2x10, load-area method pending)"
+  },
+  {
+   "id": "FL-girder-02",
+   "role": "girder",
+   "nominal": "2x10",
+   "actual": {
+    "w": 1.5,
+    "d": 9.25
+   },
+   "cutLength": 240,
+   "position": [
+    10,
+    -1.0520833333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "stage": 2,
+   "grade": "No. 2 common",
+   "nailing": "16d @ 16\" staggered, both faces (PH)",
+   "doctrineRef": "FM 5-426 Table 6-1 built-up girder (PH: fixed 3-2x10, load-area method pending)"
+  },
+  {
+   "id": "FL-girder-03",
+   "role": "girder",
+   "nominal": "2x10",
+   "actual": {
+    "w": 1.5,
+    "d": 9.25
+   },
+   "cutLength": 240,
+   "position": [
+    10,
+    -1.0520833333333333,
+    8.125
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "stage": 2,
+   "grade": "No. 2 common",
+   "nailing": "16d @ 16\" staggered, both faces (PH)",
+   "doctrineRef": "FM 5-426 Table 6-1 built-up girder (PH: fixed 3-2x10, load-area method pending)"
+  },
+  {
+   "id": "FL-joist-01",
+   "role": "joist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 189,
+   "position": [
+    0.0625,
+    -0.3645833333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "FM 5-426 Table 6-2 joist span (PH: 2x8 fixed, span check pending)"
+  },
+  {
+   "id": "FL-joist-02",
+   "role": "joist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 189,
+   "position": [
+    1.3333333333333333,
+    -0.3645833333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "FM 5-426 Table 6-2 joist span (PH: 2x8 fixed, span check pending)"
+  },
+  {
+   "id": "FL-joist-03",
+   "role": "joist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 189,
+   "position": [
+    2.6666666666666665,
+    -0.3645833333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "FM 5-426 Table 6-2 joist span (PH: 2x8 fixed, span check pending)"
+  },
+  {
+   "id": "FL-joist-04",
+   "role": "joist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 189,
+   "position": [
+    4,
+    -0.3645833333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "FM 5-426 Table 6-2 joist span (PH: 2x8 fixed, span check pending)"
+  },
+  {
+   "id": "FL-joist-05",
+   "role": "joist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 189,
+   "position": [
+    5.333333333333333,
+    -0.3645833333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "FM 5-426 Table 6-2 joist span (PH: 2x8 fixed, span check pending)"
+  },
+  {
+   "id": "FL-tailJoist-01",
+   "role": "tailJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 94.5,
+   "position": [
+    7.999999999999999,
+    -0.3645833333333333,
+    4.0625
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "tail joist at stair opening, bears on girder — FM 5-426 framing at openings (PH page)"
+  },
+  {
+   "id": "FL-tailJoist-02",
+   "role": "tailJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 48.54,
+   "position": [
+    7.999999999999999,
+    -0.3645833333333333,
+    13.8525
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "tail joist at stair opening, hangs on double header — FM 5-426 framing at openings (PH page)"
+  },
+  {
+   "id": "FL-tailJoist-03",
+   "role": "tailJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 94.5,
+   "position": [
+    9.333333333333332,
+    -0.3645833333333333,
+    4.0625
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "tail joist at stair opening, bears on girder — FM 5-426 framing at openings (PH page)"
+  },
+  {
+   "id": "FL-tailJoist-04",
+   "role": "tailJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 48.54,
+   "position": [
+    9.333333333333332,
+    -0.3645833333333333,
+    13.8525
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "tail joist at stair opening, hangs on double header — FM 5-426 framing at openings (PH page)"
+  },
+  {
+   "id": "FL-tailJoist-05",
+   "role": "tailJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 94.5,
+   "position": [
+    10.666666666666666,
+    -0.3645833333333333,
+    4.0625
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "tail joist at stair opening, bears on girder — FM 5-426 framing at openings (PH page)"
+  },
+  {
+   "id": "FL-tailJoist-06",
+   "role": "tailJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 48.54,
+   "position": [
+    10.666666666666666,
+    -0.3645833333333333,
+    13.8525
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "tail joist at stair opening, hangs on double header — FM 5-426 framing at openings (PH page)"
+  },
+  {
+   "id": "FL-tailJoist-07",
+   "role": "tailJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 94.5,
+   "position": [
+    12,
+    -0.3645833333333333,
+    4.0625
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "tail joist at stair opening, bears on girder — FM 5-426 framing at openings (PH page)"
+  },
+  {
+   "id": "FL-tailJoist-08",
+   "role": "tailJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 48.54,
+   "position": [
+    12,
+    -0.3645833333333333,
+    13.8525
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "tail joist at stair opening, hangs on double header — FM 5-426 framing at openings (PH page)"
+  },
+  {
+   "id": "FL-tailJoist-09",
+   "role": "tailJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 94.5,
+   "position": [
+    13.333333333333334,
+    -0.3645833333333333,
+    4.0625
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "tail joist at stair opening, bears on girder — FM 5-426 framing at openings (PH page)"
+  },
+  {
+   "id": "FL-tailJoist-10",
+   "role": "tailJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 48.54,
+   "position": [
+    13.333333333333334,
+    -0.3645833333333333,
+    13.8525
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "tail joist at stair opening, hangs on double header — FM 5-426 framing at openings (PH page)"
+  },
+  {
+   "id": "FL-tailJoist-11",
+   "role": "tailJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 94.5,
+   "position": [
+    14.666666666666668,
+    -0.3645833333333333,
+    4.0625
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "tail joist at stair opening, bears on girder — FM 5-426 framing at openings (PH page)"
+  },
+  {
+   "id": "FL-tailJoist-12",
+   "role": "tailJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 48.54,
+   "position": [
+    14.666666666666668,
+    -0.3645833333333333,
+    13.8525
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "tail joist at stair opening, hangs on double header — FM 5-426 framing at openings (PH page)"
+  },
+  {
+   "id": "FL-joist-06",
+   "role": "joist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 189,
+   "position": [
+    17.333333333333332,
+    -0.3645833333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "FM 5-426 Table 6-2 joist span (PH: 2x8 fixed, span check pending)"
+  },
+  {
+   "id": "FL-joist-07",
+   "role": "joist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 189,
+   "position": [
+    18.666666666666664,
+    -0.3645833333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "FM 5-426 Table 6-2 joist span (PH: 2x8 fixed, span check pending)"
+  },
+  {
+   "id": "FL-joist-08",
+   "role": "joist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 189,
+   "position": [
+    19.9375,
+    -0.3645833333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea bearing (PH)",
+   "doctrineRef": "FM 5-426 Table 6-2 joist span (PH: 2x8 fixed, span check pending)"
+  },
+  {
+   "id": "FL-trimmerJoist-01",
+   "role": "trimmerJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 189,
+   "position": [
+    6.356260469011724,
+    -0.3645833333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "16d @ 12\" staggered to mate (PH)",
+   "doctrineRef": "double trimmer joist at stair opening — FM 5-426 framing at openings (PH page)"
+  },
+  {
+   "id": "FL-trimmerJoist-02",
+   "role": "trimmerJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 189,
+   "position": [
+    6.231260469011724,
+    -0.3645833333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "16d @ 12\" staggered to mate (PH)",
+   "doctrineRef": "double trimmer joist at stair opening — FM 5-426 framing at openings (PH page)"
+  },
+  {
+   "id": "FL-trimmerJoist-03",
+   "role": "trimmerJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 189,
+   "position": [
+    16.0625,
+    -0.3645833333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "16d @ 12\" staggered to mate (PH)",
+   "doctrineRef": "double trimmer joist at stair opening — FM 5-426 framing at openings (PH page)"
+  },
+  {
+   "id": "FL-trimmerJoist-04",
+   "role": "trimmerJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 189,
+   "position": [
+    16.1875,
+    -0.3645833333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "16d @ 12\" staggered to mate (PH)",
+   "doctrineRef": "double trimmer joist at stair opening — FM 5-426 framing at openings (PH page)"
+  },
+  {
+   "id": "FL-headerJoist-01",
+   "role": "headerJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 114.9748743718593,
+   "position": [
+    11.209380234505861,
+    -0.3645833333333333,
+    8.1875
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d ea tail joist + 16d @ 12\" to mate (PH)",
+   "doctrineRef": "double header at stair opening, bears on girder — FM 5-426 framing at openings (PH; verify span)"
+  },
+  {
+   "id": "FL-headerJoist-02",
+   "role": "headerJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 114.9748743718593,
+   "position": [
+    11.209380234505861,
+    -0.3645833333333333,
+    8.0625
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d ea tail joist + 16d @ 12\" to mate (PH)",
+   "doctrineRef": "double header at stair opening, bears on girder — FM 5-426 framing at openings (PH; verify span)"
+  },
+  {
+   "id": "FL-headerJoist-03",
+   "role": "headerJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 114.9748743718593,
+   "position": [
+    11.209380234505861,
+    -0.3645833333333333,
+    11.6425
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d ea tail joist + 16d @ 12\" to mate (PH)",
+   "doctrineRef": "double header at stair opening, carried by trimmers — FM 5-426 framing at openings (PH; verify span)"
+  },
+  {
+   "id": "FL-headerJoist-04",
+   "role": "headerJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 114.9748743718593,
+   "position": [
+    11.209380234505861,
+    -0.3645833333333333,
+    11.7675
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d ea tail joist + 16d @ 12\" to mate (PH)",
+   "doctrineRef": "double header at stair opening, carried by trimmers — FM 5-426 framing at openings (PH; verify span)"
+  },
+  {
+   "id": "FL-rimJoist-01",
+   "role": "rimJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 240,
+   "position": [
+    10,
+    -0.3645833333333333,
+    0.0625
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d ea joist end (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "FL-rimJoist-02",
+   "role": "rimJoist",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 240,
+   "position": [
+    10,
+    -0.3645833333333333,
+    15.9375
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "3-16d ea joist end (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "FL-bridging-01",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.221806725878501,
+   "position": [
+    0.6979166666666666,
+    -0.3645833333333333,
+    3.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.4433741601473803
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-02",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.221806725878501,
+   "position": [
+    0.6979166666666666,
+    -0.3645833333333333,
+    4.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.4433741601473803
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-03",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665766,
+   "position": [
+    2,
+    -0.3645833333333333,
+    3.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.42314064803350465
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-04",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665766,
+   "position": [
+    2,
+    -0.3645833333333333,
+    4.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.42314064803350465
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-05",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665766,
+   "position": [
+    3.333333333333333,
+    -0.3645833333333333,
+    3.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.4231406480335046
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-06",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665766,
+   "position": [
+    3.333333333333333,
+    -0.3645833333333333,
+    4.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.4231406480335046
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-07",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665763,
+   "position": [
+    4.666666666666666,
+    -0.3645833333333333,
+    3.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.42314064803350476
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-08",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665763,
+   "position": [
+    4.666666666666666,
+    -0.3645833333333333,
+    4.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.42314064803350476
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-09",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 31.191199079227456,
+   "position": [
+    6.666666666666666,
+    -0.3645833333333333,
+    3.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.21091419799995997
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-10",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 31.191199079227456,
+   "position": [
+    6.666666666666666,
+    -0.3645833333333333,
+    4.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.21091419799995997
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-11",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665763,
+   "position": [
+    8.666666666666666,
+    -0.3645833333333333,
+    3.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.42314064803350476
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-12",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665763,
+   "position": [
+    8.666666666666666,
+    -0.3645833333333333,
+    4.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.42314064803350476
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-13",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.90254382166577,
+   "position": [
+    10,
+    -0.3645833333333333,
+    3.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.4231406480335045
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-14",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.90254382166577,
+   "position": [
+    10,
+    -0.3645833333333333,
+    4.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.4231406480335045
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-15",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.90254382166577,
+   "position": [
+    11.333333333333332,
+    -0.3645833333333333,
+    3.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.4231406480335045
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-16",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.90254382166577,
+   "position": [
+    11.333333333333332,
+    -0.3645833333333333,
+    4.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.4231406480335045
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-17",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.90254382166577,
+   "position": [
+    12.666666666666668,
+    -0.3645833333333333,
+    3.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.4231406480335045
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-18",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.90254382166577,
+   "position": [
+    12.666666666666668,
+    -0.3645833333333333,
+    4.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.4231406480335045
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-19",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.90254382166577,
+   "position": [
+    14,
+    -0.3645833333333333,
+    3.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.4231406480335045
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-20",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.90254382166577,
+   "position": [
+    14,
+    -0.3645833333333333,
+    4.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.4231406480335045
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-21",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 31.191199079227435,
+   "position": [
+    16,
+    -0.3645833333333333,
+    3.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.2109141979999601
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-22",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 31.191199079227435,
+   "position": [
+    16,
+    -0.3645833333333333,
+    4.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.2109141979999601
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-23",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665752,
+   "position": [
+    18,
+    -0.3645833333333333,
+    3.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.42314064803350504
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-24",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665752,
+   "position": [
+    18,
+    -0.3645833333333333,
+    4.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.42314064803350504
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-25",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.22180672587853,
+   "position": [
+    19.302083333333332,
+    -0.3645833333333333,
+    3.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.4433741601473795
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-26",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.22180672587853,
+   "position": [
+    19.302083333333332,
+    -0.3645833333333333,
+    4.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.4433741601473795
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-27",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.221806725878501,
+   "position": [
+    0.6979166666666666,
+    -0.3645833333333333,
+    11.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.4433741601473803
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-28",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.221806725878501,
+   "position": [
+    0.6979166666666666,
+    -0.3645833333333333,
+    12.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.4433741601473803
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-29",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665766,
+   "position": [
+    2,
+    -0.3645833333333333,
+    11.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.42314064803350465
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-30",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665766,
+   "position": [
+    2,
+    -0.3645833333333333,
+    12.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.42314064803350465
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-31",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665766,
+   "position": [
+    3.333333333333333,
+    -0.3645833333333333,
+    11.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.4231406480335046
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-32",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665766,
+   "position": [
+    3.333333333333333,
+    -0.3645833333333333,
+    12.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.4231406480335046
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-33",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665763,
+   "position": [
+    4.666666666666666,
+    -0.3645833333333333,
+    11.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.42314064803350476
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-34",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665763,
+   "position": [
+    4.666666666666666,
+    -0.3645833333333333,
+    12.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.42314064803350476
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-35",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 31.191199079227456,
+   "position": [
+    6.666666666666666,
+    -0.3645833333333333,
+    11.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.21091419799995997
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-36",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 31.191199079227456,
+   "position": [
+    6.666666666666666,
+    -0.3645833333333333,
+    12.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.21091419799995997
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-37",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665763,
+   "position": [
+    8.666666666666666,
+    -0.3645833333333333,
+    11.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.42314064803350476
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-38",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665763,
+   "position": [
+    8.666666666666666,
+    -0.3645833333333333,
+    12.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.42314064803350476
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-39",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.90254382166577,
+   "position": [
+    10,
+    -0.3645833333333333,
+    11.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.4231406480335045
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-40",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.90254382166577,
+   "position": [
+    10,
+    -0.3645833333333333,
+    12.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.4231406480335045
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-41",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.90254382166577,
+   "position": [
+    11.333333333333332,
+    -0.3645833333333333,
+    11.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.4231406480335045
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-42",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.90254382166577,
+   "position": [
+    11.333333333333332,
+    -0.3645833333333333,
+    12.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.4231406480335045
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-43",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.90254382166577,
+   "position": [
+    12.666666666666668,
+    -0.3645833333333333,
+    11.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.4231406480335045
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-44",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.90254382166577,
+   "position": [
+    12.666666666666668,
+    -0.3645833333333333,
+    12.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.4231406480335045
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-45",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.90254382166577,
+   "position": [
+    14,
+    -0.3645833333333333,
+    11.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.4231406480335045
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-46",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.90254382166577,
+   "position": [
+    14,
+    -0.3645833333333333,
+    12.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.4231406480335045
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-47",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 31.191199079227435,
+   "position": [
+    16,
+    -0.3645833333333333,
+    11.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.2109141979999601
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-48",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 31.191199079227435,
+   "position": [
+    16,
+    -0.3645833333333333,
+    12.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.2109141979999601
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-49",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665752,
+   "position": [
+    18,
+    -0.3645833333333333,
+    11.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.42314064803350504
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-50",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.902543821665752,
+   "position": [
+    18,
+    -0.3645833333333333,
+    12.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.42314064803350504
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-51",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.22180672587853,
+   "position": [
+    19.302083333333332,
+    -0.3645833333333333,
+    11.96
+   ],
+   "rotation": [
+    0,
+    0,
+    -0.4433741601473795
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-bridging-52",
+   "role": "bridging",
+   "nominal": "1x3",
+   "actual": {
+    "w": 0.75,
+    "d": 2.5
+   },
+   "cutLength": 15.22180672587853,
+   "position": [
+    19.302083333333332,
+    -0.3645833333333333,
+    12.04
+   ],
+   "rotation": [
+    0,
+    0,
+    0.4433741601473795
+   ],
+   "stage": 3,
+   "grade": "No. 2 common",
+   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
+   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+  },
+  {
+   "id": "FL-subfloor-01",
+   "role": "subfloor",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.75,
+    "d": 48
+   },
+   "cutLength": 96,
+   "position": [
+    4,
+    -0.03125,
+    2
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    0,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 subfloor, staggered joints (PH page)"
+  },
+  {
+   "id": "FL-subfloor-02",
+   "role": "subfloor",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.75,
+    "d": 48
+   },
+   "cutLength": 96,
+   "position": [
+    12,
+    -0.03125,
+    2
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    0,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 subfloor, staggered joints (PH page)"
+  },
+  {
+   "id": "FL-subfloor-03",
+   "role": "subfloor",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.75,
+    "d": 48
+   },
+   "cutLength": 48,
+   "position": [
+    18,
+    -0.03125,
+    2
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    0,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 subfloor, staggered joints (PH page)"
+  },
+  {
+   "id": "FL-subfloor-04",
+   "role": "subfloor",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.75,
+    "d": 48
+   },
+   "cutLength": 48,
+   "position": [
+    2,
+    -0.03125,
+    6
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    0,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 subfloor, staggered joints (PH page)"
+  },
+  {
+   "id": "FL-subfloor-05",
+   "role": "subfloor",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.75,
+    "d": 48
+   },
+   "cutLength": 96,
+   "position": [
+    8,
+    -0.03125,
+    6
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    0,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 subfloor, staggered joints (PH page)"
+  },
+  {
+   "id": "FL-subfloor-06",
+   "role": "subfloor",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.75,
+    "d": 48
+   },
+   "cutLength": 96,
+   "position": [
+    16,
+    -0.03125,
+    6
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    0,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 subfloor, staggered joints (PH page)"
+  },
+  {
+   "id": "FL-subfloor-07",
+   "role": "subfloor",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.75,
+    "d": 48
+   },
+   "cutLength": 77.0251256281407,
+   "position": [
+    3.209380234505862,
+    -0.03125,
+    10
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    0,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 subfloor, cut to the stairwell trimmers/headers (PH page)"
+  },
+  {
+   "id": "FL-subfloor-08",
+   "role": "subfloor",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.75,
+    "d": 48
+   },
+   "cutLength": 48,
+   "position": [
+    18,
+    -0.03125,
+    10
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    0,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 subfloor, cut to the stairwell trimmers/headers (PH page)"
+  },
+  {
+   "id": "FL-subfloor-09",
+   "role": "subfloor",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.75,
+    "d": 48
+   },
+   "cutLength": 48,
+   "position": [
+    2,
+    -0.03125,
+    14
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    0,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 subfloor, staggered joints (PH page)"
+  },
+  {
+   "id": "FL-subfloor-10",
+   "role": "subfloor",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.75,
+    "d": 48
+   },
+   "cutLength": 96,
+   "position": [
+    8,
+    -0.03125,
+    14
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    0,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 subfloor, staggered joints (PH page)"
+  },
+  {
+   "id": "FL-subfloor-11",
+   "role": "subfloor",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.75,
+    "d": 48
+   },
+   "cutLength": 96,
+   "position": [
+    16,
+    -0.03125,
+    14
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    0,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 subfloor, staggered joints (PH page)"
+  },
+  {
+   "id": "FL-stringer-01",
+   "role": "stringer",
+   "nominal": "2x12",
+   "actual": {
+    "w": 1.5,
+    "d": 11.25
+   },
+   "cutLength": 155.8853745545104,
+   "position": [
+    11.284901633204894,
+    -4.518066622947768,
+    8.35
+   ],
+   "rotation": [
+    0,
+    0,
+    0.6532747743598999
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "top plumb cut to trimmer + kicker at slab (PH)",
+   "doctrineRef": "FM 5-426 stair layout (PH page): 13 risers @ 7.65\", 12 treads @ 10\""
+  },
+  {
+   "id": "FL-stringer-02",
+   "role": "stringer",
+   "nominal": "2x12",
+   "actual": {
+    "w": 1.5,
+    "d": 11.25
+   },
+   "cutLength": 155.8853745545104,
+   "position": [
+    11.284901633204894,
+    -4.518066622947768,
+    9.915
+   ],
+   "rotation": [
+    0,
+    0,
+    0.6532747743598999
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "top plumb cut to trimmer + kicker at slab (PH)",
+   "doctrineRef": "FM 5-426 stair layout (PH page): 13 risers @ 7.65\", 12 treads @ 10\""
+  },
+  {
+   "id": "FL-stringer-03",
+   "role": "stringer",
+   "nominal": "2x12",
+   "actual": {
+    "w": 1.5,
+    "d": 11.25
+   },
+   "cutLength": 155.8853745545104,
+   "position": [
+    11.284901633204894,
+    -4.518066622947768,
+    11.48
+   ],
+   "rotation": [
+    0,
+    0,
+    0.6532747743598999
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "top plumb cut to trimmer + kicker at slab (PH)",
+   "doctrineRef": "FM 5-426 stair layout (PH page): 13 risers @ 7.65\", 12 treads @ 10\""
+  },
+  {
+   "id": "FL-tread-01",
+   "role": "tread",
+   "nominal": "2x10",
+   "actual": {
+    "w": 1.5,
+    "d": 9.25
+   },
+   "cutLength": 36.36,
+   "position": [
+    15.583333333333334,
+    -0.7003205128205129,
+    9.915
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "3-16d per stringer (PH)",
+   "doctrineRef": "FM 5-426 stair treads on stringers (PH page)"
+  },
+  {
+   "id": "FL-tread-02",
+   "role": "tread",
+   "nominal": "2x10",
+   "actual": {
+    "w": 1.5,
+    "d": 9.25
+   },
+   "cutLength": 36.36,
+   "position": [
+    14.75,
+    -1.3381410256410258,
+    9.915
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "3-16d per stringer (PH)",
+   "doctrineRef": "FM 5-426 stair treads on stringers (PH page)"
+  },
+  {
+   "id": "FL-tread-03",
+   "role": "tread",
+   "nominal": "2x10",
+   "actual": {
+    "w": 1.5,
+    "d": 9.25
+   },
+   "cutLength": 36.36,
+   "position": [
+    13.916666666666666,
+    -1.9759615384615388,
+    9.915
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "3-16d per stringer (PH)",
+   "doctrineRef": "FM 5-426 stair treads on stringers (PH page)"
+  },
+  {
+   "id": "FL-tread-04",
+   "role": "tread",
+   "nominal": "2x10",
+   "actual": {
+    "w": 1.5,
+    "d": 9.25
+   },
+   "cutLength": 36.36,
+   "position": [
+    13.083333333333332,
+    -2.6137820512820515,
+    9.915
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "3-16d per stringer (PH)",
+   "doctrineRef": "FM 5-426 stair treads on stringers (PH page)"
+  },
+  {
+   "id": "FL-tread-05",
+   "role": "tread",
+   "nominal": "2x10",
+   "actual": {
+    "w": 1.5,
+    "d": 9.25
+   },
+   "cutLength": 36.36,
+   "position": [
+    12.25,
+    -3.2516025641025643,
+    9.915
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "3-16d per stringer (PH)",
+   "doctrineRef": "FM 5-426 stair treads on stringers (PH page)"
+  },
+  {
+   "id": "FL-tread-06",
+   "role": "tread",
+   "nominal": "2x10",
+   "actual": {
+    "w": 1.5,
+    "d": 9.25
+   },
+   "cutLength": 36.36,
+   "position": [
+    11.416666666666666,
+    -3.8894230769230775,
+    9.915
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "3-16d per stringer (PH)",
+   "doctrineRef": "FM 5-426 stair treads on stringers (PH page)"
+  },
+  {
+   "id": "FL-tread-07",
+   "role": "tread",
+   "nominal": "2x10",
+   "actual": {
+    "w": 1.5,
+    "d": 9.25
+   },
+   "cutLength": 36.36,
+   "position": [
+    10.583333333333332,
+    -4.52724358974359,
+    9.915
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "3-16d per stringer (PH)",
+   "doctrineRef": "FM 5-426 stair treads on stringers (PH page)"
+  },
+  {
+   "id": "FL-tread-08",
+   "role": "tread",
+   "nominal": "2x10",
+   "actual": {
+    "w": 1.5,
+    "d": 9.25
+   },
+   "cutLength": 36.36,
+   "position": [
+    9.75,
+    -5.165064102564103,
+    9.915
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "3-16d per stringer (PH)",
+   "doctrineRef": "FM 5-426 stair treads on stringers (PH page)"
+  },
+  {
+   "id": "FL-tread-09",
+   "role": "tread",
+   "nominal": "2x10",
+   "actual": {
+    "w": 1.5,
+    "d": 9.25
+   },
+   "cutLength": 36.36,
+   "position": [
+    8.916666666666666,
+    -5.802884615384616,
+    9.915
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "3-16d per stringer (PH)",
+   "doctrineRef": "FM 5-426 stair treads on stringers (PH page)"
+  },
+  {
+   "id": "FL-tread-10",
+   "role": "tread",
+   "nominal": "2x10",
+   "actual": {
+    "w": 1.5,
+    "d": 9.25
+   },
+   "cutLength": 36.36,
+   "position": [
+    8.083333333333332,
+    -6.440705128205129,
+    9.915
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "3-16d per stringer (PH)",
+   "doctrineRef": "FM 5-426 stair treads on stringers (PH page)"
+  },
+  {
+   "id": "FL-tread-11",
+   "role": "tread",
+   "nominal": "2x10",
+   "actual": {
+    "w": 1.5,
+    "d": 9.25
+   },
+   "cutLength": 36.36,
+   "position": [
+    7.25,
+    -7.078525641025641,
+    9.915
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "3-16d per stringer (PH)",
+   "doctrineRef": "FM 5-426 stair treads on stringers (PH page)"
+  },
+  {
+   "id": "FL-tread-12",
+   "role": "tread",
+   "nominal": "2x10",
+   "actual": {
+    "w": 1.5,
+    "d": 9.25
+   },
+   "cutLength": 36.36,
+   "position": [
+    6.416666666666666,
+    -7.716346153846155,
+    9.915
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 4,
+   "grade": "No. 2 common",
+   "nailing": "3-16d per stringer (PH)",
+   "doctrineRef": "FM 5-426 stair treads on stringers (PH page)"
+  },
+  {
+   "id": "S-solePlate-01",
+   "role": "solePlate",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 240,
+   "position": [
+    10,
+    0.0625,
+    0.14583333333333334
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    0,
+    0
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "16d @ 16\" to joists (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-topPlate-01",
+   "role": "topPlate",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 240,
+   "position": [
+    10,
+    7.8125,
+    0.14583333333333334
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    0,
+    0
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-capPlate-01",
+   "role": "capPlate",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 233,
+   "position": [
+    10,
+    7.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    0,
+    0
+   ],
+   "stage": 6,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "16d @ 16\" + 2-16d at laps (PH)",
+   "doctrineRef": "FM 5-426: cap plate laps at corners tie the walls (PH page)"
+  },
+  {
+   "id": "S-stud-01",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.0625,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-stud-02",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    1.3333333333333333,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-stud-03",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    2.6666666666666665,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-stud-04",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    4,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-stud-05",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    5.333333333333333,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-stud-06",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    6.666666666666666,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-stud-07",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    7.999999999999999,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-stud-08",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    9.333333333333332,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-stud-09",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    10.666666666666666,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-stud-10",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    12,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-stud-11",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    13.333333333333334,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-stud-12",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    14.666666666666668,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-stud-13",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    16,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-stud-14",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    17.333333333333332,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-stud-15",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    18.666666666666664,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-stud-16",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.9375,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-stud-17",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.1875,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "16d @ 12\" to end stud (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "S-stud-18",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.8125,
+    3.9375,
+    0.14583333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "S",
+   "grade": "No. 2 common",
+   "nailing": "16d @ 12\" to end stud (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-solePlate-01",
+   "role": "solePlate",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 240,
+   "position": [
+    10,
+    0.0625,
+    15.854166666666666
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    3.141592653589793,
+    0
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "16d @ 16\" to joists (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-topPlate-01",
+   "role": "topPlate",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 240,
+   "position": [
+    10,
+    7.8125,
+    15.854166666666666
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    3.141592653589793,
+    0
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-capPlate-01",
+   "role": "capPlate",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 233,
+   "position": [
+    10,
+    7.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    3.141592653589793,
+    0
+   ],
+   "stage": 6,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "16d @ 16\" + 2-16d at laps (PH)",
+   "doctrineRef": "FM 5-426: cap plate laps at corners tie the walls (PH page)"
+  },
+  {
+   "id": "N-stud-01",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.9375,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-stud-02",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    18.666666666666668,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-stud-03",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    17.333333333333332,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-stud-04",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    16,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-stud-05",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    14.666666666666668,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-stud-06",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    13.333333333333334,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-stud-07",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    12,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-stud-08",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    10.666666666666668,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-stud-09",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    9.333333333333334,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-stud-10",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    8,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-stud-11",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    6.666666666666666,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-stud-12",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    5.333333333333332,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-stud-13",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    4,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-stud-14",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    2.666666666666668,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-stud-15",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    1.3333333333333357,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-stud-16",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.0625,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-stud-17",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.8125,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "16d @ 12\" to end stud (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "N-stud-18",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.1875,
+    3.9375,
+    15.854166666666666
+   ],
+   "rotation": [
+    0,
+    4.71238898038469,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "N",
+   "grade": "No. 2 common",
+   "nailing": "16d @ 12\" to end stud (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "E-solePlate-01",
+   "role": "solePlate",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 185,
+   "position": [
+    19.854166666666668,
+    0.0625,
+    8
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 5,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "16d @ 16\" to joists (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "E-topPlate-01",
+   "role": "topPlate",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 185,
+   "position": [
+    19.854166666666668,
+    7.8125,
+    8
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 5,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "E-capPlate-01",
+   "role": "capPlate",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 192,
+   "position": [
+    19.854166666666668,
+    7.9375,
+    8
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 6,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "16d @ 16\" + 2-16d at laps (PH)",
+   "doctrineRef": "FM 5-426: cap plate laps at corners tie the walls (PH page)"
+  },
+  {
+   "id": "E-stud-01",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.854166666666668,
+    3.9375,
+    0.3541666666666667
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "E-stud-02",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.854166666666668,
+    3.9375,
+    1.625
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "E-stud-03",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.854166666666668,
+    3.9375,
+    2.958333333333333
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "E-stud-04",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.854166666666668,
+    3.9375,
+    4.291666666666667
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "E-stud-05",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.854166666666668,
+    3.9375,
+    5.625
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "E-stud-06",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.854166666666668,
+    3.9375,
+    6.958333333333333
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "E-stud-07",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.854166666666668,
+    3.9375,
+    8.291666666666666
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "E-stud-08",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.854166666666668,
+    3.9375,
+    9.624999999999998
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "E-stud-09",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.854166666666668,
+    3.9375,
+    10.958333333333332
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "E-stud-10",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.854166666666668,
+    3.9375,
+    12.291666666666666
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "E-stud-11",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.854166666666668,
+    3.9375,
+    13.625
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "E-stud-12",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.854166666666668,
+    3.9375,
+    14.958333333333334
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "E-stud-13",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.854166666666668,
+    3.9375,
+    15.645833333333332
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "E-stud-14",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.854166666666668,
+    3.9375,
+    0.4791666666666667
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "16d @ 12\" to end stud (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "E-stud-15",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    19.854166666666668,
+    3.9375,
+    15.520833333333332
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "E",
+   "grade": "No. 2 common",
+   "nailing": "16d @ 12\" to end stud (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "W-solePlate-01",
+   "role": "solePlate",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 185,
+   "position": [
+    0.14583333333333334,
+    0.0625,
+    8
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    1.5707963267948966,
+    0
+   ],
+   "stage": 5,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "16d @ 16\" to joists (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "W-topPlate-01",
+   "role": "topPlate",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 185,
+   "position": [
+    0.14583333333333334,
+    7.8125,
+    8
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    1.5707963267948966,
+    0
+   ],
+   "stage": 5,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "W-capPlate-01",
+   "role": "capPlate",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 192,
+   "position": [
+    0.14583333333333334,
+    7.9375,
+    8
+   ],
+   "rotation": [
+    -1.5707963267948966,
+    1.5707963267948966,
+    0
+   ],
+   "stage": 6,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "16d @ 16\" + 2-16d at laps (PH)",
+   "doctrineRef": "FM 5-426: cap plate laps at corners tie the walls (PH page)"
+  },
+  {
+   "id": "W-stud-01",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.14583333333333334,
+    3.9375,
+    15.645833333333334
+   ],
+   "rotation": [
+    0,
+    3.141592653589793,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "W-stud-02",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.14583333333333334,
+    3.9375,
+    14.375
+   ],
+   "rotation": [
+    0,
+    3.141592653589793,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "W-stud-03",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.14583333333333334,
+    3.9375,
+    13.041666666666668
+   ],
+   "rotation": [
+    0,
+    3.141592653589793,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "W-stud-04",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.14583333333333334,
+    3.9375,
+    11.708333333333334
+   ],
+   "rotation": [
+    0,
+    3.141592653589793,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "W-stud-05",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.14583333333333334,
+    3.9375,
+    10.375
+   ],
+   "rotation": [
+    0,
+    3.141592653589793,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "W-stud-06",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.14583333333333334,
+    3.9375,
+    9.041666666666668
+   ],
+   "rotation": [
+    0,
+    3.141592653589793,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "W-stud-07",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.14583333333333334,
+    3.9375,
+    7.708333333333335
+   ],
+   "rotation": [
+    0,
+    3.141592653589793,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "W-stud-08",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.14583333333333334,
+    3.9375,
+    6.375000000000002
+   ],
+   "rotation": [
+    0,
+    3.141592653589793,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "W-stud-09",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.14583333333333334,
+    3.9375,
+    5.041666666666668
+   ],
+   "rotation": [
+    0,
+    3.141592653589793,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "W-stud-10",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.14583333333333334,
+    3.9375,
+    3.708333333333334
+   ],
+   "rotation": [
+    0,
+    3.141592653589793,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "W-stud-11",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.14583333333333334,
+    3.9375,
+    2.375
+   ],
+   "rotation": [
+    0,
+    3.141592653589793,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "W-stud-12",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.14583333333333334,
+    3.9375,
+    1.041666666666666
+   ],
+   "rotation": [
+    0,
+    3.141592653589793,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "W-stud-13",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.14583333333333334,
+    3.9375,
+    0.35416666666666785
+   ],
+   "rotation": [
+    0,
+    3.141592653589793,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "2-16d ea end or 4-8d toenail (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "W-stud-14",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.14583333333333334,
+    3.9375,
+    15.520833333333334
+   ],
+   "rotation": [
+    0,
+    3.141592653589793,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "16d @ 12\" to end stud (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "W-stud-15",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 91.5,
+   "position": [
+    0.14583333333333334,
+    3.9375,
+    0.47916666666666785
+   ],
+   "rotation": [
+    0,
+    3.141592653589793,
+    1.5707963267948966
+   ],
+   "stage": 5,
+   "wall": "W",
+   "grade": "No. 2 common",
+   "nailing": "16d @ 12\" to end stud (PH)",
+   "doctrineRef": "FM 5-426 ch. 6 (PH page)"
+  },
+  {
+   "id": "RF-joist-01",
+   "role": "joist",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 192,
+   "position": [
+    1.4583333333333333,
+    8.229166666666666,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 7,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea plate + 16d to rafter (PH)",
+   "doctrineRef": "FM 5-426 ceiling joists tie walls (PH page)"
+  },
+  {
+   "id": "RF-joist-02",
+   "role": "joist",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 192,
+   "position": [
+    2.7916666666666665,
+    8.229166666666666,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 7,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea plate + 16d to rafter (PH)",
+   "doctrineRef": "FM 5-426 ceiling joists tie walls (PH page)"
+  },
+  {
+   "id": "RF-joist-03",
+   "role": "joist",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 192,
+   "position": [
+    4.125,
+    8.229166666666666,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 7,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea plate + 16d to rafter (PH)",
+   "doctrineRef": "FM 5-426 ceiling joists tie walls (PH page)"
+  },
+  {
+   "id": "RF-joist-04",
+   "role": "joist",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 192,
+   "position": [
+    5.458333333333333,
+    8.229166666666666,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 7,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea plate + 16d to rafter (PH)",
+   "doctrineRef": "FM 5-426 ceiling joists tie walls (PH page)"
+  },
+  {
+   "id": "RF-joist-05",
+   "role": "joist",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 192,
+   "position": [
+    6.791666666666666,
+    8.229166666666666,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 7,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea plate + 16d to rafter (PH)",
+   "doctrineRef": "FM 5-426 ceiling joists tie walls (PH page)"
+  },
+  {
+   "id": "RF-joist-06",
+   "role": "joist",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 192,
+   "position": [
+    8.125,
+    8.229166666666666,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 7,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea plate + 16d to rafter (PH)",
+   "doctrineRef": "FM 5-426 ceiling joists tie walls (PH page)"
+  },
+  {
+   "id": "RF-joist-07",
+   "role": "joist",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 192,
+   "position": [
+    9.458333333333332,
+    8.229166666666666,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 7,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea plate + 16d to rafter (PH)",
+   "doctrineRef": "FM 5-426 ceiling joists tie walls (PH page)"
+  },
+  {
+   "id": "RF-joist-08",
+   "role": "joist",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 192,
+   "position": [
+    10.791666666666666,
+    8.229166666666666,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 7,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea plate + 16d to rafter (PH)",
+   "doctrineRef": "FM 5-426 ceiling joists tie walls (PH page)"
+  },
+  {
+   "id": "RF-joist-09",
+   "role": "joist",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 192,
+   "position": [
+    12.125,
+    8.229166666666666,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 7,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea plate + 16d to rafter (PH)",
+   "doctrineRef": "FM 5-426 ceiling joists tie walls (PH page)"
+  },
+  {
+   "id": "RF-joist-10",
+   "role": "joist",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 192,
+   "position": [
+    13.458333333333334,
+    8.229166666666666,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 7,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea plate + 16d to rafter (PH)",
+   "doctrineRef": "FM 5-426 ceiling joists tie walls (PH page)"
+  },
+  {
+   "id": "RF-joist-11",
+   "role": "joist",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 192,
+   "position": [
+    14.791666666666668,
+    8.229166666666666,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 7,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea plate + 16d to rafter (PH)",
+   "doctrineRef": "FM 5-426 ceiling joists tie walls (PH page)"
+  },
+  {
+   "id": "RF-joist-12",
+   "role": "joist",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 192,
+   "position": [
+    16.125,
+    8.229166666666666,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 7,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea plate + 16d to rafter (PH)",
+   "doctrineRef": "FM 5-426 ceiling joists tie walls (PH page)"
+  },
+  {
+   "id": "RF-joist-13",
+   "role": "joist",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 192,
+   "position": [
+    17.458333333333332,
+    8.229166666666666,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 7,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea plate + 16d to rafter (PH)",
+   "doctrineRef": "FM 5-426 ceiling joists tie walls (PH page)"
+  },
+  {
+   "id": "RF-joist-14",
+   "role": "joist",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 192,
+   "position": [
+    18.791666666666664,
+    8.229166666666666,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 7,
+   "grade": "No. 2 common",
+   "nailing": "3-16d toenail ea plate + 16d to rafter (PH)",
+   "doctrineRef": "FM 5-426 ceiling joists tie walls (PH page)"
+  },
+  {
+   "id": "RF-rafter-01",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    0.0625,
+    9.15625,
+    3.46875
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-02",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    0.0625,
+    9.15625,
+    12.53125
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    -0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-03",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    1.3333333333333333,
+    9.15625,
+    3.46875
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-04",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    1.3333333333333333,
+    9.15625,
+    12.53125
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    -0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-05",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    2.6666666666666665,
+    9.15625,
+    3.46875
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-06",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    2.6666666666666665,
+    9.15625,
+    12.53125
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    -0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-07",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    4,
+    9.15625,
+    3.46875
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-08",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    4,
+    9.15625,
+    12.53125
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    -0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-09",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    5.333333333333333,
+    9.15625,
+    3.46875
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-10",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    5.333333333333333,
+    9.15625,
+    12.53125
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    -0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-11",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    6.666666666666666,
+    9.15625,
+    3.46875
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-12",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    6.666666666666666,
+    9.15625,
+    12.53125
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    -0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-13",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    7.999999999999999,
+    9.15625,
+    3.46875
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-14",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    7.999999999999999,
+    9.15625,
+    12.53125
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    -0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-15",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    9.333333333333332,
+    9.15625,
+    3.46875
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-16",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    9.333333333333332,
+    9.15625,
+    12.53125
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    -0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-17",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    10.666666666666666,
+    9.15625,
+    3.46875
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-18",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    10.666666666666666,
+    9.15625,
+    12.53125
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    -0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-19",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    12,
+    9.15625,
+    3.46875
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-20",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    12,
+    9.15625,
+    12.53125
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    -0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-21",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    13.333333333333334,
+    9.15625,
+    3.46875
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-22",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    13.333333333333334,
+    9.15625,
+    12.53125
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    -0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-23",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    14.666666666666668,
+    9.15625,
+    3.46875
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-24",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    14.666666666666668,
+    9.15625,
+    12.53125
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    -0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-25",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    16,
+    9.15625,
+    3.46875
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-26",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    16,
+    9.15625,
+    12.53125
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    -0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-27",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    17.333333333333332,
+    9.15625,
+    3.46875
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-28",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    17.333333333333332,
+    9.15625,
+    12.53125
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    -0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-29",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    18.666666666666664,
+    9.15625,
+    3.46875
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-30",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    18.666666666666664,
+    9.15625,
+    12.53125
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    -0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-31",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    19.9375,
+    9.15625,
+    3.46875
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-rafter-32",
+   "role": "rafter",
+   "nominal": "2x6",
+   "actual": {
+    "w": 1.5,
+    "d": 5.5
+   },
+   "cutLength": 113.05142635101956,
+   "position": [
+    19.9375,
+    9.15625,
+    12.53125
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    -0.3217505543966422
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-16d at ridge, bird’s-mouth toenail 3-8d (PH)",
+   "doctrineRef": "FM 5-426 framing-square method: 1.054 ft/ft run, less half the ridge (PH page)",
+   "angles": {
+    "plumbCut": 71.56505117707799,
+    "seatCut": 18.43494882292201
+   }
+  },
+  {
+   "id": "RF-ridge-01",
+   "role": "ridge",
+   "nominal": "2x8",
+   "actual": {
+    "w": 1.5,
+    "d": 7.25
+   },
+   "cutLength": 240,
+   "position": [
+    10,
+    10.60614621015175,
+    8
+   ],
+   "rotation": [
+    0,
+    0,
+    0
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "rafters 3-16d ea (PH)",
+   "doctrineRef": "FM 5-426: ridge one size deeper than rafters, tops flush (PH page)"
+  },
+  {
+   "id": "RF-collarTie-01",
+   "role": "collarTie",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 64,
+   "position": [
+    4.125,
+    9.777777777777777,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "4-8d ea end (PH)",
+   "doctrineRef": "FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)"
+  },
+  {
+   "id": "RF-collarTie-02",
+   "role": "collarTie",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 64,
+   "position": [
+    8.125,
+    9.777777777777777,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "4-8d ea end (PH)",
+   "doctrineRef": "FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)"
+  },
+  {
+   "id": "RF-collarTie-03",
+   "role": "collarTie",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 64,
+   "position": [
+    12.125,
+    9.777777777777777,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "4-8d ea end (PH)",
+   "doctrineRef": "FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)"
+  },
+  {
+   "id": "RF-collarTie-04",
+   "role": "collarTie",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 64,
+   "position": [
+    16.125,
+    9.777777777777777,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "4-8d ea end (PH)",
+   "doctrineRef": "FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)"
+  },
+  {
+   "id": "RF-stud-01",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 2.434578811512317,
+   "position": [
+    0.1875,
+    8.101440783813013,
+    1.3333333333333333
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-02",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 7.767912144845648,
+   "position": [
+    0.1875,
+    8.323663006035236,
+    2.6666666666666665
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-03",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 13.101245478178985,
+   "position": [
+    0.1875,
+    8.545885228257458,
+    4
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-04",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 18.434578811512317,
+   "position": [
+    0.1875,
+    8.768107450479679,
+    5.333333333333333
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-05",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 23.767912144845646,
+   "position": [
+    0.1875,
+    8.990329672701902,
+    6.666666666666666
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-06",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 29.101245478178978,
+   "position": [
+    0.1875,
+    9.212551894924124,
+    7.999999999999999
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-07",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 23.767912144845653,
+   "position": [
+    0.1875,
+    8.990329672701902,
+    9.333333333333332
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-08",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 18.43457881151232,
+   "position": [
+    0.1875,
+    8.76810745047968,
+    10.666666666666666
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-09",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 13.101245478178985,
+   "position": [
+    0.1875,
+    8.545885228257458,
+    12
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-10",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 7.767912144845648,
+   "position": [
+    0.1875,
+    8.323663006035236,
+    13.333333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-11",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 2.434578811512314,
+   "position": [
+    0.1875,
+    8.101440783813013,
+    14.666666666666668
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-12",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 2.434578811512317,
+   "position": [
+    19.8125,
+    8.101440783813013,
+    1.3333333333333333
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-13",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 7.767912144845648,
+   "position": [
+    19.8125,
+    8.323663006035236,
+    2.6666666666666665
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-14",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 13.101245478178985,
+   "position": [
+    19.8125,
+    8.545885228257458,
+    4
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-15",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 18.434578811512317,
+   "position": [
+    19.8125,
+    8.768107450479679,
+    5.333333333333333
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-16",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 23.767912144845646,
+   "position": [
+    19.8125,
+    8.990329672701902,
+    6.666666666666666
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-17",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 29.101245478178978,
+   "position": [
+    19.8125,
+    9.212551894924124,
+    7.999999999999999
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-18",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 23.767912144845653,
+   "position": [
+    19.8125,
+    8.990329672701902,
+    9.333333333333332
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-19",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 18.43457881151232,
+   "position": [
+    19.8125,
+    8.76810745047968,
+    10.666666666666666
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-20",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 13.101245478178985,
+   "position": [
+    19.8125,
+    8.545885228257458,
+    12
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-21",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 7.767912144845648,
+   "position": [
+    19.8125,
+    8.323663006035236,
+    13.333333333333334
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-stud-22",
+   "role": "stud",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 2.434578811512314,
+   "position": [
+    19.8125,
+    8.101440783813013,
+    14.666666666666668
+   ],
+   "rotation": [
+    0,
+    1.5707963267948966,
+    1.5707963267948966
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "toenail 2-8d ea end (PH)",
+   "doctrineRef": "FM 5-426 gable studs (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-01",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 48
+   },
+   "cutLength": 96,
+   "position": [
+    4,
+    8.53629302321297,
+    0.818309654596818
+   ],
+   "rotation": [
+    1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-02",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 48
+   },
+   "cutLength": 96,
+   "position": [
+    12,
+    8.53629302321297,
+    0.818309654596818
+   ],
+   "rotation": [
+    1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-03",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 48
+   },
+   "cutLength": 48,
+   "position": [
+    18,
+    8.53629302321297,
+    0.818309654596818
+   ],
+   "rotation": [
+    1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-04",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 48
+   },
+   "cutLength": 96,
+   "position": [
+    4,
+    9.801204087280322,
+    4.613042846798874
+   ],
+   "rotation": [
+    1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-05",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 48
+   },
+   "cutLength": 96,
+   "position": [
+    12,
+    9.801204087280322,
+    4.613042846798874
+   ],
+   "rotation": [
+    1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-06",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 48
+   },
+   "cutLength": 48,
+   "position": [
+    18,
+    9.801204087280322,
+    4.613042846798874
+   ],
+   "rotation": [
+    1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-07",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 17.841995766061657
+   },
+   "cutLength": 96,
+   "position": [
+    4,
+    10.668748555246646,
+    7.215676250697847
+   ],
+   "rotation": [
+    1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing; top course ripped to the ridge (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-08",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 17.841995766061657
+   },
+   "cutLength": 96,
+   "position": [
+    12,
+    10.668748555246646,
+    7.215676250697847
+   ],
+   "rotation": [
+    1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing; top course ripped to the ridge (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-09",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 17.841995766061657
+   },
+   "cutLength": 48,
+   "position": [
+    18,
+    10.668748555246646,
+    7.215676250697847
+   ],
+   "rotation": [
+    1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing; top course ripped to the ridge (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-10",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 48
+   },
+   "cutLength": 96,
+   "position": [
+    4,
+    8.53629302321297,
+    15.181690345403181
+   ],
+   "rotation": [
+    -1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-11",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 48
+   },
+   "cutLength": 96,
+   "position": [
+    12,
+    8.53629302321297,
+    15.181690345403181
+   ],
+   "rotation": [
+    -1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-12",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 48
+   },
+   "cutLength": 48,
+   "position": [
+    18,
+    8.53629302321297,
+    15.181690345403181
+   ],
+   "rotation": [
+    -1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-13",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 48
+   },
+   "cutLength": 96,
+   "position": [
+    4,
+    9.801204087280322,
+    11.386957153201127
+   ],
+   "rotation": [
+    -1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-14",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 48
+   },
+   "cutLength": 96,
+   "position": [
+    12,
+    9.801204087280322,
+    11.386957153201127
+   ],
+   "rotation": [
+    -1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-15",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 48
+   },
+   "cutLength": 48,
+   "position": [
+    18,
+    9.801204087280322,
+    11.386957153201127
+   ],
+   "rotation": [
+    -1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-16",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 17.841995766061657
+   },
+   "cutLength": 96,
+   "position": [
+    4,
+    10.668748555246646,
+    8.784323749302153
+   ],
+   "rotation": [
+    -1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing; top course ripped to the ridge (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-17",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 17.841995766061657
+   },
+   "cutLength": 96,
+   "position": [
+    12,
+    10.668748555246646,
+    8.784323749302153
+   ],
+   "rotation": [
+    -1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing; top course ripped to the ridge (PH page)"
+  },
+  {
+   "id": "RF-roofPanel-18",
+   "role": "roofPanel",
+   "nominal": "4x8 panel",
+   "actual": {
+    "w": 0.5,
+    "d": 17.841995766061657
+   },
+   "cutLength": 48,
+   "position": [
+    18,
+    10.668748555246646,
+    8.784323749302153
+   ],
+   "rotation": [
+    -1.2490457723982544,
+    0,
+    0
+   ],
+   "stage": 9,
+   "grade": "No. 2 common",
+   "nailing": "8d @ 6\" edges / 12\" field (PH)",
+   "doctrineRef": "FM 5-426 roof sheathing; top course ripped to the ridge (PH page)"
+  }
+ ],
+ "levels": {
+  "subfloorTop": 0,
+  "joistTop": -0.0625,
+  "sillTop": -0.6666666666666666,
+  "gradeY": -1.7916666666666665,
+  "slabTop": -8.291666666666666
+ }
+}
