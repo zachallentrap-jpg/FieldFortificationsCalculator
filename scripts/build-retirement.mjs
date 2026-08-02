@@ -4,10 +4,13 @@
 // external references. Includes a self-destructing sw.js at v1's registration path
 // so previously-installed PWA copies drop their caches, unregister, and pick up
 // this notice instead of the cached app.
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const DIST = fileURLToPath(new URL('../dist', import.meta.url));
+// Clean first: a stale dist/ (local build or cached deploy workspace) must not leak
+// v1 app files into the retirement deployment at their old URLs.
+rmSync(DIST, { recursive: true, force: true });
 mkdirSync(DIST, { recursive: true });
 
 const page = `<!doctype html>
