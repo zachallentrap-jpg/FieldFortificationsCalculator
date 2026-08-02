@@ -19,6 +19,8 @@ import type { LumberSize } from '../three-viewer';
 import type { Member } from '../../timber/types';
 import type { StructureModel } from '../../timber/families/index';
 import { bomSummary } from '../../timber/bom';
+import { fastenerTakeoff, sheetTakeoff } from '../../timber/fasteners';
+import { FEATURES } from './mode';
 import { plainName, whatItDoes } from './labels';
 import {
   planeForState, initialCutawayState, toggleAxis, setDepth, passesCut, CUT_AXES, axisById,
@@ -421,17 +423,54 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     const row = cur ? bom.stages.find((s) => s.stage === cur.ordinal) : undefined;
 
     const detail = cur ? `<p class="stage-detail">${esc(cur.detail)}</p>` : '';
+    // Man-hours are a PLANNING output. In the learning app the same line reports size and piece
+    // count — what the stage is — without a labor figure a student could hand to their command
+    // as if it were an estimate. Board-feet stay: that is a property of the building.
+    const labor = (mh: number): string => (FEATURES.commandOutputs ? ` · ${mh.toFixed(1)} MH (PH rates)` : '');
     const note = row
-      ? `<p class="stage-note">This stage: ${row.memberCount} members · ${row.boardFeet.toFixed(0)} BF · ${row.manHours.toFixed(1)} MH (PH rates).<br>Through stage ${row.stage}: ${runBf.toFixed(0)} BF · ${runMh.toFixed(1)} MH.</p>`
-      : `<p class="stage-note">Whole structure: ${bom.totalMembers} members · ${bom.totalBoardFeet.toFixed(0)} BF · ${bom.totalManHours.toFixed(1)} MH (PH rates).</p>`;
+      ? `<p class="stage-note">This stage: ${row.memberCount} members · ${row.boardFeet.toFixed(0)} BF${labor(row.manHours)}.<br>Through stage ${row.stage}: ${runBf.toFixed(0)} BF${labor(runMh)}.</p>`
+      : `<p class="stage-note">Whole structure: ${bom.totalMembers} members · ${bom.totalBoardFeet.toFixed(0)} BF${labor(bom.totalManHours)}.</p>`;
 
     const lines = (row?.lines ?? (showAll ? bom.stages.flatMap((s) => s.lines) : []))
       .map((l) => `<tr><td>${esc(l.nominal)}</td><td class="num">${fmtFtIn(l.cutLengthIn)}</td><td class="num">${l.count}</td><td>${esc(l.roles.map(plainName as never).join(', '))}</td></tr>`)
       .join('');
 
+    // The hardware bill is scoped to whatever is on screen: pick a stage and it tells you what
+    // to draw for that stage, which is how a section actually goes to supply.
+    const forHardware = showAll ? model.members : model.members.filter((m) => m.stage <= stage);
+    const hardware = FEATURES.hardwareTakeoff ? hardwareHtml(forHardware, showAll ? null : stage) : '';
+
     dom.stagePanel.innerHTML = `${detail}${note}
       <h2>Cut list${cur ? ' — this stage' : ''}</h2>
-      <table><thead><tr><th>Stock</th><th class="num">Cut</th><th class="num">Pcs</th><th>Use</th></tr></thead><tbody>${lines}</tbody></table>`;
+      <table><thead><tr><th>Stock</th><th class="num">Cut</th><th class="num">Pcs</th><th>Use</th></tr></thead><tbody>${lines}</tbody></table>
+      ${hardware}`;
+  }
+
+  /**
+   * Nails and pins, by count and by pound. Derived from the same members the scene draws — each
+   * one carries the nailing schedule its geometry needs — so this can never disagree with the
+   * model. Any schedule the take-off could not read is printed rather than dropped: a supply
+   * request that silently omits what it did not understand is worse than a short one.
+   */
+  function hardwareHtml(members: Member[], throughStage: number | null): string {
+    const take = fastenerTakeoff(members);
+    if (take.lines.length === 0) return '';
+    const rows = take.lines
+      .map((l) => `<tr><td>${esc(l.spec)}</td><td class="num">${l.count.toLocaleString()}</td><td class="num">${l.poundsApprox ? `${l.poundsApprox} lb` : '—'}</td></tr>`)
+      .join('');
+    const sheets = sheetTakeoff(members)
+      .map((l) => `<tr><td>${esc(l.nominal)}</td><td class="num">${l.count}</td><td class="num">—</td></tr>`)
+      .join('');
+    const unread = take.unparsed.length > 0
+      ? `<p class="doctrine">Not counted — ${take.unparsed.length} nailing schedule(s) this take-off could not read:
+         ${take.unparsed.map((u) => `${esc(u.schedule)} (${u.members})`).join('; ')}</p>`
+      : '';
+    return `<h2>Hardware &amp; sheet goods${throughStage === null ? '' : ` — through stage ${throughStage}`}</h2>
+      <table><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Weight</th></tr></thead>
+      <tbody>${rows}${sheets}</tbody></table>
+      <p class="doctrine">Counts are read off each member's own nailing schedule. Sheathing field nails
+        assume supports at ${take.fieldSupportSpacingIn} in. Pieces-per-pound are common published
+        figures, marked (PH) — page check before submitting a supply request.</p>${unread}`;
   }
 
   function renderMemberCard(): void {

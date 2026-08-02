@@ -12,6 +12,7 @@
 //     their own cards"), so nobody opens it hunting for a tower knob.
 
 import { pickerGroups, type FamilyDef } from '../../timber/catalog';
+import { isLearning } from './mode';
 import { thumbnailCached } from '../../timber/thumbnails';
 import type { StoredBuild } from './store';
 
@@ -70,8 +71,10 @@ export function renderPicker(root: HTMLElement, builds: StoredBuild[], cb: Picke
   root.innerHTML = `
     <div class="picker">
       <div class="picker-head">
-        <h1>What are you building?</h1>
-        <p class="sub">Pick a standard design to start from, or a clean sheet. Every one is fully adjustable.</p>
+        <h1>${isLearning ? 'What do you want to learn?' : 'What are you building?'}</h1>
+        <p class="sub">${isLearning
+          ? 'Pick a structure to take apart. Watch it go up stage by stage, tap any piece, change anything you like — then drill on the cards.'
+          : 'Pick a standard design to start from, or a clean sheet. Every one is fully adjustable, down to the hardware.'}</p>
         <nav class="jumps" aria-label="Jump to a group">${jump}</nav>
       </div>
       ${resumeHtml(builds)}

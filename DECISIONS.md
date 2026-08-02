@@ -499,6 +499,56 @@ option, implement it, and log it here.
   equation exists ONCE and feeds both the renderer and the raycast filter, so clicking through
   a cut selects what you see; stage scrubbing toggles visibility rather than rebuilding; and
   `unlockToCustom` preserves the family (a tower stays a tower) with a per-family test.
+## 2026-08-02 — The wood-frame tool is two apps now, and they are not the same tool twice
+
+The owner's instruction was explicit: *"we should actually branch here. one sub app should be
+woodframe construction learning, and one should be woodframe construction planning."* Learning
+gets the flashcards and the tools, but is a teaching aid — *"its not meant to show manhours or
+things for the command, you get the principle and expand on it."* Planning is *"explicitly made
+for 1371s to be able to choose everything they want... all the way down to the hardware, the
+quantity, everything about it"*, ending in *"a clean sheet for their command to send off or
+print out."*
+
+**ONE code base, two pages.** `src/ui/woodframe/mode.ts` reads `<body data-app>` and exports a
+short list of feature predicates; `woodframe-plan.html` and `woodframe-learn.html` are the same
+shell with a different flag, a different title, and the same script. Forking the studio was the
+obvious alternative and it is the wrong one: two copies of a 500-line workbench drift, and the
+half that gets less attention rots. The difference between the two products is now a list you
+can read in one file instead of a diff nobody re-reads.
+
+`woodframe.html` stays, as a shim that forwards to the planning app carrying `location.hash`
+across. It is deployed and linked and someone has a shared build URL pointing at it; deleting it
+to make the naming tidy would 404 every one of those.
+
+**What planning gained, because it had to.** A cut list tells a crew what to saw; it does not
+tell them how many pounds of 16d to draw. `src/timber/fasteners.ts` reads the nailing schedule
+each member already carries — "2-16d ea end", `8d @ 6" edges / 12" field` — and turns it into
+counts and weights. This is an AGGREGATION over the same members the scene draws (I-3), not a
+second model of how the building is fastened, and those strings are byte-pinned by the compat
+goldens, so they cannot drift under it silently. The parser's rules encode real distinctions
+that a naive scan gets wrong: an "or" is an alternative and is billed once, not twice; the ridge
+board's "rafters 3-16d ea" is the same joint each rafter already bought and is skipped rather
+than double-counted. **Anything it cannot read is printed, not dropped** — a supply list that
+silently omits what it did not understand is worse than a short one, because it looks complete —
+and a test walks every member of a shipped family and fails if any schedule goes unread.
+
+`src/ui/woodframe/sheet.ts` is the deliverable: one document with the structure, the effort, a
+still of the view the operator actually set up, the build sequence, the cut list, what to draw
+from supply, and a signature block. Two refusals are deliberate. Nothing is pre-filled — unit,
+date, prepared-by and approver are blank lines, because a document that signs itself is one
+nobody checked. And every (PH) stays visible, including on the labor rates, because the whole
+point of a command sheet is that the person signing it can see which numbers have been
+page-checked and which have not.
+
+**What learning gained, and what it deliberately does not have.** Flashcards, generated from the
+model on screen rather than typed into a list — change the roof to a shed and the rafter cards
+go away, add a basement and stair cards appear, so a student drills the building in front of
+them. Card fronts are always the DESCRIPTION or the JOB and the back is the name and the size,
+because the earlier direction ("what carries this? — 2x4") is unanswerable when six roles share
+a nominal. Man-hours are gone from the stage panel; there is no hardware take-off and no command
+sheet. Board-feet stay, because that is a property of the building rather than an estimate. A
+classroom model that prints labor projections invites someone to hand a lesson to their CO.
+
 ## 2026-08-02 — Adding a window should be one click, and editing one should not delete them all
 
 The openings editor put six controls on a line — a type popup and five bare number inputs —

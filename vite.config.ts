@@ -50,6 +50,8 @@ export default defineConfig({
         index: fileURLToPath(new URL('src/ui/index.html', import.meta.url)),
         hub: fileURLToPath(new URL('src/ui/hub.html', import.meta.url)),
         woodframe: fileURLToPath(new URL('src/ui/woodframe.html', import.meta.url)),
+        'woodframe-plan': fileURLToPath(new URL('src/ui/woodframe-plan.html', import.meta.url)),
+        'woodframe-learn': fileURLToPath(new URL('src/ui/woodframe-learn.html', import.meta.url)),
       },
       output: {
         // Deterministic, hashless names so the standalone inliner has stable targets.

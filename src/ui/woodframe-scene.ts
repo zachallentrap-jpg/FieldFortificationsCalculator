@@ -20,6 +20,9 @@ import {
   unlockToCustom, recentBuilds, type SessionState, type StoredBuild,
 } from './woodframe/store';
 import { parseRoute, routeToHash, decodeSpec, encodeSpec } from './woodframe/router';
+import { FEATURES, APP_NAME, MODE } from './woodframe/mode';
+import { openCommandSheet } from './woodframe/sheet';
+import { buildDeck, groupLabel, shuffle, type Card } from './woodframe/cards';
 
 const esc = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -133,6 +136,12 @@ function regenerate(): void {
   studio?.setModel(model);
   renderIssues(issues.map((i) => i.message));
   renderStrips();
+  // The deck is generated FROM the model, so a changed model invalidates it — otherwise the
+  // student drills on a rafter the building no longer has.
+  deckCards = [];
+  deckIndex = 0;
+  deckFlipped = false;
+  renderDeck();
   session = commitBuild(session, { ...current, updatedAt: Date.now() }).state;
   scheduleSave();
 }
@@ -159,7 +168,9 @@ function renderWorkbench(build: StoredBuild): void {
         <div class="wb-actions">
           <button class="chip" id="shareBtn" type="button">Copy link</button>
           <button class="chip" id="unlockBtn" type="button">Unlock everything</button>
-          <button class="chip" id="printBtn" type="button">Print</button>
+          ${FEATURES.commandOutputs
+            ? '<button class="chip chip--go" id="sheetBtn" type="button">Command sheet</button>'
+            : '<button class="chip chip--go" id="cardsBtn" type="button">Flashcards</button>'}
         </div>
       </header>
       <div id="issues" class="issues" hidden></div>
@@ -177,6 +188,7 @@ function renderWorkbench(build: StoredBuild): void {
         <div id="viewport" class="viewport"></div>
         <aside class="pane pane--inspect" aria-label="Inspect">
           <div id="memberCard" class="member-card" hidden></div>
+          ${FEATURES.flashcards ? '<section id="deck" class="deck"></section>' : ''}
           <div id="stagePanel"></div>
           <!-- The strips belong beside the model, not below the fold: the window itself no
                longer scrolls, so anything parked under it would simply never be seen. -->
@@ -205,7 +217,26 @@ function renderWorkbench(build: StoredBuild): void {
   );
 
   document.getElementById('backBtn')!.addEventListener('click', () => go('#/'));
-  document.getElementById('printBtn')!.addEventListener('click', () => window.print());
+  document.getElementById('sheetBtn')?.addEventListener('click', () => {
+    // The sheet carries a still of the view the operator set up, so the drawing on the page is
+    // the one they were looking at when they decided it was right. `preserveDrawingBuffer` is on
+    // for exactly this; a blocked pop-up falls back to printing the workbench itself.
+    const canvas = document.querySelector<HTMLCanvasElement>('#viewport canvas');
+    const opened = openCommandSheet({
+      model: model!,
+      title: current!.label ?? family?.name ?? current!.id,
+      lineage: family?.lineage ?? '',
+      viewImage: canvas ? canvas.toDataURL('image/png') : null,
+    });
+    if (!opened) {
+      showNotices(['Your browser blocked the new window — printing this page instead.']);
+      window.print();
+    }
+  });
+  document.getElementById('cardsBtn')?.addEventListener('click', () => {
+    deckOpen = !deckOpen;
+    renderDeck();
+  });
   document.getElementById('shareBtn')!.addEventListener('click', () => {
     const url = `${window.location.origin}${window.location.pathname}#/build/${current!.id}?c=${encodeSpec(current!.spec)}`;
     void navigator.clipboard?.writeText(url).then(
@@ -622,3 +653,68 @@ render();
   studio: () => studio?.debug(),
   spec: () => current?.spec,
 };
+
+// ── Flashcards (learning app only) ──────────────────────────────────────────
+//
+// The deck is generated from the model on screen, so it drills the building the student is
+// looking at. State is deliberately tiny and local: which card, is it flipped, is the panel
+// open. Nothing about a drill belongs in the saved session — a half-finished deck restored
+// three days later is noise, not progress.
+
+let deckOpen = false;
+let deckSeed = 1;
+let deckIndex = 0;
+let deckFlipped = false;
+let deckCards: Card[] = [];
+
+function renderDeck(): void {
+  const host = document.getElementById('deck');
+  if (!host) return;
+  if (!deckOpen) {
+    host.innerHTML = '';
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+  if (deckCards.length === 0 && model) deckCards = shuffle(buildDeck(model), deckSeed);
+  const card = deckCards[deckIndex];
+  if (!card) {
+    host.innerHTML = '<p class="doctrine">No cards for this structure yet.</p>';
+    return;
+  }
+  host.innerHTML = `
+    <div class="deck-head">
+      <h2>Flashcards<span class="deck-tag">${esc(groupLabel(card.group))}</span></h2>
+      <span class="deck-count">${deckIndex + 1} / ${deckCards.length}</span>
+    </div>
+    <button class="card-face${deckFlipped ? ' card-face--back' : ''}" id="cardFace" type="button">
+      <p class="card-q">${esc(card.front).replace(/\n\n/g, '</p><p class="card-q2">')}</p>
+      ${deckFlipped
+        ? `<p class="card-a">${esc(card.back)}</p><p class="card-src">${esc(card.source)}</p>`
+        : '<p class="card-hint">Tap to show the answer</p>'}
+    </button>
+    <div class="deck-nav">
+      <button class="chip" data-deck="prev" type="button">‹ Back</button>
+      <button class="chip" data-deck="shuffle" type="button">Shuffle</button>
+      <button class="chip" data-deck="next" type="button">Next ›</button>
+    </div>`;
+  document.getElementById('cardFace')!.addEventListener('click', () => {
+    deckFlipped = !deckFlipped;
+    renderDeck();
+  });
+  host.querySelectorAll<HTMLButtonElement>('[data-deck]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const n = deckCards.length;
+      if (el.dataset.deck === 'next') deckIndex = (deckIndex + 1) % n;
+      else if (el.dataset.deck === 'prev') deckIndex = (deckIndex - 1 + n) % n;
+      else {
+        // A new seed rather than a re-sort of the same order, so "shuffle" actually reshuffles.
+        deckSeed = (deckSeed * 1103515245 + 12345) >>> 0;
+        deckCards = shuffle(buildDeck(model!), deckSeed);
+        deckIndex = 0;
+      }
+      deckFlipped = false;
+      renderDeck();
+    });
+  });
+}

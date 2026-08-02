@@ -31,6 +31,11 @@ export default defineConfig({
     rollupOptions: {
       input: {
         hub: fileURLToPath(new URL('src/ui/hub.html', import.meta.url)),
+        // Wood-frame is two apps off one code base (src/ui/woodframe/mode.ts). The third entry
+        // is the retired single-tool URL, kept as a forwarding shim because it is deployed and
+        // linked — dropping it would 404 every bookmark and shared build link in existence.
+        'woodframe-plan': fileURLToPath(new URL('src/ui/woodframe-plan.html', import.meta.url)),
+        'woodframe-learn': fileURLToPath(new URL('src/ui/woodframe-learn.html', import.meta.url)),
         woodframe: fileURLToPath(new URL('src/ui/woodframe.html', import.meta.url)),
       },
     },
