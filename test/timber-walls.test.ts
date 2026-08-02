@@ -98,3 +98,51 @@ test('stage integrity: wall framing is stage 5, cap plates stage 6, union covers
   const total = [...byStage.values()].reduce((a, b) => a + b, 0);
   assert.equal(total, members.length, 'stage partition must cover every member exactly once');
 });
+
+test('walls sit INSIDE the floor edge: no member overhangs the building line', () => {
+  const d = 3.5 / 12;
+  for (const m of generateWalls(golden)) {
+    assert.ok(m.position[0] > -1e-9 && m.position[0] < golden.lengthFt + 1e-9, `${m.id}: x ${m.position[0]}`);
+    assert.ok(m.position[2] > -1e-9 && m.position[2] < golden.widthFt + 1e-9, `${m.id}: z ${m.position[2]}`);
+    // S-wall members stay within the wall's 3.5" band just inside the edge.
+    if (m.wall === 'S') assert.ok(m.position[2] < d + 1e-9, `${m.id}: outside S wall band`);
+  }
+});
+
+test('studs land on the true OC layout grid (panel edges hit stud centers)', () => {
+  // N wall has no openings in the golden config: interior stud centers must be exact
+  // multiples of the OC spacing measured from the wall end (15 1/4" to the first mark).
+  const members = generateWalls(golden);
+  const t = 1.5 / 12;
+  const oc = golden.studSpacingIn / 12;
+  const xs = members
+    .filter((m) => m.wall === 'N' && m.role === 'stud')
+    .map((m) => golden.lengthFt - m.position[0]) // N wall runs right-to-left
+    .sort((a, b) => a - b);
+  for (const s of xs) {
+    if (s < 2.5 * t || s > golden.lengthFt - 2.5 * t) continue; // end + corner studs are edge-flush
+    const k = Math.round(s / oc);
+    assert.ok(Math.abs(s - k * oc) < 1e-6, `stud at ${s} ft is off the ${golden.studSpacingIn}" grid`);
+  }
+  assert.ok(xs.some((s) => Math.abs(s - oc) < 1e-6), 'first interior stud at one OC from the end');
+});
+
+test('let-in bracing: 45° braces at the ends of clear walls, steeper where openings crowd', () => {
+  const members = generateWalls({ ...golden, letInBracing: true });
+  const braces = members.filter((m) => m.role === 'brace');
+  assert.ok(braces.length >= 6, `bracing across walls: got ${braces.length}`);
+  for (const b of braces) {
+    assert.equal(b.stage, 6, `${b.id}: braces belong to stage 6 (plates tied & braced)`);
+    assert.equal(b.nominal, '1x4');
+    const ang = Math.abs(b.rotation[2]);
+    assert.ok(ang > Math.PI / 5 && ang < Math.PI / 2, `${b.id}: angle ${ang}`);
+  }
+  // N wall is clear: both braces run at 45° (rise = run = stud zone height).
+  const north = braces.filter((b) => b.wall === 'N');
+  assert.equal(north.length, 2);
+  for (const b of north) {
+    assert.ok(Math.abs(Math.abs(b.rotation[2]) - Math.PI / 4) < 1e-6, `${b.id}: expected 45°`);
+  }
+  // Braces are off by default (golden reproduces the plain wall set).
+  assert.equal(generateWalls(golden).filter((m) => m.role === 'brace').length, 0);
+});

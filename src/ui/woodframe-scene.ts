@@ -3,16 +3,20 @@
 // the tap-to-inspect Member Card, and the per-wall plate Layout Strips (design doc §2, §4, §5,
 // §11.4). The scene invents NO geometry: every mesh carries the id of the Member it projects.
 // Standalone by design (npm run build:woodframe); never imported by the app.
+//
+// The Model toolbar swaps FM 5-426 lessons live: foundation type (piers / continuous wall /
+// full basement with framed stair opening), cross vs solid bridging, let-in bracing, and the
+// attic scuttle — every option regenerates the same single Member[] and every pane follows.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { lumberPiece, plywoodSheet, onPropAssetsReady, disposeObject, toonGradient } from './three-viewer';
 import type { LumberSize } from './three-viewer';
-import { generateFrame, type BuildingInput } from '../timber/frame';
+import { generateFrame, type BuildingInput, type FoundationType, type BridgingType } from '../timber/frame';
 import { bomSummary } from '../timber/bom';
 import { layoutStrip } from '../timber/elevation';
 import { STAGES, type Member, type StageId } from '../timber/types';
 
-// The demo building. This becomes user input when TIMBER-1 grows its control panel.
+// The demo building. Dimensions are fixed; the Model toolbar toggles the teaching options.
 const BUILDING: BuildingInput = {
   lengthFt: 20,
   widthFt: 16,
@@ -28,16 +32,58 @@ const BUILDING: BuildingInput = {
     { wall: 'S', offsetFt: 13, widthFt: 3, heightFt: 6.7, sillHeightFt: 0 }, // door
     { wall: 'N', offsetFt: 8.5, widthFt: 3, heightFt: 3.5, sillHeightFt: 3 }, // window
   ],
+  foundation: 'piers',
+  bridging: 'cross',
+  letInBracing: true,
+  atticAccess: true,
 };
 
-const MODEL = generateFrame(BUILDING);
-const BOM = bomSummary(MODEL.members);
+let MODEL = generateFrame(BUILDING);
+let BOM = bomSummary(MODEL.members);
+
 const PLAIN: Record<string, string> = {
   post: 'post', sill: 'sill', girder: 'girder (built-up)', joist: 'joist', rimJoist: 'rim joist',
   bridging: 'bridging', subfloor: 'subfloor panel', solePlate: 'sole plate', stud: 'stud',
   cripple: 'cripple', jackStud: 'jack stud (trimmer)', kingStud: 'king stud',
   header: 'header', topPlate: 'top plate', capPlate: 'cap plate (double top)',
   rafter: 'rafter', ridge: 'ridge board', collarTie: 'collar tie', roofPanel: 'roof sheathing panel',
+  brace: 'let-in brace', foundationWall: 'foundation wall (concrete)', footing: 'footing (concrete)',
+  slab: 'basement slab (concrete)', trimmerJoist: 'trimmer joist (doubled)',
+  headerJoist: 'header joist (doubled)', tailJoist: 'tail joist',
+  stringer: 'stair stringer', tread: 'stair tread',
+};
+
+// One plain-language line per role — what the piece DOES, for a Marine meeting the term for
+// the first time (design doc §11.1 plain-language mode).
+const WHAT: Record<string, string> = {
+  post: 'Short column that carries the sills down to its footer — the building bears on these.',
+  footing: 'Concrete that spreads the load onto the soil so nothing sinks.',
+  foundationWall: 'Continuous concrete wall under the sills — replaces posts; the sill bolts to it.',
+  slab: 'Concrete floor poured inside the basement walls.',
+  sill: 'Flat starter plate: on the foundation it seats the floor; in a window bay it is the rough sill the cripples stand on.',
+  girder: 'Built-up beam down the center that cuts the joist span in half.',
+  joist: 'Repeating beam that carries the deck load to the sills and girder.',
+  rimJoist: 'Closes off the joist ends and keeps them standing straight.',
+  bridging: 'Bracing between joists — spreads load to neighbors and stops twisting.',
+  subfloor: 'Deck panels that tie the joists into one stiff floor.',
+  solePlate: 'Bottom plate of a wall; the studs nail down through it into the floor.',
+  stud: 'Vertical wall member on the layout grid; carries the plates above it.',
+  cripple: 'Short stud above a header or below a window sill — keeps the layout grid going.',
+  jackStud: 'Shortened stud under each header end — carries the header load down.',
+  kingStud: 'Full-height stud beside the opening; the jack nails to it.',
+  header: 'Doubled beam over an opening; picks up the load of the studs that were cut.',
+  topPlate: 'Upper plate that ties the studs; doubled by the cap plate.',
+  capPlate: 'Second top plate; it laps the corners so the walls lock together.',
+  brace: '1x4 let into the stud faces at an angle — keeps the wall square against racking.',
+  rafter: 'Sloped roof beam from the wall plate to the ridge.',
+  ridge: 'Board at the peak the rafter pairs bear against.',
+  collarTie: 'Horizontal tie across a rafter pair — resists spreading.',
+  roofPanel: 'Roof deck panel nailed over the rafters.',
+  trimmerJoist: 'Doubled joist along the side of an opening; carries the headers.',
+  headerJoist: 'Doubled joist across the end of an opening; carries the cut-off tail joists.',
+  tailJoist: 'Shortened joist that runs from the opening header back to its bearing.',
+  stringer: 'Sloped stair beam; the treads bear on it. Card shows the riser/tread layout math.',
+  tread: 'The board you step on.',
 };
 
 // Carpenter-readable feet-inches: 92.625" → 7′-8 5/8″.
@@ -83,13 +129,47 @@ const sun = new THREE.DirectionalLight(0xffffff, 1.0);
 sun.position.set(12, 20, 8);
 scene.add(sun);
 
-// Ground sits at the engine's grade line (posts stand on it).
-const ground = new THREE.Mesh(
-  new THREE.BoxGeometry(BUILDING.lengthFt * 3, 0.05, BUILDING.widthFt * 3.4),
-  new THREE.MeshToonMaterial({ color: 0x9dbd80, gradientMap: toonGradient() }),
-);
-ground.position.y = MODEL.levels.gradeY - 0.025;
-scene.add(ground);
+// Ground sits a hair under the engine's grade line (footer tops peek through); the basement
+// option cuts the lawn back around the excavation and lines the cut with earth faces so the
+// hole reads as dug ground, not void.
+let ground: THREE.Group | null = null;
+function buildGround(): void {
+  if (ground) { disposeObject(ground); scene.remove(ground); }
+  ground = new THREE.Group();
+  const grass = (): THREE.MeshToonMaterial => new THREE.MeshToonMaterial({ color: 0x9dbd80, gradientMap: toonGradient() });
+  const earth = (): THREE.MeshToonMaterial => new THREE.MeshToonMaterial({ color: 0x8a6b46, gradientMap: toonGradient() });
+  const gy = MODEL.levels.gradeY - 0.035;
+  const HX = BUILDING.lengthFt * 1.5;
+  const HZ = BUILDING.widthFt * 1.7;
+  const strip = (cx: number, cz: number, sx: number, sz: number): void => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(sx, 0.05, sz), grass());
+    m.position.set(cx, gy, cz);
+    ground!.add(m);
+  };
+  if ((BUILDING.foundation ?? 'piers') === 'basement') {
+    const hx = BUILDING.lengthFt / 2 + 0.8;
+    const hz = BUILDING.widthFt / 2 + 0.8;
+    strip(0, -(hz + HZ) / 2, 2 * HX, HZ - hz);
+    strip(0, (hz + HZ) / 2, 2 * HX, HZ - hz);
+    strip(-(hx + HX) / 2, 0, HX - hx, 2 * hz);
+    strip((hx + HX) / 2, 0, HX - hx, 2 * hz);
+    // Excavation faces: earth curtains lining the hole from grade down past the footings.
+    const digBottom = (MODEL.levels.slabTop ?? MODEL.levels.gradeY - 8) - 1.2;
+    const digH = gy - digBottom;
+    const face = (cx: number, cz: number, sx: number, sz: number): void => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(sx, digH, sz), earth());
+      m.position.set(cx, gy - digH / 2 + 0.025, cz);
+      ground!.add(m);
+    };
+    face(0, -hz - 0.06, 2 * hx + 0.24, 0.12);
+    face(0, hz + 0.06, 2 * hx + 0.24, 0.12);
+    face(-hx - 0.06, 0, 0.12, 2 * hz);
+    face(hx + 0.06, 0, 0.12, 2 * hz);
+  } else {
+    strip(0, 0, 2 * HX, 2 * HZ);
+  }
+  scene.add(ground);
+}
 
 // ── Views (design doc §3.1): perspective isos, orthographic plan/elevations ──
 const CENTER = new THREE.Vector3(0, BUILDING.wallHeightFt * 0.45, 0);
@@ -118,6 +198,7 @@ const VIEWS: [string, () => void][] = [
 // ── FrameModel → meshes ───────────────────────────────────────────────────────
 function propFor(nominal: string): LumberSize {
   if (nominal in { '2x4': 1, '2x6': 1, '4x4': 1 }) return nominal as LumberSize;
+  if (nominal.startsWith('1x')) return '2x4'; // thin stock; exact dims still applied
   return nominal.startsWith('2x') ? '2x6' : '4x4'; // nearest prop; exact dims still applied
 }
 
@@ -126,9 +207,24 @@ scene.add(group);
 let currentStage: StageId = 11;
 let selectedId: string | null = null;
 
+// Concrete members (foundation walls, footings, slab) are plain toon boxes — not lumber.
+function concretePiece(m: Member): THREE.Group {
+  const wrapper = new THREE.Group();
+  const geo = new THREE.BoxGeometry(
+    Math.max(0.05, m.cutLength / 12),
+    Math.max(0.05, m.actual.d / 12),
+    Math.max(0.05, m.actual.w / 12),
+  );
+  wrapper.add(new THREE.Mesh(geo, new THREE.MeshToonMaterial({ color: 0xa9a69f, gradientMap: toonGradient() })));
+  group.add(wrapper);
+  return wrapper;
+}
+
 function buildMember(m: Member): THREE.Group {
   let p: THREE.Group;
-  if (m.nominal.includes('panel')) {
+  if (m.nominal.includes('conc')) {
+    p = concretePiece(m);
+  } else if (m.nominal.includes('panel')) {
     p = plywoodSheet(group);
     p.scale.set(m.cutLength / 12, m.actual.d / 12, m.actual.w / 12);
   } else {
@@ -182,9 +278,11 @@ function renderMemberCard(): void {
   if (!m) { card.style.display = 'none'; return; }
   const identical = MODEL.members.filter((x) => x.role === m.role && x.nominal === m.nominal && Math.abs(x.cutLength - m.cutLength) < 0.06).length;
   const angles = m.angles ? Object.entries(m.angles).map(([k, v]) => `${k} ${v.toFixed(1)}°`).join(' · ') : '';
+  const what = WHAT[m.role];
   card.style.display = 'block';
   card.innerHTML = `
     <strong>${PLAIN[m.role] ?? m.role}</strong> <span style="color:#6b6250">(${m.id})</span>
+    ${what ? `<div style="margin-top:3px;color:#4a4335">${what}</div>` : ''}
     <dl style="margin:4px 0 0">
       <dt>Size</dt><dd>${m.nominal} (actual ${m.actual.w}" × ${m.actual.d}")</dd>
       <dt>Cut length</dt><dd>${fmtFtIn(m.cutLength)}${angles ? ' · ' + angles : ''}</dd>
@@ -266,6 +364,86 @@ function renderStrips(): void {
   });
 }
 
+// ── Model options (the teaching toggles) ─────────────────────────────────────
+interface OptionSpec {
+  label: string;
+  choices: [string, string][];
+  get: () => string;
+  set: (v: string) => void;
+}
+const OPTIONS: OptionSpec[] = [
+  {
+    label: 'Foundation',
+    choices: [['piers', 'Piers'], ['wall', 'Wall'], ['basement', 'Basement']],
+    get: () => BUILDING.foundation ?? 'piers',
+    set: (v) => { BUILDING.foundation = v as FoundationType; },
+  },
+  {
+    label: 'Bridging',
+    choices: [['cross', 'Cross'], ['solid', 'Solid']],
+    get: () => BUILDING.bridging ?? 'cross',
+    set: (v) => { BUILDING.bridging = v as BridgingType; },
+  },
+  {
+    label: 'Braces',
+    choices: [['on', 'On'], ['off', 'Off']],
+    get: () => (BUILDING.letInBracing ? 'on' : 'off'),
+    set: (v) => { BUILDING.letInBracing = v === 'on'; },
+  },
+  {
+    label: 'Attic hatch',
+    choices: [['on', 'On'], ['off', 'Off']],
+    get: () => (BUILDING.atticAccess ? 'on' : 'off'),
+    set: (v) => { BUILDING.atticAccess = v === 'on'; },
+  },
+];
+
+function renderOptionChips(): void {
+  for (const spec of OPTIONS) {
+    for (const b of document.querySelectorAll(`#options button[data-opt="${spec.label}"]`)) {
+      b.classList.toggle('on', (b as HTMLButtonElement).dataset.value === spec.get());
+    }
+  }
+}
+
+function buildOptionChips(): void {
+  const el = document.getElementById('options')!;
+  for (const spec of OPTIONS) {
+    const wrap = document.createElement('span');
+    wrap.className = 'optGroup';
+    const lbl = document.createElement('b');
+    lbl.textContent = spec.label;
+    wrap.appendChild(lbl);
+    for (const [value, label] of spec.choices) {
+      const b = document.createElement('button');
+      b.className = 'chip';
+      b.dataset.opt = spec.label;
+      b.dataset.value = value;
+      b.textContent = label;
+      b.addEventListener('click', () => {
+        if (spec.get() === value) return;
+        spec.set(value);
+        regenerate();
+      });
+      wrap.appendChild(b);
+    }
+    el.appendChild(wrap);
+  }
+  renderOptionChips();
+}
+
+// Every pane is a projection of MODEL — regenerate it and they all follow.
+function regenerate(): void {
+  MODEL = generateFrame(BUILDING);
+  BOM = bomSummary(MODEL.members);
+  if (selectedId && !MODEL.members.some((m) => m.id === selectedId)) selectedId = null;
+  buildGround();
+  renderStrips();
+  renderOptionChips();
+  renderMemberCard();
+  setStage(currentStage);
+}
+
 // ── Toolbar wiring ────────────────────────────────────────────────────────────
 const viewsEl = document.getElementById('views')!;
 for (const [name, go] of VIEWS) {
@@ -286,15 +464,17 @@ for (const s of STAGES) {
   b.addEventListener('click', () => setStage(s.id));
   stagesEl.appendChild(b);
 }
+buildOptionChips();
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 fitViewport();
 VIEWS[2]![1](); // Iso SE default
+buildGround();
 setStage(11);
 renderStrips();
 onPropAssetsReady(rebuild); // swap in the real lumber props when the GLBs land
 
-(window as unknown as Record<string, unknown>).__frame = { camera: () => camera, controls: () => controls, scene, group, setStage };
+(window as unknown as Record<string, unknown>).__frame = { camera: () => camera, controls: () => controls, scene, group, setStage, regenerate };
 
 function loop(): void {
   requestAnimationFrame(loop);

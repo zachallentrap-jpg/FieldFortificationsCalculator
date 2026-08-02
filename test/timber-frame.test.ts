@@ -70,9 +70,11 @@ test('floor structure stacks: posts reach grade, joists bear on sill/girder tops
   }
 });
 
-test('roof geometry: rafter length follows the framing-square method, ridge is centered', () => {
+test('roof geometry: rafter length is framing-square length LESS half the ridge, ridge is centered', () => {
   const { members, input } = generateFrame(golden);
-  const run = input.widthFt / 2 + input.overhangFt;
+  // FM 5-426 layout sequence: line length by the framing-square method, then shorten half
+  // the ridge thickness (0.75" of run).
+  const run = input.widthFt / 2 + input.overhangFt - 0.75 / 12;
   const expected = run * (Math.sqrt(144 + input.risePer12 ** 2) / 12) * 12; // inches
   for (const r of members.filter((m) => m.role === 'rafter')) {
     assert.ok(Math.abs(r.cutLength - expected) < 0.01, `${r.id}: ${r.cutLength} vs ${expected}`);
@@ -81,6 +83,13 @@ test('roof geometry: rafter length follows the framing-square method, ridge is c
   const ridge = members.find((m) => m.role === 'ridge')!;
   assert.equal(ridge.position[2], input.widthFt / 2);
   assert.ok(ridge.position[1] > input.wallHeightFt, 'ridge above the walls');
+  // Ridge top edge stays flush with the rafter top planes (no board poking through the roof).
+  const pitch = Math.atan2(input.risePer12, 12);
+  const ridgeY = input.wallHeightFt + (input.widthFt / 2) * (input.risePer12 / 12);
+  const rafterHalf = 5.5 / 12 / 2;
+  const ridgeTopExpected = ridgeY + rafterHalf / Math.cos(pitch);
+  const ridgeTop = ridge.position[1] + ridge.actual.d / 12 / 2;
+  assert.ok(Math.abs(ridgeTop - ridgeTopExpected) < 1e-9, `ridge top ${ridgeTop} vs ${ridgeTopExpected}`);
   // Rafters come in pairs per grid line.
   const rafters = members.filter((m) => m.role === 'rafter');
   assert.equal(rafters.length % 2, 0);
@@ -108,6 +117,40 @@ test('roof sheathing courses tile the slope with no overlap or gap, for any pitc
     for (const side of [0, 1] as const) {
       const total = [...perSide.get(side)!.values()].reduce((a, d) => a + d, 0);
       assert.ok(Math.abs(total - slopeLenIn) < 0.02, `rise ${risePer12} side ${side}: course widths sum to ${total}, expected ${slopeLenIn}`);
+    }
+  }
+});
+
+test('roof sheathing lies ON the rafter planes and courses never overlap', () => {
+  const { members, input } = generateFrame(golden);
+  const slope = input.risePer12 / 12;
+  const pitch = Math.atan2(input.risePer12, 12);
+  const ridgeY = input.wallHeightFt + (input.widthFt / 2) * slope;
+  const yEave = input.wallHeightFt - input.overhangFt * slope;
+  for (const p of members.filter((m) => m.role === 'roofPanel')) {
+    const side = p.position[2] < input.widthFt / 2 ? -1 : 1;
+    const zEave = side === -1 ? -input.overhangFt : input.widthFt + input.overhangFt;
+    // Undo the normal offset to recover the point on the rafter center plane, then check
+    // the offset itself: panels must sit above the rafter centers by half a rafter depth
+    // plus half their own thickness (i.e. ON the rafters, not buried in them).
+    const lift = 5.5 / 12 / 2 + 0.25 / 12;
+    const zOnPlane = p.position[2] - side * Math.sin(pitch) * lift;
+    const frac = (zOnPlane - zEave) / (input.widthFt / 2 - zEave);
+    const yLine = yEave + (ridgeY - yEave) * frac;
+    const dy = p.position[1] - yLine;
+    assert.ok(Math.abs(dy - Math.cos(pitch) * lift) < 0.01, `${p.id}: lift ${dy}`);
+  }
+  // Courses partition the slope: total course width per side ≈ slope length (no overlaps).
+  const slopeLen = (input.widthFt / 2 + input.overhangFt) * (Math.sqrt(144 + input.risePer12 ** 2) / 12);
+  for (const side of [-1, 1]) {
+    const panels = members.filter((m) => m.role === 'roofPanel' && (m.position[2] < input.widthFt / 2 ? -1 : 1) === side);
+    const perX = new Map<number, number>();
+    for (const p of panels) {
+      const key = Math.round(p.position[0] * 100);
+      perX.set(key, (perX.get(key) ?? 0) + p.actual.d / 12);
+    }
+    for (const [key, total] of perX) {
+      assert.ok(Math.abs(total - slopeLen) < 0.05, `side ${side} x=${key / 100}: courses sum ${total} vs slope ${slopeLen}`);
     }
   }
 });
