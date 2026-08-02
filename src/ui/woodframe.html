@@ -18,6 +18,8 @@
       #toolbar { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 14px; align-items: center; }
       #toolbar .grp { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
       #toolbar .grp b { font-size: 11px; color: #6b6250; margin-right: 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+      #toolbar .optGroup { display: inline-flex; gap: 4px; align-items: center; margin-right: 8px; }
+      #toolbar .optGroup b { font-size: 11px; color: #6b6250; margin-right: 2px; text-transform: none; letter-spacing: 0; }
       button.chip { min-height: 30px; padding: 4px 10px; border: 1px solid #c9c0ad; border-radius: 8px; background: #fbf9f4; font-size: 12px; cursor: pointer; }
       button.chip.on { background: #2b2419; color: #fbf9f4; border-color: #2b2419; }
       main { display: flex; gap: 0; align-items: stretch; }
@@ -41,12 +43,13 @@
   <body>
     <header>
       <h1>TIMBER-1 — wood-frame construction</h1>
-      <span class="sub">FM 5-426 TO framing · every piece is an engine Member — tap one for its card · doctrine cites (PH) pending page verification</span>
+      <span class="sub">FM 5-426 TO framing · every piece is an engine Member — tap one for its card · Model chips swap the foundation / bracing / stair lessons · doctrine cites (PH) pending page verification</span>
       <a href="./hub.html" style="margin-left:auto; font-size:12px; color:#6b6250">⌂ Combat Engineer Toolkit</a>
     </header>
     <div id="toolbar">
       <div class="grp" id="views"><b>View</b></div>
       <div class="grp" id="stages"><b>Stage</b></div>
+      <div class="grp" id="options"><b>Model</b></div>
     </div>
     <main>
       <div id="viewport"></div>
