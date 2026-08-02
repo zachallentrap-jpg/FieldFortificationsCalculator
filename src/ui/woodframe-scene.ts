@@ -178,12 +178,16 @@ function renderWorkbench(build: StoredBuild): void {
         <aside class="pane pane--inspect" aria-label="Inspect">
           <div id="memberCard" class="member-card" hidden></div>
           <div id="stagePanel"></div>
+          <!-- The strips belong beside the model, not below the fold: the window itself no
+               longer scrolls, so anything parked under it would simply never be seen. -->
+          <section class="strips">
+            <h2>Plate layout — the marks to pencil (X stud · K king · J jack · C cripple)</h2>
+            <div id="stripsBody"></div>
+          </section>
+          <p class="doctrine">TO construction per FM 5-426 (public release); life-safety values cite
+            EM 385-1-1. Citations marked (PH) are pending a manual page check.</p>
         </aside>
       </main>
-      <section class="strips">
-        <h2>Plate layout strips — the marks to pencil on the plate (X stud · K king · J jack · C cripple)</h2>
-        <div id="stripsBody"></div>
-      </section>
     </div>`;
 
   studio = createStudio(

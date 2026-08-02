@@ -79,12 +79,31 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
   renderer.localClippingEnabled = true; // gates every material's clippingPlanes at once
   dom.viewport.appendChild(renderer.domElement);
 
+  // The canvas follows the system appearance. A white sky and a bright green field sitting in a
+  // dark window is the loudest possible tell that the 3D is a foreign object bolted into the
+  // app rather than part of it — so the stage is neutral in both, and the timber stays the only
+  // saturated thing in the frame.
+  const darkAppearance = window.matchMedia('(prefers-color-scheme: dark)');
+  const sceneColors = () => (darkAppearance.matches
+    ? { sky: 0x1c1c1e, ground: 0x2c2c2e, bounce: 0x14161a, ambient: 0.5 }
+    : { sky: 0xf2f2f5, ground: 0xdedee2, bounce: 0x4a3a22, ambient: 0.55 });
+
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf4f2ec);
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x4a3a22, 1.1), new THREE.AmbientLight(0xffffff, 0.55));
+  scene.background = new THREE.Color(sceneColors().sky);
+  const hemi = new THREE.HemisphereLight(0xffffff, sceneColors().bounce, 1.1);
+  const ambient = new THREE.AmbientLight(0xffffff, sceneColors().ambient);
+  scene.add(hemi, ambient);
   const sun = new THREE.DirectionalLight(0xffffff, 1.0);
   sun.position.set(12, 20, 8);
   scene.add(sun);
+  darkAppearance.addEventListener('change', () => {
+    const s = sceneColors();
+    scene.background = new THREE.Color(s.sky);
+    hemi.groundColor.setHex(s.bounce);
+    ambient.intensity = s.ambient;
+    if (ground) (ground.material as THREE.MeshToonMaterial).color.setHex(s.ground);
+    // The render loop is continuous, so the next frame picks this up on its own.
+  });
   // Warm fill from inside, so a cut face is lit rather than a black hole.
   const sectionFill = new THREE.PointLight(0xffe9c8, 0.0, 120);
   scene.add(sectionFill);
@@ -198,7 +217,7 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     const gy = model.levels.gradeY ?? 0;
     ground = new THREE.Mesh(
       new THREE.BoxGeometry((box.max[0] - box.min[0]) * 3 + 20, 0.05, (box.max[2] - box.min[2]) * 3 + 20),
-      new THREE.MeshToonMaterial({ color: 0x9dbd80, gradientMap: toonGradient() }),
+      new THREE.MeshToonMaterial({ color: sceneColors().ground, gradientMap: toonGradient() }),
     );
     ground.position.set((box.min[0] + box.max[0]) / 2, gy - 0.03, (box.min[2] + box.max[2]) / 2);
     scene.add(ground);
@@ -294,6 +313,11 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
   }
 
   function viewportHeight(): number {
+    // The workbench is a windowed layout now: the viewport is a flex item with a real height of
+    // its own. Measure that when it exists, and only fall back to the window-relative estimate
+    // on the first pass, before the layout has settled.
+    const own = dom.viewport.clientHeight;
+    if (own > 40) return own;
     return Math.max(320, window.innerHeight - dom.viewport.getBoundingClientRect().top - 12);
   }
 
