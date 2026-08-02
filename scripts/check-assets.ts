@@ -58,7 +58,10 @@ function walk(dir: string, rel: string): void {
       continue;
     }
     scanned++;
-    if (ASSET_ALLOWLIST.has(entry)) continue;
+    // Vite content-hashes emitted assets (lumber_2x4-CZ7P8OrR.glb). Compare on the stem so
+    // the allowlist names the ASSET, not whatever hash this build happened to produce.
+    const unhashed = entry.replace(/-[A-Za-z0-9_-]{8}(\.[^.]+)$/, '$1');
+    if (ASSET_ALLOWLIST.has(entry) || ASSET_ALLOWLIST.has(unhashed)) continue;
     if (CODE_PATTERNS.some((re) => re.test(entry))) continue;
     // Anything with no extension (LICENSE, etc.) or an unlisted asset extension is new art.
     const ext = extname(entry).toLowerCase();

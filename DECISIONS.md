@@ -418,3 +418,32 @@ option, implement it, and log it here.
   names exactly which gate classes apply to `src/timber` (offline/determinism/doctrine YES;
   watermark/commissioning NO — LS-GATE replaces them); R5b gains the crib-bunker reconciliation
   entry condition so the bunker boundary is owned on both sides.
+
+- **D38 — TIMBER-2 T1: the parametric engine exists, and the legacy output did not move by one
+  bit.** `generateFrame` no longer composes the generators itself: it maps `BuildingInput` onto
+  a `BuildingSpec` (the §2.4 migration table, written as `specFromBuildingInput`) and delegates
+  to `generateStructure`, the single entry point every future family also goes through. The
+  frozen goldens from D37 passed unchanged through the delegation on the first run — exact
+  deep-equal, not epsilon — across all 12 curated fixtures and all 72 matrix rows. New modules:
+  `spec.ts` (the StructureSpec discriminated union + the SPEC_PATH registry), `normalize.ts`,
+  `stagePlan.ts`, `doctrine.ts`, `families/{building,index}.ts`, `subsystems/wallSystem.ts`.
+  Four decisions worth recording. **(1) C-10 taken literally:** `floor.ts`/`walls.ts`/`roof.ts`
+  ARE the frozen branch — not rewritten, not edited, wrapped. Breadth arrives as sibling code
+  reading a published contract, so the byte-pinned path is never in its way and never in a
+  refactor's blast radius. **(2) The wall placement convention is now OWNED** (C-4): where a
+  wall sits was knowledge duplicated between `walls.ts` and `elevation.ts` and about to be
+  copied a third and fourth time by coverings and second stories. `wallSystem.wallContract()`
+  publishes `bearings` (what a floor above can sit on) and `surfaces` (each wall plane with its
+  opening cutouts), and the test checks the contract against the framing the frozen generator
+  actually emitted — not against itself. **(3) Two normalizers, deliberately:** `normalizeSpec`
+  clamps and reports but NEVER reorders (TD5 — the legacy generator bakes opening input order
+  into member ids, so a helpful sort would silently renumber members the goldens pin);
+  `canonicalizeSpec` does sort, and is used only for presets, serialization and hashing.
+  **(4) `bomSummary` throws past its stage plan** (TD18) instead of filtering: hand a tower's
+  members to the legacy 11-stage plan and the old code silently dropped everything above stage
+  11, producing a bill that was short and looked fine. Also this phase: `doctrine.ts` mirrors
+  the frozen modules' magnitudes rather than moving them, with a test asserting the mirror is
+  true, so the two cannot drift; DRESSED/BF_PER_LF gained the TIMBER-2 sizes with a lockstep
+  test making the emitters' `{1.5,3.5}` fallback unreachable in real output; and
+  `timber2-number-free` scans the new generator surface for inline magnitudes the way
+  `number-free.test.ts` already does for SAP.
