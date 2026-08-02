@@ -4,6 +4,7 @@
 
 import type { Member, StageId } from './types';
 import { STAGES } from './types';
+import { num } from './data';
 
 // Nominal section board-feet per lineal foot (nominal w×d ÷ 12).
 const BF_PER_LF: Record<string, number> = {
@@ -44,11 +45,14 @@ export interface BomSummary {
   totalManHours: number;
 }
 
-// Placeholder labor rates, man-hours per board-foot equivalent (FM 5-426 Table C-1 pending
-// verification — design doc §8 keeps these DOCTRINE-UNVERIFIED and visibly footnoted).
-const MH_PER_BF = 0.055; // (PH)
-const MH_PER_PANEL = 0.5; // (PH)
-const MH_PER_CONC_LF = 0.15; // (PH) concrete form/pour per lineal foot of wall/footing/slab run
+// Labor rates now live in the value catalog (src/timber/data.ts) so the unit can type over
+// them without editing source — they are the numbers a command packet's man-hour total is
+// built on, and the least transferable values in the app: they move with crew experience,
+// tools, weather, and load. Read per call rather than captured at module load, so an
+// override takes effect on the next regenerate instead of the next page load.
+const mhPerBf = (): number => num('labor.perBoardFoot');
+const mhPerPanel = (): number => num('labor.perPanel');
+const mhPerConcLf = (): number => num('labor.perConcreteLf');
 
 const eighth = (inches: number): number => Math.round(inches * 8) / 8;
 
@@ -93,7 +97,7 @@ export function bomSummary(members: Member[]): BomSummary {
       boardFeet: bf,
       panels,
       memberCount: ofStage.length,
-      manHours: bf * MH_PER_BF + panels * MH_PER_PANEL + concLf * MH_PER_CONC_LF,
+      manHours: bf * mhPerBf() + panels * mhPerPanel() + concLf * mhPerConcLf(),
     });
   }
   return {

@@ -16,6 +16,7 @@
 import type { Member, MemberRole, StageId } from './types';
 import { DRESSED } from './types';
 import { layoutCenters } from './floor';
+import { value, cite } from './data';
 
 const FT = 12;
 
@@ -52,7 +53,7 @@ export function generateRoof(input: RoofInput): Member[] {
       rotation,
       stage,
       grade: 'No. 2 common',
-      nailing: extras?.nailing ?? '16d common (PH)',
+      nailing: extras?.nailing ?? value('generic.faceNail'),
       doctrineRef: extras?.doctrineRef ?? 'FM 5-426 ch. 6 roof framing (PH page)',
       ...extras,
     });
@@ -84,7 +85,7 @@ export function generateRoof(input: RoofInput): Member[] {
   const cjXs = gridXs.slice(1, -1).map((x) => x + t);
   const cjAt = (x: number, z0: number, z1: number, role: MemberRole, extras?: Partial<Member>): void =>
     emit(role, '2x6', z1 - z0, [x, cjY, (z0 + z1) / 2], [0, -Math.PI / 2, 0], 7, {
-      nailing: '3-16d toenail ea plate + 16d to rafter (PH)',
+      nailing: value('ceilingJoist.toPlate'),
       doctrineRef: 'FM 5-426 ceiling joists tie walls (PH page)',
       ...extras,
     });
@@ -117,7 +118,7 @@ export function generateRoof(input: RoofInput): Member[] {
       const dir = edge === scuttle.x0 ? -1 : 1;
       for (const k of [0.5, 1.5]) {
         cjAt(edge + dir * k * t, 0, W, 'trimmerJoist', {
-          nailing: '16d @ 12" staggered to mate (PH)',
+          nailing: value('header.double'),
           doctrineRef: 'double trimmer at attic scuttle (FM 5-426 framing at openings, PH page)',
         });
       }
@@ -125,7 +126,7 @@ export function generateRoof(input: RoofInput): Member[] {
     for (const [face, dir] of [[scuttle.z1, -1], [scuttle.z2, 1]] as const) {
       for (const k of [0.5, 1.5]) {
         emit('headerJoist', '2x6', scuttle.x1 - scuttle.x0, [(scuttle.x0 + scuttle.x1) / 2, cjY, face + dir * k * t], [0, 0, 0], 7, {
-          nailing: '3-16d ea tail joist + 16d @ 12" to mate (PH)',
+          nailing: value('header.toTailJoist'),
           doctrineRef: 'double header at attic scuttle (FM 5-426 framing at openings, PH page)',
         });
       }
@@ -148,7 +149,7 @@ export function generateRoof(input: RoofInput): Member[] {
       const yC = (yEave + yRidge) / 2;
       emit('rafter', '2x6', rafterLen, [x, yC, zC], [0, -Math.PI / 2, -side * pitch], 8, {
         angles: { plumbCut: 90 - (pitch * 180) / Math.PI, seatCut: (pitch * 180) / Math.PI },
-        nailing: '3-16d at ridge, bird’s-mouth toenail 3-8d (PH)',
+        nailing: `${value('rafter.toRidge')} at ridge; ${value('rafter.toPlate')} at bird’s-mouth`,
         doctrineRef: `FM 5-426 framing-square method: ${lenPerFtRun.toFixed(3)} ft/ft run, less half the ridge (PH page)`,
       });
     }
@@ -158,7 +159,7 @@ export function generateRoof(input: RoofInput): Member[] {
   const ridgeD = DRESSED['2x8']!.d / FT;
   const ridgeTop = ridgeY + rafterHalf / cosP;
   emit('ridge', '2x8', L, [L / 2, ridgeTop - ridgeD / 2, W / 2], [0, 0, 0], 8, {
-    nailing: 'rafters 3-16d ea (PH)',
+    nailing: value('ridge.toRafters'),
     doctrineRef: 'FM 5-426: ridge one size deeper than rafters, tops flush (PH page)',
   });
   // Collar ties on every third interior rafter pair (≤5 ft apart per manual), at 1/3 down
@@ -172,7 +173,7 @@ export function generateRoof(input: RoofInput): Member[] {
   const tieHalf = halfSpan / 3;
   for (let i = 3; i < gridXs.length - 1; i += 3) {
     emit('collarTie', '2x4', 2 * tieHalf, [gridXs[i]! + t, tieY, W / 2], [0, -Math.PI / 2, 0], 8, {
-      nailing: '4-8d ea end (PH)',
+      nailing: value('collarTie.toRafter'),
       doctrineRef: 'FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)',
     });
   }
@@ -184,7 +185,7 @@ export function generateRoof(input: RoofInput): Member[] {
       const riseHere = (halfSpan - Math.abs(z - halfSpan)) * slope - underside;
       if (riseHere < 0.2) continue;
       emit('stud', '2x4', riseHere, [xEnd, H + riseHere / 2, z], [0, Math.PI / 2, Math.PI / 2], 8, {
-        nailing: 'toenail 2-8d ea end (PH)',
+        nailing: value('gableStud.toRafter'),
         doctrineRef: 'FM 5-426 gable studs (PH page)',
       });
     }
@@ -215,11 +216,11 @@ export function generateRoof(input: RoofInput): Member[] {
         // face lies in the slope plane, mirrored per side.
         emit('roofPanel', '4x8 panel', wPanel, [x0 + wPanel / 2, yC, zC], [-side * (Math.PI / 2 - pitch), 0, 0], 9, {
           actual: { w: 0.5, d: courseW * FT },
-          nailing: '8d @ 6" edges / 12" field (PH)',
+          nailing: value('roof.sheathing'),
           doctrineRef:
             courseW < 4 - 0.01
-              ? 'FM 5-426 roof sheathing; top course ripped to the ridge (PH page)'
-              : 'FM 5-426 roof sheathing (PH page)',
+              ? `${cite('roof.sheathing')} — top course ripped to the ridge`
+              : cite('roof.sheathing'),
         });
       }
     }

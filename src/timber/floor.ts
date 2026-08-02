@@ -21,6 +21,7 @@
 
 import type { Member, MemberRole, StageId } from './types';
 import { DRESSED } from './types';
+import { value, cite } from './data';
 
 const FT = 12;
 
@@ -150,7 +151,7 @@ export function generateFloor(input: FloorInput): Member[] {
       rotation,
       stage,
       grade: 'No. 2 common',
-      nailing: extras?.nailing ?? '16d common (PH)',
+      nailing: extras?.nailing ?? value('generic.faceNail'),
       doctrineRef: extras?.doctrineRef ?? 'FM 5-426 ch. 6 (PH page)',
       ...extras,
     });
@@ -176,7 +177,7 @@ export function generateFloor(input: FloorInput): Member[] {
   const padAt = (x: number, z: number, topY: number): void =>
     emit('footing', 'conc pad 16x16x8', PAD_SIDE / FT, [x, topY - PAD_H / FT / 2, z], [0, 0, 0], 1, {
       actual: { w: PAD_SIDE, d: PAD_H },
-      nailing: 'poured on undisturbed soil (PH)',
+      nailing: value('footing.pour'),
       doctrineRef: 'FM 5-426 post footers (PH page)',
     });
 
@@ -218,12 +219,12 @@ export function generateFloor(input: FloorInput): Member[] {
     for (const wr of wallRuns) {
       emit('foundationWall', `conc wall ${CONC_WALL_T}"`, wr.len, wr.pos, wr.rot, 1, {
         actual: { w: CONC_WALL_T, d: wallH * FT },
-        nailing: '1/2" anchor bolts @ ~6 ft into sill (PH)',
+        nailing: value('sill.anchorBolt'),
         doctrineRef: 'FM 5-426 continuous-wall foundation (PH ch./page)',
       });
       emit('footing', `conc footing ${FOOTING_W}x${FOOTING_H}`, wr.len, [wr.pos[0], wallBottom - FOOTING_H / FT / 2, wr.pos[2]], wr.rot, 1, {
         actual: { w: FOOTING_W, d: FOOTING_H },
-        nailing: 'poured on undisturbed soil (PH)',
+        nailing: value('footing.pour'),
         doctrineRef: 'FM 5-426 wall footing: width ~2x wall, depth ~wall thickness (PH page)',
       });
     }
@@ -231,7 +232,7 @@ export function generateFloor(input: FloorInput): Member[] {
       const slabTop = lv.slabTop ?? lv.gradeY;
       emit('slab', `conc slab ${SLAB_T}"`, L - 2 * concT, [L / 2, slabTop - SLAB_T / FT / 2, W / 2], [0, 0, 0], 1, {
         actual: { w: (W - 2 * concT) * FT, d: SLAB_T },
-        nailing: 'poured against walls over vapor barrier (PH)',
+        nailing: value('slab.pour'),
         doctrineRef: 'FM 5-426 basement slab (PH ch./page)',
       });
       // Girder columns bear on the slab (footing thickened below, not modeled); girder
@@ -239,7 +240,7 @@ export function generateFloor(input: FloorInput): Member[] {
       const colLen = girderBottom - slabTop;
       for (const x of postXs.slice(1, -1)) {
         postAt(x, W / 2, colLen, slabTop, {
-          doctrineRef: 'girder column on slab footing — steel column typical (PH); girder ends bear in wall pockets',
+          doctrineRef: `${cite('girder.column')} — ${value('girder.column')}`,
         });
       }
     } else {
@@ -253,7 +254,7 @@ export function generateFloor(input: FloorInput): Member[] {
 
   // ── Stage 2: sills (2x6 flat, outside face flush with the frame line) + center girder
   // (built-up 3-2x10 on edge, top flush with the sills so joists bear level everywhere).
-  const sillAnchor = foundation === 'piers' ? 'anchor/drift per post cap (PH)' : '1/2" anchor bolts @ ~6 ft (PH)';
+  const sillAnchor = foundation === 'piers' ? value('sill.postCap') : value('sill.anchorBolt');
   for (const z of [sillCtr, W - sillCtr]) {
     emit('sill', '2x6', L, [L / 2, lv.sillTop - sillT / 2, z], [-Math.PI / 2, 0, 0], 2, { nailing: sillAnchor });
   }
@@ -267,7 +268,7 @@ export function generateFloor(input: FloorInput): Member[] {
     emit('girder', '2x10', L, [L / 2, lv.sillTop - girderD / 2, W / 2 + lat], [0, 0, 0], 2, {
       nominal: '2x10',
       doctrineRef: 'FM 5-426 Table 6-1 built-up girder (PH: fixed 3-2x10, load-area method pending)',
-      nailing: '16d @ 16" staggered, both faces (PH)',
+      nailing: value('girder.builtUp'),
     });
   }
 
@@ -280,7 +281,7 @@ export function generateFloor(input: FloorInput): Member[] {
   const joistXs = layoutCenters(L, oc, t);
   const joistAt = (x: number, z0: number, z1: number, role: MemberRole, extras?: Partial<Member>): void =>
     emit(role, '2x8', z1 - z0, [x, joistY, (z0 + z1) / 2], [0, -Math.PI / 2, 0], 3, {
-      nailing: '3-16d toenail ea bearing (PH)',
+      nailing: value('joist.toBearing'),
       doctrineRef: 'FM 5-426 Table 6-2 joist span (PH: 2x8 fixed, span check pending)',
       ...extras,
     });
@@ -317,7 +318,7 @@ export function generateFloor(input: FloorInput): Member[] {
       const dir = edge === stair.x0 ? -1 : 1;
       for (const k of [0.5, 1.5]) {
         joistAt(edge + dir * k * t, t, W - t, 'trimmerJoist', {
-          nailing: '16d @ 12" staggered to mate (PH)',
+          nailing: value('header.double'),
           doctrineRef: 'double trimmer joist at stair opening — FM 5-426 framing at openings (PH page)',
         });
       }
@@ -327,7 +328,7 @@ export function generateFloor(input: FloorInput): Member[] {
     for (const [face, dir] of [[stair.z1, -1], [stair.z2, 1]] as const) {
       for (const k of [0.5, 1.5]) {
         emit('headerJoist', '2x8', stair.x1 - stair.x0, [(stair.x0 + stair.x1) / 2, joistY, face + dir * k * t], [0, 0, 0], 3, {
-          nailing: '3-16d ea tail joist + 16d @ 12" to mate (PH)',
+          nailing: value('header.toTailJoist'),
           doctrineRef:
             dir === -1
               ? 'double header at stair opening, bears on girder — FM 5-426 framing at openings (PH; verify span)'
@@ -337,7 +338,7 @@ export function generateFloor(input: FloorInput): Member[] {
     }
   }
   for (const z of [t / 2, W - t / 2]) {
-    emit('rimJoist', '2x8', L, [L / 2, joistY, z], [0, 0, 0], 3, { nailing: '3-16d ea joist end (PH)' });
+    emit('rimJoist', '2x8', L, [L / 2, joistY, z], [0, 0, 0], 3, { nailing: value('rimJoist.toJoist') });
   }
 
   // Bridging rows at each half-span midpoint once the half-span reaches ~8 ft
@@ -359,13 +360,13 @@ export function generateFloor(input: FloorInput): Member[] {
           const ang = Math.atan2(rise, gap);
           for (const s of [-1, 1] as const) {
             emit('bridging', '1x3', len, [xc, joistY, zMid + s * 0.04], [0, 0, s * ang], 3, {
-              nailing: '2-8d ea end; bottom ends nailed after subfloor (PH)',
+              nailing: value('bridging.toJoist'),
               doctrineRef: 'FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)',
             });
           }
         } else {
           emit('bridging', '2x8', gap, [xc, joistY, zMid + (i % 2 === 0 ? 0.125 : -0.125)], [0, 0, 0], 3, {
-            nailing: '3-16d ea end, staggered line (PH)',
+            nailing: value('blocking.solid'),
             doctrineRef: 'FM 5-426 solid bridging (full-depth blocking), rows <=8 ft apart (PH page)',
           });
         }
@@ -382,7 +383,7 @@ export function generateFloor(input: FloorInput): Member[] {
   const panelAt = (xC: number, wPanel: number, zC: number, rowW: number, note?: string): void =>
     emit('subfloor', '4x8 panel', wPanel, [xC, -panelT / 2, zC], [-Math.PI / 2, 0, 0], 4, {
       actual: { w: 0.75, d: rowW * FT },
-      nailing: '8d @ 6" edges / 12" field (PH)',
+      nailing: value('subfloor.sheathing'),
       doctrineRef: note ?? 'FM 5-426 subfloor, staggered joints (PH page)',
     });
   for (let r = 0; r < rows; r++) {
@@ -439,13 +440,13 @@ export function generateFloor(input: FloorInput): Member[] {
     const zs = [stair.z1 + 0.1, (stair.z1 + stair.z2) / 2, stair.z2 - 0.1];
     for (const z of zs) {
       emit('stringer', '2x12', strLen, [cx, cy, z], [0, 0, beta], 4, {
-        nailing: 'top plumb cut to trimmer + kicker at slab (PH)',
+        nailing: value('stair.stringer'),
         doctrineRef: `FM 5-426 stair layout (PH page): ${stair.risers} risers @ ${stair.unitRiseIn.toFixed(2)}", ${stair.treads} treads @ ${stair.unitRunIn}"`,
       });
     }
     for (let k = 1; k <= stair.treads; k++) {
       emit('tread', '2x10', stair.z2 - stair.z1 - 0.3, [stair.x1 - (k - 0.5) * urunFt, -k * urFt - t / 2, (stair.z1 + stair.z2) / 2], [-Math.PI / 2, -Math.PI / 2, 0], 4, {
-        nailing: '3-16d per stringer (PH)',
+        nailing: value('stair.tread'),
         doctrineRef: 'FM 5-426 stair treads on stringers (PH page)',
       });
     }

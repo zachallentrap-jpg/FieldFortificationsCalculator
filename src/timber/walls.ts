@@ -14,6 +14,7 @@
 
 import type { Member, MemberRole, StageId, WallId } from './types';
 import { DRESSED } from './types';
+import { value, cite, GRADE } from './data';
 
 const T = 1.5; // dressed 2x4 thickness, inches
 const D = 3.5; // dressed 2x4 face width (wall thickness), inches
@@ -98,9 +99,9 @@ export function generateWalls(input: WallsInput): Member[] {
         rotation,
         stage: opts?.stage ?? 5,
         wall: f.wall,
-        grade: 'No. 2 common',
-        nailing: opts?.nailing ?? '2-16d ea end (PH)',
-        doctrineRef: opts?.doctrineRef ?? 'FM 5-426 ch. 6 (PH page)',
+        grade: value(GRADE.id),
+        nailing: opts?.nailing ?? value('stud.toPlate'),
+        doctrineRef: opts?.doctrineRef ?? cite('stud.toPlate'),
       });
     };
 
@@ -110,17 +111,17 @@ export function generateWalls(input: WallsInput): Member[] {
     // Plates. The cap plate belongs to stage 6 (plates tied & braced) and laps the corner:
     // through-wall caps stop short, butt-wall caps run long, tying the walls together.
     emit('solePlate', '2x4', f.runFt, f.runFt / 2, t / 2, 'flat', {
-      nailing: '16d @ 16" to joists (PH)',
+      nailing: value('plate.soleToJoist'),
       doctrineRef: hasDoor
-        ? 'FM 5-426 ch. 6 (PH page) — run full, then cut out of door ROs after the wall is raised'
+        ? `${cite('plate.soleToJoist')} — run full, then cut out of door ROs after the wall is raised`
         : undefined,
     });
     emit('topPlate', '2x4', f.runFt, f.runFt / 2, H - 1.5 * t, 'flat');
     const capLap = f.wall === 'S' || f.wall === 'N' ? -2 * dFt : 2 * dFt;
     emit('capPlate', '2x4', f.runFt + capLap, f.runFt / 2, H - t / 2, 'flat', {
       stage: 6,
-      nailing: '16d @ 16" + 2-16d at laps (PH)',
-      doctrineRef: 'FM 5-426: cap plate laps at corners tie the walls (PH page)',
+      nailing: `${value('plate.capToTop')}; ${value('plate.capLap')} at laps`,
+      doctrineRef: `${cite('plate.capLap')} — cap plate laps at corners tie the walls`,
     });
 
     // Common studs: end studs edge-flush, interior studs on exact OC multiples so panel
@@ -135,11 +136,11 @@ export function generateWalls(input: WallsInput): Member[] {
 
     for (const s of gridXs) {
       if (inBay(s)) continue;
-      emit('stud', '2x4', studLen, s, t + studLen / 2, 'vertical', { nailing: '2-16d ea end or 4-8d toenail (PH)' });
+      emit('stud', '2x4', studLen, s, t + studLen / 2, 'vertical', { nailing: value('stud.toPlate') });
     }
     // One extra corner stud at each end (partial TO corner; see header note).
     for (const s of [1.5 * t, f.runFt - 1.5 * t]) {
-      emit('stud', '2x4', studLen, s, t + studLen / 2, 'vertical', { nailing: '16d @ 12" to end stud (PH)' });
+      emit('stud', '2x4', studLen, s, t + studLen / 2, 'vertical', { nailing: value('stud.toEndStud') });
     }
 
     // Openings: kings full height, jacks carry the header, doubled header on edge,
@@ -161,19 +162,19 @@ export function generateWalls(input: WallsInput): Member[] {
         const edge = side === -1 ? left : right;
         emit('kingStud', '2x4', studLen, clampAlong(edge + (side * 3 * t) / 2), t + studLen / 2, 'vertical');
         emit('jackStud', '2x4', headBottom - t, clampAlong(edge + (side * t) / 2), t + (headBottom - t) / 2, 'vertical', {
-          nailing: '16d @ 12" to king stud (PH)',
+          nailing: value('stud.jackToKing'),
         });
       }
       const hdrLen = o.widthFt + 2 * t; // bears on both jacks
       for (const lat of [-t / 2, t / 2]) {
         emit('header', headerNominal, hdrLen, (left + right) / 2, headBottom + headerDepthFt / 2, 'onEdge', {
           lateralFt: lat,
-          nailing: '16d @ 16" staggered, both faces (PH)',
+          nailing: value('header.wall'),
         });
       }
       if (o.sillHeightFt > 0) {
         const sillTop = t + o.sillHeightFt;
-        emit('sill', '2x4', o.widthFt, (left + right) / 2, sillTop - t / 2, 'flat', { nailing: '2-16d ea end (PH)' });
+        emit('sill', '2x4', o.widthFt, (left + right) / 2, sillTop - t / 2, 'flat', { nailing: value('sill.rough') });
         // Guarded the same way the above-header cripple below is (cripLen > 0.05) — a low sill
         // (e.g. a crawlspace/basement vent under 1.5" above the sole plate) drove this negative
         // or to exactly zero with no guard, unlike its structurally-identical sibling two lines
@@ -214,11 +215,11 @@ export function generateWalls(input: WallsInput): Member[] {
           stage: 6,
           lateralFt: lat,
           diagRz: end === 'L' ? ang : -ang,
-          nailing: '2-8d at each stud crossing (PH)',
+          nailing: value('brace.letIn'),
           doctrineRef:
             run >= studLen - 0.01
-              ? 'FM 5-426 let-in corner brace, 45 deg (PH page)'
-              : 'FM 5-426 let-in corner brace — steepened where the openings crowd it (PH page)',
+              ? `${cite('brace.letIn')} — let-in corner brace, 45 deg`
+              : `${cite('brace.letIn')} — let-in brace, steepened where the openings crowd it`,
         });
       }
     }

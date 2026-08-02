@@ -434,3 +434,60 @@ The general lesson, recorded because it will recur: **a gate that cannot disting
 "checked and clean" from "checked nothing" is not a gate.** Every gate this repo adds
 should be asked what it prints when its subject is absent. T0's own acceptance criterion
 was "CI runs and is green" — green was true and meant less than it appeared to.
+
+## 2026-08-02 — Wood-frame values move out of the engine and become the unit's to set
+
+Owner direction, reversing the ship-empty posture for TIMBER: *"for wood frame and for sap
+you can have loaded values i just have to be able to get to the backend somehow and type
+those in when i want to but its good for both to hvae data already there thats as acucate
+as you can be esp with woodframe you definatly know most if not all of that."*
+
+That is two requirements, and the second is the one that was structurally impossible:
+values lived as inline string literals across `floor.ts` / `walls.ts` / `roof.ts`, so the
+only way to change a nailing schedule was to edit TypeScript and redeploy. Centralizing
+them in `src/timber/data.ts` is what makes an editor possible at all.
+
+**On accuracy.** All 39 sites were previously marked `(PH)` — pending page verification.
+That marker flattened two very different situations into one shrug: specs that are
+ordinary, well-documented construction practice, and specs that genuinely need someone to
+open a manual. Most of them were the former and were already correct. Four were not, and
+are corrected here:
+
+| Spec | Was | Now | Why |
+|---|---|---|---|
+| `plate.capLap` | `2-16d at laps` | `8-16d in the lapped area, joints offset 24" min` | The lap *is* the splice — it carries the plate in tension. Two nails does not. |
+| `ceilingJoist.toPlate` | `3-16d toenail` | `3-8d toenail` | A 16d toenail splits the plate; the schedule specifies 8d for this connection. |
+| `collarTie.toRafter` | `4-8d` | `3-10d face nail` | Collar ties resist ridge separation and are a 10d connection. |
+| `sill.anchorBolt` | `1/2" @ ~6 ft` | adds `min 2 per plate, within 12" of each end` | The end-distance and two-per-piece minimums are the parts that actually get missed. |
+
+`confidence` now distinguishes `'published'` (value and source both ordinary published
+practice, checkable against the IRC fastening schedule) from `'verify'` (standard practice,
+very likely right, but the exact table/section is not settled enough to present as fact).
+A test enforces that only publicly checkable sources may claim `'published'`. **No page
+numbers were invented** — where the military lineage is FM 5-426 and the page is unknown,
+it says so rather than manufacturing a precise-looking cite, which is the failure mode that
+matters most here.
+
+**Two real gaps surfaced by the catalog tests**, both worth their own work:
+
+1. **The engine emits no wall sheathing at all.** Subfloor and roof panels exist; walls get
+   nothing, despite `siding` and `sheathingPanel` being declared member roles. Found when
+   a `wall.sheathing` catalog row sat unread and the "every row is actually used" test went
+   red. The row was removed rather than kept for appearance — a value the owner can edit
+   that changes nothing is worse than an absent one, because the editor implies it matters.
+2. **Member sizing is hardcoded, not spanned.** `floor.ts` fixes joists at 2x8 and girders
+   at 3-2x10 regardless of span, with the doctrineRef openly saying `span check pending`.
+   That is a structural value, not a cosmetic one, and it is a bigger accuracy problem than
+   any nailing note. Not touched in this pass.
+
+**Goldens regenerated deliberately**, which the T0 rule permits only with a recorded reason
+— this is that reason. Before regenerating, a scripted diff compared all 4,865 members
+across the 17 cases field by field and proved only `nailing` and `doctrineRef` changed:
+every coordinate, cut length, and rotation is byte-identical. The committed diff confirms
+it — 6,612 insertions against 6,612 deletions, every changed line one of those two fields.
+
+Overrides are a replaceable map consulted at read time, not a mutation of the catalog, so
+shipped defaults are always recoverable and a build with no overrides is byte-identical to
+one where the owner cleared them. An overridden value stops citing its published source
+(`— value replaced by unit`): a member card must not keep flying a flag over a number the
+owner replaced.
