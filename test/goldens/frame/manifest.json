@@ -1,0 +1,87 @@
+[
+ {
+  "case": "basement-stairs",
+  "sha256": "a4d22f05ee2fa1d73c619cd533a3ab9f9c25756dde1c7be3929fd4255d2b3c73",
+  "members": 295
+ },
+ {
+  "case": "flat-roof-rise0",
+  "sha256": "86e22fa87c2195f0c0a376e342fb3007ff6c78a37338f0fb29be3f14dd44ed48",
+  "members": 266
+ },
+ {
+  "case": "golden",
+  "sha256": "e62b3842aaa04256f9bbdb5f29ead3f704e7d02bff8e39a8615aedba3ae7e63b",
+  "members": 309
+ },
+ {
+  "case": "large-40x24",
+  "sha256": "61e3fb53a246a3c05f7dd9f08ed74f67c36f9c18340ca4c115e8202d529ea8f4",
+  "members": 522
+ },
+ {
+  "case": "low-sill-window",
+  "sha256": "2a97d9bf5adee1cf3fe86472121027a51fe2a32ed6492283ba5285a317d1ed3e",
+  "members": 294
+ },
+ {
+  "case": "negative-crawl",
+  "sha256": "866daf98a6bb30460966beaadbfd96c7b584f6efce082adc005bc56c8b7748c4",
+  "members": 288
+ },
+ {
+  "case": "no-overhang",
+  "sha256": "9f79680d0a55c62c2d55f8ece8aac17acf3aea81221b3f6dac577f29f9d0fff6",
+  "members": 288
+ },
+ {
+  "case": "offmultiple-13.5x14",
+  "sha256": "9b7ddff8adaa46015b59b3b9fdb2513ae67ef5f5d49cdc13b46f35da57202795",
+  "members": 175
+ },
+ {
+  "case": "offmultiple-13.5x8",
+  "sha256": "2d66e169276056896f0fc28824ebe1411d7bf3c505d77303d751c7db86de7cbe",
+  "members": 150
+ },
+ {
+  "case": "piers-nopenings",
+  "sha256": "0188a786a337f7251e4c714add7e8652c5055c74e0c0ee346ece4b3e9d177c7b",
+  "members": 288
+ },
+ {
+  "case": "slab-on-grade-crawl0",
+  "sha256": "68b08247e32df68cc5bb92d86fe0f0426a34de306aba8dc1e7db524da8b50112",
+  "members": 288
+ },
+ {
+  "case": "spacing-24",
+  "sha256": "6a2971d4e8b5c61be6173d723ab39765bbb264685759be2e71255d544e33d63f",
+  "members": 221
+ },
+ {
+  "case": "steep-roof-rise12",
+  "sha256": "f73689947f178bac296645df4c2212e4724df2649f0bccf7da2cc1c1bd25a388",
+  "members": 294
+ },
+ {
+  "case": "td5-all-walls",
+  "sha256": "3b233f26187934e0d393d0459af5178f21be0964e7af1b37f5e8b4b9e73116c4",
+  "members": 318
+ },
+ {
+  "case": "td5-equal-offset",
+  "sha256": "f00d8c97c6b3d9d7fda617e15ba9a04690665ea7c014e3f70b48d1cf07744989",
+  "members": 306
+ },
+ {
+  "case": "td5-unsorted-openings",
+  "sha256": "aa88017feffe4fe36be9dac26216e5a2140290aac50e5fd19bba29877674e923",
+  "members": 309
+ },
+ {
+  "case": "wall-foundation",
+  "sha256": "aaf69a78ec4de15823d1c0ddf17b84783a215edca40fa3945a12705164006000",
+  "members": 278
+ }
+]

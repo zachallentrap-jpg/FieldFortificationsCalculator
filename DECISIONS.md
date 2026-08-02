@@ -397,7 +397,7 @@ option, implement it, and log it here.
 
 - **D37 — TIMBER-2 T0: the compat lock is committed bytes, and every "we promise" became a
   machine.** Executing `docs/TIMBER2_PLAN.md` phase T0. Four guardrails, all of which had to
-  exist BEFORE the engine is touched: (1) `test/goldens/frame/` — `generateFrame` snapshotted
+  exist BEFORE the engine is touched: (1) `test/goldens/frame-compat/` — `generateFrame` snapshotted
   at the pre-refactor commit into 12 curated full-JSON goldens (one per distinct code path,
   one member per line so a regression reads as a reviewable diff) plus a hashed index over the
   entire 72-row timber-features option matrix. Full-matrix coverage for 1.3 MB instead of
@@ -499,3 +499,75 @@ option, implement it, and log it here.
   equation exists ONCE and feeds both the renderer and the raycast filter, so clicking through
   a cut selects what you see; stage scrubbing toggles visibility rather than rebuilding; and
   `unlockToCustom` preserves the family (a tower stays a tower) with a per-family test.
+## 2026-08-02 — Two sessions built T0 twice, and the second copy caught a real bug
+
+This branch and `main` each executed TIMBER-2 T0 independently, so the repo briefly held two
+snapshots of `generateFrame`: a 12-case set with a hashed option matrix (this branch, the
+anchor `test/timber2-compat.test.ts` diffs the new engine against forever) and a 17-case set
+with a sha256 manifest (`main`, which also byte-locks the goldens themselves against silent
+edits). Merging them, the obvious move was to delete one. Both were kept instead, the first
+renamed to `test/goldens/frame-compat/`, because on the very first joint run the second set
+failed on two cases the first never covered — which is the entire argument for redundant
+locks, made concretely.
+
+**What it caught.** `negative-crawl` (crawlFt −0.5) and `slab-on-grade-crawl0` (crawlFt 0)
+each gained **12 `4x4` posts**. Neither fixture names a foundation, so both are PIER
+foundations. Pre-T1, `floor.ts` computed `postLen = sillBottom − gradeY`, and with a crawl
+shallower than the built-up girder's 9 1/4 in of hang the length came out ≤ 0.1 ft, so the
+`if (postLen > 0.1)` guard **skipped every post** — emitting twelve concrete pads and a
+building resting on nothing. The guard existed to avoid a negative-length member and did its
+job; what it did not do was tell anyone the foundation had vanished.
+
+T1 routed `generateFrame` through `normalizeSpec`, which floors `foundation.crawlFt` at 1 ft
+for exactly this reason (the bound is geometry — the girder's depth below the sill — and is
+stated once, in `SPEC_PATH_DEFS`). The clamp raises a `clamped` issue the caller can surface,
+so the number is corrected out loud rather than silently. Both goldens were regenerated in
+this commit, which is the sanctioned path (deliberate change + a recorded reason); the kill
+criterion K-F1 forbids regenerating to make red go green, not regenerating a change you can
+explain. `slab-on-grade-crawl0` is misnamed and stays that way for now: it never set a
+foundation, so it was always piers-with-zero-crawl, and renaming a fixture rewrites its sha
+for no gain.
+
+**The lesson, which is the same shape as the offline-gate entry above:** a guard that skips
+work when its input is degenerate is not a check. `postLen > 0.1` and `dist/ not present —
+pass` are the same failure wearing different clothes.
+
+## 2026-08-02 — The offline gate was passing without checking anything
+
+The first run of `.github/workflows/toolkit.yml` (TIMBER-2 T0) came back green on all
+four check runs. Reading the logs rather than the badge showed one line worth the whole
+exercise:
+
+    > sap1@1.0.0 check:offline
+    check-offline: dist/ not present yet — nothing to scan (pass).
+
+`npm run verify` runs `check:offline` third, before `build:suite` has produced anything.
+On a developer's machine that usually finds a stale `dist/` and prints "scanned 11
+file(s)". On CI's fresh checkout there is no `dist/` at all, so the gate scanned **zero
+files and reported a pass**. The offline guarantee — "ships offline, zero external
+requests", one of this toolkit's load-bearing claims — was not being enforced anywhere in
+CI, and the green badge said otherwise.
+
+Fixed in three parts:
+
+1. **`scripts/check-offline.ts` gained `--require-dist`**, under which "nothing to scan"
+   is a hard failure. The lenient default survives for local ergonomics (`npm run verify`
+   on a clean tree shouldn't demand a build first), but it now prints `SKIPPED — … this is
+   not a pass` instead of the word "pass". Wording was the whole bug.
+2. **The vacuum's second shape is closed too**: a `dist/` that exists but holds no
+   scannable text files (empty, or all binary) used to report "scanned 0 file(s), zero
+   external URLs" — the same no-op in a different hat. Also fatal under `--require-dist`.
+3. **CI and `verify:full` run the strict form AFTER `build:suite`**, against the real
+   artifact, as a separately named step so a failure points at itself.
+
+`scripts/check-offline.ts` also gained `--dir=<path>` purely so the gate could be tested,
+which it never had been. `test/gate-offline.test.ts` now pins six properties: strict mode
+fails on both vacuum shapes; lenient mode says SKIPPED and never says PASS; a real
+external URL and a protocol-relative host still fail with the offender named; and the W3C
+`xmlns` allowlist still passes clean SVG. Without these, softening the strict path back
+into a pass would be silent again.
+
+The general lesson, recorded because it will recur: **a gate that cannot distinguish
+"checked and clean" from "checked nothing" is not a gate.** Every gate this repo adds
+should be asked what it prints when its subject is absent. T0's own acceptance criterion
+was "CI runs and is green" — green was true and meant less than it appeared to.

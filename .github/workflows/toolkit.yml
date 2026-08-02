@@ -1,9 +1,10 @@
 # TIMBER-2 T0 — the machine behind "main is always green" (plan §7 T0, §10.4 DoD).
 #
 # Before this existed, "verify + build:suite green at every merge" was a promise a human had
-# to keep. Now every push and PR that touches the toolkit's source proves it, including the
-# deploy build itself — which is the step that actually broke in the sandbox before.
-name: toolkit
+# to keep, and a broken deploy was discovered by clicking Republish and reading a red banner.
+# Now every push and PR that touches the toolkit's source proves it, including the deploy
+# build itself — which is the step that actually broke in the sandbox before — with the
+# failing step named.
 
 on:
   push:
@@ -19,7 +20,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: sap2/.nvmrc # 22.x — the suite build's floor, and what Replit runs
           cache: npm
       - run: npm ci
       - name: verify (typecheck + tests + offline scan + asset allowlist)
@@ -46,10 +47,31 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version-file: sap2/.nvmrc
           cache: npm
       - run: npm ci
       - name: build:suite (THE deploy build)
         run: npm run build:suite
       - name: asset allowlist over the real dist
         run: npm run check:assets
+      # The offline guarantee, checked against the REAL artifact. --require-dist makes
+      # "nothing to scan" a failure, so this step can never go quiet the way the in-verify
+      # run does on a fresh checkout (it scans zero files and prints "pass").
+      - name: the built suite is offline-clean
+        run: npm run check:offline:dist
+
+  sap2:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sap2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: sap2/.nvmrc
+          cache: npm
+          cache-dependency-path: sap2/package-lock.json
+      - run: npm ci
+      # SAP-2's own gates: typecheck, G-1..G-13 + G-16, and its single-file artifact.
+      - run: npm run verify
