@@ -18,7 +18,8 @@ import { REVETMENT_STRUCTURE } from '../schema/leaves/materials';
 import { SOIL_IDS, STANDARD_IDS, type PositionId, type RevetmentId, type SoilId, type StandardId, type ThreatId } from '../schema/ids';
 import { CONDITIONS_TEXT_VERSION, needsAcceptance, recordAcceptance, type ConditionsAcceptance } from '../state/conditions';
 import { browserEnv } from '../state/env';
-import { $, latched, list, makeScheduler, setText, setValue, swap } from './dom';
+import { startUpdates, type UpdateState } from '../state/updates';
+import { $, latched, list, makeScheduler, setAttr, setText, setValue, swap } from './dom';
 
 const APP_SCHEMA_HASH = computeSchemaHash(LEAVES);
 const CONDITIONS_KEY = 'sap2.conditions.v1';
@@ -191,6 +192,48 @@ const boot = (): void => {
     env.write(CONDITIONS_KEY, JSON.stringify(acceptance));
     (overlay as HTMLElement).hidden = true;
   });
+
+  // ---- back to the toolkit hub ----
+  // Shown only when SAP-2 is running inside the deployed suite; the single-file
+  // air-gapped copy has no hub to return to, so the link would strand you worse
+  // than no link at all.
+  const backLink = $<HTMLAnchorElement>(doc, '#back-to-hub');
+  backLink.hidden = location.protocol === 'file:';
+
+  // ---- update button (the owner's workflow: ship → app notices → one click) ----
+  const updateBar = $(doc, '#update-bar');
+  const updateNow = $<HTMLButtonElement>(doc, '#update-now');
+  const versionText = $(doc, '#version-text');
+  const checkBtn = $<HTMLButtonElement>(doc, '#check-updates');
+  let appVersion = '';
+
+  const showUpdateState = (s: UpdateState): void => {
+    (updateBar as HTMLElement).hidden = s.kind !== 'ready';
+    setAttr(checkBtn, 'disabled', s.kind === 'checking' ? '' : null);
+    const label =
+      s.kind === 'unsupported' ? (location.protocol === 'file:'
+        ? 'single-file copy — update by downloading a new one'
+        : 'updates unavailable in this browser')
+      : s.kind === 'checking' ? 'checking for updates…'
+      : s.kind === 'installing' ? 'downloading a new version…'
+      : s.kind === 'ready' ? 'a new version is ready'
+      : appVersion ? `version ${appVersion} — up to date` : 'up to date';
+    setText(versionText, label);
+  };
+
+  const updates = startUpdates({
+    onState: showUpdateState,
+    onVersion: (v) => {
+      appVersion = v;
+      showUpdateState(updates.state());
+    },
+  });
+  updateNow.addEventListener('click', () => {
+    setText(updateNow, 'Updating…');
+    updates.apply();
+  });
+  checkBtn.addEventListener('click', () => { void updates.check(); });
+  showUpdateState(updates.state());
 
   if (!env.persistent) {
     state.fillError = 'Storage is unavailable — acceptances and sessions will not survive a reload (in-memory only).';

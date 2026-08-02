@@ -36,6 +36,12 @@ html = html.replace(/<link\b[^>]*\brel="stylesheet"[^>]*\bhref="([^"]+)"[^>]*>/g
 // Drop modulepreload hints (nothing left to preload; they 404 from file://).
 html = html.replace(/<link\b[^>]*\brel="modulepreload"[^>]*>/g, '');
 
+// Remove the back-to-hub link outright. The single-file copy is a standalone
+// distribution with no toolkit around it, so the link has nowhere to go — the
+// runtime also hides it on file://, but a dead href must not survive into the
+// artifact at all (the self-containment check below would fail on it, correctly).
+html = html.replace(/<a\b[^>]*\bid="back-to-hub"[^>]*>[\s\S]*?<\/a>/g, '');
+
 const remaining = [...html.matchAll(/\b(?:src|href)="([^"#][^"]*)"/g)]
   .map((m) => m[1]!)
   .filter((u) => !u.startsWith('data:'));
