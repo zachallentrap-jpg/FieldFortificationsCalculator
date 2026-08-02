@@ -475,3 +475,27 @@ option, implement it, and log it here.
   number-free gate earned its keep** — it rejected a dozen inline constants during this phase,
   which became either cited doctrine entries or a named `TOLERANCE` block for the genuine
   geometry bookkeeping (z-fight lifts, sliver minimums) that no manual has an opinion about.
+
+- **D40 — TIMBER-2 T3: the app opens on a picker, and the browser caught four bugs the unit
+  tests could not.** The UI is now a package (`src/ui/woodframe/*`) with everything testable
+  kept pure and node-tested — cutaway plane math, camera rigs, session store (injected
+  storage), router/share codec, config schema, label dictionaries — and a thin DOM layer over
+  it (picker, studio, boot). happy-dom is not installed at the root and adding it needs a
+  lockfile change, so the DOM layer is verified in a REAL browser via Playwright instead,
+  which is stronger than a shim and caught things a shim would not have. Four real bugs, all
+  found by looking at pixels: **(1)** `memberAabb` applied each member's half-LENGTH on all
+  three axes, so a 48-ft girder inflated the bounding box to 69×64×73 ft and every camera
+  framed a phantom — the model rendered as a toy in an empty viewport. Replaced with a proper
+  oriented-box projection (`Σ|R[i][j]|·h[j]`); the box is now the real 48.9×14.8×22.2 and the
+  fit distance dropped from 204 ft to 99. **(2)** Shed rafters were rotated with the wrong
+  sign for Z-running slopes: correct length, correct cut angles, running downhill toward the
+  high wall and sitting above their own deck. Length-and-angle assertions passed it; a
+  direction-vector test now catches it, plus a rafters-under-the-deck test. **(3)** The
+  clip-plane pass forced `side = FrontSide` on EVERY material including the cartoon outline
+  shells, whose entire trick is being back-side — every outline became a solid black box
+  wrapping its member, painting a board-and-batten wall pure black. **(4)** Mobile inputs
+  overflowed the viewport; rows now stack and the model sits above the config panel, because a
+  config panel above the thing it configures makes every edit blind. Also: the cut plane
+  equation exists ONCE and feeds both the renderer and the raycast filter, so clicking through
+  a cut selects what you see; stage scrubbing toggles visibility rather than rebuilding; and
+  `unlockToCustom` preserves the family (a tower stays a tower) with a per-family test.

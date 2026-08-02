@@ -115,6 +115,29 @@ test('board-and-batten covers the same area and adds battens over the joints', (
   assert.equal(battens[0]!.nominal, '1x2');
 });
 
+test('board siding and battens run VERTICALLY — board-and-batten is not lap siding', () => {
+  const model = generateStructure(withCoverings({ siding: 'boardAndBatten' }));
+  const lengthDir = (r: readonly [number, number, number]): [number, number, number] => {
+    const [rx, ry, rz] = r;
+    const cz = Math.cos(rz), sz = Math.sin(rz), cx = Math.cos(rx), sx = Math.sin(rx), cy = Math.cos(ry), sy = Math.sin(ry);
+    let [a, b, c] = [cz, sz, 0];
+    [b, c] = [b * cx - c * sx, b * sx + c * cx];
+    [a, c] = [a * cy + c * sy, -a * sy + c * cy];
+    return [a, b, c];
+  };
+  for (const role of ['sidingBoard', 'batten'] as const) {
+    const pieces = model.members.filter((m) => m.role === role);
+    assert.ok(pieces.length > 0, `${role}: none emitted`);
+    for (const p of pieces) {
+      const d = lengthDir(p.rotation);
+      assert.ok(Math.abs(Math.abs(d[1]) - 1) < 1e-9, `${p.id}: length axis is not vertical (${d.map((n) => n.toFixed(2))})`);
+    }
+  }
+  // And a board is taller than it is wide — the give-away if the axes ever swap.
+  const board = model.members.find((m) => m.role === 'sidingBoard')!;
+  assert.ok(board.cutLength > board.actual.d, 'a siding board runs the height of the wall');
+});
+
 test('C-9: the gable roof is decked ONCE — the covering pass does not double it', () => {
   // The frozen roof generator emits the legacy stage-9 deck. If coverings also decked it, the
   // roof would be sheathed twice and the bill would silently double.

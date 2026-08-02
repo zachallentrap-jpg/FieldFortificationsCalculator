@@ -183,7 +183,12 @@ export function generateShed(input: ShedInput): Member[] {
     emit('rafter', LUMBER.rafterNominal.value as string, {
       cutLengthFt: rafterLen,
       position: pos,
-      rotation: alongZ ? [0, -Math.PI / 2, -up * pitchRad] : [0, 0, up * pitchRad],
+      // Rotation order is YXZ, so rz tilts the member in its LOCAL frame first and ry then
+      // swings it onto the run. For a Z-running rafter, ry = -90° maps local +X to world +Z
+      // and local +Y stays up, so a positive rz climbs toward +Z — which is uphill exactly
+      // when `up` is +1. (Getting this sign backwards puts the rafters below the deck they
+      // are supposed to carry; the deck is placed off the PLANE, so only the framing moves.)
+      rotation: alongZ ? [0, -Math.PI / 2, up * pitchRad] : [0, 0, up * pitchRad],
       stage: stageRoofFrame,
       angles: { plumbCut: 90 - (pitchRad * 180) / Math.PI, seatCut: (pitchRad * 180) / Math.PI },
       nailing: 'bird’s-mouth toenail 3-8d each plate (PH)',

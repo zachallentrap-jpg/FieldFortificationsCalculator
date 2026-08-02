@@ -142,6 +142,53 @@ test('shed rafters use the framing-square length and carry their cut angles', ()
   }
 });
 
+test('shed rafters actually CLIMB toward the high side (rotation sign, not just length)', () => {
+  // A length-and-angle check passes even when the rafter is tilted the wrong way — the piece
+  // is the right size, it just runs downhill into the ground. Only the direction vector
+  // catches it, and a browser look caught it before this test existed.
+  for (const highSide of ['N', 'S', 'E', 'W'] as WallId[]) {
+    const spec = bldg({ kind: 'shed', risePer12: 4, overhangFt: 1, highSide });
+    const model = generateStructure(spec);
+    const rafters = model.members.filter((m) => m.role === 'rafter');
+    assert.ok(rafters.length > 0, `${highSide}: no rafters`);
+    for (const r of rafters) {
+      // Rotate local +X (the member's length axis) into world space with the YXZ euler.
+      const [rx, ry, rz] = r.rotation;
+      const cz = Math.cos(rz), sz = Math.sin(rz);
+      const cx = Math.cos(rx), sx = Math.sin(rx);
+      const cy = Math.cos(ry), sy = Math.sin(ry);
+      let [a, b, c] = [cz, sz, 0];
+      [b, c] = [b * cx - c * sx, b * sx + c * cx];
+      [a, c] = [a * cy + c * sy, -a * sy + c * cy];
+      // Which way is uphill in plan?
+      const uphill: [number, number] = highSide === 'N' ? [0, 1] : highSide === 'S' ? [0, -1]
+        : highSide === 'E' ? [1, 0] : [-1, 0];
+      const alongUphill = a * uphill[0] + c * uphill[1];
+      // Take the direction that heads uphill in plan; its vertical component must be POSITIVE.
+      const rise = alongUphill >= 0 ? b : -b;
+      assert.ok(rise > 0.05, `${highSide}/${r.id}: rafter falls toward the high wall (rise ${rise.toFixed(3)})`);
+    }
+  }
+});
+
+test('shed rafters sit UNDER the roof deck, never above it', () => {
+  const spec = bldg(
+    { kind: 'shed', risePer12: 4, overhangFt: 1, highSide: 'N' },
+    { coverings: { wallSheathing: 'none', siding: 'none', roofDeck: 'plywood', roofing: 'none' } },
+  );
+  const model = generateStructure(spec);
+  const rafters = model.members.filter((m) => m.role === 'rafter');
+  const panels = model.members.filter((m) => m.role === 'roofPanel');
+  assert.ok(rafters.length > 0 && panels.length > 0);
+  // At matched z stations, the deck must be higher than the rafter centerline.
+  for (const p of panels) {
+    const near = rafters.filter((r) => Math.abs(r.position[2] - p.position[2]) < 1.5);
+    for (const r of near) {
+      assert.ok(p.position[1] > r.position[1], `${p.id} (y=${p.position[1].toFixed(2)}) must sit above ${r.id} (y=${r.position[1].toFixed(2)})`);
+    }
+  }
+});
+
 test('no roof kind produces a NaN, at any pitch, on any high side', () => {
   const roofs: RoofSpec[] = [];
   for (const risePer12 of [0, 1, 4, 12]) {
