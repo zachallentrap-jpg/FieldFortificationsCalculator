@@ -9,6 +9,11 @@
 //                            retired app with its placeholder values
 //
 // SAP-1 is not built and not shipped (see vite.suite.config.ts).
+//
+// Deploy-environment notes: every step logs a banner and resolves its binary through
+// node_modules/.bin rather than `npx` (npx can try to FETCH a missing package, which
+// fails closed in a sandboxed build). Failures re-throw with the step named, so the
+// deployment log says which step died instead of just "build command error".
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
@@ -18,37 +23,67 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const DIST = join(ROOT, 'dist');
 const SAP2 = join(ROOT, 'sap2');
 
-const run = (cmd, args, cwd) =>
-  execFileSync(cmd, args, { cwd, stdio: 'inherit', env: process.env });
+const step = (name, fn) => {
+  console.log(`\n=== build-suite: ${name} ===`);
+  try {
+    fn();
+  } catch (err) {
+    console.error(`build-suite FAILED at step: ${name}`);
+    throw err;
+  }
+};
 
-// 1. Hub + TIMBER-1 (SAP-1 excluded by config). Wipes dist/.
-run('npx', ['vite', 'build', '-c', 'vite.suite.config.ts'], ROOT);
+const run = (cmd, args, cwd) => execFileSync(cmd, args, { cwd, stdio: 'inherit', env: process.env });
 
-// 2. SAP-2 — installed and built in its own tree with its own pinned toolchain.
-if (!existsSync(join(SAP2, 'node_modules'))) run('npm', ['ci'], SAP2);
-run('npm', ['run', 'build'], SAP2);
+/** Resolve a locally installed CLI without npx (no network, no prompt). */
+const localBin = (pkgDir, name) => {
+  const bin = join(pkgDir, 'node_modules', '.bin', name);
+  if (!existsSync(bin)) throw new Error(`${name} not found at ${bin} — did npm ci run in ${pkgDir}?`);
+  return bin;
+};
 
-// 3. Place SAP-2 under /survivability/ (its base is './', so it runs from any path).
-const target = join(DIST, 'survivability');
-rmSync(target, { recursive: true, force: true });
-mkdirSync(target, { recursive: true });
-cpSync(join(SAP2, 'dist'), target, { recursive: true });
+step('hub + TIMBER-1 (SAP-1 excluded by config)', () => {
+  run(localBin(ROOT, 'vite'), ['build', '-c', 'vite.suite.config.ts'], ROOT);
+});
 
-// The single-file artifact is a download, not part of the hosted app — keep it out of
-// the deployment (it is reachable from the repo/release instead).
-rmSync(join(target, 'sap2-standalone.html'), { force: true });
-rmSync(join(target, 'sap2-standalone.html.sha256'), { force: true });
+step('install SAP-2 dependencies', () => {
+  if (existsSync(join(SAP2, 'node_modules', 'vite'))) {
+    console.log('sap2/node_modules present — skipping install');
+    return;
+  }
+  try {
+    run('npm', ['ci', '--no-audit', '--no-fund'], SAP2);
+  } catch {
+    // A lockfile/engine hiccup in a deploy sandbox should not sink the build when a
+    // plain install would succeed.
+    console.warn('npm ci failed in sap2 — retrying with npm install');
+    run('npm', ['install', '--no-audit', '--no-fund'], SAP2);
+  }
+});
 
-// 4. Root lands on the hub.
-const hub = join(DIST, 'hub.html');
-if (!existsSync(hub)) throw new Error('hub.html missing from the suite build');
-writeFileSync(join(DIST, 'index.html'), readFileSync(hub));
+step('build SAP-2 (hosted app only)', () => {
+  // build:app skips the single-file artifact — it is a separate download, and this
+  // script deletes it below anyway, so building it here is cost and failure surface.
+  run('npm', ['run', 'build:app'], SAP2);
+});
 
-// 5. Retire v1's service worker at its old scope: clear every cache, unregister, and
-//    reload clients so an installed v1 copy converges on the current toolkit.
-writeFileSync(
-  join(DIST, 'sw.js'),
-  `// v1 service worker retired — see docs/SAP2_BLUEPRINT.md §2.11.
+step('assemble dist/', () => {
+  const target = join(DIST, 'survivability');
+  rmSync(target, { recursive: true, force: true });
+  mkdirSync(target, { recursive: true });
+  cpSync(join(SAP2, 'dist'), target, { recursive: true });
+  rmSync(join(target, 'sap2-standalone.html'), { force: true });
+  rmSync(join(target, 'sap2-standalone.html.sha256'), { force: true });
+
+  const hub = join(DIST, 'hub.html');
+  if (!existsSync(hub)) throw new Error('hub.html missing from the suite build');
+  writeFileSync(join(DIST, 'index.html'), readFileSync(hub));
+
+  // Retire v1's service worker at its old scope: clear every cache, unregister, and
+  // reload clients so an installed v1 copy converges on the current toolkit.
+  writeFileSync(
+    join(DIST, 'sw.js'),
+    `// v1 service worker retired — see docs/SAP2_BLUEPRINT.md §2.11.
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
@@ -60,6 +95,7 @@ self.addEventListener('activate', (event) => {
   })());
 });
 `,
-);
+  );
+});
 
-console.log('suite built: hub at /, TIMBER-1 at /woodframe.html, SAP-2 at /survivability/');
+console.log('\nsuite built: hub at /, TIMBER-1 at /woodframe.html, SAP-2 at /survivability/');
