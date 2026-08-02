@@ -16,7 +16,10 @@ channel = "stable-24_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["sh", "-c", "npm ci && npm run build"]
+# v1 EOL (docs/SAP2_BLUEPRINT.md §2.11): the deployment serves ONLY the retirement
+# notice — the v1 app with its placeholder values is no longer published. The build
+# is dependency-free on purpose; scripts/serve.js (zero-dep) serves dist/.
+build = ["sh", "-c", "node scripts/build-retirement.mjs"]
 run = ["sh", "-c", "npm run start"]
 
 [[ports]]
