@@ -27,6 +27,18 @@ export interface ComputeInputs {
   readonly machineAssist: boolean;
 }
 
+/** A drawable dimension: the quantity plus its display identity. Renderers consume
+ *  THESE — they never look up leaves themselves (render imports Result only, which
+ *  keeps the render-can't-reach-doctrine lint a one-line rule). `token` is the
+ *  recruit-register name rendered inside ⟨angle tokens⟩ when the value is unfilled;
+ *  `governing` distinguishes dimension-class on the drawing (§3.5). */
+export interface DimSpec {
+  readonly key: string;
+  readonly token: string;
+  readonly q: Q<'ft'>;
+  readonly governing: boolean;
+}
+
 export interface Result {
   readonly inputs: ComputeInputs;
   /** Provenance identity of the data that produced every number below; null in
@@ -35,6 +47,8 @@ export interface Result {
   readonly solid: BatteredPrism;
   readonly section: SectionTrapezoid;
   readonly plan: PlanRect;
+  readonly dims: readonly DimSpec[];
+  readonly positionLabel: string;
   readonly cover: CoverResolution;
   readonly work: WorkPlan;
   readonly validation: readonly ValidationItem[];
@@ -103,12 +117,23 @@ export const compute = (inputs: ComputeInputs, fillValue: FillValue | null): Res
     cover, totalSandbags: work.totalSandbags, unfilledConeLeafIds: unfilledSoFar,
   });
 
+  const plain = (id: string): string => leafById(id).plainName;
+  const dims: readonly DimSpec[] = Object.freeze([
+    { key: 'hole.L', token: plain(holeId(inputs.position, 'L')), q: L, governing: true },
+    { key: 'hole.W', token: plain(holeId(inputs.position, 'W')), q: W, governing: true },
+    { key: 'hole.D', token: plain(holeId(inputs.position, 'D')), q: D, governing: true },
+    { key: 'top.L', token: 'top opening, front', q: solid.topL, governing: false },
+    { key: 'top.W', token: 'top opening, back to front', q: solid.topW, governing: false },
+  ]);
+
   return Object.freeze({
     inputs,
     fillIdentity: fillValue
       ? { cls: fillValue.cls, contentHash: fillValue.contentHash, schemaHash: fillValue.schemaHash }
       : null,
-    solid, section, plan, cover, work,
+    solid, section, plan, dims,
+    positionLabel: structure.label,
+    cover, work,
     validation,
     worst: worstSeverity(validation),
     coneLeafIds: Object.freeze([...touched].sort()),
