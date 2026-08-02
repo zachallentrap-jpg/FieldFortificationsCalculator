@@ -926,7 +926,7 @@ re-entry bar where one exists).
 | Squad battle-position sketch | IN-later (R8, optional) | Needs azimuths + real fills + rollup; entry gate defined (§7 R8) |
 | Protective wire | OUT | Re-entry: post-R7, with fill data, if wanted |
 | Hub/suite page | OUT | One product, one name; a hub returns only when a second regime-passing tool exists |
-| TIMBER-1 | OUT (archived with v1) | Re-entry bar: rebuilt inside the regime (`timber.*` leaves, same gates) — whole-tree scoping makes outside-the-regime impossible |
+| TIMBER-1 / TIMBER-2 | OUT of SAP-2's product scope; NOT out of the toolkit | **Superseded row (TIMBER2_PLAN TD1, owner-acked).** The old re-entry bar ("rebuilt inside the regime, `timber.*` leaves") is withdrawn: it required a carpentry tool to adopt a survivability tool's ship-empty regime, which fits neither its failure mode nor its doctrine. TIMBER is governed by `docs/TIMBER2_PLAN.md` §6.1 — it ships working doctrinal defaults with (PH) cites. **Which SAP-2 gate classes apply to `src/timber`: offline gate YES · determinism YES · doctrine-integrity/cite discipline YES · ship-empty + watermark + commissioning NO** — replaced by LS-GATE (TIMBER2_PLAN §6.2), which routes every fall/collapse/overload number through a ledger with named reviewers, and by the bunker boundary (§2.7/§6.4). SAP-2's own gates remain whole-of-sap2 scoped; nothing here reopens N13 (a TIMBER file cannot satisfy a SAP-2 leaf). |
 | Quiz/PDF/DXF/i18n/terrain/productivity curves | OUT | v1's cuts, still correct |
 | Conditions-of-use acceptance gate (first-run typed acknowledgment, re-shown on fill-class change) | IN-core (R0) | The qualified-user flow's enforcement point; wording counsel-routed (§2.9 flag 1) |
 | Structural-stability checks (soil bearing, sandbag-wall stability, revetment structural sizing) | OUT (SME-routed) | Beyond estimating-model fidelity — `REVET_HEIGHT_LIMIT` is the only structural validation; the fidelity line + PENDING stamp carry the difference; re-entry only with SME-provided models. `retainingWall.*` leaves gain that consumer or are deleted at the R1 freeze — no valueless leaf survives |
@@ -971,7 +971,7 @@ re-entry bar where one exists).
 | Engine/render shape disagreement (§6B-8, N8) | geometry kernel; renderers project only |
 | Hand-written explain strings drifting (N1) | opaque Traced + generated formulas + node re-evaluation test |
 | Job sheet omitting validation (§6B-4) | validation required by constructor type |
-| Gates scoped to subtrees; TIMBER escaped (N13) | whole-of-sap2 scope + root inventory gate |
+| Gates scoped to subtrees; TIMBER escaped (N13) | whole-of-sap2 scope + root inventory gate. (TIMBER is not an *escape* — it is a separate regime with its own named gates, TIMBER2_PLAN §6; the failure this row records was SAP leaves hiding outside the scope, which whole-of-sap2 scoping still prevents.) |
 | Hashless assets, fixed SW cache (§6B-9) | generated precache, hashed names, node-tested SW logic |
 | Orphan leaves re-growing (N6) | static consumer table + sensitivity fuzz |
 | Invented planner weights (N7) | planner OUT; no invented magnitude survives the AST gate |
@@ -1098,6 +1098,15 @@ reference-device pass re-run (scene population changed).
 
 ### R5a — Breadth II: fifty_cal, mortar_pit, connecting_trench (**L**)
 ### R5b — Breadth III: atgm_javelin, bunker_op_cp (**L**)
+
+**Entry condition (TIMBER2_PLAN TD1/§2.7, owner-acked):** before `bunker_op_cp` starts,
+reconcile it with TIMBER-2's `crib-bunker` family. The boundary is owned on both sides —
+SAP states how much cover defeats what; TIMBER sizes the wood to carry a **user-stated**
+`designCoverDepthFt` and never computes protection. Reconcile: (a) which side owns
+excavation/spoil/cover (SAP) vs the wood cut list (TIMBER); (b) that SAP's
+`protection.spanSizes`/overhead model and TIMBER's stringer table are the same table or are
+cross-checked by test; (c) that SAP's commissioning watermark cannot be end-run by reading
+numbers off TIMBER. Without this reconciliation R5b does not start.
 
 Tranched so the first three reveal the real per-position mini-slice cost before the
 two hardest geometries. Position truths carried: π/4 mortar volume, open-corridor

@@ -394,3 +394,27 @@ option, implement it, and log it here.
   on the Member Card (§11.1 posture: a 1371 meeting the term for the first time). All of it
   stays inside the placeholder regime — no new fabricated doctrine values, every cite still
   (PH) pending page verification.
+
+- **D37 — TIMBER-2 T0: the compat lock is committed bytes, and every "we promise" became a
+  machine.** Executing `docs/TIMBER2_PLAN.md` phase T0. Four guardrails, all of which had to
+  exist BEFORE the engine is touched: (1) `test/goldens/frame/` — `generateFrame` snapshotted
+  at the pre-refactor commit into 12 curated full-JSON goldens (one per distinct code path,
+  one member per line so a regression reads as a reviewable diff) plus a hashed index over the
+  entire 72-row timber-features option matrix. Full-matrix coverage for 1.3 MB instead of
+  10 MB, and `test/timber2-compat.test.ts` diffs against those bytes FOREVER — never against a
+  live `generateFrame`, which goes self-referential the moment frame.ts delegates (plan TD12).
+  The comparator (TD13) is exact-deep-equal first, then a 1e-12 epsilon pass with per-field
+  diffs, so benign FP wobble from an extraction can never be mistaken for the project's kill
+  criterion. (2) `.github/workflows/toolkit.yml` — `npm run verify` + `npm run build:suite` on
+  every push/PR, plus a merge-base diff that fails the build if a legacy timber suite was
+  edited (I-8/K2: the compat suite is the only sanctioned bridge). (3) `scripts/check-assets.ts`
+  wired into `verify` — the "no new dist assets" promise behind TD11's runtime-SVG thumbnails
+  is now an allowlist gate; it immediately caught the pre-existing `icons/icon.svg`, which was
+  added to the baseline explicitly rather than pattern-waived. (4) `public/sw.js` deleted
+  (TD16): it was SAP-1's cache-first worker listing files that no longer exist in suite builds,
+  while `build-suite.mjs` already writes the cache-killer `dist/sw.js` — the toolkit ships no
+  service worker, and now nothing claims otherwise. Reciprocal doc edits per plan §6.5: the
+  SAP-2 blueprint's TIMBER row no longer binds carpentry to SAP's ship-empty regime (TD1) and
+  names exactly which gate classes apply to `src/timber` (offline/determinism/doctrine YES;
+  watermark/commissioning NO — LS-GATE replaces them); R5b gains the crib-bunker reconciliation
+  entry condition so the bunker boundary is owned on both sides.

@@ -970,7 +970,7 @@ strongback, bunker, stories=2, hip-in-some-form). Each phase lists its ladder.
 
 | Phase | Status | Shipped | Cards live after |
 |---|---|---|---|
-| T0 | not started | — | 1 (TIMBER-1 as-is) |
+| T0 | DONE | CI toolkit.yml · frame goldens (12 full + 72 hashed) · check-assets · SAP2 reciprocity · sw.js deleted | 1 (TIMBER-1 as-is) |
 | T1 | not started | — | 1 |
 | T2 | not started | — | 1 |
 | T3 | not started | — | 3 |

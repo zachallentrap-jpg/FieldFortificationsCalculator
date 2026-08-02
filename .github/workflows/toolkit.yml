@@ -1,0 +1,55 @@
+# TIMBER-2 T0 — the machine behind "main is always green" (plan §7 T0, §10.4 DoD).
+#
+# Before this existed, "verify + build:suite green at every merge" was a promise a human had
+# to keep. Now every push and PR that touches the toolkit's source proves it, including the
+# deploy build itself — which is the step that actually broke in the sandbox before.
+name: toolkit
+
+on:
+  push:
+    branches: ['**']
+    paths: ['src/**', 'test/**', 'scripts/**', 'sap2/**', 'package.json', 'package-lock.json', 'vite*.ts', '.github/workflows/toolkit.yml']
+  pull_request:
+    paths: ['src/**', 'test/**', 'scripts/**', 'sap2/**', 'package.json', 'package-lock.json', 'vite*.ts', '.github/workflows/toolkit.yml']
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: verify (typecheck + tests + offline scan + asset allowlist)
+        run: npm run verify
+      - name: legacy timber suites are immutable
+        # Plan I-8 / TD31: acceptance is "git diff empty on test/timber-*.test.ts", never a
+        # repo-wide test count. Compare against the merge base, not a fixed ref.
+        run: |
+          git fetch origin ${{ github.base_ref || github.event.repository.default_branch }} --depth=1 || true
+          BASE=$(git merge-base HEAD FETCH_HEAD 2>/dev/null || echo "")
+          if [ -n "$BASE" ]; then
+            CHANGED=$(git diff --name-only "$BASE" HEAD -- 'test/timber-frame.test.ts' 'test/timber-walls.test.ts' 'test/timber-features.test.ts')
+            if [ -n "$CHANGED" ]; then
+              echo "STOP-THE-LINE: a legacy timber suite was edited:"; echo "$CHANGED"
+              echo "The compat suite (test/timber2-compat.test.ts) is the only sanctioned bridge (plan §9 K2)."
+              exit 1
+            fi
+          fi
+          echo "legacy timber suites untouched"
+
+  deploy-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: build:suite (THE deploy build)
+        run: npm run build:suite
+      - name: asset allowlist over the real dist
+        run: npm run check:assets
