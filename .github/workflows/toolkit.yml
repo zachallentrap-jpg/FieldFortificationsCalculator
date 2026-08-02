@@ -25,7 +25,9 @@ jobs:
       - name: Install (root)
         run: npm ci
 
-      # Typecheck + full node suite + the offline gate.
+      # Typecheck + full node suite. `verify` also runs the offline gate, but on a fresh
+      # checkout there is no dist/ yet, so that run is a SKIP by design — the authoritative
+      # offline check is the strict one below, after the artifact actually exists.
       - name: Verify
         run: npm run verify
 
@@ -37,6 +39,12 @@ jobs:
       # No unexplained file may enter dist/ (and no allowlisted asset may vanish).
       - name: Check dist assets
         run: npm run check:assets
+
+      # The offline guarantee, checked against the REAL artifact. --require-dist makes
+      # "nothing to scan" a failure, so this step can never go quiet the way the in-verify
+      # run did (it scanned zero files on a fresh checkout and printed "pass").
+      - name: Check the built suite is offline-clean
+        run: npm run check:offline:dist
 
   sap2:
     runs-on: ubuntu-latest

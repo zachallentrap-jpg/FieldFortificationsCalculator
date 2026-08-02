@@ -17,11 +17,12 @@
     "build": "vite build && vite build -c vite.standalone.config.ts && node --import tsx scripts/build-standalone.ts && npm run check:offline",
     "build:standalone": "node --import tsx scripts/build-standalone.ts",
     "check:offline": "node --import tsx scripts/check-offline.ts",
+    "check:offline:dist": "node --import tsx scripts/check-offline.ts --require-dist",
     "build:woodframe": "vite build -c vite.woodframe.config.ts",
     "build:suite": "node scripts/build-suite.mjs",
     "check:assets": "node --import tsx scripts/check-assets.ts",
     "gen:frame-goldens": "node --import tsx scripts/gen-frame-goldens.ts",
-    "verify:full": "npm run verify && npm run build:suite && npm run check:assets"
+    "verify:full": "npm run verify && npm run build:suite && npm run check:assets && npm run check:offline:dist"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
