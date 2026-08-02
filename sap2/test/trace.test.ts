@@ -23,6 +23,7 @@ const depthLeaf: NumericLeaf = {
 const fillWith = (vals: Record<string, number>): FillView => ({
   numeric: (id) => vals[id],
   text: () => undefined,
+  flag: () => undefined,
 });
 
 test('empty fill resolves to Unfilled naming the leaf', () => {

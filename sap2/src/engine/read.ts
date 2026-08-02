@@ -13,12 +13,15 @@ export interface FillView {
   numeric(leafId: string): number | undefined;
   /** Owner-authored phrase for a check/body-unit leaf id, or undefined. */
   text(leafId: string): string | undefined;
+  /** Doctrinal boolean for a flag leaf id, or undefined when unfilled. */
+  flag(leafId: string): boolean | undefined;
 }
 
 /** The empty fill — TEMPLATE mode reads through the same door as a real fill. */
 export const EMPTY_FILL: FillView = {
   numeric: () => undefined,
   text: () => undefined,
+  flag: () => undefined,
 };
 
 export const resolve = <U extends NumericLeaf['unit']>(
