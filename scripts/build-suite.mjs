@@ -46,25 +46,12 @@ step('hub + TIMBER-1 (SAP-1 excluded by config)', () => {
   run(localBin(ROOT, 'vite'), ['build', '-c', 'vite.suite.config.ts'], ROOT);
 });
 
-step('install SAP-2 dependencies', () => {
-  if (existsSync(join(SAP2, 'node_modules', 'vite'))) {
-    console.log('sap2/node_modules present — skipping install');
-    return;
-  }
-  try {
-    run('npm', ['ci', '--no-audit', '--no-fund'], SAP2);
-  } catch {
-    // A lockfile/engine hiccup in a deploy sandbox should not sink the build when a
-    // plain install would succeed.
-    console.warn('npm ci failed in sap2 — retrying with npm install');
-    run('npm', ['install', '--no-audit', '--no-fund'], SAP2);
-  }
-});
-
-step('build SAP-2 (hosted app only)', () => {
-  // build:app skips the single-file artifact — it is a separate download, and this
-  // script deletes it below anyway, so building it here is cost and failure surface.
-  run('npm', ['run', 'build:app'], SAP2);
+step('build SAP-2 (hosted app, root toolchain)', () => {
+  // No second npm install: SAP-2's hosted app has no runtime dependencies, so the
+  // root toolchain bundles it. That removes a network round trip from the deploy
+  // sandbox entirely (sap2 keeps its own pinned toolchain for dev/test/verify).
+  run(localBin(ROOT, 'vite'), ['build', '--config', 'vite.sap2.config.ts'], ROOT);
+  run(process.execPath, ['--import', 'tsx', join(SAP2, 'scripts', 'build-sw.ts')], ROOT);
 });
 
 step('assemble dist/', () => {
