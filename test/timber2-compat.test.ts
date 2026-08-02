@@ -17,7 +17,7 @@ import { FULL_FIXTURES, MATRIX_FIXTURES } from './fixtures/frameFixtures';
 import { canonicalJson, frameSnapshot, GOLDEN_FORMAT, type FrameSnapshot } from './fixtures/goldenFormat';
 import { compareSnapshots, compatMessage } from './fixtures/compare';
 
-const DIR = fileURLToPath(new URL('./goldens/frame/', import.meta.url));
+const DIR = fileURLToPath(new URL('./goldens/frame-compat/', import.meta.url));
 const readJson = (f: string): unknown => JSON.parse(readFileSync(DIR + f, 'utf8'));
 const sha256 = (s: string): string => createHash('sha256').update(s).digest('hex');
 

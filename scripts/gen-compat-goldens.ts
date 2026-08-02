@@ -4,7 +4,7 @@
 // compat suite diffs against forever — never a live-vs-live comparison, which would go
 // self-referential the moment frame.ts starts delegating to the new engine.
 //
-//   npm run gen:frame-goldens          # rewrite test/goldens/frame/
+//   npm run gen:compat-goldens          # rewrite test/goldens/frame-compat/
 //
 // Rewriting these is a stop-the-line event past T0: a changed golden means the frozen legacy
 // output moved, which is exactly what the compat lock exists to catch (plan §9 K2).
@@ -17,7 +17,7 @@ import { generateFrame } from '../src/timber/frame';
 import { FULL_FIXTURES, MATRIX_FIXTURES } from '../test/fixtures/frameFixtures';
 import { canonicalJson, frameSnapshot, GOLDEN_FORMAT } from '../test/fixtures/goldenFormat';
 
-const OUT = fileURLToPath(new URL('../test/goldens/frame/', import.meta.url));
+const OUT = fileURLToPath(new URL('../test/goldens/frame-compat/', import.meta.url));
 
 const sha256 = (s: string): string => createHash('sha256').update(s).digest('hex');
 
@@ -53,4 +53,4 @@ writeFileSync(
 );
 
 const bytes = index.reduce((a, r) => a + r.members, 0);
-console.log(`gen-frame-goldens: ${index.length} full goldens (${bytes} members) + ${matrix.length} hashed matrix rows → test/goldens/frame/`);
+console.log(`gen-compat-goldens: ${index.length} full goldens (${bytes} members) + ${matrix.length} hashed matrix rows → test/goldens/frame-compat/`);

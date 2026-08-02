@@ -18,7 +18,7 @@
     "build:standalone": "node --import tsx scripts/build-standalone.ts",
     "check:offline": "node --import tsx scripts/check-offline.ts",
     "check:assets": "node --import tsx scripts/check-assets.ts",
-    "gen:frame-goldens": "node --import tsx scripts/gen-frame-goldens.ts",
+    "gen:compat-goldens": "node --import tsx scripts/gen-compat-goldens.ts",
     "build:woodframe": "vite build -c vite.woodframe.config.ts",
     "build:suite": "node scripts/build-suite.mjs",
     "update:thumb-goldens": "node --import tsx scripts/gen-thumb-goldens.ts"

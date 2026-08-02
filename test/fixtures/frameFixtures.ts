@@ -1,5 +1,5 @@
 // TIMBER-2 T0 — the compat corpus (plan §8.2, TD12). ONE definition of the golden inputs,
-// shared by `scripts/gen-frame-goldens.ts` (which snapshots them) and
+// shared by `scripts/gen-compat-goldens.ts` (which snapshots them) and
 // `test/timber2-compat.test.ts` (which diffs against the committed snapshot forever).
 //
 // Two tiers, both frozen at the pre-refactor commit:
