@@ -14,7 +14,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { lumberPiece, plywoodSheet, disposeObject, toonGradient } from '../three-viewer';
+import { lumberPiece, plywoodSheet, roofingSheet, disposeObject, toonGradient } from '../three-viewer';
 import type { LumberSize } from '../three-viewer';
 import type { Member } from '../../timber/types';
 import type { StructureModel } from '../../timber/families/index';
@@ -85,15 +85,20 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
   // saturated thing in the frame.
   const darkAppearance = window.matchMedia('(prefers-color-scheme: dark)');
   const sceneColors = () => (darkAppearance.matches
-    ? { sky: 0x1c1c1e, ground: 0x2c2c2e, bounce: 0x14161a, ambient: 0.5 }
-    : { sky: 0xf2f2f5, ground: 0xdedee2, bounce: 0x4a3a22, ambient: 0.55 });
+    ? { sky: 0x1c1c1e, ground: 0x2c2c2e, bounce: 0x14161a, ambient: 0.30 }
+    : { sky: 0xf2f2f5, ground: 0xdedee2, bounce: 0x4a3a22, ambient: 0.26 });
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(sceneColors().sky);
-  const hemi = new THREE.HemisphereLight(0xffffff, sceneColors().bounce, 1.1);
+  // Sum of intensities matters more than any one of them: hemi 1.1 + ambient 0.55 + sun 1.0 put
+  // every surface at the top band of the toon ramp, so a roof plane, a wall, and a gable end all
+  // came out the same value and the building read as one beige mass with no form. The sun now
+  // carries most of the light and the fills only keep the shaded sides off black, which is what
+  // makes the two roof planes, the eave, and the wall separate at a glance.
+  const hemi = new THREE.HemisphereLight(0xffffff, sceneColors().bounce, 0.42);
   const ambient = new THREE.AmbientLight(0xffffff, sceneColors().ambient);
   scene.add(hemi, ambient);
-  const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+  const sun = new THREE.DirectionalLight(0xffffff, 1.15);
   sun.position.set(12, 20, 8);
   scene.add(sun);
   darkAppearance.addEventListener('change', () => {
@@ -136,7 +141,15 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
       );
       p.add(new THREE.Mesh(geo, new THREE.MeshToonMaterial({ color: CONCRETE, gradientMap: toonGradient() })));
       group.add(p);
-    } else if (m.nominal.includes('panel') || m.role === 'roofingCourse' || m.role === 'screenPanel') {
+    } else if (m.role === 'roofingCourse') {
+      // Roll goods vs. corrugated metal — two different materials, told apart by the nominal the
+      // engine already wrote. `repeatAlong` keeps the granule/rib scale constant on any run
+      // length: a course is as long as the eave, so one stretched tile would be nonsense.
+      const corrugated = m.nominal.startsWith('corrugated');
+      const tileFt = corrugated ? 26 / 12 : 3;
+      p = roofingSheet(group, corrugated ? 'corrugated' : 'roll', Math.round(m.cutLength / 12 / tileFt), corrugated ? 1 : Math.round(m.actual.d / 36));
+      p.scale.set(m.cutLength / 12, m.actual.d / 12, Math.max(0.02, m.actual.w / 12));
+    } else if (m.nominal.includes('panel') || m.role === 'screenPanel') {
       p = plywoodSheet(group);
       p.scale.set(m.cutLength / 12, m.actual.d / 12, Math.max(0.02, m.actual.w / 12));
     } else {

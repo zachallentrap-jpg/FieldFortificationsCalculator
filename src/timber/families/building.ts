@@ -181,6 +181,9 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
   const planes = roofPlanes(spec, walls.plateTopY);
   const rafterHalf = DRESSED[LUMBER.rafterNominal.value as string]!.d / IN_PER_FT / 2;
   const deckedByFrozenPath = spec.roof.kind === 'gable';
+  // What the covering pass should PLACE, which is not the same question as what is there:
+  // `deckLaidElsewhere` below tells it the gable's stage-9 deck already exists so its
+  // thickness still lifts the roofing off the rafters.
   const deck = deckedByFrozenPath ? 'none' : spec.coverings.roofDeck;
 
   if (spec.coverings.roofDeck === 'purlins' && planes.length > 0) {
@@ -190,7 +193,8 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
     members.push(
       ...generateRoofCovering({
         planes,
-        deck: deck === 'purlins' ? 'none' : deck,
+        deck: spec.coverings.roofDeck === 'purlins' ? 'none' : spec.coverings.roofDeck,
+        deckLaidElsewhere: deckedByFrozenPath,
         roofing: spec.coverings.roofing,
         buildingPaper: spec.coverings.buildingPaper,
         stageDeck: requireOrdinal(stagePlan, 'roof-deck'),

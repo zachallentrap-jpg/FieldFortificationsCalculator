@@ -221,6 +221,14 @@ function roofTilePlacement(
   const z = p.origin[2] + p.alongEave[2] * uMid + p.upSlope[2] * vMid + p.normal[2] * liftFt;
   const yaw = Math.atan2(-p.alongEave[2]!, p.alongEave[0]!);
   const pitch = Math.asin(Math.max(-1, Math.min(1, p.upSlope[1]!)));
+  // Callers rotate a tile with [PI/2 - pitch, yaw, 0] in YXZ order, and the sign is NOT a free
+  // choice: composing Ry(yaw)·Rx(rx) sends the tile's local +Y to (sin rx·sin yaw, cos rx,
+  // sin rx·cos yaw), which equals this plane's upSlope only at rx = +(PI/2 - pitch). The far
+  // slope of a gable comes out right by the same expression because its alongEave points -x, so
+  // its yaw is already PI and the mirroring is in there. A `-Math.sign(upSlope.z)` factor used
+  // to sit in front of it, correcting the far slope a SECOND time and tilting the near slope
+  // backwards: its courses ran downhill under the deck, and the deck striped through between
+  // them. Anything that lands on a roof plane rotates by this and nothing else.
   return { position: [x, y, z], yaw, pitch };
 }
 
@@ -233,14 +241,24 @@ export interface RoofCoveringInput {
   stageRoofing: number;
   /** Half the rafter depth — the deck sits on the rafter tops, not in them. */
   rafterHalfFt: number;
+  /**
+   * True when the deck named above is already on the roof because somebody else laid it — for a
+   * gable, the frozen `roof.ts` course loop (C-9). This module then skips EMITTING it, so the
+   * bill is not doubled, but its thickness still counts: roofing goes on top of a deck whoever
+   * built it. Conflating "I am not placing this" with "this is not there" put the first roofing
+   * course half an inch INTO the deck, and the deck showed through along both eaves.
+   */
+  deckLaidElsewhere?: boolean;
 }
 
 export function generateRoofCovering(input: RoofCoveringInput): Member[] {
   const emit = makeEmitter('CV');
-  const { planes, deck, roofing, stageDeck, stageRoofing, rafterHalfFt } = input;
+  const { planes, deck, roofing, stageDeck, stageRoofing, rafterHalfFt, deckLaidElsewhere } = input;
+  // What is UNDER the roofing, regardless of who put it there.
+  const deckThick = deck === 'plywood' || deck === 'boards' ? (PANEL.roofDeckThickIn.value as number) / IN_PER_FT : 0;
 
   // ── Deck
-  if (deck === 'plywood' || deck === 'boards') {
+  if (!deckLaidElsewhere && (deck === 'plywood' || deck === 'boards')) {
     const thick = (PANEL.roofDeckThickIn.value as number) / IN_PER_FT;
     const sheetW = PANEL.lengthFt.value as number; // 8 ft along the eave
     const sheetH = PANEL.widthFt.value as number; // 4 ft up the slope
@@ -250,7 +268,7 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
         emit('roofPanel', `${PANEL.widthFt.value}x${PANEL.lengthFt.value} panel`, {
           cutLengthFt: t.u1 - t.u0,
           position: p.position,
-          rotation: [-Math.sign(plane.upSlope[2]! || 1) * (Math.PI / 2 - p.pitch), p.yaw, 0],
+          rotation: [Math.PI / 2 - p.pitch, p.yaw, 0],
           stage: stageDeck,
           actual: { w: PANEL.roofDeckThickIn.value as number, d: (t.v1 - t.v0) * IN_PER_FT },
           nailing: '8d @ 6" edges / 12" field (PH)',
@@ -269,7 +287,6 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
       : (ROOFING.corrugatedSideLapIn.value as number);
     const exposureFt = (widthIn - lapIn) / IN_PER_FT;
     const courseWFt = widthIn / IN_PER_FT;
-    const deckThick = deck === 'plywood' || deck === 'boards' ? (PANEL.roofDeckThickIn.value as number) / IN_PER_FT : 0;
     const nominal = isRoll
       ? (roofing === 'rollDouble' ? 'roll roofing (double coverage)' : 'roll roofing')
       : `corrugated ${ROOFING.corrugatedWidthIn.value}x${ROOFING.corrugatedLengthFt.value}`;
@@ -281,17 +298,39 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
       const courses = Math.max(1, Math.ceil(plane.slopeLengthFt / exposureFt));
       for (let c = 0; c < courses; c++) {
         const v0 = c * exposureFt;
-        const v1 = Math.min(v0 + courseWFt, Math.max(plane.slopeLengthFt, v0 + exposureFt));
+        // Cut the top course AT the ridge. The old `Math.max(slopeLength, v0 + exposure)` floor
+        // meant the last course kept its full width no matter where the slope ended, so on a
+        // 11.6-ft slope the fifth 3-ft course ran to 12.5 ft — nine inches of roofing standing
+        // past the peak in mid-air, which is the stepped lip visible along the ridge. `courses`
+        // is ceil(slopeLength / exposure), so every v0 is already short of the ridge and this
+        // can never produce an empty course.
+        const v1 = Math.min(v0 + courseWFt, plane.slopeLengthFt);
         const sheetLen = isRoll ? plane.eaveLengthFt : (ROOFING.corrugatedLengthFt.value as number);
         const runs = isRoll ? 1 : Math.ceil(plane.eaveLengthFt / sheetLen);
         for (let r = 0; r < runs; r++) {
           const u0 = r * sheetLen;
           const u1 = Math.min(u0 + sheetLen, plane.eaveLengthFt);
-          const p = roofTilePlacement(plane, { u0, u1, v0, v1 }, rafterHalfFt + deckThick + TOLERANCE.surfaceLiftFt);
+          // Each course laps the one below it, so consecutive courses share `lapIn` of the
+          // slope. Placed at one common lift they were two slabs in the same plane —
+          // interpenetrating, z-fighting, and reading as a stepped seam the width of the lap.
+          // Stack them instead: course c rides on the c courses under it. The buildup is real
+          // (lapped roofing does thicken toward the ridge) and tiny — five 1/4-in courses is
+          // 1 1/4 in over a 12-ft slope — but it is what turns the lap into a clean shadow line.
+          // `roofTilePlacement`'s lift is to the tile's CENTRE, so every term here is measured
+          // to the middle of the course: rafter top, deck, a hair of clearance, the courses
+          // already under this one, and finally half of this course's own thickness. Leaving
+          // that last half out sank each course an eighth of an inch INTO the deck, and the
+          // deck striped through — the same class of mistake as the sign above, seen twice.
+          const coveringThick = (ROOFING.coveringThickIn.value as number) / IN_PER_FT;
+          const p = roofTilePlacement(
+            plane,
+            { u0, u1, v0, v1 },
+            rafterHalfFt + deckThick + TOLERANCE.surfaceLiftFt + c * coveringThick + coveringThick / 2,
+          );
           emit('roofingCourse', nominal, {
             cutLengthFt: u1 - u0,
             position: p.position,
-            rotation: [-Math.sign(plane.upSlope[2]! || 1) * (Math.PI / 2 - p.pitch), p.yaw, 0],
+            rotation: [Math.PI / 2 - p.pitch, p.yaw, 0],
             stage: stageRoofing,
             actual: { w: ROOFING.coveringThickIn.value as number, d: (v1 - v0) * IN_PER_FT },
             nailing: isRoll ? 'roofing nails @ 6" laps (PH)' : 'lead-head nails at every 3rd corrugation (PH)',

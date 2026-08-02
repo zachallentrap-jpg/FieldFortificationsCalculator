@@ -499,6 +499,54 @@ option, implement it, and log it here.
   equation exists ONCE and feeds both the renderer and the raycast filter, so clicking through
   a cut selects what you see; stage scrubbing toggles visibility rather than rebuilding; and
   `unlockToCustom` preserves the family (a tower stays a tower) with a per-family test.
+## 2026-08-02 — "What the heck are these boards on the roof?"
+
+Driving the deployed build, the owner pointed at the roof of the GP building. It was covered
+in wide tan boards. Four separate faults were stacked under that one question, and each was
+invisible until the one above it was cleared — worth recording because the sequence is the
+lesson, not any single fix.
+
+1. **The plywood face texture was drawn at the wrong scale.** Twelve wavy grain lines across a
+   canvas that maps to an 8-ft sheet is a dark stripe every eight inches with five inches of
+   wobble. Rewritten with every dimension stated in inches of real sheet: half-inch grain, an
+   eighth of an inch of wander, and the only high-contrast mark is a soft joint inset at the
+   perimeter so a rank of 4x8s reads as panels. Knots and mineral streaks came OUT — one
+   texture instance is shared by every sheet, so a recognisable shape repeats identically on
+   all thirty-six roof panels and stops looking like wood.
+2. **Roll roofing was being drawn as plywood.** `buildMemberMesh` routed `roofingCourse`
+   through `plywoodSheet`, so five overlapping courses of mineral-surfaced asphalt came out as
+   five overlapping tan boards. They now have their own material — granulated near-black for
+   roll goods, ribbed galvanised for corrugated, tiled at the material's real width.
+3. **Every roof tile was rotated with a spurious sign.** `-Math.sign(upSlope.z) * (PI/2 -
+   pitch)` corrected the far slope a second time (its yaw is already PI, which does the
+   mirroring) and tilted the near slope BACKWARDS: its courses ran downhill, sinking under the
+   deck at their upper edge and lifting off it at their lower one. The deck striped through
+   between them, which is what the tan bands actually were. Composing Ry(yaw)·Rx(rx) admits
+   exactly one answer, `rx = +(PI/2 - pitch)`, and the derivation is now written at the
+   placement helper so the next person does not re-guess it.
+4. **The roofing did not know the deck was there.** C-9 keeps the gable's stage-9 deck in the
+   frozen `roof.ts`, so `building.ts` passed `deck: 'none'` to the covering pass to avoid
+   billing it twice — and `deckThick`, the term that lifts roofing over the deck, went to zero
+   with it. The first course sat half an inch INSIDE the deck. `deckLaidElsewhere` now says
+   "someone else placed this" without also claiming it is absent.
+
+Two smaller things fell out of the same pass. Lapped courses were all placed at one lift, so
+the shared six inches of every lap was two slabs in the same plane, z-fighting; each course now
+rides on the ones beneath it. And the top course kept its full 36-in width past the ridge —
+`Math.max(slopeLength, v0 + exposure)` — leaving nine inches of roofing standing in mid-air
+above the peak, which is the stepped lip the aerial shots caught. It is cut at the ridge now.
+
+Scene lighting was rebalanced in the same commit for a related reason: hemi 1.1 + ambient 0.55
++ sun 1.0 pinned every surface to the top band of the toon ramp, so a roof plane, a wall, and a
+gable end came out the same value. The sun now carries the light and the fills only keep the
+shaded sides off black.
+
+**The lesson:** the owner reported ONE symptom and there were four causes, three of them in
+code that had passed review and 366 green tests. Geometry that is never looked at is geometry
+that is not checked — the sign error had been shipping since T2, and no test could see it
+because no test renders. The numeric probe that found it (walk z across the slope, print which
+surface is on top) is the cheap version of looking, and is worth reaching for before theorising.
+
 ## 2026-08-02 — Two sessions built T0 twice, and the second copy caught a real bug
 
 This branch and `main` each executed TIMBER-2 T0 independently, so the repo briefly held two
