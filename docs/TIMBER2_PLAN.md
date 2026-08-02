@@ -972,7 +972,7 @@ strongback, bunker, stories=2, hip-in-some-form). Each phase lists its ladder.
 |---|---|---|---|
 | T0 | DONE | CI toolkit.yml · frame goldens (12 full + 72 hashed) · check-assets · SAP2 reciprocity · sw.js deleted | 1 (TIMBER-1 as-is) |
 | T1 | DONE | spec.ts/normalize/stagePlan/doctrine · families/ + subsystems/wallSystem (C-4) · frame.ts delegates · BOM throw+classify+BF export | 1 |
-| T2 | not started | — | 1 |
+| T2 | DONE | shed+flat roofs (TD6 pony wall) · coverings (C-5 conserved) · skids/slab · small-plan rule · catalog · runtime SVG thumbs | 1 |
 | T3 | not started | — | 3 |
 | T4 | not started | — | 4 |
 | T5 | not started | — | 10 |

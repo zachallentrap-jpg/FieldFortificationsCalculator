@@ -20,7 +20,8 @@
     "check:assets": "node --import tsx scripts/check-assets.ts",
     "gen:frame-goldens": "node --import tsx scripts/gen-frame-goldens.ts",
     "build:woodframe": "vite build -c vite.woodframe.config.ts",
-    "build:suite": "node scripts/build-suite.mjs"
+    "build:suite": "node scripts/build-suite.mjs",
+    "update:thumb-goldens": "node --import tsx scripts/gen-thumb-goldens.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

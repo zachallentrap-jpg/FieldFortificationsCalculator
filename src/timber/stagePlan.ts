@@ -85,3 +85,17 @@ export function stagePlanForLegacyBuilding(): StagePlanEntry[] {
 export function ordinalOf(plan: StagePlanEntry[], key: StageKey): number | undefined {
   return plan.find((e) => e.key === key)?.ordinal;
 }
+
+/**
+ * Ordinal for a stage the caller KNOWS its plan contains. Throws rather than falling back to a
+ * hardcoded number: a family emitting into a stage its own plan does not declare is a bug that
+ * should surface as a stack trace, not as members quietly landing in the wrong stage — where
+ * they would appear under the wrong heading in the cut list and nobody would notice.
+ */
+export function requireOrdinal(plan: StagePlanEntry[], key: StageKey): number {
+  const found = plan.find((e) => e.key === key);
+  if (!found) {
+    throw new Error(`stage "${key}" is not in this family's stage plan (${plan.map((e) => e.key).join(', ')})`);
+  }
+  return found.ordinal;
+}

@@ -23,7 +23,7 @@ const SCANNED_DIRS = ['families', 'subsystems'];
 
 // Numbers that are arithmetic, not doctrine — they mean the same thing in any manual.
 const ALLOWED = new Set([
-  '0', '1', '2', '0.5', '1.5', '3', '4', '12', '100', '360', '180',
+  '0', '1', '2', '0.5', '1.5', '3', '4', '12', '100', '360', '180', '90',
   '1e-6', '1e-9', '1e-12',
 ]);
 
@@ -75,7 +75,9 @@ test('no bare doctrinal magnitudes inline in generators', () => {
     const lines = src.split('\n');
     lines.forEach((line, i) => {
       const code = line.replace(/\/\/.*$/, '').replace(/'[^']*'|"[^"]*"|`[^`]*`/g, '');
-      for (const m of code.matchAll(/(?<![\w.])(\d+\.\d+|\d+)(?![\w.])/g)) {
+      // Skip scientific notation wholesale: the exponent digits of 1e-9 are not a magnitude.
+      const scrubbed = code.replace(/\d+(\.\d+)?e[+-]?\d+/gi, ' ');
+      for (const m of scrubbed.matchAll(/(?<![\w.])(\d+\.\d+|\d+)(?![\w.])/g)) {
         const lit = m[1]!;
         if (ALLOWED.has(lit)) continue;
         // Array indices and small ordinals read as arithmetic in context.

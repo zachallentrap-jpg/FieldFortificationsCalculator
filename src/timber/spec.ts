@@ -212,7 +212,10 @@ export const SPEC_PATH_DEFS: readonly SpecPathDef[] = [
   { path: 'roof.risePer12', label: 'Roof pitch', min: 0, max: 12, step: 1, cite: 'FM 5-426 framing-square method (PH)' },
   { path: 'roof.overhangFt', label: 'Eave overhang', min: 0, max: 3, step: 0.5, cite: 'FM 5-426 cornice (PH)' },
   { path: 'roof.drainPer12', label: 'Flat-roof drainage slope', min: 1, max: 2, step: 0.25, cite: 'FM 5-426 roll-roofing minimum slope (PH)' },
-  { path: 'foundation.crawlFt', label: 'Crawl height', min: 0.5, max: 4, step: 0.25, cite: 'FM 5-426 foundations (PH)' },
+  // Floored at 1 ft, not 0.5: the built-up girder hangs a full 9 1/4 in BELOW the sill, so a
+  // shallower crawl puts the girder posts underground — the sweep caught it as a negative post
+  // length. The bound is geometry, not preference, and it is stated once here.
+  { path: 'foundation.crawlFt', label: 'Crawl height', min: 1, max: 4, step: 0.25, cite: 'FM 5-426 foundations (PH); floored by the girder depth below the sill' },
   { path: 'foundation.depthFt', label: 'Basement depth', min: 6, max: 9, step: 0.5, cite: 'FM 5-426 basement (PH)' },
   { path: 'foundation.embedFt', label: 'Post embedment', min: 2, max: 6, step: 0.5, cite: 'TM 5-302 (PH)' },
   { path: 'platformHeightFt', label: 'Platform height', min: 10, max: 32, step: 1, cite: 'TM 5-302 tower (PH, LS)' },

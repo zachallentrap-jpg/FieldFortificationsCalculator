@@ -447,3 +447,31 @@ option, implement it, and log it here.
   test making the emitters' `{1.5,3.5}` fallback unreachable in real output; and
   `timber2-number-free` scans the new generator surface for inline magnitudes the way
   `number-free.test.ts` already does for SAP.
+
+- **D39 — TIMBER-2 T2: breadth arrives as siblings, and the tests found two real bugs.** Shed
+  and flat roofs, the full coverings system, skid/slab foundations, the small-plan rule, the
+  catalog and runtime card art — all added without the frozen legacy branch moving one byte
+  (the compat goldens stayed exact through every step). Decisions worth recording. **TD6 in
+  practice:** a shed needs a taller wall on its high side, and `generateWalls` is frozen and
+  only makes rectangular walls. Rather than unfreeze it, the ROOF module emits the difference
+  itself — a pony wall above the high cap plate plus rake infill up the two side walls — which
+  is exactly how the legacy roof generator already handles gable-end studs, so the pattern is
+  the repo's own. A test asserts all four cap plates stay at one height, proving the frozen
+  generator was never asked for an unequal wall. **C-9 double-decking avoided:** the gable's
+  stage-9 deck comes from the frozen roof generator, so the covering pass decks only the NEW
+  roof kinds — otherwise the roof would be sheathed twice and the bill would silently double;
+  the test pins the `RF-` prefix on legacy panels and `CV-` on the new ones. **Two real bugs,
+  both found by tests rather than by eye:** (1) the seeded sweep caught a NEGATIVE post length
+  at crawl heights below ~0.65 ft — the built-up girder hangs 9 1/4 in below the sill, so a
+  shallower crawl buries its posts; the `crawlFt` bound is now floored at 1 ft with the
+  geometry, not a preference, recorded as the reason. (2) The C-5 conservation check caught
+  board siding billing a third of a square foot heavy per wall: boards were spaced at a
+  computed cell width but billed at their nominal 9 1/4 in face. Boards now run at their true
+  dressed width with the last one ripped — what happens on site — and the arithmetic closes to
+  1e-6 sf. **Thumbnails (TD11):** runtime SVG projected from the engine's own members, so no
+  build step, no asset files, and no possible drift from the structure depicted. First cut blew
+  the 140 KB budget at 147 KB by drawing all twelve edges of every 1.5-in stud; thin members
+  now draw as centerlines, which is both 4x smaller and more legible at card size. **The
+  number-free gate earned its keep** — it rejected a dozen inline constants during this phase,
+  which became either cited doctrine entries or a named `TOLERANCE` block for the genuine
+  geometry bookkeeping (z-fight lifts, sliver minimums) that no manual has an opinion about.

@@ -74,6 +74,31 @@ export const LAYOUT = {
   bridgingThresholdFt: doc(7.5, 'FM 5-426 bridging rows', { unit: 'ft' }),
   collarTieEveryNthRafter: doc(3, 'FM 5-426: collar tie every 3rd rafter / <= 5 ft'),
   purlinSpacingMaxIn: doc(24, 'FM 5-426 purlin spacing along the slope', { unit: 'in' }),
+  // Below this width the floor is girderless — joists clear-span (plan §3.2.2). Stated once
+  // so custom, guard-shack and latrine cannot disagree about where the rule starts.
+  smallPlanWidthFt: doc(8, 'FM 5-426 Table 6-2: a short span needs no intermediate bearing', { unit: 'ft' }),
+} as const;
+
+/**
+ * Modeling tolerances — geometry bookkeeping, not doctrine. They exist so coincident surfaces
+ * do not z-fight and so a degenerate sliver is not emitted as a member; no manual has an
+ * opinion about them, which is exactly why they are named here rather than typed inline.
+ */
+export const TOLERANCE = {
+  /** Lift a covering off the surface below it so the two do not z-fight. */
+  surfaceLiftFt: 0.01,
+  /** Bridging is skipped in a bay narrower than this — there is nothing to brace. */
+  minBayFt: 0.15,
+  /** Bridging stops short of the joist edges by this much, so it fits between them. */
+  bridgingInsetFt: 0.06,
+  /** Half the lateral offset between a crossed bridging pair. */
+  bridgingSplayFt: 0.04,
+  /** A piece thinner than this is a sliver, not a member — skip it. */
+  minSliverFt: 0.05,
+  /** Loop guard so a run that lands exactly on its end does not emit a zero-width piece. */
+  epsFt: 0.01,
+  /** Infill studs shorter than this are not worth cutting; the plate covers the gap. */
+  minInfillStudFt: 0.2,
 } as const;
 
 // ── Foundations ──────────────────────────────────────────────────────────────
@@ -140,6 +165,8 @@ export const ROOFING = {
   corrugatedWidthIn: doc(26, 'FM 5-426 corrugated metal sheet width', { unit: 'in' }),
   corrugatedLengthFt: doc(8, 'FM 5-426 corrugated metal sheet length', { unit: 'ft' }),
   corrugatedSideLapCorrugations: doc(1.5, 'FM 5-426 corrugated side lap'),
+  corrugatedSideLapIn: doc(3.25, 'FM 5-426 corrugated side lap (1.5 corrugations at 2 1/6 in pitch)', { unit: 'in' }),
+  coveringThickIn: doc(0.25, 'roofing course thickness as modeled (roll goods lie flat)', { unit: 'in' }),
   feltWidthIn: doc(36, 'FM 5-426 felt underlayment', { unit: 'in' }),
   feltLapIn: doc(2, 'FM 5-426 felt lap', { unit: 'in' }),
   squareSf: doc(100, 'roofing square = 100 sf', { unit: 'sf', ph: false }),
