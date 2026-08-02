@@ -96,7 +96,12 @@ export function buildGeometry(calc: Calc): GeometryModel {
       key: 'setback',
       label: 'Roof setback',
       valueFt: calc.setback,
-      placeholder: ph(overhead.setbackMin.status) || ph(overhead.setbackDepthFrac.status),
+      // calc.setback = max(standoffMin, setbackDepthFrac × depthOfCut). standoffMin comes from
+      // calc.standoffLeaf (the THREAT's own standoff, explain.ts:46) whenever a real threat is
+      // selected — overhead.setbackMin is only the fallback for threat==='none'/unknown, so
+      // checking it unconditionally missed the leaf that's actually live in the common case.
+      // depthOfCut also feeds this (depthPh, computed above) and was never OR'd in at all.
+      placeholder: ph((calc.standoffLeaf ?? overhead.setbackMin).status) || ph(overhead.setbackDepthFrac.status) || depthPh,
     },
     { key: 'outer_l', label: 'Overall length', valueFt: calc.outerL, placeholder: ph(posL) || ph(frontalW.status) },
     { key: 'outer_w', label: 'Overall width', valueFt: calc.outerW, placeholder: ph(posW) || ph(frontalW.status) },

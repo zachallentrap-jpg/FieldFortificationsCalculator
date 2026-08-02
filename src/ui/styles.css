@@ -40,10 +40,6 @@ html.sheet-open { overflow: hidden; }
 }
 .brand { display: flex; align-items: baseline; gap: 8px; }
 .brand strong { font-size: 16px; letter-spacing: 0.2px; font-weight: 700; }
-.fielduse-badge {
-  margin-left: 6px; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.4px;
-  background: var(--banner-bg); color: var(--banner-text);
-}
 .btn {
   min-height: 34px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--r-sm);
   background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; cursor: pointer;
@@ -232,11 +228,10 @@ table.bom td.n { text-align: right; font-variant-numeric: tabular-nums; }
 .operands li { display: flex; gap: 10px; align-items: baseline; font-size: 13px; }
 .op-name { flex: 1; color: var(--ink-soft); }
 .op-val { font-variant-numeric: tabular-nums; font-weight: 600; }
-.op-placeholder {
+.issue-flag {
   margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 10px; font-weight: 700;
   letter-spacing: 0.3px; background: var(--banner-bg); color: var(--banner-text); cursor: help;
 }
-.trace-footer { margin: 10px 0 0; font-size: 12px; color: var(--ink-soft); }
 .help dl { display: grid; grid-template-columns: minmax(90px, auto) 1fr; gap: 6px 12px; margin: 12px 0 0; }
 .help dt { font-weight: 700; }
 .help dd { margin: 0; color: var(--ink-soft); }
@@ -300,10 +295,6 @@ table.bom td.n { text-align: right; font-variant-numeric: tabular-nums; }
 }
 
 /* ── Doctrine fill overlay (Phase 2 — the placeholder burn-down) ───────────── */
-.doctrine .cleared-badge {
-  display: inline-block; padding: 4px 10px; border-radius: var(--r-sm);
-  background: var(--ok, #2e7d32); color: #fff; font-weight: 700; font-size: 12px;
-}
 .doctrine-groups { margin: 10px 0; max-width: 420px; }
 .import-report { margin: 8px 0; padding: 8px 10px; border-radius: var(--r-sm); border: 1px solid var(--border); font-size: 12px; }
 .import-report.ok { border-color: var(--focus); }

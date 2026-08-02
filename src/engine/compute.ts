@@ -44,7 +44,7 @@ export interface Calc {
   count: number;
   teamSize: number;
 
-  invalid: { position: boolean; soil: boolean; threat: boolean; standard: boolean };
+  invalid: { position: boolean; soil: boolean; threat: boolean; standard: boolean; revetment: boolean };
   clamped: { count: boolean; team: boolean };
 
   // shape family (from the position's volumeModel)
@@ -139,7 +139,9 @@ function computeCalc(raw: Inputs): Calc {
   const invalidThreat = !threatKnown;
   const threat = threatKnown ? raw.threat : 'none';
 
-  const revet = revetments[raw.revetment] ?? revetments['none']!;
+  const revetKnown = raw.revetment in revetments;
+  const invalidRevetment = !revetKnown;
+  const revet = revetKnown ? revetments[raw.revetment]! : revetments['none']!;
 
   const roundedCount = Math.round(finite(raw.count, 1));
   const roundedTeam = Math.round(finite(raw.teamSize, 1));
@@ -301,7 +303,7 @@ function computeCalc(raw: Inputs): Calc {
     threat,
     count,
     teamSize,
-    invalid: { position: invalidPosition, soil: invalidSoil, threat: invalidThreat, standard: invalidStandard },
+    invalid: { position: invalidPosition, soil: invalidSoil, threat: invalidThreat, standard: invalidStandard, revetment: invalidRevetment },
     clamped: { count: clampedCount, team: clampedTeam },
     isVehicle,
     isCircular,

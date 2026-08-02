@@ -86,6 +86,80 @@ test('roof geometry: rafter length follows the framing-square method, ridge is c
   assert.equal(rafters.length % 2, 0);
 });
 
+test('roof sheathing courses tile the slope with no overlap or gap, for any pitch', () => {
+  // Each course's along-slope width (actual.d) must sum to exactly the slope length, per side —
+  // an overlap (the old bug: a fixed-width last course whose CENTER was clamped inward instead
+  // of shrinking) would sum to MORE than the slope length; a gap would sum to less.
+  for (const risePer12 of [2, 3, 4, 5, 6, 7, 12]) {
+    const { members, input } = generateFrame({ ...golden, risePer12, openings: [] });
+    const run = input.widthFt / 2 + (input.overhangFt ?? 1);
+    const slopeLenIn = run * (Math.sqrt(144 + risePer12 ** 2) / 12) * 12;
+    const panels = members.filter((m) => m.role === 'roofPanel');
+    // Courses on the two slope sides (±Z) share the same |z - W/2| distance from the ridge but
+    // differ in sign — group by (y, |z - ridgeZ|) so front and rear courses are counted
+    // separately, then each side's course widths must sum to slopeLenIn on their own.
+    const ridgeZ = input.widthFt / 2;
+    const perSide = new Map<0 | 1, Map<string, number>>([[0, new Map()], [1, new Map()]]);
+    for (const p of panels) {
+      const side = p.position[2] < ridgeZ ? 0 : 1;
+      const key = p.position[1].toFixed(6) + ',' + p.position[2].toFixed(6);
+      perSide.get(side)!.set(key, p.actual.d);
+    }
+    for (const side of [0, 1] as const) {
+      const total = [...perSide.get(side)!.values()].reduce((a, d) => a + d, 0);
+      assert.ok(Math.abs(total - slopeLenIn) < 0.02, `rise ${risePer12} side ${side}: course widths sum to ${total}, expected ${slopeLenIn}`);
+    }
+  }
+});
+
+test('subfloor panels tile both axes with no overlap or gap, including staggered rows', () => {
+  // lengthFt=13.5 (not a multiple of 8) and widthFt=14 (not a multiple of 4) are exactly the
+  // dimensions the audit found overlapping under the old center-computed-from-both-edges
+  // algorithm — assert coverage sums to the true row/run length instead of re-deriving 3D
+  // overlap directly.
+  for (const [lengthFt, widthFt] of [[20, 16], [13.5, 14], [13.5, 8], [40, 24]] as const) {
+    const { members } = generateFrame({ ...golden, lengthFt, widthFt, openings: [] });
+    const panels = members.filter((m) => m.role === 'subfloor');
+    // Z-direction: one row = one distinct Z value; its width (actual.d) summed across rows
+    // must equal the building width exactly.
+    const rowWidths = new Map<number, number>();
+    for (const p of panels) rowWidths.set(p.position[2], p.actual.d);
+    const zTotal = [...rowWidths.values()].reduce((a, d) => a + d, 0);
+    assert.ok(Math.abs(zTotal - widthFt * 12) < 0.02, `${lengthFt}x${widthFt}: row widths sum to ${zTotal}, expected ${widthFt * 12}`);
+    // X-direction: within ANY single row, panel cutLengths (already trimmed to fit) must sum
+    // to exactly the building length.
+    for (const z of new Set(panels.map((p) => p.position[2]))) {
+      const rowPanels = panels.filter((p) => p.position[2] === z);
+      const xTotal = rowPanels.reduce((a, p) => a + p.cutLength, 0);
+      assert.ok(Math.abs(xTotal - lengthFt * 12) < 0.02, `${lengthFt}x${widthFt} row z=${z}: panel widths sum to ${xTotal}, expected ${lengthFt * 12}`);
+    }
+  }
+});
+
+test('collar tie stays finite at a flat (risePer12=0) roof', () => {
+  const { members } = generateFrame({ ...golden, risePer12: 0, openings: [] });
+  const ties = members.filter((m) => m.role === 'collarTie');
+  assert.ok(ties.length > 0, 'flat roof still emits collar ties');
+  for (const t of ties) assert.ok(Number.isFinite(t.cutLength) && t.cutLength > 0, `${t.id}: cutLength ${t.cutLength}`);
+});
+
+test('a very low window sill never emits a negative/zero-length cripple below it', () => {
+  for (const sillHeightFt of [0, 0.02, 0.1, 0.125, 0.5, 3]) {
+    const { members } = generateFrame({
+      ...golden,
+      openings: [{ wall: 'S', offsetFt: 4, widthFt: 3, heightFt: 3.5, sillHeightFt }],
+    });
+    for (const m of members) assert.ok(m.cutLength > 0, `sillHeightFt=${sillHeightFt}: ${m.id} cutLength ${m.cutLength}`);
+  }
+});
+
+test('a slab-on-grade building (crawlFt ≤ 0) never emits a negative/zero-length post', () => {
+  for (const crawlFt of [0, -0.5, -2]) {
+    const { members } = generateFrame({ ...golden, crawlFt, openings: [] });
+    for (const m of members) assert.ok(m.cutLength > 0, `crawlFt=${crawlFt}: ${m.id} cutLength ${m.cutLength}`);
+  }
+});
+
 test('stage BOMs partition the total exactly (design doc §9 stage integrity)', () => {
   const { members } = generateFrame(golden);
   const bom = bomSummary(members);

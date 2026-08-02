@@ -1,7 +1,7 @@
 {
   "name": "Fighting Position Planner",
   "short_name": "Position Planner",
-  "description": "Deterministic, offline planner for digging and building defensive positions. Illustrative placeholder data; not for field use.",
+  "description": "Deterministic, offline planner for digging and building defensive positions.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

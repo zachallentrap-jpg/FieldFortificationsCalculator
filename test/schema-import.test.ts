@@ -33,6 +33,22 @@ test('rejects wrong field types', () => {
   assert.equal(validateInputs({ ...defaultInputs(), sectorAzimuths: { leftDeg: 'x', rightDeg: 1 } }).ok, false);
 });
 
+// A hand-edited or hostile file can carry a structurally-valid number that's still garbage —
+// out of compute()'s own [1,999]/[1,50] range, or fractional. Reject it the same way an
+// invalid "standard" is, rather than letting it become a stored value nothing downstream
+// ever corrects (§ plan.ts / schema.ts count-teamSize audit).
+test('rejects out-of-range or non-integer count/teamSize', () => {
+  assert.equal(validateInputs({ ...defaultInputs(), count: 0 }).ok, false, 'count below min');
+  assert.equal(validateInputs({ ...defaultInputs(), count: 1000 }).ok, false, 'count above max');
+  assert.equal(validateInputs({ ...defaultInputs(), count: 4.5 }).ok, false, 'fractional count');
+  assert.equal(validateInputs({ ...defaultInputs(), count: -3 }).ok, false, 'negative count');
+  assert.equal(validateInputs({ ...defaultInputs(), teamSize: 0 }).ok, false, 'teamSize below min');
+  assert.equal(validateInputs({ ...defaultInputs(), teamSize: 51 }).ok, false, 'teamSize above max');
+  assert.equal(validateInputs({ ...defaultInputs(), teamSize: 2.5 }).ok, false, 'fractional teamSize');
+  assert.equal(validateInputs({ ...defaultInputs(), count: 999, teamSize: 50 }).ok, true, 'max bounds are inclusive');
+  assert.equal(validateInputs({ ...defaultInputs(), count: 1, teamSize: 1 }).ok, true, 'min bounds are inclusive');
+});
+
 test('safeJsonParse rejects non-JSON, oversized, and prototype-pollution payloads', () => {
   assert.equal(safeJsonParse('{not json').ok, false);
   assert.equal(safeJsonParse('x'.repeat(600 * 1024)).ok, false);

@@ -88,7 +88,7 @@ export function exportDoctrine(manifest?: { author?: string; date?: string }): D
   if (manifest?.date) m.date = manifest.date;
   return {
     doctrineVersion: DOCTRINE_VERSION,
-    note: 'SAP-1 doctrine export — values are ILLUSTRATIVE PLACEHOLDERS unless status is DOCTRINE. NOT FOR FIELD USE.',
+    note: 'SAP-1 doctrine export — status is PLACEHOLDER unless confirmed and re-imported as DOCTRINE.',
     manifest: m,
     entries,
   };
@@ -123,6 +123,25 @@ interface Staged {
   status: 'PLACEHOLDER' | 'DOCTRINE';
   source: string;
   note: string | undefined;
+}
+
+// A dry run must PREVIEW the counts an apply would actually produce, not just echo the
+// current (unmutated) state under the same field name — the two used to be silently
+// different (counts() called before vs. after the commit loop), which would have made a
+// dry-run preview lie the moment anything ever read report.counts.
+function previewCounts(staged: Staged[]): Counts {
+  const overrides = new Map(staged.map((s) => [s.path, s.status]));
+  let doctrine = 0, placeholder = 0, safetyCritical = 0, safetyCriticalRemaining = 0;
+  for (const e of all()) {
+    const status = overrides.get(e.path) ?? e.status;
+    if (status === 'DOCTRINE') doctrine++;
+    else placeholder++;
+    if (e.safetyCritical) {
+      safetyCritical++;
+      if (status !== 'DOCTRINE') safetyCriticalRemaining++;
+    }
+  }
+  return { total: all().length, doctrine, placeholder, safetyCritical, safetyCriticalRemaining };
 }
 
 export function importDoctrine(raw: unknown, opts?: { maxEntries?: number; dryRun?: boolean }): DoctrineImportReport {
@@ -202,7 +221,7 @@ export function importDoctrine(raw: unknown, opts?: { maxEntries?: number; dryRu
   }
 
   if (dryRun) {
-    return { ok: true, applied: staged.length, dryRun: true, rejected: [], manifest, counts: counts() };
+    return { ok: true, applied: staged.length, dryRun: true, rejected: [], manifest, counts: previewCounts(staged) };
   }
 
   // Commit: mutate live leaves in place (value/status/source/note only — unit and

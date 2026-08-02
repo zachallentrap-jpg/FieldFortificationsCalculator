@@ -79,24 +79,31 @@ export function generateFloor(input: FloorInput): Member[] {
 
   // ── Stage 1: posts on footers. Perimeter posts under the sills at ≤8 ft spacing plus
   // corners; girder posts under the center girder line (z = W/2), sized to reach grade.
+  // postLen/girderPostLen reduce to (crawlFt) and (crawlFt - ~0.65 ft) respectively — a
+  // slab-on-grade or very-low-pier building (crawlFt ≤0, a perfectly ordinary real input, not
+  // a contrived one) drove these to zero/negative "post" members with no floor beneath them to
+  // stand on. Guarded the same way the file already guards other near-zero members (e.g. the
+  // above-header cripple below): skip emitting a post that wouldn't have positive length.
   const postLen = sillBottom - lv.gradeY;
   const postCount = Math.max(2, Math.ceil(L / 8) + 1);
   const postAt = (x: number, z: number, len: number, yBase: number): void =>
     emit('post', '4x4', len, [x, yBase + len / 2, z], [0, 0, Math.PI / 2], 1, {
       doctrineRef: 'FM 5-426 post & footer spacing 6-10 ft (PH page)',
     });
-  for (let i = 0; i < postCount; i++) {
-    const x = (i / (postCount - 1)) * L;
-    postAt(x, 0, postLen, lv.gradeY); // front sill line
-    postAt(x, W, postLen, lv.gradeY); // rear sill line
+  if (postLen > 0.1) {
+    for (let i = 0; i < postCount; i++) {
+      const x = (i / (postCount - 1)) * L;
+      postAt(x, 0, postLen, lv.gradeY); // front sill line
+      postAt(x, W, postLen, lv.gradeY); // rear sill line
+    }
   }
-  const girderBottom = lv.joistTop - joistD - girderD + joistD; // girder top carries joists at sill top
   const girderPostLen = lv.sillTop - girderD - lv.gradeY;
-  for (let i = 0; i < postCount; i++) {
-    const x = (i / (postCount - 1)) * L;
-    postAt(x, W / 2, girderPostLen, lv.gradeY);
+  if (girderPostLen > 0.1) {
+    for (let i = 0; i < postCount; i++) {
+      const x = (i / (postCount - 1)) * L;
+      postAt(x, W / 2, girderPostLen, lv.gradeY);
+    }
   }
-  void girderBottom;
 
   // ── Stage 2: sills (2x6 flat along front/rear post lines) + center girder (built-up 3-2x10
   // on edge, top flush with the sills so joists bear level across all three lines).
@@ -144,16 +151,35 @@ export function generateFloor(input: FloorInput): Member[] {
   const panelT = 0.75 / FT;
   const rows = Math.ceil(W / 4);
   for (let r = 0; r < rows; r++) {
-    const zC = Math.min(r * 4 + 2, W - 2);
+    // Along-Z start-edge + width-trim (same pattern as roof.ts's sheathing courses) — the
+    // last row shrinks to fit instead of a fixed 4 ft depth with its center clamped inward,
+    // which used to overlap the previous row whenever W wasn't an exact multiple of 4.
+    const zStart = r * 4;
+    const zWidth = Math.min(4, W - zStart);
+    const zC = zStart + zWidth / 2;
     const stagger = r % 2 === 1 ? 4 : 0;
-    const xs: number[] = [];
-    if (stagger > 0) xs.push(stagger / 2);
-    for (let x = stagger + 4; x <= L - 0.01; x += 8) xs.push(x);
-    if ((L - stagger) % 8 > 0.01) xs.push(L - ((L - stagger) % 8) / 2);
-    for (const xC of xs) {
-      const wPanel = Math.min(8, 2 * Math.min(xC, L - xC));
-      emit('subfloor', '4x8 panel', wPanel, [xC, -panelT / 2, zC], [-Math.PI / 2, 0, 0], 4, {
-        actual: { w: 0.75, d: 48 },
+    // Along-X: a single left-to-right sweep — an optional leading partial panel (the stagger
+    // offset), then full 8 ft panels, each width trimmed to whatever remains. Each panel's
+    // start is exactly the previous one's end, so panels can never overlap or gap, unlike the
+    // old approach of computing panel centers from BOTH the left edge (staggered grid) and the
+    // right edge (a separate trailing-remainder push) independently — those two computations
+    // didn't know about each other's extent and could produce a trailing panel that entirely
+    // contained the previous one.
+    const panels: Array<[number, number]> = []; // [xStart, width]
+    let xPos = 0;
+    if (stagger > 0) {
+      const w = Math.min(stagger, L);
+      panels.push([0, w]);
+      xPos = w;
+    }
+    while (xPos < L - 0.01) {
+      const w = Math.min(8, L - xPos);
+      panels.push([xPos, w]);
+      xPos += w;
+    }
+    for (const [xStart, wPanel] of panels) {
+      emit('subfloor', '4x8 panel', wPanel, [xStart + wPanel / 2, -panelT / 2, zC], [-Math.PI / 2, 0, 0], 4, {
+        actual: { w: 0.75, d: zWidth * FT },
         nailing: '8d @ 6" edges / 12" field (PH)',
         doctrineRef: 'FM 5-426 subfloor, staggered joints (PH page)',
       });

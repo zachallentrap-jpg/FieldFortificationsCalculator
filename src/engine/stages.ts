@@ -12,7 +12,7 @@
 
 import { excavationSplit, STAGE_ORDER, STAGE_BOM } from '../doctrine/stages';
 import { labor as laborDoctrine } from '../doctrine/labor';
-import { machine, revetments } from '../doctrine/materials';
+import { revetments } from '../doctrine/materials';
 import { round1 } from './round';
 import type { StageId } from '../doctrine/stages';
 import type { BomLine, Result } from './types';
@@ -100,7 +100,6 @@ export interface ScheduleOpts {
   teamSize: number;
   availableHours: number; // start → stand-to, in hours (a DTG delta the caller computes)
   securityPostureFrac: number; // fraction of the team DIGGING (rest on watch); 0<f≤1
-  machineAssist: boolean;
 }
 
 export interface ScheduledStep extends StageStep {
@@ -113,14 +112,19 @@ export interface Schedule {
   availableHours: number;
   feasible: boolean; // completes by stand-to?
   shortfallHours: number; // hours past stand-to (0 if feasible)
-  effectiveDiggers: number; // team × posture (× machine speed-up)
+  effectiveDiggers: number; // team × posture
 }
 
 export function scheduleStages(plan: StagePlan, opts: ScheduleOpts): Schedule {
   const team = Math.max(1, Math.floor(opts.teamSize));
   const posture = Math.min(1, Math.max(0.01, opts.securityPostureFrac));
-  const machineSpeed = opts.machineAssist ? 1 / machine.excavationFactor.value : 1; // dozer digs faster
-  const effectiveDiggers = team * posture * machineSpeed;
+  // Machine assist is NOT re-applied here: compute.ts already scales the excavation man-hours
+  // by machine.excavationFactor when inputs.machineAssist is on (the total this plan partitions,
+  // result.labor.manHoursPerPosition, is already the machine-adjusted figure). Dividing by an
+  // extra 1/excavationFactor here compounded the same doctrine constant twice — a 0.4× reduction
+  // in compute.ts became 0.4×0.4=0.16× once this clock also sped up the digging rate on top of
+  // the already-reduced total. effectiveDiggers is purely "how many bodies are on the tools."
+  const effectiveDiggers = team * posture;
 
   let cumulative = 0;
   const steps: ScheduledStep[] = plan.steps.map((s) => {

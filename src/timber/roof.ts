@@ -97,7 +97,12 @@ export function generateRoof(input: RoofInput): Member[] {
   });
   // Collar ties on every third rafter pair (≤5 ft apart per manual), at 1/3 down from ridge.
   const tieY = ridgeY - (ridgeY - H) / 3;
-  const tieHalf = ((ridgeY - tieY) * 12) / input.risePer12;
+  // The horizontal half-length at 1/3 of the vertical rise-to-ridge distance is exactly
+  // halfSpan/3 for ANY pitch — (ridgeY-H) and the horizontal-per-vertical ratio both scale with
+  // risePer12, so it cancels out of ((ridgeY-tieY)*12)/risePer12 algebraically (confirmed
+  // numerically identical across pitches 0.5–24). Writing it directly avoids a 0/0 at a flat
+  // (risePer12=0) roof, which the cancelled-out form divided by literally.
+  const tieHalf = halfSpan / 3;
   for (let i = 0; i < joistXs.length; i += 3) {
     emit('collarTie', '2x4', 2 * tieHalf, [joistXs[i]!, tieY, W / 2], [0, -Math.PI / 2, 0], 8, {
       nailing: '4-8d ea end (PH)',
@@ -121,7 +126,14 @@ export function generateRoof(input: RoofInput): Member[] {
   const courses = Math.ceil(slopeLen / 4);
   for (const side of [-1, 1] as const) {
     for (let c = 0; c < courses; c++) {
-      const sMid = Math.min(c * 4 + 2, slopeLen - 2); // along-slope center of this course
+      // Along-slope start-edge + width-trim (mirrors the ridge-direction x0/wPanel tiling
+      // below) — the LAST course shrinks to fit instead of keeping a fixed 4 ft depth with its
+      // center clamped inward, which used to overlap the previous course by up to the full 4 ft
+      // whenever slopeLen wasn't an exact multiple of 4 (i.e. essentially always, for any
+      // nonzero pitch).
+      const sStart = c * 4;
+      const sWidth = Math.min(4, slopeLen - sStart);
+      const sMid = sStart + sWidth / 2; // along-slope center of this course
       const frac = sMid / slopeLen; // 0 at eave, 1 at ridge
       const zEave = side === -1 ? -overhang : W + overhang;
       const yEave = H - overhang * (input.risePer12 / 12);
@@ -132,7 +144,7 @@ export function generateRoof(input: RoofInput): Member[] {
         // Panel width (local Y) leans from vertical down onto the slope: tilt about X so the
         // face lies in the slope plane, mirrored per side.
         emit('roofPanel', '4x8 panel', wPanel, [x0 + wPanel / 2, yC, zC], [-side * (Math.PI / 2 - pitch), 0, 0], 9, {
-          actual: { w: 0.5, d: 48 },
+          actual: { w: 0.5, d: sWidth * FT },
           nailing: '8d @ 6" edges / 12" field (PH)',
         });
       }

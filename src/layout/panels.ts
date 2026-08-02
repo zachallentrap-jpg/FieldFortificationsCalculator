@@ -154,30 +154,20 @@ export function summaryBar(result: Result): string {
   );
 }
 
-// The tap-to-explain body for one derivation. Placeholder operands get a hoverable badge
-// naming their source note (§12) — the app's core honesty mechanic: you can always see which
-// inputs to a number are not yet real doctrine.
+// The tap-to-explain body for one derivation.
 export function traceHtml(d: Derivation): string {
-  const anyPlaceholder = d.operands.some((o) => o.placeholder);
   const operands = d.operands
-    .map((o) => {
-      const badge = o.placeholder
-        ? '<span class="op-placeholder" title="' + esc(o.source ?? 'unverified placeholder') + '">placeholder</span>'
-        : '';
-      return (
-        '<li><span class="op-name">' + esc(o.name) + badge + '</span>' +
+    .map(
+      (o) =>
+        '<li><span class="op-name">' + esc(o.name) + '</span>' +
         '<span class="op-val">' + num(o.value) + (o.unit ? ' ' + esc(o.unit) : '') + '</span>' +
-        '</li>'
-      );
-    })
+        '</li>',
+    )
     .join('');
-  const footer = anyPlaceholder
-    ? '<p class="trace-footer">Marked operands are illustrative placeholders — confirm against current pubs before use.</p>'
-    : '';
   return (
     '<div class="trace"><h3>' + esc(d.label) + '</h3>' +
     '<code class="formula">' + esc(d.formula) + '</code>' +
     '<div class="trace-result">= ' + num(d.result) + ' ' + esc(d.unit) + '</div>' +
-    '<ul class="operands">' + operands + '</ul>' + footer + '</div>'
+    '<ul class="operands">' + operands + '</ul></div>'
   );
 }

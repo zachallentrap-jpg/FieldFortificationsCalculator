@@ -125,10 +125,16 @@ export function generateWalls(input: WallsInput): Member[] {
       const headerNominal = o.headerNominal ?? '2x6';
       const headerDepthFt = (DRESSED[headerNominal] ?? DRESSED['2x6']!).d / FT;
 
+      // King/jack studs sit outward from the opening edge by a stud-thickness gap — for an
+      // opening with little or no corner setback (offsetFt near 0, or near right ≈ runFt),
+      // "outward" can land past the wall's own end (a member with no wall left to nail it to,
+      // verified with offsetFt:0 placing the king 2.25" beyond x=0). Clamped to the same
+      // physical envelope the common-stud grid above already respects ([t/2, runFt-t/2]).
+      const clampAlong = (v: number): number => Math.max(t / 2, Math.min(f.runFt - t / 2, v));
       for (const side of [-1, 1] as const) {
         const edge = side === -1 ? left : right;
-        emit('kingStud', '2x4', studLen, edge + (side * 3 * t) / 2, t + studLen / 2, 'vertical');
-        emit('jackStud', '2x4', headBottom - t, edge + (side * t) / 2, t + (headBottom - t) / 2, 'vertical', {
+        emit('kingStud', '2x4', studLen, clampAlong(edge + (side * 3 * t) / 2), t + studLen / 2, 'vertical');
+        emit('jackStud', '2x4', headBottom - t, clampAlong(edge + (side * t) / 2), t + (headBottom - t) / 2, 'vertical', {
           nailing: '16d @ 12" to king stud (PH)',
         });
       }
@@ -142,9 +148,16 @@ export function generateWalls(input: WallsInput): Member[] {
       if (o.sillHeightFt > 0) {
         const sillTop = t + o.sillHeightFt;
         emit('sill', '2x4', o.widthFt, (left + right) / 2, sillTop - t / 2, 'flat', { nailing: '2-16d ea end (PH)' });
-        for (const s of gridXs) {
-          if (!(s > left + t && s < right - t)) continue;
-          emit('cripple', '2x4', sillTop - 2 * t, s, t + (sillTop - 2 * t) / 2, 'vertical');
+        // Guarded the same way the above-header cripple below is (cripLen > 0.05) — a low sill
+        // (e.g. a crawlspace/basement vent under 1.5" above the sole plate) drove this negative
+        // or to exactly zero with no guard, unlike its structurally-identical sibling two lines
+        // down.
+        const belowSillCripLen = sillTop - 2 * t;
+        if (belowSillCripLen > 0.05) {
+          for (const s of gridXs) {
+            if (!(s > left + t && s < right - t)) continue;
+            emit('cripple', '2x4', belowSillCripLen, s, t + belowSillCripLen / 2, 'vertical');
+          }
         }
       }
       const cripBase = headBottom + headerDepthFt;

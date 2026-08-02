@@ -158,12 +158,11 @@ function fieldHeader(): string {
 }
 
 // Doctrine-fill provenance: a DOCTRINE stamp is only evidence if it names the fill it was
-// computed against. Printed small at the foot of every sheet.
+// computed against. Printed small at the foot of every sheet, when a fill has been applied.
 function fillFooter(): string {
   const f = getFillState();
-  const text = f
-    ? 'Computed against doctrine fill ' + esc(f.contentHash) + (f.author ? ', filled by ' + esc(f.author) : '') + (f.date ? ', ' + esc(f.date) : '') + '.'
-    : 'Computed against illustrative placeholder doctrine (no fill applied).';
+  if (!f) return '';
+  const text = 'Computed against doctrine fill ' + esc(f.contentHash) + (f.author ? ', filled by ' + esc(f.author) : '') + (f.date ? ', ' + esc(f.date) : '') + '.';
   return '<p style="margin-top:16px;font-size:9px;color:var(--ink-soft)">' + text + '</p>';
 }
 

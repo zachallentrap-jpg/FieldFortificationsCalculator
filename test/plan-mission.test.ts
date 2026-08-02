@@ -19,6 +19,24 @@ test('planForTime: generous budget yields feasible options ranked by protection 
   }
 });
 
+test('planForTime: a doctrine-invalid combination (soil forces revetment, swept revetment=none) never outranks a valid one at the same protection tier', () => {
+  // soil='sand' forces revetment (REVET_REQUIRED_SOIL); the sweep still tries revetment='none'
+  // for every standard/overhead combination, which must come back flagged and sorted BEHIND the
+  // sandbag_facing/pickets_wire options at the same protection tier, not interleaved with them.
+  const r = planForTime({ availableHours: 200, teamSize: 4, base: defaultInputs({ soil: 'sand' }) });
+  const noneOptions = r.feasible.filter((o) => o.revetment === 'none');
+  assert.ok(noneOptions.length > 0, 'the none-revetment sweep is present');
+  for (const o of noneOptions) assert.equal(o.hasErrors, true, 'sand + no revetment must be flagged');
+  // Ranking invariant: hasErrors must be non-decreasing down the list — once a flagged option
+  // appears, every option after it must also be flagged (never a flagged option sorting ahead
+  // of, or between, unflagged ones).
+  let sawError = false;
+  for (const o of r.feasible) {
+    if (o.hasErrors) sawError = true;
+    else assert.ok(!sawError, 'an unflagged option must never sort after a flagged one');
+  }
+});
+
 test('planForTime: impossible budget → no feasible options but a best-effort fallback', () => {
   const r = planForTime({ availableHours: 0.001, teamSize: 1, base: defaultInputs() });
   assert.equal(r.feasible.length, 0);

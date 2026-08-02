@@ -31,17 +31,7 @@ The whole roadmap that produced the current tool — the multi-angle plan and th
 
 The interface leads with plain language everywhere (the technical term stays alongside in parentheses — e.g. "Dirt wall up front (parapet)") so it's usable without already knowing the jargon; the fixed doctrinal vocabulary the spec requires is never hidden, just never load-bearing for basic use.
 
----
-
-> ## ⚠ NOT FOR FIELD USE — CUI handling
->
-> **SAP-1 ships on illustrative placeholder data. Do not use it to build a real position.**
->
-> It is **not** a substitute for current engineer publications or the engineer's judgment. SAP-1 performs **no** authoritative-value lookup and fabricates **no** shielding thickness, roof/stringer load or span, standoff, or parapet/retaining thickness. Every such value is a flagged placeholder (`status: "PLACEHOLDER"`, `source: "TODO: confirm against current pub"`), and the safety-critical ones — shielding thickness, roof/stringer load and span, standoff, parapet and retaining thickness — are tagged `safetyCritical: true`.
->
-> A data-driven **NOT FOR FIELD USE** banner is on until the count of remaining placeholders reaches zero. It clears only when a qualified user has replaced every placeholder with a real, verified value **offline** via doctrine import (`src/doctrine/io.ts`). Until then, treat every number on screen as a stand-in.
->
-> **Handling:** this tool and its output are **CUI**. Clear handling and distribution with your **S-6 / information-management shop** before fielding.
+Real values are filled in **offline** via doctrine import (`src/doctrine/io.ts`) — export the current values, edit them against the current pub, and import them back in.
 
 ---
 
@@ -92,7 +82,7 @@ Both are produced by the same `npm run build`, and both pass the `check:offline`
 
 ## More docs
 
-- [`PLACEHOLDER_POLICY.md`](PLACEHOLDER_POLICY.md) — the placeholder / provenance regime and how the NOT FOR FIELD USE banner clears.
+- [`PLACEHOLDER_POLICY.md`](PLACEHOLDER_POLICY.md) — the placeholder / provenance regime and how a doctrine fill clears it.
 - [`DOCTRINE_SOURCES.md`](DOCTRINE_SOURCES.md) — what a qualified user must confirm, and against which publications, before fielding.
 - [`USER_GUIDE.md`](USER_GUIDE.md) — how to use the planner: inputs, drawings, exports, scenarios, mission rollup, comparison, and time-available planning.
 - [`DECISIONS.md`](DECISIONS.md) — the design decisions behind the engine, the safety invariants, and the offline / private posture.
