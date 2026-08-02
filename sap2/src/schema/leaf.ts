@@ -14,6 +14,7 @@ export type LeafKind =
   | 'labor'       // man-hour contents/adders
   | 'duration'    // elapsed hours
   | 'weight'
+  | 'flag'        // doctrinal boolean (e.g. soil forces revetment)
   | 'check'       // owner-authored recruit check phrase (B35)
   | 'body_unit';  // owner-authored body-referenced measure phrase (B35)
 
@@ -50,7 +51,7 @@ export interface LeafBase<Id extends string = string> {
 
 export interface NumericLeafCommon<Id extends string = string> extends LeafBase<Id> {
   readonly unit: NumericUnit;
-  readonly kind: Exclude<LeafKind, 'check' | 'body_unit'>;
+  readonly kind: Exclude<LeafKind, 'check' | 'body_unit' | 'flag'>;
   readonly integer: boolean;
   readonly divisor: boolean;     // participates as a divisor somewhere → 0 must refuse
   readonly roundingDirection: 'up' | 'down' | 'nearest' | 'exact';
@@ -83,9 +84,17 @@ export interface CheckLeaf<Id extends string = string, Dim extends string = stri
   };
 }
 
-export type SchemaLeaf<Id extends string = string> = NumericLeaf<Id> | CheckLeaf<Id>;
+// Doctrinal booleans (v1's soils.revetForced class). True/false in the fill, cited and
+// verified like any other leaf; never defaulted — an unfilled flag is Unfilled.
+export interface FlagLeaf<Id extends string = string> extends LeafBase<Id> {
+  readonly unit: 'flag';
+  readonly kind: 'flag';
+  readonly safetyCritical: boolean;
+}
+
+export type SchemaLeaf<Id extends string = string> = NumericLeaf<Id> | CheckLeaf<Id> | FlagLeaf<Id>;
 
 export const isNumericLeaf = <Id extends string>(l: SchemaLeaf<Id>): l is NumericLeaf<Id> =>
-  l.unit !== 'text';
+  l.unit !== 'text' && l.unit !== 'flag';
 
 export type { CanonicalUnit };
