@@ -46,11 +46,13 @@ test('G-9: unsafeValue imports only in render/precision.ts (Traced opacity)', ()
   assert.deepEqual(offenders, [], `unsafeValue leaked into: ${offenders.join(', ')}`);
 });
 
-test('G-9: render/scene/viewer/ui never import doctrine or fills (boundary lint)', () => {
+test('G-9: render/scene/viewer never import doctrine or fills (boundary lint)', () => {
+  // ui/ is the composition root — it loads fills and calls compute by design; the
+  // PURE-PRESENTATION dirs are the ones that must consume Result only.
   const BANNED_IMPORT = /from\s+'[^']*(schema\/leaves|schema\/io|schema\/consumers|engine\/read)'/;
   const offenders: string[] = [];
   for (const { rel, body } of srcFiles()) {
-    if (!/^(render|scene|viewer|ui)\//.test(rel)) continue;
+    if (!/^(render|scene|viewer)\//.test(rel)) continue;
     if (BANNED_IMPORT.test(body)) offenders.push(rel);
   }
   assert.deepEqual(offenders, [], `presentation code importing doctrine:\n${offenders.join('\n')}`);

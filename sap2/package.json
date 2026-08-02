@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
-  "description": "Survivability Position Planner v2 — schema-first, ship-empty, deterministic. See docs/SAP2_BLUEPRINT.md at repo root.",
+  "description": "Survivability Position Planner v2 \u2014 schema-first, ship-empty, deterministic. See docs/SAP2_BLUEPRINT.md at repo root.",
   "engines": {
     "node": "22.22.2"
   },
@@ -11,7 +11,8 @@
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test \"test/**/*.test.ts\"",
-    "verify": "npm run typecheck && npm run test"
+    "verify": "npm run typecheck && npm run build && npm run test",
+    "build": "vite build && node --import tsx scripts/build-standalone.ts"
   },
   "dependencies": {
     "three": "0.185.0"

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SAP-2 — Survivability Position Planner</title>
+<!-- Static shell (blueprint §4.5): one fixed DOM order; layout modes are a root
+     class + grid-template-areas re-placement; the 3D canvas socket is permanent and
+     never reparents. No element in this file is ever re-created at runtime. -->
+<style>
+  :root { --ink:#1a1c1e; --muted:#5b6167; --paper:#fff; --shell:#f2f0ea; --warn:#b3261e; --accent:#8a4b0f; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; font-family: system-ui, sans-serif; color:var(--ink); background:var(--shell); }
+  #app {
+    display:grid; height:100%;
+    grid-template-areas: "banner banner" "inputs drawings" "inputs panels";
+    grid-template-columns: 320px 1fr;
+    grid-template-rows: auto 1fr auto;
+    gap:10px; padding:10px;
+  }
+  .narrow #app { grid-template-areas:"banner" "inputs" "drawings" "panels"; grid-template-columns:1fr; grid-template-rows:auto auto 1fr auto; }
+  #banner { grid-area:banner; padding:8px 14px; border-radius:8px; background:#3c3f43; color:#fff; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  #banner .state { font-weight:700; padding:2px 10px; border-radius:6px; background:var(--warn); }
+  #banner .hash { font-family:monospace; font-size:12px; opacity:.85 }
+  #inputs { grid-area:inputs; background:var(--paper); border-radius:8px; padding:14px; overflow:auto; }
+  #drawings { grid-area:drawings; background:var(--paper); border-radius:8px; padding:10px; overflow:auto; display:flex; gap:12px; flex-wrap:wrap; align-items:flex-start; }
+  #drawings svg { max-width:100%; height:auto; border:1px solid #ddd; }
+  #panels { grid-area:panels; display:flex; gap:10px; flex-wrap:wrap; }
+  #panels > section { background:var(--paper); border-radius:8px; padding:12px; flex:1 1 260px; min-height:80px; }
+  h1 { font-size:16px; margin:0; } h2 { font-size:13px; margin:0 0 8px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; }
+  label { display:block; font-size:13px; margin:10px 0 2px; color:var(--muted); }
+  select, input[type=text] { width:100%; padding:8px; font-size:14px; border:1px solid #c8c4bb; border-radius:6px; background:#fff; }
+  .check { display:flex; gap:8px; align-items:center; margin-top:12px; font-size:14px; }
+  #fill-reasons { color:var(--warn); font-size:13px; white-space:pre-wrap; }
+  #canvas-socket { width:100%; min-height:40px; border:1px dashed #c8c4bb; border-radius:6px; display:grid; place-items:center; color:var(--muted); font-size:12px; }
+  ul { margin:0; padding-left:18px; font-size:13px; } td, th { font-size:13px; padding:2px 8px 2px 0; text-align:left; }
+  .error-card { background:#fdecea; border:1px solid var(--warn); color:var(--warn); padding:10px; border-radius:6px; font-size:13px; }
+  #conditions-overlay { position:fixed; inset:0; background:rgba(20,20,20,.75); display:grid; place-items:center; z-index:10; }
+  #conditions-overlay[hidden] { display:none; }
+  #conditions-overlay .sheet { background:#fff; max-width:560px; padding:22px; border-radius:10px; }
+  button { padding:9px 16px; border-radius:6px; border:1px solid #8a4b0f; background:#8a4b0f; color:#fff; font-size:14px; cursor:pointer; }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="banner">
+    <h1>SAP-2 — Survivability Position Planner</h1>
+    <span class="state" id="wm-state">BOOTING</span>
+    <span id="wm-detail"></span>
+    <span class="hash" id="hash-line"></span>
+  </header>
+
+  <section id="inputs" aria-label="Planning inputs">
+    <h2>Position</h2>
+    <label for="in-position">What are you digging?</label>
+    <select id="in-position"></select>
+    <label for="in-threat">Worst weapon you expect</label>
+    <select id="in-threat"></select>
+    <label for="in-soil">Ground you are digging in</label>
+    <select id="in-soil"></select>
+    <label for="in-standard">How complete a position</label>
+    <select id="in-standard"></select>
+    <label for="in-revetment">Wall bracing</label>
+    <select id="in-revetment"></select>
+    <div class="check">
+      <input type="checkbox" id="in-machine" />
+      <label for="in-machine" style="margin:0">Machine help for the digging</label>
+    </div>
+
+    <h2 style="margin-top:18px">Data</h2>
+    <label for="in-fill">Load a fill file (.sap2fill.json)</label>
+    <input type="file" id="in-fill" accept=".json,.sap2fill.json" />
+    <p id="fill-reasons" role="alert"></p>
+
+    <h2 style="margin-top:18px">3D</h2>
+    <div id="canvas-socket" data-retain>3D view arrives in R2b — this socket is permanent.</div>
+  </section>
+
+  <section id="drawings" aria-label="Drawings">
+    <figure id="fig-section" style="margin:0"></figure>
+    <figure id="fig-plan" style="margin:0"></figure>
+  </section>
+
+  <div id="panels">
+    <section aria-label="Checks"><h2>Checks</h2><ul id="validation"></ul></section>
+    <section aria-label="Materials"><h2>What you need</h2><table id="bom"></table></section>
+    <section aria-label="Work"><h2>Work by stage</h2><table id="stages"></table></section>
+  </div>
+</div>
+
+<div id="conditions-overlay" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="cond-title">
+    <h1 id="cond-title">Conditions of use</h1>
+    <p style="font-size:14px">This tool is a planning aid. It ships with <strong>no doctrinal
+    values</strong>; every number it will ever print must be entered, cited, verified, and
+    commissioned by a qualified operator, and outputs are marked with their data's
+    provenance state. It is not a substitute for current publications or engineer
+    judgment. Full text: <code>docs/CONDITIONS_OF_USE.md</code> (wording pending counsel
+    review).</p>
+    <label for="cond-name">Type your name to accept</label>
+    <input type="text" id="cond-name" autocomplete="off" />
+    <p style="margin-top:14px"><button id="cond-accept" disabled>I accept</button></p>
+  </div>
+</div>
+
+<noscript><p style="padding:20px">SAP-2 needs JavaScript enabled. Nothing here runs from a network — the file you opened is the whole app.</p></noscript>
+<script type="module" src="/src/ui/main.ts"></script>
+</body>
+</html>
