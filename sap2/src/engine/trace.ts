@@ -112,6 +112,12 @@ export const mul = <A extends NumericUnit, B extends NumericUnit>(
   return mk('mul', labelKey, unit, val(a) * val(b), [a.node, b.node]);
 };
 
+/** Ratio-scaling preserves any unit — the generic-safe form of mul(ratio, q). */
+export const scale = <U extends NumericUnit>(labelKey: string, ratio: Q<'ratio'>, q: Q<U>): Q<U> => {
+  if (ratio.kind === 'unfilled' || q.kind === 'unfilled') return unfilled(mergeBlockers(ratio, q));
+  return mk('mul', labelKey, q.unit, val(ratio) * val(q), [ratio.node, q.node]);
+};
+
 export const div = <A extends NumericUnit, B extends NumericUnit>(
   labelKey: string, a: Q<A>, b: Q<B>, unit: Div<A, B>,
 ): Q<Div<A, B>> => {
@@ -146,6 +152,17 @@ export const sum = <U extends NumericUnit>(labelKey: string, qs: readonly Q<U>[]
 };
 
 const val = (t: Traced<NumericUnit>): number => (t.node as InternalNode).value;
+
+/** Same-unit comparison WITHOUT extraction (engine-safe): unknown compares as
+ *  'unknown', never as false — a validation gated on unfilled data must report
+ *  incompleteness, not silently pass (fail-safe, INV-3). */
+export const qCompare = <U extends NumericUnit>(
+  a: Q<U>, b: Q<U>,
+): 'lt' | 'eq' | 'gt' | { readonly unknown: readonly string[] } => {
+  if (a.kind === 'unfilled' || b.kind === 'unfilled') return { unknown: mergeBlockers(a, b) };
+  const x = val(a), y = val(b);
+  return x < y ? 'lt' : x > y ? 'gt' : 'eq';
+};
 
 // ---------------------------------------------------------------------------------
 // Restricted extraction & verification. Lint (G-9) allows `unsafeValue` imports only

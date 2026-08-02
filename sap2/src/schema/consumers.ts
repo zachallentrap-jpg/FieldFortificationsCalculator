@@ -54,15 +54,19 @@ export const CONSUMERS: Readonly<Record<ConsumerId, readonly string[]>> = {
     ...STANDARD_IDS.map((s) => standardMulId(s, 'labor')),
     ...POSITION_IDS.map(sumpCountId),
     ...POSITION_IDS.map(elbowHolesId),
-    SANDBAG_IDS.L, SANDBAG_IDS.W, SANDBAG_IDS.H, SANDBAG_IDS.wasteFactor, SANDBAG_IDS.frontWallHeight,
+    // Dig rates are LABOR's, exclusively (§4.3): labor is the sole consumer of
+    // dig-rate/machine leaves; the scheduler consumes labor-by-stage only and cannot
+    // see them — the v1 double-count is a set-equality impossibility.
+    ...SOIL_IDS.map(digRateHandId),
+    ...SOIL_IDS.map(digRateMachineId),
+    SANDBAG_IDS.L, SANDBAG_IDS.W, SANDBAG_IDS.H, SANDBAG_IDS.wasteFactor,
+    SANDBAG_IDS.frontWallHeight, SANDBAG_IDS.frontWallDepthCount,
     MISC_MATERIAL_IDS.picketSpacing, MISC_MATERIAL_IDS.wirePerPicket,
     MISC_MATERIAL_IDS.camoDrapeFactor, MISC_MATERIAL_IDS.swellFactor,
     SUMP_IDS.gravelFt3,
   ],
   'engine/schedule': [
     ...POSITION_IDS.map(crewSizeId),
-    ...SOIL_IDS.map(digRateHandId),
-    ...SOIL_IDS.map(digRateMachineId),
   ],
   'engine/validate': [
     BACKBLAST_CLEARANCE_ID,
@@ -77,8 +81,8 @@ export const CONSUMERS: Readonly<Record<ConsumerId, readonly string[]>> = {
 };
 
 /** Leaves only one consumer may read (the machine/labor double-count killer class —
- *  §4.3): dig rates belong to the scheduler alone. */
+ *  §4.3): dig rates belong to labor alone. */
 export const EXCLUSIVE_CONSUMERS: Readonly<Record<string, ConsumerId>> = Object.fromEntries([
-  ...SOIL_IDS.map((s) => [digRateHandId(s), 'engine/schedule'] as const),
-  ...SOIL_IDS.map((s) => [digRateMachineId(s), 'engine/schedule'] as const),
+  ...SOIL_IDS.map((s) => [digRateHandId(s), 'engine/work'] as const),
+  ...SOIL_IDS.map((s) => [digRateMachineId(s), 'engine/work'] as const),
 ]);

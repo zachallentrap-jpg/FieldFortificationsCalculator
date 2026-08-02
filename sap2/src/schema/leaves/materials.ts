@@ -27,6 +27,7 @@ export const SANDBAG_IDS = {
   L: 'sandbag.L', W: 'sandbag.W', H: 'sandbag.H',
   wasteFactor: 'sandbag.wasteFactor',
   frontWallHeight: 'sandbag.frontWallHeight',
+  frontWallDepthCount: 'sandbag.frontWallDepthCount',
   basicLoad: 'sandbag.basicLoad',
 } as const;
 
@@ -68,6 +69,11 @@ export const MATERIAL_LEAVES: readonly SchemaLeaf[] = [
     def: 'Height of the front firing-rest sandbag course at the parapet (the only concentrated sandbag element on an earth parapet).',
     pub: 'Front retaining wall spec in the fighting-position section (e.g. ATP 3-21.8 §5-238 class)', batch: 'materials.sandbag',
   }, { unit: 'ft', kind: 'dimension' }),
+  leaf(SANDBAG_IDS.frontWallDepthCount, {
+    name: 'Front retaining-wall bags in depth', plain: 'how many bags thick the firing-rest course is',
+    def: 'Number of filled sandbags laid front-to-back (in depth) in the front retaining-wall course at the parapet.',
+    pub: 'Front retaining wall spec in the fighting-position section', batch: 'materials.sandbag',
+  }, { unit: 'ea', kind: 'count', integer: true }),
   leaf(SANDBAG_IDS.basicLoad, {
     name: 'Sandbag basic load', plain: 'bags each Marine carries in',
     def: 'Sandbags a soldier carries as a starting set; designs needing far more imply on-site fill/resupply (validation input, not a limit).',

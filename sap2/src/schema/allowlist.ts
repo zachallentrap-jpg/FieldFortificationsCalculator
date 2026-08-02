@@ -17,7 +17,12 @@ export interface AllowlistEntry {
 }
 
 export const MAGNITUDE_ALLOWLIST: readonly AllowlistEntry[] = [
-  // (empty at R0 start — geometry structure constants land with the engine, each with
-  //  a decision entry; the first candidates are exact math constants like π/4 for the
-  //  circular-pit volume model, which are mathematics, not doctrine.)
+  // Exact mathematics of the prismatoid volume formula V = h/6·(A₀ + 4·A_m + A₁) and
+  // the both-sides batter term (2·s·D). Mathematics, not doctrine.
+  { ref: 'AL-GEOM-2', value: 2, module: 'engine/solids', decisionRef: 'B43/§4.3-I3', rationale: 'both-sides batter doubling and midpoint halving in exact prismatoid integration' },
+  { ref: 'AL-GEOM-4', value: 4, module: 'engine/solids', decisionRef: 'B43/§4.3-I3', rationale: 'prismatoid midsection weight (Simpson exact for linear-edge solids)' },
+  { ref: 'AL-GEOM-6', value: 6, module: 'engine/solids', decisionRef: 'B43/§4.3-I3', rationale: 'prismatoid divisor (Simpson exact for linear-edge solids)' },
+  { ref: 'AL-COUNT-1', value: 1, module: 'engine/work', decisionRef: 'B43/§4.3', rationale: 'dimensionless→count identity when a geometric ratio becomes an item count (traced explicitly)' },
+  { ref: 'AL-PERIM-2', value: 2, module: 'engine/work', decisionRef: 'B43/§4.3-I3', rationale: 'rectangle perimeter doubling (mathematics)' },
+  { ref: 'AL-ZERO', value: 0, module: 'engine/work', decisionRef: 'B43/§4.3', rationale: 'additive identity for absent features (no revetment ⇒ zero bags), traced explicitly' },
 ];

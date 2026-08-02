@@ -25,12 +25,14 @@ export type NumericUnit = Exclude<CanonicalUnit, 'text' | 'flag'>;
 // units, so `area × depth` types as ft3 and a ft×ft3 product is a compile error.
 // 'ratio' is the multiplicative identity.
 export type UnitMul = {
-  ft:   { ft: 'ft2'; ft2: 'ft3'; ratio: 'ft' };
-  ft2:  { ft: 'ft3'; ratio: 'ft2' };
-  ft3:  { ratio: 'ft3' };
+  // A per-each quantity times a count is that quantity's total (mh/ea is implicit in
+  // per-item leaves — 'ea' multiplication is the explicit, traced form of that).
+  ft:   { ft: 'ft2'; ft2: 'ft3'; ratio: 'ft'; ea: 'ft' };
+  ft2:  { ft: 'ft3'; ratio: 'ft2'; ea: 'ft2' };
+  ft3:  { ratio: 'ft3'; ea: 'ft3' };
   ratio: { ft: 'ft'; ft2: 'ft2'; ft3: 'ft3'; ratio: 'ratio'; man_hours: 'man_hours'; hours: 'hours'; ea: 'ea'; lb: 'lb' };
-  ea:   { ratio: 'ea'; lb: 'lb' };            // count × per-item-weight → weight
-  man_hours: { ratio: 'man_hours' };
+  ea:   { ratio: 'ea'; ea: 'ea'; lb: 'lb' };  // count × per-item-weight → weight
+  man_hours: { ratio: 'man_hours'; ea: 'man_hours' };
   machine_hours: { ratio: 'machine_hours' };
   hours: { ratio: 'hours' };
   lb:   { ratio: 'lb' };
