@@ -377,6 +377,39 @@ Pinned: `test/fixtures/train-vectors.json` fixes the PRNG, the shuffle and the s
 so a learner's card order is reproducible across builds. Regenerate only via
 `npm run gen:train-vectors`, in the same PR as the change that moved it.
 
+### 5.0b The command packet — the Planning app's deliverable
+
+`src/timber/packet/**`, compiled pure and rendered pure; `src/ui/woodframe/sheet.ts` is a thin
+adapter that draws the cover art and opens the print frame. Five sections in print order —
+cover, executive summary, materials, labor and schedule, assumptions and citations — with
+drawings in an opt-in annex at the back. Nine sheets for the GP frame, ten for the guard tower.
+
+**The bill is orderable now**, which it was not:
+
+| Was | Is |
+|---|---|
+| Subfloor, roof sheathing and siding all billed as `4x8 panel` — three products, one order line | Thickness in the order nominal, taken from the member's own `actual.w` |
+| `Member.grade` dropped by `cutList` entirely | Part of the key; a No. 2 and a select-structural 2x6 are two lines |
+| No treatment anywhere — sills and posts bear on soil | Derived by role with a cite; a role with no rule prints blank, never a guess |
+| Cut lengths only: `2x4, 12 ft, 37 pieces` | First-fit stock purchase table over the lengths the operator's supply point carries, with exact cut-fit waste, kerf ignored and said so |
+| — | Sheets by the sheet, roll goods by the 100-sf square, concrete by the cubic yard off the member's own section |
+| — | Runs longer than stock surfaced with their roles, never silently spliced |
+| — | `.materials.csv` export, RFC 4180, fitted to the same stock lengths as the packet |
+
+**Regime rules the tests enforce.** No signature theater — the tool never says a design was
+verified or approved, and the approval block prints what a signature does and does not cover.
+The honesty strip rides a `<tfoot>` so it repeats on every sheet in both Chrome and Firefox
+(margin boxes render nowhere in Chrome; `position: fixed` prints once in Firefox). The
+life-safety table is scoped to what *this* build consumes, by role and by family, gated by a
+test that every one of the 53 LS constants declares its consumers. Type floors at 9 pt because
+this document gets photocopied in grey. Byte-identical output for identical input, no script,
+no external URL, no clock.
+
+**Operator inputs, not doctrine.** Crew sizes, productive hours (6, not 8 — "excludes security,
+details, travel and tool contention") and stock lengths are asked before anything generates,
+and clamped rather than validated. A crew larger than the work can absorb is *suppressed with a
+reason*, never given a smaller number.
+
 ### Verification runs (2026-08-01)
 
 | Check | Result |
@@ -732,6 +765,32 @@ Plus three build gates: `tsc --noEmit` (extra-strict), `check-offline` (zero ext
 ---
 
 ## 8. Recommended priorities
+
+### 8.0 What's actually next (supersedes the list below where they disagree)
+
+The list in §8.1 predates the TIMBER-2 rebuild and the retirement of SAP-1; several of its
+items no longer exist (TIMBER-1's "it's a demo until the building is parameterized" was closed
+by the catalog and the config panel). The live queue is:
+
+1. **A real doctrine fill.** Every framing number the toolkit prints is `(PH)` — pending a
+   manual page check — and the packet says so on every sheet. One verified table would prove
+   the burn-down path end to end and would be the single largest jump in what this tool is
+   allowed to claim. This is a documents-and-review task, not a code task, and nothing in the
+   code can substitute for it.
+2. **Span checking that computes rather than warns.** Member sizes come from the standard
+   drawing for the family; the packet prints that limitation verbatim and the approval block
+   scopes signatures away from it. Real span arithmetic against a cited table is what would let
+   the "reviewed by unit engineer" line come back.
+3. **The training plan's remaining phases** (`docs/TRAINING_AND_PACKETS_PLAN.md` F5–F9):
+   printable paper decks and worksheets, hip-pocket class mode, records, and the post-T3
+   integration. F1 (training core), F2 (the trainer), F3 (the command packet) and F4 (quiz
+   modes) have shipped.
+4. **A hip roof's covering.** `roofPlanes` returns two rectangular planes for a hip, so the two
+   triangular ends show bare framing. The framing itself is right; the skin is not.
+5. **SAP-2's own trainer** (F7/F8) — the training core is app-agnostic and already carries the
+   regime enum for it.
+
+### 8.1 Earlier audit ordering (historical)
 
 If the next effort is a fix pass, this order maximizes trust-per-hour (consolidations from the
 audit plan, updated by what's already fixed):
