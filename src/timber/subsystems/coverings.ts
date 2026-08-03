@@ -18,7 +18,7 @@ import type { Member } from '../types';
 import { DRESSED } from '../types';
 import { makeEmitter } from '../emit';
 import { PANEL, ROOFING, SIDING, LUMBER, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
-import type { RoofPlane } from './roofFamilies';
+import { planeSpanAt, type RoofPlane } from './roofFamilies';
 import type { WallSurface } from './wallSystem';
 
 /** A rectangle in a surface's own (u, v) coordinates. */
@@ -63,6 +63,12 @@ export function subtractCutouts(tile: Rect, cutouts: Rect[]): Rect[] {
 /**
  * Lay sheet goods over a surface: full sheets from the origin, courses offset by `stagger`,
  * last row and column cut to fit — never overlapped, which would double-count material.
+ *
+ * `span` clips each course to the surface's own width at that height. A rectangle passes the
+ * full run at every height and comes out exactly as before; a hip's trapezoid narrows toward
+ * the ridge and its ends narrow to a point, and the cut pieces are billed at the width they
+ * are actually cut to. The clip is per COURSE rather than per tile because that is how the
+ * material is cut on site — you snap a line and cut the row.
  */
 export function tileSurface(
   runFt: number,
@@ -70,20 +76,34 @@ export function tileSurface(
   sheetWFt: number,
   sheetHFt: number,
   stagger = 0,
+  span?: (v: number) => { lo: number; hi: number },
 ): Tile[] {
   const tiles: Tile[] = [];
   let row = 0;
   for (let v = 0; v < heightFt - EPS; v += sheetHFt, row++) {
     const v1 = Math.min(v + sheetHFt, heightFt);
+    // AT THE COURSE'S MID-HEIGHT, and the choice is the difference between a right bill and a
+    // wrong one. Clipping at the course's widest edge covers the whole surface but bills the
+    // triangular offcuts as if they were laid — 14% over on a 48x20 hip. Clipping at the
+    // narrowest leaves the same 14% of the roof bare. The taper is linear in v, so the width at
+    // mid-height is the course's exact average and the areas cancel to the square foot.
+    //
+    // What it costs, stated: the drawn pieces step across the hip line by half a course rather
+    // than following it, because a rectangle cannot be cut on a diagonal. The roof is covered
+    // and the quantity is right; the hip line is a staircase at course resolution.
+    const s = span ? span((v + v1) / 2) : { lo: 0, hi: runFt };
+    const lo = s.lo;
+    const hi = s.hi;
+    if (hi - lo <= EPS) continue; // the point at the top of a hip end — nothing to cut
     const off = row % 2 === 1 ? stagger : 0;
-    let u = 0;
+    let u = lo;
     if (off > 0) {
-      const first = Math.min(off, runFt);
-      tiles.push({ u0: 0, u1: first, v0: v, v1, full: false });
+      const first = Math.min(lo + off, hi);
+      tiles.push({ u0: lo, u1: first, v0: v, v1, full: false });
       u = first;
     }
-    for (; u < runFt - EPS; u += sheetWFt) {
-      const u1 = Math.min(u + sheetWFt, runFt);
+    for (; u < hi - EPS; u += sheetWFt) {
+      const u1 = Math.min(u + sheetWFt, hi);
       tiles.push({ u0: u, u1, v0: v, v1, full: u1 - u >= sheetWFt - EPS && v1 - v >= sheetHFt - EPS });
     }
   }
@@ -263,7 +283,8 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
     const sheetW = PANEL.lengthFt.value as number; // 8 ft along the eave
     const sheetH = PANEL.widthFt.value as number; // 4 ft up the slope
     for (const plane of planes) {
-      for (const t of tileSurface(plane.eaveLengthFt, plane.slopeLengthFt, sheetW, sheetH)) {
+      for (const t of tileSurface(plane.eaveLengthFt, plane.slopeLengthFt, sheetW, sheetH, 0,
+        (v) => planeSpanAt(plane, v))) {
         const p = roofTilePlacement(plane, t, rafterHalfFt + thick / 2);
         emit('roofPanel', `${PANEL.widthFt.value}x${PANEL.lengthFt.value} panel`, {
           cutLengthFt: t.u1 - t.u0,
@@ -305,11 +326,19 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
         // is ceil(slopeLength / exposure), so every v0 is already short of the ridge and this
         // can never produce an empty course.
         const v1 = Math.min(v0 + courseWFt, plane.slopeLengthFt);
-        const sheetLen = isRoll ? plane.eaveLengthFt : (ROOFING.corrugatedLengthFt.value as number);
-        const runs = isRoll ? 1 : Math.ceil(plane.eaveLengthFt / sheetLen);
+        // A hip's courses get SHORTER toward the ridge, and on its triangular ends they run out
+        // to nothing. Mid-height for the same reason as the deck tiler above: the taper is
+        // linear, so the average width is exact and the quantity is right.
+        const s = planeSpanAt(plane, (v0 + v1) / 2);
+        const lo = s.lo;
+        const hi = s.hi;
+        const courseRun = hi - lo;
+        if (courseRun <= TOLERANCE.epsFt) continue;
+        const sheetLen = isRoll ? courseRun : (ROOFING.corrugatedLengthFt.value as number);
+        const runs = isRoll ? 1 : Math.ceil(courseRun / sheetLen);
         for (let r = 0; r < runs; r++) {
-          const u0 = r * sheetLen;
-          const u1 = Math.min(u0 + sheetLen, plane.eaveLengthFt);
+          const u0 = lo + r * sheetLen;
+          const u1 = Math.min(u0 + sheetLen, hi);
           // Each course laps the one below it, so consecutive courses share `lapIn` of the
           // slope. Placed at one common lift they were two slabs in the same plane —
           // interpenetrating, z-fighting, and reading as a stepped seam the width of the lap.

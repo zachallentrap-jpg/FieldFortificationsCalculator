@@ -35,6 +35,28 @@ export interface RoofPlane {
   normal: [number, number, number]; // unit, outward (up)
   eaveLengthFt: number;
   slopeLengthFt: number;
+  /**
+   * How wide the plane is at its TOP edge, when that differs from the eave.
+   *
+   * A gable slope and a shed are rectangles and leave this undefined. A hip is not: its long
+   * slopes are trapezoids narrowing to the ridge, and its two ends are triangles narrowing to
+   * a point. The taper is centred on the eave, which is what an equal-pitch hip produces.
+   *
+   * Carrying it on the PLANE rather than special-casing the tiler is what lets one covering
+   * path serve every roof — the tiler clips each course to the plane's width at that height
+   * and a rectangle simply never gets clipped.
+   */
+  topLengthFt?: number;
+}
+
+/** Half-open [lo, hi) of the plane's own u at height v — the outline, evaluated. */
+export function planeSpanAt(p: RoofPlane, v: number): { lo: number; hi: number } {
+  const top = p.topLengthFt;
+  if (top === undefined || p.slopeLengthFt <= 0) return { lo: 0, hi: p.eaveLengthFt };
+  const t = Math.min(1, Math.max(0, v / p.slopeLengthFt));
+  const width = p.eaveLengthFt + (top - p.eaveLengthFt) * t;
+  const lo = (p.eaveLengthFt - width) / 2;
+  return { lo, hi: lo + width };
 }
 
 const cross = (a: number[], b: number[]): [number, number, number] => [
@@ -72,14 +94,58 @@ export function roofPlanes(spec: BuildingSpec, plateTopY: number): RoofPlane[] {
   const { slope, lenPerFtRun } = slopeOf(roof);
   const oh = roof.overhangFt; // 'none' returned above, so every remaining kind has one
 
-  // KNOWN LIMITATION, stated rather than left to be discovered: a hip is treated here as a
-  // gable, which gives the two long slopes and NOT the two triangular hip ends. The FRAMING is
-  // complete (see `generateHip` — commons, hips and jacks are all emitted and the jack sequence
-  // is asserted in `timber2-hip`); what is missing is covering over the two ends, so a hip roof
-  // shows deck and roofing on its long slopes and bare framing on its hip ends. Closing it means
-  // returning four planes here, two of them triangular, which the rectangular tiler in
-  // `coverings.ts` cannot lay out yet.
-  if (roof.kind === 'gable' || roof.kind === 'hip') {
+  // A HIP HAS FOUR SURFACES, and for a long time this returned two — a hip was treated as a
+  // gable, so its long slopes got deck and roofing and its two triangular ends showed bare
+  // framing. The framing was always complete (`generateHip` emits commons, hips and jacks, and
+  // the jack sequence is asserted in `timber2-hip`); it was the skin that stopped at the hips.
+  //
+  // Geometry, for an equal-pitch hip on an L × W plan with L > W: the ridge runs along X at
+  // z = W/2, from x = W/2 to x = L - W/2, so it is (L - W) long. Both long slopes are
+  // trapezoids from a full-length eave up to that ridge. Both ends are triangles from a
+  // W-wide eave up to a single point at the ridge end. Every one of the four rises
+  // (W/2 + overhang) of run, so all four share the pitch — which is what makes it a hip
+  // rather than four unrelated planes.
+  if (roof.kind === 'hip') {
+    const run = W / 2 + oh;
+    const yEave = plateTopY - oh * slope;
+    const slopeLengthFt = run * lenPerFtRun;
+    const planes: RoofPlane[] = [];
+    // Long slopes: same convention as the gable — u runs +X on the south side, -X on the
+    // north, so both normals point up and outward.
+    for (const side of [-1, 1] as const) {
+      const zEave = side === -1 ? -oh : W + oh;
+      planes.push({
+        id: side === -1 ? 'roof-S' : 'roof-N',
+        origin: [side === -1 ? 0 : L, yEave, zEave],
+        alongEave: side === -1 ? [1, 0, 0] : [-1, 0, 0],
+        upSlope: [0, slope / lenPerFtRun, (side === -1 ? 1 : -1) / lenPerFtRun],
+        normal: cross([0, slope / lenPerFtRun, (side === -1 ? 1 : -1) / lenPerFtRun],
+          side === -1 ? [1, 0, 0] : [-1, 0, 0]),
+        eaveLengthFt: L,
+        slopeLengthFt,
+        topLengthFt: Math.max(0, L - W),
+      });
+    }
+    // Hip ends. At x = 0 uphill is +X and u runs -Z; at x = L it is mirrored. Both taper to a
+    // point, so `topLengthFt` is 0 and the tiler cuts every course to the triangle.
+    for (const end of [-1, 1] as const) {
+      const upSlope: [number, number, number] = [end === -1 ? 1 / lenPerFtRun : -1 / lenPerFtRun, slope / lenPerFtRun, 0];
+      const alongEave: [number, number, number] = end === -1 ? [0, 0, -1] : [0, 0, 1];
+      planes.push({
+        id: end === -1 ? 'roof-W' : 'roof-E',
+        origin: [end === -1 ? -oh : L + oh, yEave, end === -1 ? W : 0],
+        alongEave,
+        upSlope,
+        normal: cross(upSlope, alongEave),
+        eaveLengthFt: W,
+        slopeLengthFt,
+        topLengthFt: 0,
+      });
+    }
+    return planes;
+  }
+
+  if (roof.kind === 'gable') {
     const halfSpan = W / 2;
     const run = halfSpan + oh;
     const yEave = plateTopY - oh * slope;
