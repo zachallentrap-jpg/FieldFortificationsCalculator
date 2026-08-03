@@ -101,6 +101,27 @@
   .wb-toolbar .grp > span {
     display: inline-flex; gap: 0; padding: 2px; background: var(--fill);
     border-radius: 8px; max-width: 100%; overflow-x: auto; scrollbar-width: none;
+    /* `min-width: 0` is what makes the `overflow-x` above do anything. A flex item's automatic
+       minimum size is its CONTENT width, so eleven stage chips refused to shrink, pushed the
+       toolbar wider than the phone, and took the whole page sideways with them — every screen
+       scrolled horizontally by a few pixels and the last chip in each row was clipped off the
+       edge with no way to reach it. The track scrolls inside itself now. */
+    min-width: 0;
+    /* SCROLL SHADOWS, so a clipped track says so. A phone shows six of eleven stage chips and
+       nothing about a flat cut edge suggests the rest are one swipe away. This is the
+       background-attachment trick: the two `local` covers scroll WITH the content and sit on
+       top of the two `scroll` shadows, so a shadow is only visible at an end you have not
+       reached yet. No script, and it cannot get out of step with the real scroll position. */
+    background-color: var(--fill);
+    background-image:
+      linear-gradient(to right, var(--fill), rgba(120, 120, 128, 0)),
+      linear-gradient(to left, var(--fill), rgba(120, 120, 128, 0)),
+      radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.19), rgba(0, 0, 0, 0)),
+      radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.19), rgba(0, 0, 0, 0));
+    background-position: left center, right center, left center, right center;
+    background-repeat: no-repeat;
+    background-size: 26px 100%, 26px 100%, 11px 100%, 11px 100%;
+    background-attachment: local, local, scroll, scroll;
   }
   .wb-toolbar .grp > span::-webkit-scrollbar { display: none; }
   .wb-toolbar .grp > span .chip {
@@ -178,7 +199,9 @@
   }
   .wb-head h1 { font-size: 13.5px; font-weight: 640; letter-spacing: -0.01em; }
   .wb-head .lineage { font-size: 11.5px; color: var(--label-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .wb-actions { margin-left: auto; display: flex; gap: 6px; }
+  /* Wrapping, because three chips do not fit beside a title on a phone and the third was
+     running off the right edge — which on this bar is the primary action of the whole app. */
+  .wb-actions { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; }
   .back { display: inline-flex; align-items: center; gap: 3px; color: var(--accent); font-weight: 500; }
 
   .wb-toolbar {
@@ -385,6 +408,11 @@
     .pane--inspect { width: auto; }
     .chip, .back, .jump, .resume-chip { min-height: 34px; padding-left: 13px; padding-right: 13px; }
     .wb-toolbar .grp > span .chip { min-height: 30px; }
+    /* One control group per row. Side by side, "View" and "Stage" each got half a phone and
+       both scrolled — two tiny scrollers beside each other is worse than two full-width ones. */
+    .wb-toolbar { gap: 8px 12px; }
+    .wb-toolbar .grp { flex: 1 1 100%; }
+    .wb-actions { width: 100%; margin-left: 0; }
     /* Stack label over control: side by side pushed the input off the right edge, and a
        number you cannot see is a number you cannot set. */
     .row { display: grid; grid-template-columns: 1fr; gap: 5px; }

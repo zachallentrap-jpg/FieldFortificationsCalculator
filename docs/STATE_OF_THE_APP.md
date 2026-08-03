@@ -114,6 +114,14 @@ large VBIED) resolve to `engineered_required`; unknown munitions fail safe.
 
 Design decisions are logged as **D1–D35** in `DECISIONS.md` (D33 intentionally skipped).
 
+> **This table stops at 2026-07-12 and the repository does not.** Everything after it — TIMBER-2
+> (`docs/TIMBER2_PLAN.md`), the trainer and the command packet
+> (`docs/TRAINING_AND_PACKETS_PLAN.md`), and the model-fidelity work of 2026-08-03
+> (`docs/MODEL_FIDELITY_LOG.md`) — landed after this audit was taken and is NOT reflected in the
+> ground-truth block at the top of this file or in the findings below. Read those three
+> documents alongside this one; a stale audit that does not say it is stale is worse than no
+> audit.
+
 ---
 
 ## 3. Architecture and data flow
