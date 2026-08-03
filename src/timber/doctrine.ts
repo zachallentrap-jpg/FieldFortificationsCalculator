@@ -150,6 +150,16 @@ export const RAIL = {
   requiredAboveFt: doc(2.5, 'EM 385-1-1 fall-protection threshold', { unit: 'ft', lifeSafety: true }),
 } as const;
 
+export const PLATFORM = {
+  pierSpacingFt: doc(8, 'FM 5-426 post & footer spacing on a deck (PH)', { unit: 'ft' }),
+  padSideIn: doc(16, 'FM 5-426 post footers', { unit: 'in' }),
+  padDepthIn: doc(8, 'FM 5-426 post footers', { unit: 'in' }),
+  /** Bent posts stand this far in from the deck edge, so the plate is not the last board. */
+  bentInsetFt: doc(0.25, 'TM 10-8340 tent frame (PH)', { unit: 'ft' }),
+  /** Shorter than this and a 'post' is a shim, not a member. Mirrors the frozen floor.ts guard. */
+  minPostFt: doc(0.1, 'engine floor: below this a post is a shim, not a member', { unit: 'ft', ph: false }),
+} as const;
+
 export const RAMP = {
   slopes: doc([4, 6, 8] as const, 'EM 385-1-1 / TM 5-302 ramp slopes (1:N)', { lifeSafety: true }),
   stringerNominal: doc('2x12', 'TM 5-302 ramp stringers', { lifeSafety: true }),
@@ -295,7 +305,7 @@ export interface LsEntry {
 
 const GROUPS: Record<string, Record<string, Doc<unknown>>> = {
   LUMBER, PANEL, LAYOUT, FOUNDATION, STAIR, LADDER, RAIL, RAMP, ROOFING, SIDING, LABOR,
-  HUT, LATRINE, TOWER, TENT, OPENING,
+  HUT, LATRINE, TOWER, TENT, OPENING, PLATFORM,
 } as unknown as Record<string, Record<string, Doc<unknown>>>;
 
 /** Every doctrine constant, flattened — the source for the doc-integrity tests. */

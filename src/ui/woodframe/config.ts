@@ -146,6 +146,43 @@ export function configSchemaFor(familyId: FamilyId): PanelSchema {
     return { family: familyId, groups };
   }
 
+  // A platform and a tent frame have no walls and no openings; their panels say what they are.
+  if (family.specBranch === 'platform') {
+    groups.push({
+      title: '1 · THE DECK',
+      rows: [
+        ...(['dims.lengthFt', 'dims.widthFt'].map((p) => numberRow(p, family)).filter(Boolean) as PanelRow[]),
+        ...(numberRow('deckHeightFt', family, 'Grade to the walking surface. Above 2 ft 6 in this has to be railed (EM 385-1-1).') ? [numberRow('deckHeightFt', family)!] : []),
+        { path: 'deck', label: 'Decking', control: 'select', options: ['plank', 'panel'] },
+      ],
+    });
+    groups.push({
+      title: '2 · WHAT IT STANDS ON',
+      rows: [{ path: 'base', label: 'Base', control: 'select', options: ['piers', 'skids'], help: 'Piers and footings, or skids you can drag it on.' }],
+    });
+    groups.push({
+      title: '3 · GETTING UP',
+      rows: [
+        ...(numberRow('ramp.widthFt', family, 'Wide enough for what has to go up it.') ? [numberRow('ramp.widthFt', family)!] : []),
+        { path: 'ramp.slope', label: 'Ramp slope', control: 'select', numeric: true, options: ['4', '6', '8'], cite: 'EM 385-1-1 / TM 5-302 ramp slopes (1:N)', help: 'Run per foot of rise. 1 in 8 is the gentlest.' },
+        { path: 'steps', label: 'Steps at the end', control: 'toggle' },
+      ],
+    });
+    return { family: familyId, groups };
+  }
+  if (family.specBranch === 'tentFrame') {
+    groups.push({
+      title: '1 · THE TENT',
+      rows: [
+        { path: 'tent', label: 'Tent', control: 'select', options: ['gpSmall', 'gpMedium', 'temper'], cite: 'TM 10-8340 (PH)' },
+        ...(numberRow('temperBays', family, 'TEMPER only — the frame grows a bay at a time.') ? [numberRow('temperBays', family)!] : []),
+      ],
+    });
+    groups.push({ title: '2 · FLOOR', rows: (['dims.lengthFt', 'dims.widthFt'].map((p) => numberRow(p, family)).filter(Boolean) as PanelRow[]) });
+    groups.push({ title: '3 · FITTINGS', rows: [{ path: 'endDoor', label: 'Framed end door', control: 'toggle' }] });
+    return { family: familyId, groups };
+  }
+
   // 1 · SHAPE
   const shape: PanelRow[] = [];
   for (const p of ['dims.lengthFt', 'dims.widthFt', 'stories.0.wallHeightFt']) {

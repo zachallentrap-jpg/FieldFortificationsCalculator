@@ -11,7 +11,7 @@
 // different tool than the code is impossible rather than merely discouraged.
 
 import type { StructureSpec, RoofSpec, CoveringSpec, StructureFamily } from './spec';
-import { HUT, LATRINE, TOWER, RAIL, LADDER, citeOf } from './doctrine';
+import { HUT, LATRINE, TOWER, TENT, RAIL, RAMP, LADDER, citeOf } from './doctrine';
 import { hutDims } from './families/hut';
 
 export type FamilyId =
@@ -367,10 +367,104 @@ const TOWER_CARD: FamilyDef = {
   cutaway: { axis: 'z', frac: 0.5, keep: -1, reason: 'Cut through the middle — see the batter, every brace bay, and how the platform lands on the legs.' },
 };
 
+// ── Platform, tent floor and strongback (T6a) ────────────────────────────────
+
+const PLATFORM_CARD: FamilyDef = {
+  id: 'platform',
+  group: 'site',
+  name: 'Loading platform',
+  oneLiner: 'A working deck at truck-bed height, railed on every open edge, with a ramp at the doctrine slope.',
+  specBranch: 'platform',
+  lineage: 'TM 5-302 loading platform (PH — sheet pending); EM 385-1-1 for rails and ramp slope',
+  capacity: 'materials handling',
+  shipped: true,
+  rationale:
+    'The RAMP is generated from the doctrine slope, not drawn to fit the space left over — a ramp that '
+    + 'looks about right is a ramp somebody drops a pallet down. Rails follow from the deck height, not '
+    + 'from a checkbox.',
+  preset: {
+    family: 'platform',
+    dims: { lengthFt: 20, widthFt: 12 },
+    spacing: STD_SPACING,
+    coverings: NO_COVERINGS,
+    deckHeightFt: 4,
+    base: 'piers',
+    deck: 'plank',
+    ramp: { widthFt: 6, slope: 6 },
+    steps: true,
+    railEdges: ['S', 'E', 'N', 'W'],
+  } as StructureSpec,
+  locks: [
+    { path: 'rail.topHeightIn', label: 'Guardrail height', value: `${RAIL.topHeightIn.value} in`, cite: citeOf(RAIL.topHeightIn), lifeSafety: true },
+    { path: 'ramp.slope', label: 'Ramp slope', value: '1 in 4, 6 or 8', cite: citeOf(RAMP.slopes), lifeSafety: true },
+  ],
+  roofs: ['none'],
+  coverings: {},
+  cutaway: { axis: 'z', frac: 0.5, keep: -1, reason: 'Cut across the deck — see the joists, what they bear on, and how the rail posts land.' },
+};
+
+const TENT_FLOOR: FamilyDef = {
+  id: 'tent-floor',
+  group: 'tents-frames',
+  name: 'Tent frame & floor',
+  oneLiner: 'A real floor and a rank of bents for a GP tent — the canvas goes over it and is not part of this bill.',
+  specBranch: 'tentFrame',
+  lineage: 'TM 10-8340 tentage (PH — sheet pending); FM 5-426 ch. 6 for the floor',
+  capacity: 'GP Small',
+  shipped: true,
+  rationale:
+    'The CANVAS is not a member and is not billed: what the tool generates is what a section actually '
+    + 'cuts and nails — the deck, the bents and the ridge that ties them.',
+  preset: {
+    family: 'tentFrame',
+    dims: { lengthFt: 29.5, widthFt: 17.5 },
+    spacing: STD_SPACING,
+    coverings: NO_COVERINGS,
+    tent: 'gpSmall',
+    endDoor: true,
+  } as StructureSpec,
+  locks: [
+    { path: 'tent', label: 'Tent size', value: 'from TM 10-8340', cite: citeOf(TENT.gpSmall) },
+    { path: 'bentSpacing', label: 'Bent spacing', value: `${TENT.bentSpacingFt.value} ft`, cite: citeOf(TENT.bentSpacingFt) },
+  ],
+  roofs: ['none'],
+  coverings: {},
+  cutaway: { axis: 'x', frac: 0.5, keep: -1, reason: 'Cut across a bent — see the pair of posts, the rafters, and the collar that stops them spreading.' },
+};
+
+const STRONGBACK: FamilyDef = {
+  id: 'strongback',
+  group: 'tents-frames',
+  name: 'Strongback (TEMPER)',
+  oneLiner: 'The hasty version: a decked frame under a TEMPER, sized by how many bays you need.',
+  specBranch: 'tentFrame',
+  lineage: 'TM 10-8340 TEMPER (PH — sheet pending)',
+  capacity: 'by bay count',
+  shipped: true,
+  rationale:
+    'Length is BAYS, not feet: a TEMPER grows a bay at a time, so the knob that matters is how many, '
+    + 'and the footprint follows.',
+  preset: {
+    family: 'tentFrame',
+    dims: { lengthFt: 32, widthFt: 20 },
+    spacing: STD_SPACING,
+    coverings: NO_COVERINGS,
+    tent: 'temper',
+    temperBays: 4,
+    endDoor: true,
+  } as StructureSpec,
+  locks: [
+    { path: 'temperBays', label: 'Bay length', value: `${(TENT.temper.value as { bayFt: number }).bayFt} ft each`, cite: citeOf(TENT.temper) },
+  ],
+  roofs: ['none'],
+  coverings: {},
+  cutaway: { axis: 'z', frac: 0.5, keep: -1, reason: 'Cut down the length — see every bent and the ridge running over them.' },
+};
+
 /** The one table (TD3). Families land as their phases ship; `shipped` gates the picker. */
 export const FAMILY_TABLE: readonly FamilyDef[] = [
   GP_FRAME, SEA_HUT, SWA_HUT, B_HUT, SQUAD_HUT, GUARD_SHACK, STORAGE_SHED,
-  TOWER_CARD, LATRINE_CARD, CUSTOM,
+  TOWER_CARD, TENT_FLOOR, STRONGBACK, PLATFORM_CARD, LATRINE_CARD, CUSTOM,
 ];
 
 export function familyById(id: FamilyId): FamilyDef | undefined {

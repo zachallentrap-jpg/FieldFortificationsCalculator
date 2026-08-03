@@ -134,7 +134,7 @@ export const WHAT: Record<MemberRole, string> = {
   screenFrame: 'Light frame holding a screen panel in a wall opening.',
   screenPanel: 'Insect screen filling a bay — the SEA hut band is built this way.',
   stringer: 'Sloped stair beam; the treads bear on it. The card shows the riser/tread layout.',
-  tread: 'The board you step on.',
+  tread: 'The board you step on. Its depth is a life-safety minimum, not a preference.',
   ladderRail: 'The side rail of a fixed ladder; rungs let into it.',
   ladderRung: 'The step of a fixed ladder — spacing is a life-safety number.',
   railPost: 'Post carrying the guardrail; spacing is a life-safety number.',
