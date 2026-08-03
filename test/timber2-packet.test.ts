@@ -23,6 +23,7 @@ import {
   CREW_MAX, CREW_MIN, DEFAULT_PRODUCTIVE_HOURS, HOURS_MAX, laborModel, maxUsefulCrew, timelineSvg,
 } from '../src/timber/packet/labor';
 import { APPROVAL_SCOPE, DECISION_LINE, LS_BANNER } from '../src/timber/packet/copy';
+import { csvFilename, packetCsv } from '../src/timber/packet/csv';
 import { lifeSafetyRegister } from '../src/timber/doctrine';
 import { familyById, shippedFamilies, type FamilyId } from '../src/timber/catalog';
 import { generateStructure } from '../src/timber/families/index';
@@ -346,6 +347,133 @@ test('operator-fill blanks print as blanks, and the tool fills none of them', ()
   // A Class IV list with no on-hand column and no lead time is not actionable — so the columns
   // are always present even though the tool can never know what goes in them.
   assert.ok(html.includes('class="fillcell"'));
+});
+
+// ── The supply-shop CSV ──────────────────────────────────────────────────────
+
+/** Split a CSV line, honouring RFC 4180 quoting. */
+function cells(line: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i]!;
+    if (inQ) {
+      if (c === '"' && line[i + 1] === '"') { cur += '"'; i += 1; }
+      else if (c === '"') inQ = false;
+      else cur += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ',') { out.push(cur); cur = ''; }
+    else cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+
+test('the CSV parses — every row has the column count its section header declared', () => {
+  // A nominal like `4x8 panel 1/2"` carries a quote and a role list carries commas. Get the
+  // quoting wrong and a supply section pastes a file that silently shifts columns.
+  for (const f of shippedFamilies()) {
+    const lines = packetCsv(build(f.id)).split('\r\n').filter((l) => l.length > 0);
+    let expect = 0;
+    for (const line of lines) {
+      if (line.startsWith('#')) { expect = 0; continue; }
+      const n = cells(line).length;
+      if (expect === 0) { expect = n; continue; }
+      assert.equal(n, expect, `${f.id}: "${line.slice(0, 60)}" has ${n} cells, section wants ${expect}`);
+    }
+  }
+});
+
+test('a quoted field round-trips through the quoting', () => {
+  const csv = packetCsv(build('gp-frame'));
+  const line = csv.split('\r\n').find((l) => l.includes('panel'))!;
+  assert.ok(line.includes('""'), 'the inch mark must be escaped, not dropped');
+  assert.ok(cells(line).some((c) => /^4x8 panel \d\/\d"$/.test(c)), cells(line).join(' | '));
+});
+
+test('every quantity in the CSV carries a unit of issue', () => {
+  // A column of bare numbers is not a requisition — 37 could be pieces, board-feet or sheets.
+  const csv = packetCsv(build('gp-frame'));
+  for (const header of ['# STOCK', '# CUTS', '# SHEETS', '# CONCRETE', '# HARDWARE']) {
+    const at = csv.indexOf(header);
+    assert.ok(at > 0, `no ${header} section`);
+    const cols = cells(csv.slice(at).split('\r\n')[1]!);
+    assert.ok(cols.includes('unit'), `${header} has no unit column: ${cols.join(', ')}`);
+  }
+});
+
+test('R-T4: cover depth is never a FIELD, and every mention carries the boundary sentence', () => {
+  // What the rule forbids is a machine-readable cover-depth VALUE: a column a downstream tool
+  // reads back as something this tool computed. The sentence itself is fine — it is the soil
+  // ghost's own citation, so the citation register quotes it verbatim, which is exactly the
+  // adjacency the boundary requires.
+  const p = build('crib-bunker');
+  const csv = packetCsv(p);
+  assert.ok(csv.slice(0, csv.indexOf('# STOCK')).includes(p.coverDepthNote), 'the warning block carries it');
+
+  // No section header names it — that is what a field would look like.
+  for (const line of csv.split('\r\n')) {
+    if (line.startsWith('#')) assert.ok(!/cover/i.test(line), `a cover-depth section: ${line}`);
+  }
+  const headers = csv.split('\r\n').filter((l, i, all) => (all[i - 1] ?? '').startsWith('#'));
+  for (const h of headers) {
+    for (const c of cells(h)) assert.ok(!/cover|depth/i.test(c), `a cover-depth column: "${c}" in ${h}`);
+  }
+  // And every occurrence is inside the sentence, never on its own.
+  for (const line of csv.split('\r\n')) {
+    if (!/cover.?depth/i.test(line)) continue;
+    assert.ok(line.includes('user-stated'), `an unqualified cover-depth mention: ${line}`);
+  }
+  // A structure with no cover never mentions it at all.
+  assert.ok(!/cover.?depth/i.test(packetCsv(build('gp-frame'))));
+});
+
+test('the warnings come BEFORE the first number', () => {
+  // A CSV is exactly the artifact that gets separated from its packet. A reader who opens it in
+  // a spreadsheet must meet the provenance before anything that looks like a quantity.
+  const csv = packetCsv(build('gp-frame'));
+  assert.ok(csv.indexOf('# WARNING') < csv.indexOf('# STOCK'));
+  assert.ok(csv.indexOf('PLANNING ESTIMATE') < csv.indexOf('# STOCK'));
+  assert.ok(csv.startsWith('# META'), 'provenance is the first thing in the file');
+});
+
+test('an uncounted nailing schedule is named in the CSV, not silently dropped', () => {
+  const p = {
+    ...build('gp-frame'),
+    fasteners: { ...build('gp-frame').fasteners, unparsed: [{ schedule: 'lash it (PH)', members: 4 }] },
+  };
+  assert.ok(packetCsv(p).includes('UNCOUNTED — schedule not recognised: lash it (PH)'));
+});
+
+test('R-B1: the CSV is byte-identical for identical input, and CRLF-terminated', () => {
+  assert.equal(packetCsv(build('gp-frame')), packetCsv(build('gp-frame')));
+  assert.notEqual(packetCsv(build('gp-frame')), packetCsv(build('tower')));
+  assert.ok(packetCsv(build('gp-frame')).endsWith('\r\n'));
+  assert.ok(!/[^\r]\n/.test(packetCsv(build('gp-frame'))), 'a bare LF among CRLFs');
+});
+
+test('the CSV filename is content-addressed, so two packets cannot collide', () => {
+  assert.equal(csvFilename(build('gp-frame')), `gp-framed-building-${build('gp-frame').specHash}.materials.csv`);
+  assert.notEqual(csvFilename(build('gp-frame')), csvFilename(build('tower')));
+  assert.match(csvFilename(build('crib-bunker')), /^[a-z0-9-]+\.materials\.csv$/);
+});
+
+test('the CSV and the packet report the same quantities', () => {
+  // Two surfaces over one compile. If these ever disagree, supply orders one thing and the
+  // commander approved another.
+  for (const f of shippedFamilies()) {
+    const p = build(f.id);
+    const csv = packetCsv(p);
+    for (const s of p.purchase.stock) {
+      const want = `${s.stockLengthFt},${s.pieces},EA`;
+      assert.ok(csv.includes(want), `${f.id}: ${s.nominal} ${want} missing from the CSV`);
+    }
+    for (const s of p.purchase.sheets) {
+      assert.ok(csv.includes(`,${s.quantity},${s.unit},`), `${f.id}: ${s.nominal} sheet quantity missing`);
+    }
+    assert.ok(csv.includes(p.specHash), `${f.id}: the CSV does not name its spec`);
+  }
 });
 
 test('the packet is a projection — its totals equal the model\'s', () => {

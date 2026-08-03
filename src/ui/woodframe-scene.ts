@@ -22,7 +22,7 @@ import {
 } from './woodframe/store';
 import { parseRoute, routeToHash, decodeSpec, encodeSpec } from './woodframe/router';
 import { FEATURES, APP_NAME, MODE } from './woodframe/mode';
-import { askPacketOptions, openCommandSheet, PACKET_DEFAULTS } from './woodframe/sheet';
+import { askPacketOptions, downloadMaterialsCsv, openCommandSheet, PACKET_DEFAULTS } from './woodframe/sheet';
 import { buildDeck, groupLabel, shuffle, type Card } from './woodframe/cards';
 
 const esc = (s: string): string =>
@@ -230,13 +230,20 @@ function renderWorkbench(build: StoredBuild): void {
       // is the one they were looking at when they decided it was right. `preserveDrawingBuffer`
       // is on for exactly this; a blocked pop-up falls back to printing the workbench itself.
       const canvas = document.querySelector<HTMLCanvasElement>('#viewport canvas');
-      const opened = openCommandSheet({
+      const input = {
         model: model!,
         title: current!.label ?? family?.name ?? current!.id,
         lineage: family?.lineage ?? '',
         viewImage: canvas ? canvas.toDataURL('image/png') : null,
         ...opts,
-      });
+      };
+      if (opts.action === 'csv') {
+        // Fitted to the SAME stock lengths as the packet, from the same compile.
+        downloadMaterialsCsv(input);
+        showNotices(['Materials CSV saved. It carries the estimate\'s limits at the top — keep them with it.']);
+        return;
+      }
+      const opened = openCommandSheet(input);
       if (!opened) showNotices(['This browser would not open a print frame — try Save as PDF from the browser menu.']);
     });
   });

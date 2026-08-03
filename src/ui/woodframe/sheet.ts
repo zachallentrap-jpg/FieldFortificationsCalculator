@@ -20,6 +20,7 @@
 import type { StructureModel } from '../../timber/families/index';
 import { packetHtml } from '../../timber/packet/html';
 import { packetModel } from '../../timber/packet/model';
+import { csvFilename, packetCsv } from '../../timber/packet/csv';
 import { thumbnailFor } from '../../timber/thumbnails';
 import { plainName } from './labels';
 import { DEFAULT_STOCK_FT } from '../../timber/purchase';
@@ -37,12 +38,9 @@ export interface SheetInput {
   stockLengthsFt?: readonly number[];
 }
 
-/**
- * The whole document as one HTML string. Returned rather than written to the DOM so a caller
- * can put it in a print window, a new tab, or a test.
- */
-export function commandSheetHtml(input: SheetInput): string {
-  return packetHtml(packetModel(input.model, {
+/** One compile, whichever surface asks — the packet and its CSV must never disagree. */
+function modelFor(input: SheetInput) {
+  return packetModel(input.model, {
     title: input.title,
     lineage: input.lineage,
     viewImage: input.viewImage ?? null,
@@ -53,7 +51,15 @@ export function commandSheetHtml(input: SheetInput): string {
     crewSizes: input.crewSizes,
     productiveHoursPerDay: input.productiveHoursPerDay,
     stockLengthsFt: input.stockLengthsFt,
-  }));
+  });
+}
+
+/**
+ * The whole document as one HTML string. Returned rather than written to the DOM so a caller
+ * can put it in a print window, a new tab, or a test.
+ */
+export function commandSheetHtml(input: SheetInput): string {
+  return packetHtml(modelFor(input));
 }
 
 /**
@@ -125,11 +131,18 @@ const parseList = (raw: string, lo: number, hi: number): number[] => {
   return [...new Set(out)].sort((a, b) => a - b);
 };
 
+export type PacketAction = 'print' | 'csv';
+export interface PacketChoice extends PacketOptionsInput { action: PacketAction }
+
 /**
  * Ask, then generate. Resolves null if the operator backs out — a cancelled dialog must not
  * silently produce a packet with defaults they did not choose.
+ *
+ * The CSV lives on the same dialog rather than its own button because it is fitted to the SAME
+ * stock lengths: a materials file that disagrees with the packet beside it is worse than no
+ * materials file.
  */
-export function askPacketOptions(defaults: PacketOptionsInput): Promise<PacketOptionsInput | null> {
+export function askPacketOptions(defaults: PacketOptionsInput): Promise<PacketChoice | null> {
   const dlg = document.createElement('dialog');
   dlg.className = 'pktdlg';
   dlg.innerHTML = `
@@ -150,7 +163,8 @@ export function askPacketOptions(defaults: PacketOptionsInput): Promise<PacketOp
       </label>
       <div class="pktdlg-row">
         <button value="cancel" class="chip" type="submit">Cancel</button>
-        <button value="go" class="chip chip--go" type="submit">Generate packet</button>
+        <button value="csv" class="chip" type="submit">Materials CSV</button>
+        <button value="print" class="chip chip--go" type="submit">Print packet</button>
       </div>
     </form>`;
   document.body.appendChild(dlg);
@@ -158,7 +172,8 @@ export function askPacketOptions(defaults: PacketOptionsInput): Promise<PacketOp
     dlg.addEventListener('close', () => {
       const form = dlg.querySelector('form') as HTMLFormElement;
       const read = (n: string) => (form.elements.namedItem(n) as HTMLInputElement).value;
-      const out = dlg.returnValue === 'go'
+      const action = dlg.returnValue === 'print' ? 'print' : dlg.returnValue === 'csv' ? 'csv' : null;
+      const out = action
         ? {
           crewSizes: parseList(read('crew'), 1, 30).slice(0, 6),
           productiveHoursPerDay: Math.min(24, Math.max(1, Math.round(Number(read('hours')) || defaults.productiveHoursPerDay))),
@@ -167,7 +182,8 @@ export function askPacketOptions(defaults: PacketOptionsInput): Promise<PacketOp
         : null;
       dlg.remove();
       // An operator who cleared a field gets the default back rather than an empty table.
-      resolve(out && {
+      resolve(out && action && {
+        action,
         crewSizes: out.crewSizes.length > 0 ? out.crewSizes : defaults.crewSizes,
         productiveHoursPerDay: out.productiveHoursPerDay,
         stockLengthsFt: out.stockLengthsFt.length > 0 ? out.stockLengthsFt : defaults.stockLengthsFt,
@@ -175,4 +191,23 @@ export function askPacketOptions(defaults: PacketOptionsInput): Promise<PacketOp
     }, { once: true });
     dlg.showModal();
   });
+}
+
+/**
+ * Save the materials CSV. A Blob and an anchor rather than a data: URI — Chrome caps data
+ * URIs at 2 MB and a large cut list will pass it, and a download that silently truncates a
+ * requisition is the worst possible failure for this particular file.
+ */
+export function downloadMaterialsCsv(input: SheetInput): void {
+  const p = modelFor(input);
+  const blob = new Blob([packetCsv(p)], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = csvFilename(p);
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Revoking immediately can cancel the download in some builds; a beat is enough.
+  window.setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
