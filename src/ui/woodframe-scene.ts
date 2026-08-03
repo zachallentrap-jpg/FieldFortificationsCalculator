@@ -22,7 +22,7 @@ import {
 } from './woodframe/store';
 import { parseRoute, routeToHash, decodeSpec, encodeSpec } from './woodframe/router';
 import { FEATURES, APP_NAME, MODE } from './woodframe/mode';
-import { openCommandSheet } from './woodframe/sheet';
+import { askPacketOptions, openCommandSheet, PACKET_DEFAULTS } from './woodframe/sheet';
 import { buildDeck, groupLabel, shuffle, type Card } from './woodframe/cards';
 
 const esc = (s: string): string =>
@@ -173,7 +173,7 @@ function renderWorkbench(build: StoredBuild): void {
           <button class="chip" id="shareBtn" type="button">Copy link</button>
           <button class="chip" id="unlockBtn" type="button">Unlock everything</button>
           ${FEATURES.commandOutputs
-            ? '<button class="chip chip--go" id="sheetBtn" type="button">Command sheet</button>'
+            ? '<button class="chip chip--go" id="sheetBtn" type="button">Command packet</button>'
             : '<button class="chip chip--go" id="cardsBtn" type="button">Flashcards</button>'}
         </div>
       </header>
@@ -222,20 +222,23 @@ function renderWorkbench(build: StoredBuild): void {
 
   document.getElementById('backBtn')!.addEventListener('click', () => go('#/'));
   document.getElementById('sheetBtn')?.addEventListener('click', () => {
-    // The sheet carries a still of the view the operator set up, so the drawing on the page is
-    // the one they were looking at when they decided it was right. `preserveDrawingBuffer` is on
-    // for exactly this; a blocked pop-up falls back to printing the workbench itself.
-    const canvas = document.querySelector<HTMLCanvasElement>('#viewport canvas');
-    const opened = openCommandSheet({
-      model: model!,
-      title: current!.label ?? family?.name ?? current!.id,
-      lineage: family?.lineage ?? '',
-      viewImage: canvas ? canvas.toDataURL('image/png') : null,
+    // Ask for the three numbers the tool has no basis for before generating anything. A labor
+    // table built on defaults nobody chose is a labor table the unit gets held to anyway.
+    void askPacketOptions(PACKET_DEFAULTS).then((opts) => {
+      if (!opts) return;
+      // The packet carries a still of the view the operator set up, so the drawing on the page
+      // is the one they were looking at when they decided it was right. `preserveDrawingBuffer`
+      // is on for exactly this; a blocked pop-up falls back to printing the workbench itself.
+      const canvas = document.querySelector<HTMLCanvasElement>('#viewport canvas');
+      const opened = openCommandSheet({
+        model: model!,
+        title: current!.label ?? family?.name ?? current!.id,
+        lineage: family?.lineage ?? '',
+        viewImage: canvas ? canvas.toDataURL('image/png') : null,
+        ...opts,
+      });
+      if (!opened) showNotices(['This browser would not open a print frame — try Save as PDF from the browser menu.']);
     });
-    if (!opened) {
-      showNotices(['Your browser blocked the new window — printing this page instead.']);
-      window.print();
-    }
   });
   document.getElementById('cardsBtn')?.addEventListener('click', () => {
     deckOpen = !deckOpen;
