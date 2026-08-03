@@ -499,6 +499,52 @@ option, implement it, and log it here.
   equation exists ONCE and feeds both the renderer and the raycast filter, so clicking through
   a cut selects what you see; stage scrubbing toggles visibility rather than rebuilding; and
   `unlockToCustom` preserves the family (a tower stays a tower) with a per-family test.
+## 2026-08-02 — Three phases of the catalog, and the same rotation mistake three times
+
+T4, T5 and T6a shipped together: the picker went from 3 cards to 13. What is worth recording
+is not the breadth — TD2 predicted that a hut would be a data change — but the two things the
+work kept teaching.
+
+**One engine, six huts.** SEA hut, SWA hut, B-hut, squad hut, guard shack and the field latrine
+are one `families/hut.ts` that translates a `HutSpec` into the `BuildingSpec` the existing
+engine already builds, then adds girts, the screened band and the riser box. No new framing
+code. The band is the interesting part: it enters as a wall-covering CUTOUT, because siding laid
+over a screened band is a band that does not exist, and `wallContract` grew a `bands` parameter
+so the covering pass can see it. The pit under the latrine is deliberately NOT a member —
+nothing is built out of it — so its depth travels on the spec and prints on the sheet, where a
+digging task belongs.
+
+**The tower is where the safety machinery had to become real.** `subsystems/railings.ts` and
+`subsystems/access.ts` exist as their own modules because the platform family needed them a
+phase later, and because the one decision a caller can get wrong — "does this edge need a rail"
+— should not be theirs. `railRequired()` answers it from the deck height. A ladder's rails are
+generated running 36 in past the landing, which is the most commonly omitted part of a
+field-built ladder and the part you hold when your feet leave the top rung. Ask for a ladder at
+24 or 32 ft and `normalizeSpec` switches it to a switchback stair and says so in the banner —
+checked in a browser, not only in a test.
+
+**And the lesson, which arrived three times in one session.** A member's rotation is not a thing
+to eyeball:
+
+  1. Roof tiles carried a spurious `-Math.sign(upSlope.z)`, so the near slope's courses ran
+     downhill under the deck.
+  2. `screenPanel` and `roofingCourse` were both drawn through `plywoodSheet`, so a screened
+     band and a roll roof came out as tan boards — a wall where the drawing says an opening.
+  3. Ramp planks were emitted at rotation zero, so they stayed horizontal and a 24-ft ramp read
+     as a fan of sticks in mid-air.
+
+Every one of them is the same shape: composing `Ry(yaw)·Rx(rx)` sends a member's face-width axis
+to `(sin rx·sin yaw, cos rx, sin rx·cos yaw)`, and there is exactly one `rx` that puts it on the
+surface you meant. Guessing produces something that looks nearly right from the default camera
+and is wrong from every other angle. The derivation is now written down at each placement
+helper. **None of these were caught by a test, because no test renders** — they were caught by
+looking, and by a numeric probe that walks a coordinate and prints which surface is on top.
+That probe is the cheap version of looking and is worth reaching for before theorising.
+
+The number-free gate earned its keep across all three phases: every inline magnitude in five new
+generators was caught and moved into `doctrine.ts` with a citation, including the ones that are
+genuinely tolerances rather than doctrine (those now say so in a comment where they live).
+
 ## 2026-08-02 — The wood-frame tool is two apps now, and they are not the same tool twice
 
 The owner's instruction was explicit: *"we should actually branch here. one sub app should be
