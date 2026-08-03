@@ -133,9 +133,21 @@ export interface BomSummary {
 
 // Placeholder labor rates, man-hours per board-foot equivalent (FM 5-426 Table C-1 pending
 // verification — design doc §8 keeps these DOCTRINE-UNVERIFIED and visibly footnoted).
-const MH_PER_BF = 0.055; // (PH)
-const MH_PER_PANEL = 0.5; // (PH)
-const MH_PER_CONC_LF = 0.15; // (PH) concrete form/pour per lineal foot of wall/footing/slab run
+//
+// EXPORTED (FD71) because a man-hour total is the exact number a unit gets held to, and a
+// labor block that prints the total without the rate that produced it is asking to be believed.
+// The packet prints `LABOR_RATES` inline on the block; keeping these module-private made that
+// impossible and was the reason the sibling's labor page could not be audited from the page.
+export const MH_PER_BF = 0.055; // (PH)
+export const MH_PER_PANEL = 0.5; // (PH)
+export const MH_PER_CONC_LF = 0.15; // (PH) concrete form/pour per lineal foot of wall/footing/slab run
+
+/** The governing rates, in the form the labor block prints them. */
+export const LABOR_RATES: readonly { label: string; value: string; note: string }[] = [
+  { label: 'Framing', value: `${MH_PER_BF} MH per board-foot`, note: '(PH) — unverified against FM 5-426 Table C-1 / TM 5-303' },
+  { label: 'Sheet goods', value: `${MH_PER_PANEL} MH per sheet`, note: '(PH) — unverified' },
+  { label: 'Concrete', value: `${MH_PER_CONC_LF} MH per lineal foot`, note: '(PH) — form, pour and strip, unverified' },
+];
 
 const eighth = (inches: number): number => Math.round(inches * 8) / 8;
 
