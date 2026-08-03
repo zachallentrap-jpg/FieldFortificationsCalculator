@@ -23,6 +23,8 @@ import { TOWER, RAIL, PANEL, HUT, IN_PER_FT, citeOf } from '../doctrine';
 import { stagePlan, requireOrdinal, type StagePlanEntry } from '../stagePlan';
 import { generateRailing, railRequired, type RailEdge } from '../subsystems/railings';
 import { generateLadder, generateStair } from '../subsystems/access';
+import { pyramidPlanes, type RoofPlane } from '../subsystems/roofFamilies';
+import { generateRoofCovering } from '../subsystems/coverings';
 import type { FloorLevels } from '../floor';
 
 /** Guard against a divide-by-zero on a degenerate height. Arithmetic, not doctrine. */
@@ -97,7 +99,8 @@ export function generateTower(spec: TowerSpec): TowerResult {
       emit('footing', `conc pad ${TOWER.padSideIn.value}x${TOWER.padSideIn.value}x${TOWER.padDepthIn.value}`, {
         cutLengthFt: side,
         position: [x, -depth / 2, z],
-        rotation: [0, 0, 0],
+        rotation: [-Math.PI / 2, 0, 0], // flat: pad depth is the VERTICAL dimension
+
         stage: sLayout,
         actual: { w: TOWER.padDepthIn.value as number, d: TOWER.padSideIn.value as number },
         nailing: 'poured on undisturbed soil (PH)',
@@ -110,8 +113,10 @@ export function generateTower(spec: TowerSpec): TowerResult {
     for (const [x, z] of base) {
       emit('sill', mudNominal, {
         cutLengthFt: mudLen,
-        position: [x, DRESSED[mudNominal]!.d / IN_PER_FT / 2, z],
-        rotation: [0, 0, 0],
+        // A mudsill spreads load, so it lies on its BROAD face — the whole point of the piece.
+        // On edge it was a 7 1/4-in fin under each leg, bearing on 1 1/2 in of dirt.
+        position: [x, DRESSED[mudNominal]!.w / IN_PER_FT / 2, z],
+        rotation: [-Math.PI / 2, 0, 0],
         stage: sLayout,
         nailing: 'bedded on tamped fill; leg drift-pinned (PH)',
         doctrineRef: citeOf(TOWER.mudsillNominal),
@@ -201,16 +206,29 @@ export function generateTower(spec: TowerSpec): TowerResult {
       doctrineRef: citeOf(TOWER.platformJoistNominal),
     });
   }
+  // THE PLATFORM DECK IS SHEETS, NOT ONE SLAB. It used to be emitted as a single panel the full
+  // size of the platform, standing on edge — which is both the plywood slab the owner found
+  // hanging under the cab and a bill that ordered one sheet for a deck that takes two or more.
+  // Tiled at the real sheet size, it bills what a working party actually draws from supply.
   const deckThick = PANEL.subfloorThickIn.value as number;
-  emit('subfloor', `${PANEL.widthFt.value}x${PANEL.lengthFt.value} panel`, {
-    cutLengthFt: spec.cabPlanFt,
-    position: [cx, deckY + deckThick / IN_PER_FT / 2, cx],
-    rotation: [0, 0, 0],
-    stage: sPlatform,
-    actual: { w: deckThick, d: spec.cabPlanFt * IN_PER_FT },
-    nailing: '8d @ 6" edges / 12" field (PH)',
-    doctrineRef: 'TM 5-302 tower platform decking (PH)',
-  });
+  const sheetW = PANEL.widthFt.value as number;
+  const sheetL = PANEL.lengthFt.value as number;
+  const deck0 = cx - deckHalf;
+  for (let dx = 0; dx < spec.cabPlanFt - 1e-6; dx += sheetL) {
+    const cw = Math.min(sheetL, spec.cabPlanFt - dx);
+    for (let dz = 0; dz < spec.cabPlanFt - 1e-6; dz += sheetW) {
+      const cd = Math.min(sheetW, spec.cabPlanFt - dz);
+      emit('subfloor', `${sheetW}x${sheetL} panel`, {
+        cutLengthFt: cw,
+        position: [deck0 + dx + cw / 2, deckY + deckThick / IN_PER_FT / 2, deck0 + dz + cd / 2],
+        rotation: [-Math.PI / 2, 0, 0],
+        stage: sPlatform,
+        actual: { w: deckThick, d: cd * IN_PER_FT },
+        nailing: '8d @ 6" edges / 12" field (PH)',
+        doctrineRef: 'TM 5-302 tower platform decking (PH)',
+      });
+    }
+  }
 
   // ── Access. Which edge it lands on is fixed (the front, -Z), so the railing knows where the
   // gap goes without a second convention to keep in sync.
@@ -227,15 +245,23 @@ export function generateTower(spec: TowerSpec): TowerResult {
     });
     emit.members.push(...members);
   } else {
+    // A SWITCHBACK STAIR IN A WELL OFF THE FRONT FACE, arriving on the platform's front edge —
+    // the same edge the ladder uses and the same edge the guardrail opens. It used to be aimed
+    // by guessing a start corner and turning a quarter at each landing, which walked it around
+    // two faces of the tower and finished four feet PAST the back corner at deck height, over
+    // open ground. Stating the arrival instead of the departure is what fixes that, and 180°
+    // landings keep the whole run two stair-widths wide instead of marching around the building.
     const stair = generateStair({
-      base: [cx - deckHalf - 1, cx - deckHalf - 1],
-      up: [1, 0],
+      base: [cx, cx - deckHalf],
+      up: [0, 1],
       baseY: 0,
       topY: deckY,
       widthFt: accessWidth,
       stage: sAccess,
-      // Keep each flight inside the tower footprint; a straight run to 32 ft would need 40 ft.
+      // Keep each flight to a bay; a straight run to 32 ft would need 40 ft.
       maxFlightRiseFt: bay,
+      turn: 'switchback',
+      arriveAt: { at: [cx, cx - deckHalf], dir: [0, 1] },
     });
     emit.members.push(...stair.members);
   }
@@ -250,7 +276,9 @@ export function generateTower(spec: TowerSpec): TowerResult {
       id: `deck-${i}`,
       from,
       to: corners[(i + 1) % 4]!,
-      ...(i === 0 && spec.access === 'ladder' ? { gaps: [accessEdgeGap] } : {}),
+      // The way up lands on edge 0 whether it is a ladder or a stair, so the rail opens there
+      // either way. Gating this on 'ladder' left a stair delivering people into a closed rail.
+      ...(i === 0 ? { gaps: [accessEdgeGap] } : {}),
     }));
     emit.members.push(...generateRailing({ edges, deckY: deckY + deckThick / IN_PER_FT, stage: sRail }));
   }
@@ -313,9 +341,17 @@ export function generateTower(spec: TowerSpec): TowerResult {
   }
 
   // ── Cab roof: four hips to a peak, or one slope.
+  //
+  // THE FRAMING IS BUILT HERE; THE SURFACE IS NOT. This block's job is to state the roof as
+  // planes and cut the sticks that hold them up. Sheathing and roofing then go on through the
+  // one covering path every other roof in the toolkit uses, which is what makes the cab's
+  // triangular faces come out as triangles and — not incidentally — is the only reason the
+  // roofing the operator selected reaches the cab at all. The hand-rolled version emitted four
+  // full-width rectangles and no roofing whatsoever.
   const overhang = TOWER.cabOverhangFt.value as number;
   const rise = ((TOWER.cabRisePer12.value as number) / IN_PER_FT) * (spec.cabPlanFt / 2 + overhang);
   const eaveY = postTopY;
+  let roofPlanes: RoofPlane[];
   if (spec.cab.roof === 'pyramid') {
     const peak: [number, number, number] = [cx, eaveY + rise, cx];
     const eaveCorners: [number, number][] = [
@@ -333,47 +369,46 @@ export function generateTower(spec: TowerSpec): TowerResult {
         doctrineRef: citeOf(TOWER.cabRisePer12),
       });
     }
-    // One covering panel per slope, laid on the hips.
-    for (let f = 0; f < 4; f++) {
-      const p = eaveCorners[f]!;
-      const q = eaveCorners[(f + 1) % 4]!;
-      const run = Math.hypot(q[0] - p[0], q[1] - p[1]);
-      const slope = Math.hypot(spec.cabPlanFt / 2 + overhang, rise);
-      const midX = (p[0] + q[0]) / 2;
-      const midZ = (p[1] + q[1]) / 2;
-      emit('roofPanel', `${PANEL.widthFt.value}x${PANEL.lengthFt.value} panel`, {
-        cutLengthFt: run,
-        position: [(midX + cx) / 2, eaveY + rise / 2, (midZ + cx) / 2],
-        rotation: [Math.PI / 2 - Math.atan2(rise, spec.cabPlanFt / 2 + overhang), Math.atan2(-(q[1] - p[1]), q[0] - p[0]), 0],
-        stage: sRoofing,
-        actual: { w: PANEL.roofDeckThickIn.value as number, d: slope * IN_PER_FT },
-        nailing: '8d @ 6" edges / 12" field (PH)',
-        doctrineRef: citeOf(TOWER.cabOverhangFt),
-      });
-    }
+    roofPlanes = pyramidPlanes([cx, cx], spec.cabPlanFt / 2 + overhang, eaveY, rise);
   } else {
-    // Shed: one slope over the whole cab, high side to the rear.
-    const slopeLen = Math.hypot(spec.cabPlanFt + 2 * overhang, rise * 2);
-    emit('roofPanel', `${PANEL.widthFt.value}x${PANEL.lengthFt.value} panel`, {
-      cutLengthFt: spec.cabPlanFt + 2 * overhang,
-      position: [cx, eaveY + rise, cx],
-      rotation: [Math.PI / 2 - Math.atan2(rise * 2, spec.cabPlanFt + 2 * overhang), 0, 0],
-      stage: sRoofing,
-      actual: { w: PANEL.roofDeckThickIn.value as number, d: slopeLen * IN_PER_FT },
-      nailing: '8d @ 6" edges / 12" field (PH)',
-      doctrineRef: citeOf(TOWER.cabRisePer12),
-    });
-    for (const z of [cx - deckHalf, cx, cx + deckHalf]) {
+    // Shed: one slope over the whole cab, high side to the rear (+Z).
+    const half = spec.cabPlanFt / 2 + overhang;
+    const fall = rise * 2; // eave-to-eave, since a shed has no peak in the middle
+    const slopeLen = Math.hypot(half * 2, fall);
+    const sn = fall / slopeLen;
+    const cs = (half * 2) / slopeLen;
+    roofPlanes = [{
+      id: 'cab-shed',
+      origin: [cx - half, eaveY, cx - half],
+      alongEave: [1, 0, 0],
+      upSlope: [0, sn, cs],
+      normal: [0, cs, -sn],
+      eaveLengthFt: half * 2,
+      slopeLengthFt: slopeLen,
+    }];
+    // Rafters span the slope, so they are spaced ACROSS it — along X — and run toward +Z going
+    // up, matching the plane. They used to be spaced along Z, which is the direction they RUN,
+    // so all three were laid end to end down the same line instead of across the roof.
+    for (const x of [cx - deckHalf, cx, cx + deckHalf]) {
       emit('rafter', '2x6', {
-        cutLengthFt: spec.cabPlanFt + 2 * overhang,
-        position: [cx, eaveY + rise, z],
-        rotation: [0, Math.PI / 2, Math.atan2(rise * 2, spec.cabPlanFt + 2 * overhang)],
+        cutLengthFt: slopeLen,
+        position: [x, eaveY + rise, cx],
+        rotation: [0, -Math.PI / 2, Math.atan2(fall, half * 2)],
         stage: sRoof,
         nailing: 'toenail 3-8d ea plate (PH)',
         doctrineRef: citeOf(TOWER.cabRisePer12),
       });
     }
   }
+
+  emit.members.push(...generateRoofCovering({
+    planes: roofPlanes,
+    deck: spec.coverings.roofDeck === 'none' ? 'none' : 'plywood',
+    roofing: spec.coverings.roofing,
+    stageDeck: sRoofing,
+    stageRoofing: sRoofing,
+    rafterHalfFt: DRESSED['2x6']!.d / IN_PER_FT / 2,
+  }));
 
   return {
     members: emit.members,

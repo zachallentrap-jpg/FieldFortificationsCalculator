@@ -21,6 +21,7 @@ import type {
 import { SPEC_PATH_DEFS, WALL_ORDER, specPath } from './spec';
 import type { WallId } from './types';
 import { SPAN, LUMBER } from './doctrine';
+import { defaultOpenings } from './openings';
 
 export interface SpecIssue {
   path: string; // dotted spec path
@@ -215,10 +216,18 @@ function normalizeHut(spec: HutSpec, issues: SpecIssue[]): HutSpec {
   const lengthFt = clampPath(spec.dims.lengthFt, 'dims.lengthFt', issues);
   const widthFt = clampPath(spec.dims.widthFt, 'dims.widthFt', issues);
   const runFor = (w: WallId): number => (w === 'S' || w === 'N' ? lengthFt : widthFt);
+  // RESOLVE THE VARIANT'S DOORS AND WINDOWS HERE, not downstream of this function. The hut
+  // generator asked for them with `spec.openings ?? defaultOpenings(...)`, which cannot fire
+  // once this line has turned an absent record into `{}` — so every hut in the toolkit built
+  // itself blind, with no door and no window, no matter what its card said. Filling them in at
+  // normalize also means the openings editor has something real to show and the operator can
+  // move or delete them; an empty record now honestly means "none", because it can only have
+  // got that way by somebody saying so.
+  const named = spec.openings ?? defaultOpenings(spec.variant, lengthFt, widthFt);
   const out: HutSpec = {
     ...spec,
     dims: { lengthFt, widthFt },
-    openings: normalizeOpenings(spec.openings, runFor, 'openings', issues),
+    openings: normalizeOpenings(named, runFor, 'openings', issues),
   };
   if (spec.variant === 'latrine') {
     const seats = spec.latrine?.seats === 2 ? 2 : 4;

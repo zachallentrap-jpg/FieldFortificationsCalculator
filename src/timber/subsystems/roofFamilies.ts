@@ -65,6 +65,60 @@ const cross = (a: number[], b: number[]): [number, number, number] => [
   a[0]! * b[1]! - a[1]! * b[0]!,
 ];
 
+/**
+ * The four faces of a square pyramid roof — a hip whose ridge has shrunk to a point.
+ *
+ * A guard tower's cab roof used to be drawn as four RECTANGLES, one per slope, each as wide at
+ * the peak as it was at the eave. Four 10-ft rectangles cannot meet at a point: they cross each
+ * other above the hip rafters and their upper corners hang out past the hips and below the eave
+ * line, which is the creased, folded roof the owner asked about. A pyramid face is a TRIANGLE,
+ * and the tiler already knows how to cut one — `topLengthFt: 0` is the whole answer, the same
+ * value the hip ends of a building roof carry. Once it goes through the shared covering path
+ * the cab also gets the roofing it was specified with, which the hand-rolled version dropped.
+ *
+ * `halfSideFt` is measured to the EAVE (overhang included), and `riseFt` is peak above eave.
+ */
+export function pyramidPlanes(
+  center: [number, number],
+  halfSideFt: number,
+  eaveY: number,
+  riseFt: number,
+): RoofPlane[] {
+  const side = halfSideFt * 2;
+  const slopeLengthFt = Math.hypot(halfSideFt, riseFt);
+  const cs = halfSideFt / Math.max(1e-9, slopeLengthFt);
+  const sn = riseFt / Math.max(1e-9, slopeLengthFt);
+  // Eave corners in plan order; each face spans one edge and rises to the peak over the middle.
+  const corner: [number, number][] = [
+    [center[0] - halfSideFt, center[1] - halfSideFt], [center[0] + halfSideFt, center[1] - halfSideFt],
+    [center[0] + halfSideFt, center[1] + halfSideFt], [center[0] - halfSideFt, center[1] + halfSideFt],
+  ];
+  const face = ['roof-S', 'roof-E', 'roof-N', 'roof-W'];
+  return corner.map((p, f) => {
+    const q = corner[(f + 1) % 4]!;
+    const len = Math.max(1e-9, Math.hypot(q[0] - p[0], q[1] - p[1]));
+    const alongEave: [number, number, number] = [(q[0] - p[0]) / len, 0, (q[1] - p[1]) / len];
+    // Uphill is square to the eave, toward the middle of the plan.
+    const mid: [number, number] = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+    const inLen = Math.max(1e-9, Math.hypot(center[0] - mid[0], center[1] - mid[1]));
+    const inward: [number, number] = [(center[0] - mid[0]) / inLen, (center[1] - mid[1]) / inLen];
+    const upSlope: [number, number, number] = [inward[0] * cs, sn, inward[1] * cs];
+    const n = cross(upSlope, alongEave);
+    return {
+      id: face[f]!,
+      origin: [p[0], eaveY, p[1]] as [number, number, number],
+      alongEave,
+      upSlope,
+      // Outward means UP on a roof; the cross product's sign depends on the corner winding, so
+      // it is checked rather than assumed.
+      normal: (n[1] < 0 ? [-n[0], -n[1], -n[2]] : n) as [number, number, number],
+      eaveLengthFt: side,
+      slopeLengthFt,
+      topLengthFt: 0,
+    };
+  });
+}
+
 /** Slope (rise per foot of run) and the framing-square length per foot of run. */
 export function slopeOf(roof: RoofSpec): { slope: number; lenPerFtRun: number; pitchRad: number } {
   const risePer12 =

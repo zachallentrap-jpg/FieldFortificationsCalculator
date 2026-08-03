@@ -196,7 +196,10 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
     emit('lagging', lagNominal, {
       cutLengthFt: outerL,
       position: [outerL / 2, lagY, Math.min(z, outerW - lagW / 2)],
-      rotation: [0, 0, 0],
+      // Lagging is the roof DECK — laid flat, edge to edge. The spacing loop steps by face
+      // width and the height by thickness, so at [0,0,0] the two disagreed and the roof came
+      // out as a rank of boards on edge with daylight between them.
+      rotation: [-Math.PI / 2, 0, 0],
       stage: sLag,
       nailing: 'spiked to every stringer (PH)',
       doctrineRef: citeOf(BUNKER.laggingNominal),

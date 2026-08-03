@@ -120,11 +120,71 @@ export interface StairInput {
   widthFt: number;
   stage: number;
   /**
-   * Switchback: split the climb into flights of at most this rise, each turning 90° at a
-   * landing. A single 24-ft straight flight would need 32 ft of run and does not belong on a
-   * tower footprint.
+   * Switchback: split the climb into flights of at most this rise, each turning at a landing.
+   * A single 24-ft straight flight would need 32 ft of run and does not belong on a tower
+   * footprint.
    */
   maxFlightRiseFt?: number;
+  /**
+   * How each landing turns.
+   *   'quarter'    90° left — the flights wrap a footprint, one face at a time.
+   *   'switchback' 180° — the flights stack side by side in one well, which is what a stair
+   *                alongside a tower actually is, and it keeps the plan two widths across
+   *                instead of marching around the building.
+   */
+  turn?: 'quarter' | 'switchback';
+  /**
+   * WHERE THE STAIR HAS TO ARRIVE, which is the constraint that actually matters and the one
+   * that was missing. Given the top landing point and the direction of the final flight, the
+   * whole run is translated so it ENDS there — because a stair is positioned by where you step
+   * off it, not by where its bottom tread happens to fall.
+   *
+   * Without this, the tower's stair was aimed by picking a plausible-looking base corner and
+   * hoping: two flights later it finished four feet past the platform's back corner, at deck
+   * height, over open ground. `base`/`up` are ignored when this is given.
+   */
+  arriveAt?: { at: [x: number, z: number]; dir: [x: number, z: number] };
+}
+
+/** One flight's start, in plan — the geometry the emitter walks. */
+interface FlightStep {
+  at: [number, number];
+  dir: [number, number];
+}
+
+const turnOnce = (d: [number, number], mode: 'quarter' | 'switchback'): [number, number] =>
+  mode === 'switchback' ? [-d[0], -d[1]] : [-d[1], d[0]];
+const turnBack = (d: [number, number], mode: 'quarter' | 'switchback'): [number, number] =>
+  mode === 'switchback' ? [-d[0], -d[1]] : [d[1], -d[0]];
+
+/**
+ * Walk the plan path of a switchback run: where each flight starts and which way it climbs.
+ *
+ * Every flight has the same rise, so every flight has the same run, so the path is a rigid
+ * shape — which is what makes `arriveAt` a translation and nothing more. The walk is written
+ * once and used for both the dry run that finds the offset and the real emit, so the two can
+ * never drift apart.
+ */
+function walkPath(start: FlightStep, runFt: number, stepFt: number, flights: number,
+  mode: 'quarter' | 'switchback'): { steps: FlightStep[]; end: [number, number] } {
+  const steps: FlightStep[] = [];
+  let at: [number, number] = [start.at[0], start.at[1]];
+  let dir: [number, number] = [start.dir[0], start.dir[1]];
+  for (let f = 0; f < flights; f++) {
+    steps.push({ at: [at[0], at[1]], dir: [dir[0], dir[1]] });
+    at = [at[0] + dir[0] * runFt, at[1] + dir[1] * runFt];
+    if (f === flights - 1) break;
+    if (mode === 'switchback') {
+      // Turn in place and step SIDEWAYS one stair width; the next flight climbs back alongside.
+      const across: [number, number] = [-dir[1], dir[0]];
+      at = [at[0] + across[0] * stepFt, at[1] + across[1] * stepFt];
+      dir = turnOnce(dir, mode);
+    } else {
+      dir = turnOnce(dir, mode);
+      at = [at[0] + dir[0] * stepFt, at[1] + dir[1] * stepFt];
+    }
+  }
+  return { steps, end: at };
 }
 
 export interface StairResult {
@@ -147,13 +207,29 @@ export function generateStair(input: StairInput): StairResult {
 
   const flights: StairSolution[] = [];
   const landings: { at: [number, number]; y: number }[] = [];
-  let dir: [number, number] = [up[0], up[1]];
-  let at: [number, number] = [base[0], base[1]];
+  const mode = input.turn ?? 'quarter';
+  const stepFt = widthFt;
+  // Every flight carries the same rise, so every flight has the same run.
+  const runFt = solveFlight(risePerFlight).runFt;
+
+  // Lay the path out, then move it to where it has to land. When `arriveAt` is given the first
+  // flight's heading is whatever, turned backwards, ends up pointing the way the caller wants
+  // to step off; the dry run then supplies the translation.
+  let start: FlightStep = { at: [base[0], base[1]], dir: [up[0], up[1]] };
+  if (input.arriveAt) {
+    let d0: [number, number] = [input.arriveAt.dir[0], input.arriveAt.dir[1]];
+    for (let f = 0; f < flightCount - 1; f++) d0 = turnBack(d0, mode);
+    const dry = walkPath({ at: [0, 0], dir: d0 }, runFt, stepFt, flightCount, mode);
+    start = { at: [input.arriveAt.at[0] - dry.end[0], input.arriveAt.at[1] - dry.end[1]], dir: d0 };
+  }
+  const path = walkPath(start, runFt, stepFt, flightCount, mode);
   let y = baseY;
 
   for (let f = 0; f < flightCount; f++) {
     const sol = solveFlight(risePerFlight);
     flights.push(sol);
+    const at = path.steps[f]!.at;
+    const dir = path.steps[f]!.dir;
     const yaw = Math.atan2(-dir[1], dir[0]);
     // Stringers run the slope; length is the hypotenuse of rise and run.
     const slopeLen = Math.hypot(risePerFlight, sol.runFt);
@@ -172,36 +248,47 @@ export function generateStair(input: StairInput): StairResult {
         doctrineRef: citeOf(STAIR.stringerNominal),
       });
     }
+    // A TREAD IS THE PIECE YOU PUT YOUR BOOT ON, so it lies FLAT: length across the stair, face
+    // width running the direction of travel (that face width IS the tread depth the doctrine
+    // minimum governs), thickness up. The canonical member frame puts face width along local Y,
+    // which is vertical until something rotates it — so with no rx these came out standing on
+    // edge, and a stair rendered as a comb of 9 1/4-in fins with nothing to walk on.
+    const treadYaw = Math.atan2(-across[1], across[0]);
+    const treadT = DRESSED[treadNominal]!.w / IN_PER_FT;
     for (let i = 1; i <= sol.risers; i++) {
       const d = ((i - 1) * sol.treadIn) / IN_PER_FT;
       emit('tread', treadNominal, {
         cutLengthFt: widthFt,
-        position: [at[0] + dir[0] * d, y + (risePerFlight * i) / sol.risers, at[1] + dir[1] * d],
-        rotation: [0, Math.atan2(-across[1], across[0]), 0],
+        position: [at[0] + dir[0] * d, y + (risePerFlight * i) / sol.risers - treadT / 2, at[1] + dir[1] * d],
+        rotation: [-Math.PI / 2, treadYaw, 0],
         stage,
         nailing: '2-16d ea stringer (PH)',
         doctrineRef: citeOf(STAIR.minTreadIn),
       });
     }
     y += risePerFlight;
-    at = [at[0] + dir[0] * sol.runFt, at[1] + dir[1] * sol.runFt];
     if (f < flightCount - 1) {
-      landings.push({ at: [at[0], at[1]], y });
-      // Turn 90°: the switchback that keeps a tall climb inside the tower's footprint.
-      dir = [-dir[1], dir[0]];
-      // Step off the landing before the next flight starts, or the two flights share a tread.
-      const step = widthFt;
+      // The landing spans from the top of this flight to the foot of the next, whichever way
+      // the run turns — so it is drawn from the two path points rather than from a rule that
+      // only happened to be right for a quarter turn.
+      const top: [number, number] = [at[0] + dir[0] * sol.runFt, at[1] + dir[1] * sol.runFt];
+      const next = path.steps[f + 1]!.at;
+      const cx = (top[0] + next[0]) / 2;
+      const cz = (top[1] + next[1]) / 2;
+      landings.push({ at: [cx, cz], y });
       const platformNominal = treadNominal;
+      const span = Math.max(widthFt, Math.hypot(next[0] - top[0], next[1] - top[1]));
+      const yawL = Math.abs(next[0] - top[0]) >= Math.abs(next[1] - top[1])
+        ? 0 : Math.PI / 2;
       emit('deckPlank', platformNominal, {
-        cutLengthFt: widthFt,
-        position: [at[0] + dir[0] * (step / 2), y, at[1] + dir[1] * (step / 2)],
-        rotation: [0, Math.atan2(-dir[1], dir[0]), 0],
+        cutLengthFt: span,
+        position: [cx, y - DRESSED[platformNominal]!.w / IN_PER_FT / 2, cz],
+        rotation: [-Math.PI / 2, yawL, 0], // flat, like the treads
         stage,
-        actual: { w: DRESSED[platformNominal]!.w, d: step * IN_PER_FT },
+        actual: { w: DRESSED[platformNominal]!.w, d: widthFt * IN_PER_FT },
         nailing: '2-16d ea bearer (PH)',
         doctrineRef: citeOf(STAIR.headroomIn),
       });
-      at = [at[0] + dir[0] * step, at[1] + dir[1] * step];
     }
   }
   return { members: emit.members, flights, landings };

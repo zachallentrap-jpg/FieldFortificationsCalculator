@@ -38,7 +38,13 @@ export interface StudioHandles {
 }
 
 const CONCRETE = 0xa9a69f;
-const SELECT_TINT = 0xff8844;
+// Every tint MULTIPLIES the material's own color, so these read as a wash over the real
+// material rather than as flat paint — the plywood still shows its grain and the corrugated
+// roofing still shows its ribs, they just go red. That matters: the point of highlighting is to
+// say WHICH piece, not to hide what the piece is made of. Red is chosen over the old orange
+// because tan lumber under an orange wash is still tan lumber.
+const SELECT_TINT = 0xd2402a;
+const HOVER_TINT = 0xffa06a;
 const STAGE_TINT = 0xffe9b0;
 
 function propFor(nominal: string): LumberSize {
@@ -71,6 +77,7 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
   let model = initial;
   let stage = Number.MAX_SAFE_INTEGER; // "All" until the user scrubs
   let selected: string | null = null;
+  let hovered: string | null = null;
   let cut: CutawayState = initialCutawayState();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -186,16 +193,34 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     return p;
   }
 
+  /**
+   * Recolor every material under a wrapper, or restore each one's own original color.
+   *
+   * WHAT WAS BROKEN. This used to read `o.material instanceof THREE.MeshToonMaterial`, and that
+   * test is false for most of the interesting members. A plywood sheet carries an ARRAY of six
+   * materials (grained faces, ply-edge sides) and an array is not an instance of anything; so
+   * does a roofing course; insect screen is a MeshBasicMaterial because it has to be
+   * see-through. So selecting a piece of plywood, a screen panel or a run of roofing highlighted
+   * NOTHING — the operator clicked a panel, read its card, and had no idea which panel on screen
+   * it was. Everything with a color gets tinted now, arrays included, and the original is
+   * remembered PER MATERIAL rather than per mesh (one mesh, six colors to put back).
+   */
   function tint(wrapper: THREE.Group, hex: number | null): void {
     wrapper.traverse((o) => {
-      if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshToonMaterial) {
-        const mat = o.material;
+      if (!(o instanceof THREE.Mesh)) return;
+      // The cartoon outline is a black backface shell. Tinting it turns the piece into a
+      // coloured blob with no silhouette, so it keeps its own color throughout.
+      if (o.userData.isOutline === true) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const mat of mats) {
+        const m = mat as THREE.Material & { color?: THREE.Color };
+        if (!m?.color) continue;
+        const store = m.userData as { baseColor?: number };
         if (hex === null) {
-          const base = (o.userData.baseColor as number | undefined);
-          if (base !== undefined) mat.color.setHex(base);
+          if (store.baseColor !== undefined) m.color.setHex(store.baseColor);
         } else {
-          if (o.userData.baseColor === undefined) o.userData.baseColor = mat.color.getHex();
-          mat.color.setHex(hex);
+          if (store.baseColor === undefined) store.baseColor = m.color.getHex();
+          m.color.setHex(hex);
         }
       }
     });
@@ -251,6 +276,18 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     applySelection();
   }
 
+  /**
+   * ONE PASS OWNS EVERY MEMBER'S COLOR. Stage tinting and selection tinting used to be two
+   * passes that each undid part of the other's work, which is survivable with two states and
+   * not with three — and hovering is the third. Precedence, highest first:
+   *
+   *   selected  the piece whose card is open. Unmistakable, because "which one is it" is the
+   *             question the card cannot answer on its own.
+   *   hovered   what the pointer is over right now, so you can see what you are about to click.
+   *   stage     everything going in during the stage being scrubbed.
+   *
+   * Visibility is settled here too, since it depends on the same stage number.
+   */
   function applyStage(): void {
     const maxStage = model.stagePlan.length;
     const showAll = stage >= maxStage;
@@ -260,15 +297,16 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
       mesh.visible = m.stage <= stage;
       // "All" is a DISTINCT state from selecting the last stage: no current-stage tint.
       const isCurrent = !showAll && m.stage === stage;
-      if (m.id !== selected) tint(mesh, isCurrent ? STAGE_TINT : null);
+      tint(mesh, m.id === selected ? SELECT_TINT
+        : m.id === hovered ? HOVER_TINT
+        : isCurrent ? STAGE_TINT
+        : null);
     }
   }
 
+  /** Kept as its own name because the call sites read better in pairs; the work is above. */
   function applySelection(): void {
-    for (const [id, mesh] of byId) {
-      if (id === selected) tint(mesh, SELECT_TINT);
-      else if (!(stage < model.stagePlan.length && (mesh.userData.stage as number) === stage)) tint(mesh, null);
-    }
+    applyStage();
   }
 
   // ── Cutaway ────────────────────────────────────────────────────────────────
@@ -525,7 +563,9 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
   // ── Picking ────────────────────────────────────────────────────────────────
 
   const raycaster = new THREE.Raycaster();
-  renderer.domElement.addEventListener('click', (ev) => {
+
+  /** The member under the pointer, or null. One implementation, so hover and click agree. */
+  function memberAt(ev: { clientX: number; clientY: number }): string | null {
     const r = renderer.domElement.getBoundingClientRect();
     const ndc = new THREE.Vector2(
       ((ev.clientX - r.left) / r.width) * 2 - 1,
@@ -533,22 +573,40 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     );
     raycaster.setFromCamera(ndc, camera);
     const eq = planeForState(cut, bounds());
-    const hits = raycaster.intersectObjects(group.children, true);
-    let id: string | null = null;
-    for (const h of hits) {
-      // Clicking through a cut must select what you SEE — same plane equation as the renderer.
+    for (const h of raycaster.intersectObjects(group.children, true)) {
+      // Picking through a cut must find what you SEE — same plane equation as the renderer.
       if (!passesCut([h.point.x, h.point.y, h.point.z], eq)) continue;
       let o: THREE.Object3D | null = h.object;
       while (o && !o.userData.memberId) o = o.parent;
-      if (o?.userData.memberId) {
-        id = o.userData.memberId as string;
-        break;
-      }
+      if (o?.userData.memberId) return o.userData.memberId as string;
     }
-    selected = id;
+    return null;
+  }
+
+  renderer.domElement.addEventListener('click', (ev) => {
+    selected = memberAt(ev);
     applyStage();
-    applySelection();
     renderMemberCard();
+  });
+
+  // HOVER. A raycast per pointermove is affordable here (a few hundred boxes) but pointless
+  // while the camera is being dragged, so orbiting suppresses it — otherwise every orbit
+  // repaints the whole model as the pointer sweeps across it.
+  let dragging = false;
+  renderer.domElement.addEventListener('pointerdown', () => { dragging = true; });
+  window.addEventListener('pointerup', () => { dragging = false; });
+  renderer.domElement.addEventListener('pointerleave', () => {
+    if (hovered === null) return;
+    hovered = null;
+    applyStage();
+  });
+  renderer.domElement.addEventListener('pointermove', (ev) => {
+    if (dragging) return;
+    const id = memberAt(ev);
+    renderer.domElement.style.cursor = id ? 'pointer' : '';
+    if (id === hovered) return;
+    hovered = id;
+    applyStage();
   });
 
   window.addEventListener('resize', () => {

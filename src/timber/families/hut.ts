@@ -31,6 +31,7 @@ import { WALL_ORDER } from '../spec';
 import { makeEmitter } from '../emit';
 import { HUT, LATRINE, LUMBER, OPENING, IN_PER_FT, citeOf } from '../doctrine';
 import { generateBuilding, type BuildingResult } from './building';
+import { defaultOpenings } from '../openings';
 import { surfaceYaw, type WallSurface, type WallsContract } from '../subsystems/wallSystem';
 import { requireOrdinal, type StagePlanEntry } from '../stagePlan';
 
@@ -41,44 +42,6 @@ export function hutDims(variant: HutSpec['variant']): { lengthFt: number; widthF
     squadHut: HUT.squadHut, guardShack: HUT.guardShack, latrine: HUT.latrine,
   } as const;
   return { ...table[variant].value };
-}
-
-/** Doors and windows a variant ships with, when the spec does not name its own. */
-function defaultOpenings(variant: HutSpec['variant'], lengthFt: number, widthFt: number): WallOpenings {
-  const dw = OPENING.doorWidthFt.value as number;
-  const ww = OPENING.windowWidthFt.value as number;
-  const setback = OPENING.cornerSetbackFt.value as number;
-  const pitch = OPENING.windowPitchFt.value as number;
-  const door = (offsetFt: number) => ({
-    kind: 'door' as const, offsetFt, widthFt: dw,
-    heightFt: OPENING.doorHeightFt.value as number, sillHeightFt: 0, fill: 'door-ledged' as const,
-  });
-  const win = (offsetFt: number) => ({
-    kind: 'window' as const, offsetFt, widthFt: ww,
-    heightFt: OPENING.windowHeightFt.value as number,
-    sillHeightFt: OPENING.windowSillFt.value as number, fill: 'window-shutter' as const,
-  });
-  /** A door centred on a wall of this run. */
-  const centred = (runFt: number) => door(runFt / 2 - dw / 2);
-  switch (variant) {
-    case 'guardShack':
-      // One door, and glass on the three sides you have to watch through.
-      return { S: [centred(lengthFt)], E: [win(setback)], W: [win(setback)], N: [win(setback)] };
-    case 'latrine':
-      return { S: [centred(lengthFt)] };
-    case 'bHut':
-      // A door at each end bay, so neither half of the hut is a dead end.
-      return {
-        E: [centred(widthFt)], W: [centred(widthFt)],
-        S: [win(setback * 2), win(lengthFt - setback * 2 - ww)],
-        N: [win(setback * 2), win(lengthFt - setback * 2 - ww)],
-      };
-    default: {
-      const wins: ReturnType<typeof win>[] = [];
-      for (let x = pitch / 2; x <= lengthFt - pitch / 2; x += pitch) wins.push(win(x));
-      return { E: [centred(widthFt)], W: [centred(widthFt)], S: wins, N: wins };
-    }
-  }
 }
 
 /** Bays across the length, for the B-hut's partitions. */

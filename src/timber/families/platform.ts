@@ -65,37 +65,46 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
   const sillDepth = DRESSED[sillNominal]!.d / IN_PER_FT;
 
   // ── Base
-  if (spec.base === 'skids') {
-    emit.members.push(...generateSkids(L, W, sBase));
-  } else {
-    // Piers under every bearing line, at the doctrine post spacing.
-    const bays = Math.max(1, Math.round(L / (PLATFORM.pierSpacingFt.value as number)));
-    for (let i = 0; i <= bays; i++) {
-      const x = (L * i) / bays;
-      for (const z of [sillDepth / 2, W - sillDepth / 2]) {
+  //
+  // SKIDS AND PIERS BOTH CARRY POSTS, and getting that wrong was a visible defect: choosing
+  // skids used to emit the runners and skip the posts entirely, so a 4-ft platform hung in
+  // mid-air over three timbers lying on the ground. The two bases differ in what is UNDER the
+  // post — a concrete pad you pour, or a timber runner you can drag the whole thing on — not
+  // in whether the deck is held up.
+  if (spec.base === 'skids') emit.members.push(...generateSkids(L, W, sBase));
+
+  const bays = Math.max(1, Math.round(L / (PLATFORM.pierSpacingFt.value as number)));
+  for (let i = 0; i <= bays; i++) {
+    const x = (L * i) / bays;
+    for (const z of [sillDepth / 2, W - sillDepth / 2]) {
+      if (spec.base === 'piers') {
         const padSide = PLATFORM.padSideIn.value as number;
         const padDepth = PLATFORM.padDepthIn.value as number;
         emit('footing', `conc pad ${padSide}x${padSide}x${padDepth}`, {
           cutLengthFt: padSide / IN_PER_FT,
           position: [x, -padDepth / IN_PER_FT / 2, z],
-          rotation: [0, 0, 0],
+          // Flat, like every other horizontal piece — at [0,0,0] the pad stood on end, 16 in
+          // tall and 8 in across, poking a third of itself up through the ground.
+          rotation: [-Math.PI / 2, 0, 0],
           stage: sBase,
           actual: { w: padDepth, d: padSide },
           nailing: 'poured on undisturbed soil (PH)',
           doctrineRef: 'FM 5-426 post footers (PH page)',
         });
-        const postLen = deckY - joistDepth - sillDepth;
-        // Below this a 'post' is a shim, not a member — the same guard floor.ts uses.
-        if (postLen > (PLATFORM.minPostFt.value as number)) {
-          emit('post', postNominal, {
-            cutLengthFt: postLen,
-            position: [x, postLen / 2, z],
-            rotation: [0, 0, Math.PI / 2],
-            stage: sBase,
-            nailing: 'drift-pinned to the pad; capped by the sill (PH)',
-            doctrineRef: citeOf(LUMBER.postNominal),
-          });
-        }
+      }
+      const postLen = deckY - joistDepth - sillDepth;
+      // Below this a 'post' is a shim, not a member — the same guard floor.ts uses.
+      if (postLen > (PLATFORM.minPostFt.value as number)) {
+        emit('post', postNominal, {
+          cutLengthFt: postLen,
+          position: [x, postLen / 2, z],
+          rotation: [0, 0, Math.PI / 2],
+          stage: sBase,
+          nailing: spec.base === 'skids'
+            ? 'toenailed and cleated to the skid (PH)'
+            : 'drift-pinned to the pad; capped by the sill (PH)',
+          doctrineRef: citeOf(LUMBER.postNominal),
+        });
       }
     }
   }
@@ -126,6 +135,15 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
   }
 
   // ── Deck
+  //
+  // FLAT IS A ROTATION, NOT A POSITION. The canonical member frame runs length along local X,
+  // face width along local Y and thickness along local Z, so a piece emitted at [0,0,0] stands
+  // ON EDGE with its face width vertical. Every flat-lying piece in the toolkit is therefore
+  // `[-PI/2, 0, 0]` (see floor.ts, which is frozen and got it right) — that quarter turn drops
+  // the face width into world Z and stands the thickness up in Y. Left at zero, the position
+  // math here (which spaces by face width and sinks by thickness) described a flat deck while
+  // the rotation drew a comb of boards on edge, and a panel deck came out as a 4-ft plywood
+  // wall standing on the joists. Both were visible in the shipped app.
   if (spec.deck === 'plank') {
     const nominal = TENT.deckNominal.value as string;
     const w = DRESSED[nominal]!.d / IN_PER_FT;
@@ -133,7 +151,7 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
       emit('deckPlank', nominal, {
         cutLengthFt: L,
         position: [L / 2, deckY - DRESSED[nominal]!.w / IN_PER_FT / 2, Math.min(z, W - w / 2)],
-        rotation: [0, 0, 0],
+        rotation: [-Math.PI / 2, 0, 0],
         stage: sDeck,
         nailing: '2-16d ea joist (PH)',
         doctrineRef: citeOf(TENT.deckNominal),
@@ -149,7 +167,7 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
         emit('subfloor', `${sheetW}x${sheetL} panel`, {
           cutLengthFt: cw,
           position: [x + cw / 2, deckY - (PANEL.subfloorThickIn.value as number) / IN_PER_FT / 2, z + cd / 2],
-          rotation: [0, 0, 0],
+          rotation: [-Math.PI / 2, 0, 0],
           stage: sDeck,
           actual: { w: PANEL.subfloorThickIn.value as number, d: cd * IN_PER_FT },
           nailing: '8d @ 6" edges / 12" field (PH)',
@@ -179,43 +197,96 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
   }
 
   // ── Ramp: run comes from the doctrine slope, not from the space available.
+  //
+  // THE RAMP FRAME IS WRITTEN ONCE AND EVERY PIECE ON THE RAMP IS PLACED THROUGH IT. Each piece
+  // used to carry its own trigonometry, and each got a different sign, so the ramp shipped with
+  // the stringers running downhill AWAY from the platform and the planks tilted against them —
+  // a fan of boards floating over a beam that started at grade where the deck should be. One
+  // parameterisation, stated in comments, is the fix that keeps that from recurring:
+  //
+  //   surface(s) = (x, deckY·s, -run·(1-s))   s = 0 at grade, s = 1 at the platform edge
+  //   upSlope    = (0, sin pitch,  cos pitch) — grade toward the deck
+  //   down       = (0, -cos pitch, sin pitch) — square INTO the ramp, for stacking layers
+  //
+  // Pieces are then placed by saying how far BELOW the walking surface they sit, which is how a
+  // carpenter would describe them: planks a half-thickness down, stringers under the planks.
   if (spec.ramp) {
     const sRamp = requireOrdinal(plan, 'stairs-access');
     const run = deckY * spec.ramp.slope;
     const nominal = RAMP.stringerNominal.value as string;
-    const deckNominalForRamp = TENT.deckNominal.value as string;
     const slopeLen = Math.hypot(run, deckY);
     const pitch = Math.atan2(deckY, Math.max(1e-6, run));
-    const stringers = Math.max(2, Math.round(spec.ramp.widthFt / 2) + 1);
+    const rampW = spec.ramp.widthFt;
+    const rampX0 = L / 2 - rampW / 2;
+    const downY = -Math.cos(pitch);
+    const downZ = Math.sin(pitch);
+    /** Center of a piece sitting `drop` feet square below the walking surface at station `s`. */
+    const seat = (x: number, s: number, drop: number): [number, number, number] =>
+      [x, deckY * s + downY * drop, -run * (1 - s) + downZ * drop];
+
+    const deckIsPlank = spec.deck === 'plank';
+    const rampDeckNominal = TENT.deckNominal.value as string;
+    const deckThick = (deckIsPlank
+      ? DRESSED[rampDeckNominal]!.w
+      : (PANEL.subfloorThickIn.value as number)) / IN_PER_FT;
+
+    // Ry(PI/2)·Rz(-pitch) sends the length axis to (0, -sin pitch, -cos pitch): walking out the
+    // +X end of the stringer goes DOWNHILL and away, so the piece is high at z = 0 against the
+    // platform and low at z = -run out at grade. With +pitch it was exactly reversed.
+    const stringerDepth = DRESSED[nominal]!.d / IN_PER_FT;
+    const stringers = Math.max(2, Math.round(rampW / 2) + 1);
     for (let i = 0; i < stringers; i++) {
-      const x = L / 2 - spec.ramp.widthFt / 2 + (spec.ramp.widthFt * i) / (stringers - 1);
+      const x = rampX0 + (rampW * i) / (stringers - 1);
       emit('stringer', nominal, {
         cutLengthFt: slopeLen,
-        position: [x, deckY / 2 - DRESSED[deckNominalForRamp]!.w / IN_PER_FT, -run / 2],
-        rotation: [0, Math.PI / 2, pitch],
+        position: seat(x, 0.5, deckThick + stringerDepth / 2),
+        rotation: [0, Math.PI / 2, -pitch],
         stage: sRamp,
         nailing: 'bolted at the deck; bedded at grade (PH)',
         doctrineRef: citeOf(RAMP.stringerNominal),
       });
     }
-    const deckNominal = TENT.deckNominal.value as string;
-    const boardW = DRESSED[deckNominal]!.d / IN_PER_FT;
-    const boards = Math.max(1, Math.round(slopeLen / boardW));
-    // Planks laid ACROSS the ramp, each lying IN the slope plane. Composing Ry(0)·Rx(rx) sends
-    // a member's face-width axis to (0, cos rx, sin rx), and the ramp's up-slope direction is
-    // (0, sin pitch, -cos pitch) — equal only at rx = -(PI/2 - pitch). Left at zero the boards
-    // stayed horizontal and the ramp read as a fan of sticks in mid-air.
-    const rx = -(Math.PI / 2 - pitch);
-    for (let i = 0; i < boards; i++) {
-      const s = (i + 0.5) / boards;
-      emit('deckPlank', deckNominal, {
-        cutLengthFt: spec.ramp.widthFt,
-        position: [L / 2, deckY * s, -run * (1 - s)],
-        rotation: [rx, 0, 0],
-        stage: sRamp,
-        nailing: '2-16d ea stringer (PH)',
-        doctrineRef: citeOf(RAMP.slopes),
-      });
+
+    // Laid ACROSS the ramp, each piece lying IN the slope plane. Composing Ry(0)·Rx(rx) sends a
+    // member's face-width axis to (0, cos rx, sin rx), and the ramp's up-slope direction is
+    // (0, sin pitch, cos pitch) — equal only at rx = +(PI/2 - pitch).
+    const rx = Math.PI / 2 - pitch;
+    if (deckIsPlank) {
+      const boardW = DRESSED[rampDeckNominal]!.d / IN_PER_FT;
+      const boards = Math.max(1, Math.round(slopeLen / boardW));
+      for (let i = 0; i < boards; i++) {
+        emit('deckPlank', rampDeckNominal, {
+          cutLengthFt: rampW,
+          position: seat(L / 2, (i + 0.5) / boards, deckThick / 2),
+          rotation: [rx, 0, 0],
+          stage: sRamp,
+          nailing: '2-16d ea stringer (PH)',
+          doctrineRef: citeOf(RAMP.slopes),
+        });
+      }
+    } else {
+      // A panel deck on the platform means a panel deck on the ramp — the operator picked a
+      // decking material, not a decking material for the flat part only. Sheets run their 8-ft
+      // length ACROSS the ramp and their 4-ft width UP the slope, so the joint that matters
+      // lands square across the stringers.
+      const sheetW = PANEL.widthFt.value as number;
+      const sheetL = PANEL.lengthFt.value as number;
+      for (let u = 0; u < slopeLen - 1e-6; u += sheetW) {
+        const cu = Math.min(sheetW, slopeLen - u);
+        const s = (u + cu / 2) / slopeLen;
+        for (let v = 0; v < rampW - 1e-6; v += sheetL) {
+          const cv = Math.min(sheetL, rampW - v);
+          emit('subfloor', `${sheetW}x${sheetL} panel`, {
+            cutLengthFt: cv,
+            position: seat(rampX0 + v + cv / 2, s, deckThick / 2),
+            rotation: [rx, 0, 0],
+            stage: sRamp,
+            actual: { w: PANEL.subfloorThickIn.value as number, d: cu * IN_PER_FT },
+            nailing: '8d @ 6" edges / 12" field (PH)',
+            doctrineRef: citeOf(PANEL.subfloorThickIn),
+          });
+        }
+      }
     }
   }
 
@@ -297,7 +368,8 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
     emit('deckPlank', deckNominal, {
       cutLengthFt: L,
       position: [L / 2, joistDepth + deckThick / 2, Math.min(z, W - boardW / 2)],
-      rotation: [0, 0, 0],
+      rotation: [-Math.PI / 2, 0, 0], // flat — see the platform deck above
+
       stage: sDeck,
       nailing: '2-16d ea joist (PH)',
       doctrineRef: citeOf(TENT.deckNominal),
