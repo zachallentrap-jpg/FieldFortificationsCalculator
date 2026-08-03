@@ -362,6 +362,7 @@ jobs: a Marine who knows what a jack stud is knows it in a hut, a tower and a bu
 | **Decks** | Fourteen decks — one per shipped structure, plus a cross-family "Framing pieces" deck that teaches each of the ~49 roles in the simplest structure that has one. Scheduled by session (Leitner, clock-free), modes escalate from flip to identify / point-at-it / stage-order as a card is learned. |
 | **Pieces** | The whole framing dictionary, searchable, with which structures each piece appears in. |
 | **Sequence** | Every structure's build order, with a drawing of the structure as it stood at the end of each step — all frames at the finished building's scale, so it reads as one building growing. |
+| **Paper deck** | The same cards, four to a sheet, duplex, cut on the cell borders. Three duplex modes ship (long-edge, short-edge, manual re-feed) because company printers are configured either way and plenty are simplex — one wrong guess puts somebody else's answer on the back of every card. |
 
 Three properties are worth stating because they are what the tests protect:
 
@@ -785,10 +786,13 @@ by the catalog and the config panel). The live queue is:
    printable paper decks and worksheets, hip-pocket class mode, records, and the post-T3
    integration. F1 (training core), F2 (the trainer), F3 (the command packet) and F4 (quiz
    modes) have shipped.
-4. **A hip roof's covering.** `roofPlanes` returns two rectangular planes for a hip, so the two
-   triangular ends show bare framing. The framing itself is right; the skin is not.
-5. **SAP-2's own trainer** (F7/F8) — the training core is app-agnostic and already carries the
+4. **SAP-2's own trainer** (F7/F8) — the training core is app-agnostic and already carries the
    regime enum for it.
+5. **The rest of F5** — stage posters and label-the-diagram worksheets. The paper flashcard deck
+   has shipped; these two are the same machinery pointed at different sheets.
+
+*(The hip roof's covering, listed here previously, is closed: `roofPlanes` returns four planes
+and the deck and roofing clip differently — see `subsystems/coverings.ts`.)*
 
 ### 8.1 Earlier audit ordering (historical)
 
