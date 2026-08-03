@@ -143,10 +143,23 @@ const r1 = (n: number): string => {
 };
 
 /**
+ * Where a highlighted member ended up ON THE DRAWING, in the same viewBox coordinates the SVG
+ * uses. The worksheet needs it to run a leader line from a numbered box to the actual piece,
+ * and computing it anywhere else would mean a second copy of the projection and the fit — two
+ * copies that agree until one of them is edited, and then point at the wrong stud.
+ */
+export interface Anchor { id: string; x: number; y: number }
+
+/**
  * Draw a spec as an SVG string. Deterministic: same spec → byte-identical output, which is
  * what makes the committed goldens meaningful.
  */
 export function thumbnailFor(spec: StructureSpec, opts: ThumbOptions = {}): string {
+  return drawStructure(spec, opts).svg;
+}
+
+/** The same drawing, plus where each highlighted member landed on it. */
+export function drawStructure(spec: StructureSpec, opts: ThumbOptions = {}): { svg: string; anchors: Anchor[] } {
   const width = opts.width ?? 220;
   const height = opts.height ?? 150;
   const lod = opts.lod ?? true;
@@ -159,7 +172,7 @@ export function thumbnailFor(spec: StructureSpec, opts: ThumbOptions = {}): stri
   const heavy: string[] = [];
   const picked: string[] = [];
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  const collected: { segs: [Pt2, Pt2][]; layer: 'light' | 'heavy' | 'picked' }[] = [];
+  const collected: { segs: [Pt2, Pt2][]; layer: 'light' | 'heavy' | 'picked'; id: string }[] = [];
 
   for (const m of drawable) {
     // Heavy members get their real box (they carry the silhouette); everything else is a
@@ -177,9 +190,11 @@ export function thumbnailFor(spec: StructureSpec, opts: ThumbOptions = {}): stri
       minY = Math.min(minY, a.y, b.y); maxY = Math.max(maxY, a.y, b.y);
     }
     if (opts.stageMax !== undefined && !isPicked && m.stage > opts.stageMax) continue;
-    collected.push({ segs, layer: isPicked ? 'picked' : isHeavy ? 'heavy' : 'light' });
+    collected.push({ segs, layer: isPicked ? 'picked' : isHeavy ? 'heavy' : 'light', id: m.id });
   }
-  if (drawable.length === 0) return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}"></svg>`;
+  if (drawable.length === 0) {
+    return { svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}"></svg>`, anchors: [] };
+  }
 
   // A 6-ft human at the building's front-left corner, for scale.
   const humanSegs: [Pt2, Pt2][] = [];
@@ -203,9 +218,25 @@ export function thumbnailFor(spec: StructureSpec, opts: ThumbOptions = {}): stri
   const offY = (height - spanY * scale) / 2 - minY * scale;
   const tx = (p: Pt2): string => `${r1(p.x * scale + offX)} ${r1(p.y * scale + offY)}`;
 
+  const anchors: Anchor[] = [];
   for (const c of collected) {
     const path = c.segs.map(([a, b]) => `M${tx(a)}L${tx(b)}`).join('');
     (c.layer === 'picked' ? picked : c.layer === 'heavy' ? heavy : light).push(path);
+    // The centre of what was actually drawn, in viewBox units — not the member's world
+    // centroid, because a leader line has to land where the reader sees the piece.
+    if (c.layer === 'picked') {
+      let sx = 0;
+      let sy = 0;
+      let n = 0;
+      for (const [a, b] of c.segs) {
+        sx += a.x + b.x; sy += a.y + b.y; n += 2;
+      }
+      anchors.push({
+        id: c.id,
+        x: Math.round(((sx / n) * scale + offX) * 10) / 10,
+        y: Math.round(((sy / n) * scale + offY) * 10) / 10,
+      });
+    }
   }
 
   // With a highlight the whole structure drops back so one piece can come forward. Without one
@@ -225,7 +256,7 @@ export function thumbnailFor(spec: StructureSpec, opts: ThumbOptions = {}): stri
     parts.push(`<g fill="none" stroke="#9a5b3d" stroke-width="1.2" stroke-linecap="round" opacity="0.9"><path d="${hp}"/></g>`);
   }
   parts.push('</svg>');
-  return parts.join('');
+  return { svg: parts.join(''), anchors };
 }
 
 // Memoized per catalog id — the picker draws every card on every render otherwise.
