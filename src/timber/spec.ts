@@ -100,11 +100,21 @@ export interface CoveringSpec {
 }
 
 /** What every family branch shares (plan §3.1 SpecCommon). */
+/**
+ * Ground observed at the site. RECORDED, not consumed: FM 5-426 sizes post footers per soil
+ * class, and until those tables are page-checked nothing in the engine is allowed to read this
+ * — so it travels with the spec and prints on the command packet, where the reviewing engineer
+ * can act on it, and the panel says exactly that. An input that silently did nothing would be a
+ * lie; an input that states what it feeds is a site record.
+ */
+export type SoilKind = 'sand' | 'gravel' | 'loam' | 'clay' | 'rock';
+
 export interface SpecCommon {
   dims: Dims;
   spacing: SpacingSpec;
   coverings: CoveringSpec;
   label?: string; // the user's name for a saved config
+  site?: { soil?: SoilKind };
 }
 
 export interface PartitionSpec {

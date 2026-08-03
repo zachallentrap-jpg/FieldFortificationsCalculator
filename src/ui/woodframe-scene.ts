@@ -362,9 +362,12 @@ function rowHtml(row: PanelRow, value: unknown): string {
       <input type="checkbox" data-path="${esc(row.path)}" ${value ? 'checked' : ''} ${row.lockedBy ? 'disabled' : ''}/>
       ${locked}${help}</label>`;
   }
-  if (row.control === 'select') {
+  if (row.control === 'select' || row.control === 'family') {
+    // The option VALUE stays the spec's own token; the reader sees the plain-language label.
+    // A select full of raw enum tokens was the panel quietly assuming everyone already knew
+    // the vocabulary — in the tool whose other half exists to teach it.
     const opts = (row.options ?? [])
-      .map((o) => `<option value="${esc(o)}"${String(value) === o ? ' selected' : ''}>${esc(o)}</option>`)
+      .map((o, i) => `<option value="${esc(o)}"${String(value) === o ? ' selected' : ''}>${esc(row.optionLabels?.[i] ?? o)}</option>`)
       .join('');
     return `<label class="row"><span class="row-label">${esc(row.label)}</span>
       <select data-path="${esc(row.path)}" ${row.lockedBy ? 'disabled' : ''}>${opts}</select>
@@ -381,10 +384,31 @@ function renderConfigPanel(): void {
   if (!current) return;
   const schema = configSchemaFor(current.familyId);
   const panel = document.getElementById('configPanel')!;
-  panel.innerHTML = schema.groups
-    .map((g, i) => `<details class="cfg-group"${i < 2 ? ' open' : ''}>
+  // THE PANEL REMEMBERS WHAT YOU HAD OPEN. Every edit re-renders it, and the rebuild used to
+  // reset the disclosure state to its default — open FOUNDATION, change the crawl height, and
+  // the section slammed shut on the control you were still using. Open-state is keyed by
+  // section title so it survives the rebuild; a fresh panel (or a family switch, whose titles
+  // differ) falls back to the default of the first two sections open. Scroll position gets the
+  // same treatment for the same reason.
+  const openState = new Map(
+    [...panel.querySelectorAll<HTMLDetailsElement>('details.cfg-group')]
+      .map((d) => [d.querySelector('summary')?.textContent ?? '', d.open] as const),
+  );
+  const pane = panel.parentElement;
+  const scrollTop = pane?.scrollTop ?? 0;
+  // Rows that do not apply to the current choices do not render, and a section left with
+  // nothing to say disappears whole — the panel is exactly as long as the structure is
+  // complicated, which is the point of the cascade.
+  const visibleGroups = schema.groups
+    .map((g) => ({ ...g, rows: g.rows.filter((r) => !r.applies || r.applies(current!.spec)) }))
+    .filter((g) => g.rows.length > 0);
+  panel.innerHTML = visibleGroups
+    .map((g, i) => `<details class="cfg-group"${(openState.get(g.title) ?? i < 2) ? ' open' : ''}>
       <summary>${esc(g.title)}</summary>
-      ${g.rows.map((r) => rowHtml(r, getPath(current!.spec, r.path))).join('')}
+      ${g.rows.map((r) => rowHtml(r,
+        r.path === '__family' ? current!.familyId
+        : r.path === 'site.soil' ? (getPath(current!.spec, r.path) ?? 'unknown')
+        : getPath(current!.spec, r.path))).join('')}
     </details>`)
     .join('');
 
@@ -399,7 +423,23 @@ function renderConfigPanel(): void {
     el.addEventListener('change', () => {
       const path = el.dataset.path!;
       const spec = current!.spec as BuildingSpec;
-      if (path === 'screenBand') {
+      if (path === '__family') {
+        // Changing the TYPE is not an edit of this spec — it opens that structure's standard
+        // build, exactly as the picker card would, so the first input on the panel and the
+        // picker are the same decision made in two places.
+        const next = buildFromFamily((el as HTMLSelectElement).value as FamilyId);
+        if (next) {
+          session = commitBuild(session, next).state;
+          scheduleSave();
+          go(routeToHash({ name: 'build', id: next.id }));
+        }
+        return;
+      }
+      if (path === 'site.soil') {
+        const soil = (el as HTMLSelectElement).value;
+        // 'unknown' clears the record rather than storing a value that claims an observation.
+        (spec as unknown as { site?: { soil?: string } }).site = soil === 'unknown' ? undefined : { soil };
+      } else if (path === 'screenBand') {
         // The toggle is "does this hut breathe"; the spec value is the band itself, or null.
         // Mapping it here keeps the doctrine numbers out of the control and out of the panel.
         (spec as unknown as Record<string, unknown>).screenBand = (el as HTMLInputElement).checked
@@ -427,6 +467,7 @@ function renderConfigPanel(): void {
     });
   });
   renderOpeningsEditor();
+  if (pane) pane.scrollTop = scrollTop;
 }
 
 // ── Openings ────────────────────────────────────────────────────────────────

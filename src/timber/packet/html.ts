@@ -244,7 +244,10 @@ function assumptionsPage(p: PacketModel): string {
     <p class="fine">${p.counts.phCites} of ${p.counts.cites} citations are pending a manual page check, carrying ${p.counts.members} members between them.</p>
 
     <h3>What this packet estimates rather than knows</h3>
-    <ul>${Object.values(FIDELITY).map((f) => `<li>${esc(f)}</li>`).join('')}</ul>
+    <ul>${Object.values(FIDELITY).map((f) => `<li>${esc(f)}</li>`).join('')}
+    <li>${p.siteSoil
+      ? `SITE: soil recorded by the operator as ${esc(p.siteSoil.toUpperCase())}. Recorded only — member and footer sizing does not read it; FM 5-426 sizes post footers per soil and those tables are pending a page check (PH).`
+      : 'SITE: soil not recorded. FM 5-426 sizes post footers per soil; the reviewing engineer has nothing from this tool to check that against.'}</li></ul>
     ${p.isBunker ? `<p class="boundary">${esc(p.coverDepthNote)}</p>` : ''}
 
     ${issues ? `<h3>Adjusted from what was entered</h3><ul>${issues}</ul>` : ''}

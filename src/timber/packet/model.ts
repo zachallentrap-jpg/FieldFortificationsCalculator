@@ -92,6 +92,12 @@ export interface PacketModel {
   /** Role names as a carpenter says them, resolved once. */
   plain: (role: string) => string;
   isBunker: boolean;
+  /**
+   * Ground as the operator recorded it, or null. Printed rather than consumed: FM 5-426 sizes
+   * post footers per soil class and those tables are pending a page check, so the honest place
+   * for this observation is in front of the reviewing engineer, stated as unread.
+   */
+  siteSoil: string | null;
   coverDepthNote: string;
   sections: readonly string[];
   rates: typeof LABOR_RATES;
@@ -240,6 +246,7 @@ export function packetModel(model: StructureModel, opts: PacketOptions): PacketM
     tools: toolsFor(model),
     plain: opts.plainName ?? ((r) => r),
     isBunker: model.spec.family === 'bunker',
+    siteSoil: (model.spec as { site?: { soil?: string } }).site?.soil ?? null,
     coverDepthNote: COVER_DEPTH_NOTE,
     sections: SECTIONS,
     rates: LABOR_RATES,
