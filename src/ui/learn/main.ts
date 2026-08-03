@@ -33,6 +33,7 @@ import { familyById, shippedFamilies, type FamilyId } from '../../timber/catalog
 import { generateStructure } from '../../timber/families/index';
 import { cardArt, deckArt, stageArt } from './art';
 import { printPaperDeck } from './paper';
+import { printStagePoster, printWorksheet } from './handouts';
 import { loadTrain, progressFor, resetDeck, saveTrain, withProgress, type TrainState } from './store';
 
 const esc = (s: string): string =>
@@ -326,8 +327,15 @@ function questionBody(q: Question, deckId: string, s: Session, style: DeckStyle)
     : '<div class="art blank">No drawing for this piece — go by the description.</div>';
 
   if (q.mode === 'flip') {
-    return `${artBlock}
-      ${s.revealed ? cardBack(q.card, style) : ''}
+    // A FLASHCARD HAS TWO SIDES, and showing the answer means turning it over. The answer used
+    // to be appended UNDER the picture with both visible at once, which is not a flashcard —
+    // it is a labelled diagram, and you cannot fail to have known it. The answer now lands ON
+    // the picture over a dim, so the moment of "did I get it" is a real one, and the piece
+    // stays faintly visible behind so the name and the thing connect.
+    return `<div class="face${s.revealed ? ' turned' : ''}">
+        ${artBlock}
+        ${s.revealed ? `<div class="reveal">${cardBack(q.card, style)}</div>` : ''}
+      </div>
       ${s.revealed
         ? `<div class="grade">
              <button class="btn miss" data-grade="0">Missed it</button>
@@ -338,12 +346,13 @@ function questionBody(q: Question, deckId: string, s: Session, style: DeckStyle)
 
   if (q.mode === 'flip-reverse') {
     // Name first, drawing second — the direction you work in when someone tells you what to cut.
+    // The turn goes the other way here: the answer IS the picture, so it arrives clean.
     return `<div class="back">
         <div class="name">${esc(q.card.back.name)}</div>
         <p class="plain">${esc(q.card.back.plain)}</p>
       </div>
       ${s.revealed ? artBlock : ''}
-      ${s.revealed ? cardBack(q.card, style) : ''}
+      ${s.revealed && style === 'full' ? cardBack(q.card, style) : ''}
       ${s.revealed
         ? `<div class="grade">
              <button class="btn miss" data-grade="0">Missed it</button>
@@ -532,6 +541,14 @@ function renderSequence(familyId: string): void {
       ${tabs('sequence')}
       <div class="seqpick">${picks.map((f) =>
         `<button class="btn" aria-pressed="${f.id === familyId}" data-go="#/sequence/${esc(f.id)}">${esc(f.name)}</button>`).join('')}</div>
+      <!-- The two handouts belong HERE rather than on the deck list: both are about one
+           structure, and this is the screen where a person has already chosen one. -->
+      <div class="handouts">
+        <button class="btn" data-worksheet="${esc(familyId)}">Print a label-the-diagram sheet</button>
+        <button class="btn" data-poster="${esc(familyId)}">Print this sequence as a poster</button>
+        <p class="hint">The worksheet prints with an answer key on the second page. Both carry the
+          structure's own citation line, so a sheet handed to somebody says where it came from.</p>
+      </div>
       <div class="stages">${model.stagePlan.map((s) => {
         // The structure as it stood at the end of this step, drawn at the finished building's
         // scale — the sequence is a thing you watch grow, not a list you read.
@@ -548,7 +565,7 @@ function renderSequence(familyId: string): void {
 // ── Events ───────────────────────────────────────────────────────────────────
 
 app.addEventListener('click', (ev) => {
-  const el = (ev.target as HTMLElement).closest<HTMLElement>('[data-go],[data-reveal],[data-grade],[data-pick],[data-next],[data-again],[data-reset],[data-print]');
+  const el = (ev.target as HTMLElement).closest<HTMLElement>('[data-go],[data-reveal],[data-grade],[data-pick],[data-next],[data-again],[data-reset],[data-print],[data-worksheet],[data-poster]');
   if (!el) return;
 
   const goTo = el.dataset['go'];
@@ -561,6 +578,25 @@ app.addEventListener('click', (ev) => {
   if (print) {
     const e = byId.get(print)!;
     void printPaperDeck(e.deck, e.tileFamilyId ?? e.familyId);
+    return;
+  }
+
+  const worksheet = el.dataset['worksheet'];
+  if (worksheet) {
+    // The structure's OWN deck supplies the pieces and their plain names, so a worksheet can
+    // never label something the flashcards do not teach.
+    const entry = DECKS.find((d) => d.familyId === worksheet);
+    if (!entry || !printWorksheet(worksheet, entry.deck)) {
+      notice(['This browser would not open a print frame — try Save as PDF from the browser menu.']);
+    }
+    return;
+  }
+
+  const poster = el.dataset['poster'];
+  if (poster) {
+    if (!printStagePoster(poster)) {
+      notice(['This browser would not open a print frame — try Save as PDF from the browser menu.']);
+    }
     return;
   }
 

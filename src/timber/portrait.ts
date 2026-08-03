@@ -197,7 +197,33 @@ export interface PortraitOptions {
   context?: number;
   /** Page colour behind the drawing. */
   background?: string;
+  /**
+   * Paint the focus red, or only USE it (to frame, and to report where each piece landed).
+   *
+   * A label-the-diagram worksheet needs the second: it points a numbered leader at a piece and
+   * asks the reader to name it, so colouring that piece differently from its neighbours would
+   * answer the question in the picture.
+   */
+  markFocus?: boolean;
+  /**
+   * Roles to leave out entirely. A worksheet asks a reader to find a jack stud, and a finished
+   * building has siding over every jack stud in it — so the sheet goods come off and the frame
+   * is what gets labelled. Same idea as the picker's LOD, stated per call because only the
+   * caller knows what its picture is FOR.
+   */
+  omit?: ReadonlySet<string>;
+  /**
+   * Frame on the WHOLE model rather than on what this drawing shows.
+   *
+   * A sequence of stage frames has to be drawn at one scale or it stops reading as one building
+   * growing and starts reading as nine drawings that keep resizing — the footings fill the first
+   * frame and then everything shrinks. The finished structure sets the box for every frame.
+   */
+  fitAll?: boolean;
 }
+
+/** Where a focused member ended up on the finished drawing, in viewBox units. */
+export interface PortraitAnchor { id: string; x: number; y: number }
 
 const r1 = (n: number): string => {
   const v = Math.round(n * 10) / 10;
@@ -208,6 +234,18 @@ const r1 = (n: number): string => {
  * Draw a spec as a solid SVG picture. Deterministic: same spec and options → identical bytes.
  */
 export function portraitFor(spec: StructureSpec, opts: PortraitOptions = {}): string {
+  return drawPortrait(spec, opts).svg;
+}
+
+/**
+ * The same drawing, plus where each focused member landed on it.
+ *
+ * The anchors have to be computed HERE and nowhere else: a leader line that points at a stud
+ * needs the projection AND the fit, and a second copy of those two would agree with this one
+ * until somebody edited one of them, after which the worksheet would point at the wrong piece
+ * and look like a labelling mistake rather than a maths one.
+ */
+export function drawPortrait(spec: StructureSpec, opts: PortraitOptions = {}): { svg: string; anchors: PortraitAnchor[] } {
   const width = opts.width ?? 420;
   const height = opts.height ?? 300;
   const focusIds = opts.focus;
@@ -216,13 +254,23 @@ export function portraitFor(spec: StructureSpec, opts: PortraitOptions = {}): st
   // The focus is drawn whatever stage it belongs to; everything else obeys stageMax. Drawing a
   // piece with nothing around it teaches a silhouette, so the point of the stage clip is to
   // show what WAS there, not to hide the subject.
-  const visible = model.members.filter((m) =>
+  const drawable = opts.omit ? model.members.filter((m) => !opts.omit!.has(m.role)) : model.members;
+  const visible = drawable.filter((m) =>
     focusIds?.has(m.id) || opts.stageMax === undefined || m.stage <= opts.stageMax);
   if (visible.length === 0) {
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img"></svg>`;
+    return {
+      svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" role="img"></svg>`,
+      anchors: [],
+    };
   }
 
+  const mark = opts.markFocus !== false;
   const faces: Face[] = [];
+  // When the frame is pinned to the whole model, the extent comes from every member the
+  // structure has — including the ones this frame does not draw yet.
+  const extentOf = opts.fitAll ? drawable : visible;
+  /** Running screen-space centroid per focused member, for the anchors. */
+  const spot = new Map<string, { sx: number; sy: number; n: number }>();
   let fMinX = Infinity, fMaxX = -Infinity, fMinY = Infinity, fMaxY = -Infinity;
   let aMinX = Infinity, aMaxX = -Infinity, aMinY = Infinity, aMaxY = -Infinity;
   const frameIds = opts.frameOn ?? focusIds;
@@ -231,11 +279,18 @@ export function portraitFor(spec: StructureSpec, opts: PortraitOptions = {}): st
     const isFramed = frameIds?.has(m.id) ?? false;
     // Everything that is not the subject steps back a little so the subject is the thing your
     // eye lands on. Not a ghost — you still have to be able to read the joint it sits in.
-    for (const f of facesOf(m, i, isFocus, focusIds && !isFocus ? 0.88 : 1)) {
+    for (const f of facesOf(m, i, isFocus && mark, focusIds && mark && !isFocus ? 0.88 : 1)) {
       faces.push(f);
+      if (isFocus) {
+        const acc = spot.get(m.id) ?? { sx: 0, sy: 0, n: 0 };
+        for (const p of f.pts) { acc.sx += p.x; acc.sy += p.y; acc.n += 1; }
+        spot.set(m.id, acc);
+      }
       for (const p of f.pts) {
-        aMinX = Math.min(aMinX, p.x); aMaxX = Math.max(aMaxX, p.x);
-        aMinY = Math.min(aMinY, p.y); aMaxY = Math.max(aMaxY, p.y);
+        if (!opts.fitAll) {
+          aMinX = Math.min(aMinX, p.x); aMaxX = Math.max(aMaxX, p.x);
+          aMinY = Math.min(aMinY, p.y); aMaxY = Math.max(aMaxY, p.y);
+        }
         if (isFramed) {
           fMinX = Math.min(fMinX, p.x); fMaxX = Math.max(fMaxX, p.x);
           fMinY = Math.min(fMinY, p.y); fMaxY = Math.max(fMaxY, p.y);
@@ -243,6 +298,17 @@ export function portraitFor(spec: StructureSpec, opts: PortraitOptions = {}): st
       }
     }
   });
+
+  if (opts.fitAll) {
+    for (const m of extentOf) {
+      for (const f of facesOf(m, 0, false, 1)) {
+        for (const p of f.pts) {
+          aMinX = Math.min(aMinX, p.x); aMaxX = Math.max(aMaxX, p.x);
+          aMinY = Math.min(aMinY, p.y); aMaxY = Math.max(aMaxY, p.y);
+        }
+      }
+    }
+  }
 
   // ── Frame it. With no focus this is the whole structure; with one, a window CENTRED on the
   // piece, sized to the requested amount of context.
@@ -307,7 +373,7 @@ export function portraitFor(spec: StructureSpec, opts: PortraitOptions = {}): st
     // A hairline in the fill's own colour closes the seam between adjacent quads, which would
     // otherwise show as a pale grid over every large surface at fractional scales.
     body.push(`<polygon points="${pts.join(' ')}" fill="${f.fill}" stroke="${f.fill}" stroke-width="0.5"/>`);
-    if (f.focus) xray.push(`<polygon points="${pts.join(' ')}"/>`);
+    if (f.focus && mark) xray.push(`<polygon points="${pts.join(' ')}"/>`);
   }
   parts.push(body.join(''));
   // ── X-RAY. Occlusion is what makes the picture read as solid, and it is also what buries the
@@ -327,7 +393,15 @@ export function portraitFor(spec: StructureSpec, opts: PortraitOptions = {}): st
     );
   }
   parts.push('</svg>');
-  return parts.join('');
+  const anchors: PortraitAnchor[] = [];
+  for (const [id, a] of spot) {
+    anchors.push({
+      id,
+      x: Math.round(((a.sx / a.n) * scale + offX) * 10) / 10,
+      y: Math.round(((a.sy / a.n) * scale + offY) * 10) / 10,
+    });
+  }
+  return { svg: parts.join(''), anchors };
 }
 
 // Memoized: a deck screen draws every card's art on every render otherwise, and a portrait is

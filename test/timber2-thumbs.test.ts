@@ -11,6 +11,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { FAMILY_TABLE, shippedFamilies } from '../src/timber/catalog';
 import { thumbnailFor, thumbnailCached } from '../src/timber/thumbnails';
+import { portraitFor, portraitCached } from '../src/timber/portrait';
 
 const DIR = fileURLToPath(new URL('./goldens/thumbs/', import.meta.url));
 
@@ -24,6 +25,36 @@ test('every shipped family has a committed SVG golden, and it still matches', ()
       golden,
       `${f.id}: card art changed. If deliberate, run npm run update:thumb-goldens IN THE SAME PR as the change.`,
     );
+  }
+});
+
+// THE SOLID DRAWING IS THE ONE PEOPLE LOOK AT. Line art goes on the printed packet cover; every
+// card on screen is a portrait, and the picker's fourteen tiles are the first thing anybody sees.
+// It gets the same three guarantees the line art has: pinned bytes, determinism, and a structural
+// pass that survives a rubber-stamped golden update.
+test('every shipped family has a committed SOLID golden, and it still matches', () => {
+  for (const f of shippedFamilies()) {
+    const path = `${DIR}${f.id}.solid.svg`;
+    assert.ok(existsSync(path), `${f.id}: no solid golden — run npm run update:thumb-goldens`);
+    assert.equal(
+      portraitFor(f.preset, { width: 300, height: 200 }) + '\n',
+      readFileSync(path, 'utf8'),
+      `${f.id}: solid card art changed. If deliberate, run npm run update:thumb-goldens IN THE SAME PR.`,
+    );
+  }
+});
+
+test('solid art is deterministic, self-contained, and inside its size budget', () => {
+  for (const f of shippedFamilies()) {
+    const a = portraitFor(f.preset, { width: 300, height: 200 });
+    assert.equal(portraitFor(f.preset, { width: 300, height: 200 }), a, `${f.id}: not deterministic`);
+    assert.equal(portraitCached(`p:${f.id}`, f.preset, { width: 300, height: 200 }), a, `${f.id}: cache disagrees`);
+    assert.ok(!/<script/i.test(a), `${f.id}: script tag`);
+    assert.ok(!/https?:/i.test(a.replace('http://www.w3.org/2000/svg', '')), `${f.id}: external URL`);
+    assert.ok(!/<image|xlink:href|url\(/i.test(a), `${f.id}: external reference`);
+    // A solid drawing is polygons, not strokes, so it is legitimately bigger than the line art —
+    // but a card that ships a quarter-megabyte of SVG is a card that janks a phone.
+    assert.ok(a.length < 260_000, `${f.id}: solid art is ${a.length} bytes`);
   }
 });
 

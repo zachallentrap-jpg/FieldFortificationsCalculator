@@ -13,7 +13,6 @@
 
 import { pickerGroups, type FamilyDef } from '../../timber/catalog';
 import { isLearning } from './mode';
-import { thumbnailCached } from '../../timber/thumbnails';
 import { portraitCached } from '../../timber/portrait';
 import { generateStructure } from '../../timber/families/index';
 import type { StoredBuild } from './store';
@@ -38,7 +37,11 @@ const esc = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 function cardHtml(f: FamilyDef): string {
-  const art = thumbnailCached(`card:${f.id}`, f.preset);
+  // SOLID, NOT WIRE. These were line drawings — thin dark strokes designed to read on white
+  // paper — and the app is dark, so fourteen cards of a building came out as fourteen faint
+  // smudges you could not tell apart. The owner's word for it was "undiscernable". A card whose
+  // whole job is "which structure is this" has to show the structure.
+  const art = portraitCached(`card:${f.id}`, f.preset, { width: 300, height: 200 });
   const capacity = f.capacity ? `<span class="chip-meta">${esc(f.capacity)}</span>` : '';
   // Lineage on the card is the pub NAME only; the (PH) status lives in the workbench.
   const lineage = esc(f.lineage.replace(/\s*\(PH[^)]*\)/g, '').split(';')[0] ?? '');

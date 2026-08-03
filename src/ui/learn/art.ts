@@ -25,7 +25,6 @@
 // pointed at rather than as thirty unrelated photographs.
 
 import { familyById, type FamilyId } from '../../timber/catalog';
-import { thumbnailCached, type ThumbOptions } from '../../timber/thumbnails';
 import { portraitCached, type PortraitOptions } from '../../timber/portrait';
 import type { CardSpec, SceneHighlight } from '../../timber/train/core';
 import type { StructureSpec } from '../../timber/spec';
@@ -87,17 +86,20 @@ export function cardArt(card: CardSpec, source: ArtSource, opts: PortraitOptions
 export function stageArt(familyId: string, ordinal: number, width = 240, height = 150): string | null {
   const family = familyById(familyId as FamilyId);
   if (!family) return null;
-  const svg = thumbnailCached(`learn:stage:${familyId}:${ordinal}:${width}x${height}`, family.preset, {
+  const svg = portraitCached(`learn:stage:${familyId}:${ordinal}:${width}x${height}`, family.preset, {
     width,
     height,
-    human: false,
     stageMax: ordinal,
+    // `fitAll` is what makes nine frames read as ONE building growing: every frame is drawn at
+    // the finished structure's scale, so the footings do not fill the first box and then
+    // everything shrink. Without it the sequence is nine drawings that keep resizing.
+    fitAll: true,
   });
   // A stage can legitimately put nothing on the ground — the guard shack's "Layout & foundation"
-  // is string lines and a level, and its skids do not go down until the next step. An empty grey
-  // box beside that row reads as a rendering failure; no box reads as "nothing standing yet",
+  // is string lines and a level, and its skids do not go down until the next step. An empty box
+  // beside that row reads as a rendering failure; no box reads as "nothing standing yet",
   // which is the truth.
-  return svg.includes('<path d="M') ? svg : null;
+  return svg.includes('<polygon') ? svg : null;
 }
 
 /** The deck-list tile: the whole structure, optionally with a few pieces picked out. */
@@ -105,9 +107,11 @@ export function deckArt(familyId: string, highlight?: readonly string[], width =
   const family = familyById(familyId as FamilyId);
   if (!family) return null;
   const mark = highlight && highlight.length > 0 ? new Set(highlight) : undefined;
-  return thumbnailCached(
+  return portraitCached(
     `learn:tile:${familyId}:${mark ? `h${highlight!.length}` : 'plain'}:${width}x${height}`,
     family.preset,
-    { width, height, ...(mark ? { highlight: mark } : {}) },
+    // The whole structure, not a crop: this tile answers "which building", and `frameOn` empty
+    // would zoom it to whichever piece happened to be highlighted first.
+    { width, height, fitAll: true, ...(mark ? { focus: mark, frameOn: new Set<string>() } : {}) },
   );
 }

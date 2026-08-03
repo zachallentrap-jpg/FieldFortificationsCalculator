@@ -375,7 +375,7 @@ test('a stage frame is drawn for every stage that actually puts something up', (
       const svg = stageArt(f.id, s.ordinal);
       if (!standing) { blanks += 1; assert.equal(svg, null, `${f.id} stage ${s.ordinal}: drew an empty frame`); continue; }
       assert.ok(svg && svg.startsWith('<svg'), `${f.id} stage ${s.ordinal}: no drawing`);
-      assert.ok(svg.includes('<path d="M'), `${f.id} stage ${s.ordinal}: empty frame for a stage with members`);
+      assert.ok(svg.includes('<polygon'), `${f.id} stage ${s.ordinal}: empty frame for a stage with members`);
     }
   }
   assert.ok(blanks > 0, 'if nothing is ever blank, this rule has stopped being exercised');
@@ -385,7 +385,9 @@ test('the general tiles show one of every piece, not a fifteenth building', () =
   const entry = allDecks(LABELS).find((d) => d.deck.id === FUNDAMENTALS_ID)!;
   assert.ok(entry.tileHighlight && entry.tileHighlight.length > 10, 'the tile needs pieces to pick out');
   const art = deckArt(entry.tileFamilyId!, entry.tileHighlight)!;
-  assert.ok(art.includes('#c2410c'));
+  // The tile is a SOLID render now, so the marked pieces are shaded reds rather than one stroke
+  // colour — what is asserted is that a red reached the drawing at all.
+  assert.ok(/#[b-d][0-9a-f]{5}/.test(art) && art.includes('<polygon'), 'the picked pieces are drawn');
   // And a plain structure tile is genuinely different from it.
   assert.notEqual(deckArt('gp-frame'), art);
 });
