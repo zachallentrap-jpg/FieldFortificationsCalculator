@@ -115,7 +115,51 @@ footer { padding: 22px 16px 34px; font-size: 11.5px; color: var(--label-2); text
 .lead p { color: var(--label-2); margin: 7px 0 0; max-width: 64ch; font-size: 14.5px; }
 .tabs { margin: 18px 0 4px; }
 
-.grouphead { margin: 26px 0 10px; font-size: 11.5px; font-weight: 680; letter-spacing: 0.07em; text-transform: uppercase; color: var(--label-2); }
+/* ── The general decks, up top and unmissable ──────────────────────────────
+   These two ARE the flashcards. The old page put them in a fourteen-tile grid beside every
+   building the toolkit can draw, where the deck that teaches the vocabulary was one tile among
+   thirteen structures — so they get their own row, at a size that says "open this one". */
+.heroes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0 8px; }
+@media (max-width: 760px) { .heroes { grid-template-columns: 1fr; } }
+.hero {
+  display: flex; flex-direction: column; text-align: left; padding: 0; overflow: hidden;
+  background: var(--raised); border: 0; border-radius: 18px; cursor: pointer;
+  box-shadow: var(--shadow-2), inset 0 0 0 0.5px var(--sep-strong);
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+.hero:hover { transform: translateY(-2px); }
+.hero .body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 7px; flex: 1; }
+.hero .kicker { font-size: 10.5px; font-weight: 720; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent); }
+.hero h3 { font-size: 20px; letter-spacing: -0.02em; }
+.hero .blurb { margin: 0; font-size: 13.5px; color: var(--label-2); line-height: 1.5; flex: 1; }
+.hero .cta { font-size: 13.5px; font-weight: 600; color: var(--accent); margin-top: 2px; }
+
+/* THE FAN. Three real card fronts, offset and rotated so the tile reads as a stack you can go
+   through. The transforms are on the FACES, not the container, so the container still lays out
+   as a normal block and the hover lift below does not fight three separate rotations. */
+.fan {
+  position: relative; display: block; height: 208px; overflow: hidden;
+  background: linear-gradient(160deg, #23252b, #15161a);
+}
+.fan.none { display: flex; align-items: center; justify-content: center; color: var(--label-3); font-size: 34px; }
+.fan .face {
+  position: absolute; left: 50%; top: 50%; width: 44%; border-radius: 10px; overflow: hidden;
+  background: #17181b; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+  transition: transform 0.24s ease;
+}
+.fan .face svg { display: block; width: 100%; height: auto; }
+.fan .f0 { transform: translate(-50%, -50%) rotate(-13deg) translateX(-64%); }
+.fan .f1 { transform: translate(-50%, -50%) rotate(-1deg) translateY(-3%); }
+.fan .f2 { transform: translate(-50%, -50%) rotate(12deg) translateX(64%); }
+.hero:hover .fan .f0 { transform: translate(-50%, -50%) rotate(-17deg) translateX(-76%); }
+.hero:hover .fan .f2 { transform: translate(-50%, -50%) rotate(16deg) translateX(76%); }
+
+.split { margin: 34px 0 0; padding-top: 20px; border-top: 0.5px solid var(--sep); }
+.split .grouphead { margin: 0; }
+.groupsub { margin: 5px 0 0; font-size: 13.5px; color: var(--label-2); max-width: 62ch; line-height: 1.5; }
+.subhead { margin: 20px 0 10px; font-size: 11.5px; font-weight: 680; letter-spacing: 0.07em; text-transform: uppercase; color: var(--label-3); }
+
+.grouphead { margin: 26px 0 10px; font-size: 13px; font-weight: 680; letter-spacing: -0.01em; color: var(--label); }
 .decks { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 14px; }
 .deck {
   display: flex; flex-direction: column; text-align: left; padding: 0; overflow: hidden;
@@ -157,11 +201,23 @@ footer { padding: 22px 16px 34px; font-size: 11.5px; color: var(--label-2); text
 }
 .card .prompt { padding: 14px 18px 0; font-size: 15px; font-weight: 560; }
 .card .modetag { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--label-2); padding: 14px 18px 0; }
-/* The drawing is generated at 460×320 and scales DOWN to fit a phone, never up: blowing a
-   wireframe past its native size just thickens every line into mud. */
-.art { background: var(--fill); display: flex; align-items: center; justify-content: center; padding: 8px; margin: 12px 0 0; }
-.art svg { width: 100%; max-width: 460px; height: auto; }
-.art.blank { min-height: 180px; color: var(--label-3); font-size: 13px; text-align: center; padding: 30px; }
+/* THE PICTURE IS THE CARD. It gets a dark ground of its own rather than the page's fill, for
+   two reasons: the drawing is a lit object and a lit object needs somewhere to sit, and the
+   card front then reads as a photograph on a table instead of as a diagram in a form. It is
+   the same dark either side of the light/dark switch, deliberately — the subject is the same
+   piece of wood whichever theme the reader has, and re-lighting it per theme would mean two
+   drawings to keep looking right. */
+.art {
+  background: #17181b; display: flex; align-items: center; justify-content: center;
+  padding: 0; margin: 12px 0 0; overflow: hidden;
+}
+.art svg { display: block; width: 100%; height: auto; }
+.art.blank { min-height: 180px; color: var(--label-3); font-size: 13px; text-align: center; padding: 30px; background: var(--fill); }
+
+/* The 'name' deck's answer: the name, and one line. Nothing else — see cardBack(). */
+.plain-back { text-align: center; padding: 18px 22px 6px; }
+.plain-back .name.big { font-size: 27px; font-weight: 680; letter-spacing: -0.024em; margin: 0; }
+.plain-back .plain { margin: 8px auto 0; max-width: 46ch; color: var(--label-2); font-size: 14.5px; }
 
 .answers { display: grid; gap: 8px; padding: 14px 18px 18px; }
 .answers.arts { grid-template-columns: 1fr 1fr; }

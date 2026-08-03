@@ -14,7 +14,7 @@
 // NO CLOCK. The scheduler counts sessions (FD9); nothing on this page calls Date.now, which is
 // what lets a whole session be replayed from a saved blob in a test.
 
-import { allDecks, type DeckEntry } from '../../timber/train/decks';
+import { allDecks, type DeckEntry, type DeckStyle } from '../../timber/train/decks';
 import {
   buildSession,
   deckMastery,
@@ -157,6 +157,42 @@ function masteryBar(deck: DeckSpec): string {
     </div>`;
 }
 
+/**
+ * THE FANNED STACK. A deck of cards should look like a deck of cards.
+ *
+ * The three faces are real card fronts — three actual pieces from the deck, drawn by the same
+ * projector the drill uses — so the tile is a sample of the contents rather than an icon of a
+ * deck. Fanning them is the whole visual difference between "a picture of a building" and
+ * "cards you can go through", and the owner asked for it by name.
+ */
+function fanTile(entry: DeckEntry, spread = 0): string {
+  const scenes = entry.deck.cards.filter((c) => c.front.art.kind === 'scene');
+  if (scenes.length === 0) return '<span class="fan none">&#9670;</span>';
+  // Three cards spread across the deck rather than the first three, and offset per deck, so the
+  // two tiles on the page are visibly two different decks instead of the same card twice.
+  const picks = [0.14, 0.47, 0.81]
+    .map((f) => scenes[Math.min(scenes.length - 1, Math.floor((f + spread) * scenes.length) % scenes.length)]!);
+  const faces = picks.map((c, i) => {
+    const art = cardArt(c, { spec: null, deckId: entry.deck.id }, { width: 300, height: 210, context: 0.8 });
+    return `<span class="face f${i}">${art ?? ''}</span>`;
+  }).join('');
+  return `<span class="fan" aria-hidden="true">${faces}</span>`;
+}
+
+function heroDeck(entry: DeckEntry, spread = 0): string {
+  const m = deckMastery(entry.deck, progressFor(state, entry.deck.id));
+  return `<button class="hero" data-go="#/drill/${esc(entry.deck.id)}">
+      ${fanTile(entry, spread)}
+      <span class="body">
+        <span class="kicker">${entry.style === 'name' ? 'Flashcards' : 'Go deeper'}</span>
+        <h3>${esc(entry.deck.title)}</h3>
+        <p class="blurb">${esc(entry.blurb)}</p>
+        ${masteryBar(entry.deck)}
+        <span class="cta">${m.known + m.learning === 0 ? 'Start' : 'Continue'} &rarr;</span>
+      </span>
+    </button>`;
+}
+
 function deckTile(entry: DeckEntry): string {
   const tileFamily = entry.tileFamilyId ?? entry.familyId;
   const art = tileFamily ? deckArt(tileFamily, entry.tileHighlight) : null;
@@ -171,21 +207,35 @@ function deckTile(entry: DeckEntry): string {
 }
 
 function renderDecks(): void {
+  // GENERAL FIRST, AND ON ITS OWN. Flashcards used to be a fourteen-tile grid in which the deck
+  // that teaches the vocabulary — the one everybody should open first — was one tile among
+  // thirteen buildings. What a person wants on arriving is the trade, not a structure they may
+  // never build; the specific decks are still here, below, for the night before you build one.
+  const general = DECKS.filter((d) => d.kind === 'general');
+  const structures = DECKS.filter((d) => d.kind === 'structure');
+
   const groups: { label: string; entries: DeckEntry[] }[] = [];
-  for (const e of DECKS) {
+  for (const e of structures) {
     const last = groups[groups.length - 1];
     if (last && last.label === e.groupLabel) last.entries.push(e);
     else groups.push({ label: e.groupLabel, entries: [e] });
   }
+
   app.innerHTML = `<div class="wrap">
       <div class="lead">
         <h1>Learn the trade</h1>
-        <p>Every card here is generated from a real structure this toolkit can build — the piece,
-           the stock it is cut from, where it goes and what holds it. Change nothing and drill;
-           the deck already matches the drawing.</p>
+        <p>Every card is generated from a real structure this toolkit can build, and the picture on
+           the front is that structure at the moment the piece goes in. Nothing here is stock
+           photography — it is the drawing, zoomed in on the thing being named.</p>
       </div>
       ${tabs('decks')}
-      ${groups.map((g) => `<h2 class="grouphead">${esc(g.label)}</h2>
+      <div class="heroes">${general.map((d, i) => heroDeck(d, i * 0.33)).join('')}</div>
+      <div class="split">
+        <h2 class="grouphead">Drill one structure</h2>
+        <p class="groupsub">Every piece in one specific building, in the order it goes up — what you
+          run through the night before you build it.</p>
+      </div>
+      ${groups.map((g) => `<h3 class="subhead">${esc(g.label)}</h3>
         <div class="decks">${g.entries.map(deckTile).join('')}</div>`).join('')}
     </div>`;
 }
@@ -235,7 +285,23 @@ function factRow(f: CitedFact): string {
   return `<div class="fact"><span class="k">${esc(f.label)}</span><span class="v">${esc(f.text)}${provenance}</span></div>`;
 }
 
-function cardBack(card: CardSpec): string {
+/**
+ * The answer side.
+ *
+ * A 'name' deck's back is the NAME, big, and one sentence of what it does. That is the entire
+ * card: you looked at a hip rafter, you said "hip rafter", you flip it and you are right. Piling
+ * the stock, the cut length, the nailing schedule and a citation under it turns a two-second
+ * check into a paragraph to read, and a deck you have to read is a deck nobody finishes.
+ * Everything that got cut is still one tap away in the pieces dictionary, and it is all on the
+ * 'full' deck's back — which is what that deck is FOR.
+ */
+function cardBack(card: CardSpec, style: DeckStyle = 'full'): string {
+  if (style === 'name') {
+    return `<div class="back plain-back">
+        <div class="name big">${esc(titleCase(card.back.name))}</div>
+        <p class="plain">${esc(card.back.plain)}</p>
+      </div>`;
+  }
   return `<div class="back">
       <div class="name">${esc(titleCase(card.back.name))}</div>
       <p class="plain">${esc(card.back.plain)}</p>
@@ -253,7 +319,7 @@ const MODE_TAG: Record<QuizMode, string> = {
   'stage-order': 'Sequence',
 };
 
-function questionBody(q: Question, deckId: string, s: Session): string {
+function questionBody(q: Question, deckId: string, s: Session, style: DeckStyle): string {
   const art = artFor(q.card, deckId);
   const artBlock = art
     ? `<div class="art">${art}</div>`
@@ -261,7 +327,7 @@ function questionBody(q: Question, deckId: string, s: Session): string {
 
   if (q.mode === 'flip') {
     return `${artBlock}
-      ${s.revealed ? cardBack(q.card) : ''}
+      ${s.revealed ? cardBack(q.card, style) : ''}
       ${s.revealed
         ? `<div class="grade">
              <button class="btn miss" data-grade="0">Missed it</button>
@@ -277,7 +343,7 @@ function questionBody(q: Question, deckId: string, s: Session): string {
         <p class="plain">${esc(q.card.back.plain)}</p>
       </div>
       ${s.revealed ? artBlock : ''}
-      ${s.revealed ? cardBack(q.card) : ''}
+      ${s.revealed ? cardBack(q.card, style) : ''}
       ${s.revealed
         ? `<div class="grade">
              <button class="btn miss" data-grade="0">Missed it</button>
@@ -293,7 +359,7 @@ function questionBody(q: Question, deckId: string, s: Session): string {
       return `<button class="ans${cls}" data-pick="${i}"${s.picked === null ? '' : ' disabled'}>${svg ?? esc(c.back.name)}</button>`;
     }).join('');
     return `<div class="answers arts">${choices}</div>
-      ${s.picked === null ? '' : cardBack(q.card)}
+      ${s.picked === null ? '' : cardBack(q.card, style)}
       ${s.picked === null ? '' : '<div class="grade" style="grid-template-columns:1fr"><button class="btn primary wide" data-next="1">Next</button></div>'}`;
   }
 
@@ -303,7 +369,7 @@ function questionBody(q: Question, deckId: string, s: Session): string {
   }).join('');
   return `${artBlock}
     <div class="answers">${choices}</div>
-    ${s.picked === null ? '' : cardBack(q.card)}
+    ${s.picked === null ? '' : cardBack(q.card, style)}
     ${s.picked === null ? '' : '<div class="grade" style="grid-template-columns:1fr"><button class="btn primary wide" data-next="1">Next</button></div>'}`;
 }
 
@@ -342,7 +408,7 @@ function renderDrill(deckId: string): void {
       <div class="card">
         <span class="modetag">${esc(MODE_TAG[q.mode])}</span>
         <div class="prompt">${esc(promptFor(q))}</div>
-        ${questionBody(q, deckId, s)}
+        ${questionBody(q, deckId, s, entry.style)}
       </div>
     </div>`;
 }

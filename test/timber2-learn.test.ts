@@ -19,7 +19,7 @@ import {
 } from '../src/timber/train/core';
 import { CHOICE_COUNT, buildQuestion, isSelfGraded, pickMode, promptFor } from '../src/timber/train/drill';
 import { TIMBER_REGIME_LINE } from '../src/timber/train/compile';
-import { FUNDAMENTALS_ID, allDecks, fundamentalsDeck } from '../src/timber/train/decks';
+import { FUNDAMENTALS_ID, NAMING_ID, allDecks, fundamentalsDeck } from '../src/timber/train/decks';
 import { loadTrain, progressFor, resetDeck, saveTrain, withProgress, STORAGE_KEY, type StorageLike } from '../src/ui/learn/store';
 import { plainName, whatItDoes } from '../src/ui/woodframe/labels';
 import { fakeDeck } from './fixtures/trainVectors';
@@ -231,11 +231,24 @@ test('the last card of a queue completes the session — the queue is never left
 
 // ── The deck list ────────────────────────────────────────────────────────────
 
-test('the deck list is compiled from the catalog — one per shipped structure, plus fundamentals', () => {
+test('the deck list is compiled from the catalog — one per shipped structure, plus the general decks', () => {
   const decks = allDecks(LABELS);
-  const expected = shippedFamilies().filter((f) => f.id !== 'custom').length + 1;
-  assert.equal(decks.length, expected, 'a family shipped without a deck, or a deck without a family');
-  assert.equal(decks[0]!.deck.id, FUNDAMENTALS_ID, 'a newcomer must land on the vocabulary deck first');
+  const general = decks.filter((d) => d.kind === 'general');
+  const structure = decks.filter((d) => d.kind === 'structure');
+  assert.equal(
+    structure.length,
+    shippedFamilies().filter((f) => f.id !== 'custom').length,
+    'a family shipped without a deck, or a deck without a family',
+  );
+  // THE GENERAL DECKS COME FIRST AND THEY ARE THE FRONT PAGE. A newcomer opening the trainer
+  // must land on the vocabulary, not on a list of buildings they may never be assigned.
+  assert.equal(general.length, 2, 'name-it and know-it');
+  assert.deepEqual(decks.slice(0, 2).map((d) => d.deck.id), [NAMING_ID, FUNDAMENTALS_ID]);
+  assert.deepEqual(general.map((d) => d.style), ['name', 'full'], 'easy deck first');
+  // The easy deck can only ever ask its one question; that is what makes it the easy deck.
+  for (const c of general[0]!.deck.cards) {
+    assert.deepEqual([...c.modes], ['flip'], `${c.id}: a naming card got a proving mode`);
+  }
   assert.equal(new Set(decks.map((d) => d.deck.id)).size, decks.length, 'duplicate deck id');
   for (const d of decks) {
     assert.ok(d.blurb.length > 20, `${d.deck.id}: no blurb`);
@@ -314,7 +327,12 @@ test('every card in every deck resolves to a real drawing', () => {
     for (const card of entry.deck.cards) {
       const svg = cardArt(card, { spec: null, deckId: entry.deck.id });
       assert.ok(svg, `${entry.deck.id}/${card.id}: no art`);
-      assert.ok(svg.startsWith('<svg') && svg.includes('#c2410c'), `${entry.deck.id}/${card.id}: nothing highlighted`);
+      // The subject is drawn red. `portraitFor` shades every face, so the exact bytes depend on
+      // the light — what is asserted is that the FOCUS colour reached the picture at all, which
+      // is the thing that breaks when a card's member ids stop resolving.
+      assert.ok(svg.startsWith('<svg'), `${entry.deck.id}/${card.id}: not an svg`);
+      assert.ok(/#[a-f0-9]{6}/.test(svg), `${entry.deck.id}/${card.id}: nothing drawn`);
+      assert.ok(svg.includes(`fill-opacity="0.19"`), `${entry.deck.id}/${card.id}: nothing highlighted`);
       // The SVG namespace is a URI, not a fetch — it is the one allowed occurrence.
       assert.ok(
         !/https?:/i.test(svg.replace('http://www.w3.org/2000/svg', '')),
@@ -363,9 +381,8 @@ test('a stage frame is drawn for every stage that actually puts something up', (
   assert.ok(blanks > 0, 'if nothing is ever blank, this rule has stopped being exercised');
 });
 
-test('the fundamentals tile shows one of every piece, not a fifteenth building', () => {
-  const entry = allDecks(LABELS)[0]!;
-  assert.equal(entry.deck.id, FUNDAMENTALS_ID);
+test('the general tiles show one of every piece, not a fifteenth building', () => {
+  const entry = allDecks(LABELS).find((d) => d.deck.id === FUNDAMENTALS_ID)!;
   assert.ok(entry.tileHighlight && entry.tileHighlight.length > 10, 'the tile needs pieces to pick out');
   const art = deckArt(entry.tileFamilyId!, entry.tileHighlight)!;
   assert.ok(art.includes('#c2410c'));

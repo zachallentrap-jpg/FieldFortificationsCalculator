@@ -39,7 +39,12 @@ export const FEATURES = {
   commandOutputs: isPlanning,
   /** Hardware take-off: nails and pins by count and weight. */
   hardwareTakeoff: isPlanning,
-  /** Flashcard drill over the engine's own members and doctrine. */
+  /**
+   * A link OUT to the trainer. The drill itself no longer lives in the workbench: a deck about
+   * whichever building happened to be open put the general vocabulary — the part that carries
+   * between jobs — behind a choice of structure, and it interrupted somebody who had come here
+   * to look at a structure. Learning links to it; Planning does not mention it.
+   */
   flashcards: isLearning,
   /** Teaching copy on the stage panel: why this stage, what to watch. */
   stageTeaching: true,

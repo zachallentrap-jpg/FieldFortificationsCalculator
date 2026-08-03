@@ -107,6 +107,10 @@ export function buildQuestion(deck: DeckSpec, cardId: string, cp: CardProgress |
 
 /** The prompt line a question shows above the card. Content, not chrome — it prints too. */
 export function promptFor(q: Question): string {
+  // A card may state its own question. The naming deck does, because "what is this piece, and
+  // what does it carry?" asks for two things and its answer side gives one — a prompt that
+  // over-asks makes an easy card feel like a failed one.
+  if (q.mode === 'flip' && q.card.front.prompt) return q.card.front.prompt;
   switch (q.mode) {
     case 'flip': return 'What is this piece, and what does it carry?';
     case 'flip-reverse': return 'Where does this go, and what is it cut from?';

@@ -314,30 +314,24 @@
   .chip--go:hover { filter: brightness(1.07); background: var(--accent); }
   body[data-app='learn'] .topbar .name { color: var(--accent); }
 
-  /* Flashcards */
-  .deck { margin-bottom: 14px; }
-  .deck[hidden] { display: none; }
-  .deck-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-  .deck-head h2 { display: flex; align-items: center; gap: 7px; }
-  .deck-tag {
-    font-size: 10px; font-weight: 500; letter-spacing: 0.02em; text-transform: none;
-    background: var(--fill-2); color: var(--label-2); border-radius: 4px; padding: 1px 6px;
+  /* The flashcards TILE on the Learning picker. The drill itself is its own page now: a deck
+     bolted into the workbench meant the general vocabulary sat behind a choice of building,
+     and it interrupted anyone who had opened a structure to look at the structure. */
+  .card--cards { text-decoration: none; display: flex; flex-direction: column; }
+  .group--cards .cards { grid-template-columns: minmax(0, 1fr); max-width: 620px; }
+  .card--cards .card-art { background: linear-gradient(160deg, #23252b, #15161a); padding: 0; }
+  .card--cards .fan { position: relative; display: block; height: 196px; overflow: hidden; }
+  .card--cards .fan .face {
+    position: absolute; left: 50%; top: 50%; width: 42%; border-radius: 10px; overflow: hidden;
+    background: #17181b; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+    transition: transform 0.24s ease;
   }
-  .deck-count { font-size: 11.5px; color: var(--label-3); font-variant-numeric: tabular-nums; }
-  .card-face {
-    display: block; width: 100%; text-align: left; cursor: pointer; font: inherit; color: var(--label);
-    background: var(--raised); border: 0; border-radius: var(--r-lg); padding: 15px 15px 13px;
-    margin: 6px 0 8px; box-shadow: var(--shadow-1), inset 0 0 0 0.5px var(--sep);
-    /* A card that resizes as it flips makes the buttons under it jump out from under the
-       thumb that is about to press them. Hold a floor instead. */
-    min-height: 148px;
-  }
-  .card-face--back { background: var(--accent-soft); box-shadow: inset 0 0 0 0.5px var(--accent); }
-  .card-q { margin: 0; font-size: 14.5px; line-height: 1.45; font-weight: 500; }
-  .card-q2 { margin: 9px 0 0; font-size: 14.5px; line-height: 1.45; font-weight: 620; }
-  .card-hint { margin: 12px 0 0; font-size: 11.5px; color: var(--label-3); }
-  .card-a { margin: 12px 0 0; font-size: 16px; font-weight: 620; letter-spacing: -0.01em; }
-  .card-src { margin: 5px 0 0; font-size: 11px; color: var(--label-2); line-height: 1.45; }
+  .card--cards .fan .face svg { display: block; width: 100%; height: auto; }
+  .card--cards .fan .f0 { transform: translate(-50%, -50%) rotate(-13deg) translateX(-66%); }
+  .card--cards .fan .f1 { transform: translate(-50%, -50%) rotate(-1deg); }
+  .card--cards .fan .f2 { transform: translate(-50%, -50%) rotate(12deg) translateX(66%); }
+  .card--cards:hover .fan .f0 { transform: translate(-50%, -50%) rotate(-17deg) translateX(-78%); }
+  .card--cards:hover .fan .f2 { transform: translate(-50%, -50%) rotate(16deg) translateX(78%); }
   .deck-nav { display: flex; gap: 5px; }
   .deck-nav .chip { flex: 1; }
 

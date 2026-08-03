@@ -21,6 +21,22 @@ import { compileDeck, type LabelSource } from './compile';
 import type { CardSpec, DeckSpec } from './core';
 
 export const FUNDAMENTALS_ID = 'framing-pieces';
+export const NAMING_ID = 'name-the-piece';
+
+/**
+ * HOW HARD A DECK ASKS.
+ *
+ *   'name'  See it, say it, flip, check. One question, one answer, no scoring games. This is
+ *           what people mean by flashcards, and it is the deck somebody who has never framed
+ *           anything should meet first — a picture of a hip rafter, the words "hip rafter".
+ *   'full'  The same pieces with everything attached: stock, cut length, where it goes, what
+ *           holds it, and the citation. Multiple choice, point-at-it and reversed recall, so
+ *           the card can be PROVED rather than just recognised.
+ *
+ * Both are compiled from the same structures, which is the point: the easy deck is not a
+ * simplified copy of the hard one, it is the same cards asked a smaller question.
+ */
+export type DeckStyle = 'name' | 'full';
 
 export interface DeckEntry {
   readonly deck: DeckSpec;
@@ -31,8 +47,16 @@ export interface DeckEntry {
   /** Catalog id whose spec draws this deck's art, or null for the cross-family deck. */
   readonly familyId: string | null;
   /**
-   * Member ids to pick out of the tile drawing. The fundamentals deck uses it to show one of
-   * every piece at once, so its tile reads as "the pieces" rather than as a fifteenth building.
+   * GENERAL decks teach the vocabulary of the trade and are the front page of the trainer.
+   * STRUCTURE decks drill one specific building and are for the night before you build it —
+   * still here, but no longer bolted inside each structure's workbench, where they interrupted
+   * somebody who had come to look at a building.
+   */
+  readonly kind: 'general' | 'structure';
+  readonly style: DeckStyle;
+  /**
+   * Member ids to pick out of the tile drawing. The general decks use it to show one of every
+   * piece at once, so the tile reads as "the pieces" rather than as a fifteenth building.
    */
   readonly tileHighlight?: readonly string[];
   /** Structure the tile is drawn from when it differs from `familyId` (the cross-family deck). */
@@ -119,16 +143,54 @@ export function fundamentalsDeck(labels: LabelSource): DeckSpec {
   };
 }
 
-export function allDecks(labels: LabelSource): DeckEntry[] {
-  const fundamentals: DeckEntry = {
-    deck: fundamentalsDeck(labels),
-    group: 'fundamentals',
-    groupLabel: 'Start here',
-    blurb: 'Every piece of framing the toolkit knows how to build, each one shown in the simplest structure that uses it. Learn the vocabulary once and it carries to every job.',
-    familyId: null,
-    tileFamilyId: 'gp-frame',
-    tileHighlight: oneOfEach('gp-frame'),
+/**
+ * The same pieces, asked the simplest possible question: here is a picture, what is it called?
+ *
+ * It is a projection of the fundamentals deck rather than a second compilation — one source of
+ * truth for what a piece IS, two ways of asking about it. Restricting `modes` to 'flip' is what
+ * makes it a flip deck: the drill's mode ladder can only ever offer what a card declares, so a
+ * card that declares one mode is a card that only ever gets asked one way.
+ */
+export function namingDeck(labels: LabelSource): DeckSpec {
+  const base = fundamentalsDeck(labels);
+  return {
+    ...base,
+    id: NAMING_ID,
+    title: 'Name the piece',
+    cards: base.cards.map((c) => ({
+      ...c,
+      deckId: NAMING_ID,
+      modes: ['flip'] as const,
+      front: { ...c.front, prompt: 'What is this piece called?' },
+    })),
   };
+}
+
+export function allDecks(labels: LabelSource): DeckEntry[] {
+  const general: DeckEntry[] = [
+    {
+      deck: namingDeck(labels),
+      group: 'fundamentals',
+      groupLabel: 'General knowledge',
+      blurb: 'See a piece, name it. Every piece of framing the toolkit builds with, photographed in the structure it belongs to at the moment it goes in. Start here.',
+      familyId: null,
+      kind: 'general',
+      style: 'name',
+      tileFamilyId: 'gp-frame',
+      tileHighlight: oneOfEach('gp-frame'),
+    },
+    {
+      deck: fundamentalsDeck(labels),
+      group: 'fundamentals',
+      groupLabel: 'General knowledge',
+      blurb: 'The same pieces with everything attached — stock, cut length, what holds it, and the citation. Asked four ways, so you can prove you know it and not just recognise it.',
+      familyId: null,
+      kind: 'general',
+      style: 'full',
+      tileFamilyId: 'tower',
+      tileHighlight: oneOfEach('tower'),
+    },
+  ];
   const perFamily: DeckEntry[] = [];
   for (const group of GROUP_ORDER) {
     // `custom` is a blank sheet to start a design from, not a structure anyone studies — its
@@ -140,8 +202,10 @@ export function allDecks(labels: LabelSource): DeckEntry[] {
         groupLabel: GROUP_LABELS[group],
         blurb: f.oneLiner,
         familyId: f.id,
+        kind: 'structure',
+        style: 'full',
       });
     }
   }
-  return [fundamentals, ...perFamily];
+  return [...general, ...perFamily];
 }
