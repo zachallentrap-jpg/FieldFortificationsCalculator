@@ -327,21 +327,29 @@ function questionBody(q: Question, deckId: string, s: Session, style: DeckStyle)
     : '<div class="art blank">No drawing for this piece — go by the description.</div>';
 
   if (q.mode === 'flip') {
-    // A FLASHCARD HAS TWO SIDES, and showing the answer means turning it over. The answer used
-    // to be appended UNDER the picture with both visible at once, which is not a flashcard —
-    // it is a labelled diagram, and you cannot fail to have known it. The answer now lands ON
-    // the picture over a dim, so the moment of "did I get it" is a real one, and the piece
-    // stays faintly visible behind so the name and the thing connect.
-    return `<div class="face${s.revealed ? ' turned' : ''}">
-        ${artBlock}
-        ${s.revealed ? `<div class="reveal">${cardBack(q.card, style)}</div>` : ''}
+    // A CARD. Not a form with a picture on it.
+    //
+    // It had a mode tag, a printed instruction, and a full-width blue "Show the answer" button —
+    // three pieces of chrome around a flashcard whose entire interface is the card. You look at
+    // the picture, you say the name, you turn it over. So the card turns on a CLICK, anywhere,
+    // and carries nothing on its face but the piece and the highlight.
+    //
+    // Both faces are always in the DOM and the container rotates: rendering the back only after
+    // the flip would mean animating in something that was not there, and the browser has no way
+    // to tween that. `backface-visibility` hides whichever side is pointing away.
+    return `<div class="flipcard${s.revealed ? ' turned' : ''}" data-flip="1" role="button" tabindex="0"
+              aria-label="${s.revealed ? 'Showing the answer. Click to turn the card back.' : 'Click to turn the card over.'}">
+        <div class="inner">
+          <div class="side front">${artBlock}</div>
+          <div class="side back-face">${cardBack(q.card, style)}</div>
+        </div>
       </div>
       ${s.revealed
         ? `<div class="grade">
              <button class="btn miss" data-grade="0">Missed it</button>
              <button class="btn good" data-grade="1">Got it</button>
            </div>`
-        : '<div class="grade" style="grid-template-columns:1fr"><button class="btn primary wide" data-reveal="1">Show the answer</button></div>'}`;
+        : '<p class="turnhint">Tap the card to turn it over</p>'}`;
   }
 
   if (q.mode === 'flip-reverse') {
@@ -414,9 +422,9 @@ function renderDrill(deckId: string): void {
         <span class="count">${s.index + 1} / ${s.queue.length}</span>
       </div>
       <div class="pips">${pips}</div>
-      <div class="card">
-        <span class="modetag">${esc(MODE_TAG[q.mode])}</span>
-        <div class="prompt">${esc(promptFor(q))}</div>
+      <div class="card${q.mode === 'flip' ? ' card--flip' : ''}">
+        ${q.mode === 'flip' ? '' : `<span class="modetag">${esc(MODE_TAG[q.mode])}</span>
+        <div class="prompt">${esc(promptFor(q))}</div>`}
         ${questionBody(q, deckId, s, entry.style)}
       </div>
     </div>`;
@@ -564,8 +572,17 @@ function renderSequence(familyId: string): void {
 
 // ── Events ───────────────────────────────────────────────────────────────────
 
+app.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Enter' && ev.key !== ' ') return;
+  const card = (ev.target as HTMLElement).closest<HTMLElement>('[data-flip]');
+  if (!card || !session) return;
+  ev.preventDefault();
+  session.revealed = !session.revealed;
+  render();
+});
+
 app.addEventListener('click', (ev) => {
-  const el = (ev.target as HTMLElement).closest<HTMLElement>('[data-go],[data-reveal],[data-grade],[data-pick],[data-next],[data-again],[data-reset],[data-print],[data-worksheet],[data-poster]');
+  const el = (ev.target as HTMLElement).closest<HTMLElement>('[data-go],[data-reveal],[data-flip],[data-grade],[data-pick],[data-next],[data-again],[data-reset],[data-print],[data-worksheet],[data-poster]');
   if (!el) return;
 
   const goTo = el.dataset['go'];
@@ -609,6 +626,9 @@ app.addEventListener('click', (ev) => {
   if (!q) return;
 
   if (el.dataset['reveal']) { s.revealed = true; render(); return; }
+  // Turning the card is not answering it: the grade is still the learner's to give, so a flip
+  // toggles and nothing is recorded until they say whether they had it.
+  if (el.dataset['flip']) { s.revealed = !s.revealed; render(); return; }
   if (el.dataset['next']) { advance(); return; }
 
   const gradeAttr = el.dataset['grade'];
