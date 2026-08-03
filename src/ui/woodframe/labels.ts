@@ -50,6 +50,7 @@ export const PLAIN: Record<MemberRole, string> = {
   purlin: 'purlin',
   roofPanel: 'roof sheathing panel',
   roofingCourse: 'roofing course',
+  ridgeCap: 'ridge cap',
   felt: 'felt underlayment',
   // Skin
   sheathingPanel: 'wall sheathing panel',
@@ -125,6 +126,7 @@ export const WHAT: Record<MemberRole, string> = {
   purlin: 'Horizontal member across the rafters that metal roofing nails to — no solid deck needed.',
   roofPanel: 'Roof deck panel nailed over the rafters.',
   roofingCourse: 'A course of roofing, laid from the eave up so every lap sheds water downhill.',
+  ridgeCap: 'The bent piece that closes the joint where two slopes meet — over the ridge, and down every hip. Courses are cut ON those lines, so without a cap the cut edges are the roof.',
   felt: 'Underlayment between deck and roofing.',
   sheathingPanel: 'Panel closing the wall frame and bracing it against racking.',
   siding: 'Exterior panel that keeps weather off the frame.',

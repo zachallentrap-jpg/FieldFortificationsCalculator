@@ -82,7 +82,7 @@ type Stuff = 'lumber' | 'panel' | 'concrete' | 'roofing' | 'screen' | 'earth';
 function stuffOf(m: Member): Stuff {
   if (m.role === 'soilGhost') return 'earth';
   if (m.role === 'screenPanel') return 'screen';
-  if (m.role === 'roofingCourse' || m.role === 'felt' || m.role === 'buildingPaper') return 'roofing';
+  if (m.role === 'roofingCourse' || m.role === 'ridgeCap' || m.role === 'felt' || m.role === 'buildingPaper') return 'roofing';
   if (m.nominal.includes('conc') || m.role === 'slab' || m.role === 'footing' || m.role === 'foundationWall') return 'concrete';
   if (m.nominal.includes('panel')) return 'panel';
   return 'lumber';

@@ -32,7 +32,7 @@ const SP = 0.4067366431;
 /** Roles a thumbnail skips: sheet goods hide the frame that identifies the structure. */
 const LOD_SKIP: ReadonlySet<string> = new Set([
   'subfloor', 'roofPanel', 'sheathingPanel', 'siding', 'sidingBoard', 'batten',
-  'roofingCourse', 'felt', 'buildingPaper', 'deckPlank', 'slab', 'soilGhost',
+  'roofingCourse', 'ridgeCap', 'felt', 'buildingPaper', 'deckPlank', 'slab', 'soilGhost',
 ]);
 
 /** Roles drawn heavier — the silhouette a reader recognizes first. */

@@ -102,23 +102,42 @@ export function tileSurface(
   const tiles: Tile[] = [];
   let row = 0;
   for (let v = 0; v < heightFt - EPS; v += sheetHFt, row++) {
-    const v1 = Math.min(v + sheetHFt, heightFt);
-    const edges = span
-      ? (clip === 'average' ? [span((v + v1) / 2)] : [span(v), span(v1)])
-      : [{ lo: 0, hi: runFt }];
-    const lo = Math.min(...edges.map((e) => e.lo));
-    const hi = Math.max(...edges.map((e) => e.hi));
-    if (hi - lo <= EPS) continue; // the point at the top of a hip end — nothing to cut
-    const off = row % 2 === 1 ? stagger : 0;
-    let u = lo;
-    if (off > 0) {
-      const first = Math.min(lo + off, hi);
-      tiles.push({ u0: lo, u1: first, v0: v, v1, full: false });
-      u = first;
-    }
-    for (; u < hi - EPS; u += sheetWFt) {
-      const u1 = Math.min(u + sheetWFt, hi);
-      tiles.push({ u0: u, u1, v0: v, v1, full: u1 - u >= sheetWFt - EPS && v1 - v >= sheetHFt - EPS });
+    const rowV1 = Math.min(v + sheetHFt, heightFt);
+    // HOW STEEPLY THE ROW TAPERS decides whether one rectangle can stand in for it.
+    //
+    // Neither clip rule survives a course whose width changes by more than a foot or two over
+    // its own height, and on a small pyramid roof — the guard tower's cab — a 4-ft course
+    // spans most of a 5-ft slope, so the taper is the whole roof. 'cover' then flaps yards past
+    // the hip; 'average' overhangs the PEAK, which is the tan cross that was showing through
+    // the middle of the cab's roofing where four deck tiles crossed above it.
+    //
+    // So a row is cut into as many pieces up the slope as it takes to bring that error down to
+    // a cap's width. A rectangle (no `span`) tapers by nothing and comes out exactly as one
+    // piece — byte-for-byte what it was — and a gently tapered trapezoid usually does too.
+    const rowTaper = span
+      ? Math.abs((span(rowV1).hi - span(rowV1).lo) - (span(v).hi - span(v).lo))
+      : 0;
+    const bands = Math.min(TOLERANCE.maxTaperBands, Math.max(1, Math.ceil(rowTaper / TOLERANCE.hipCapFt)));
+    for (let k = 0; k < bands; k++) {
+      const v0 = v + ((rowV1 - v) * k) / bands;
+      const v1 = v + ((rowV1 - v) * (k + 1)) / bands;
+      const edges = span
+        ? (clip === 'average' ? [span((v0 + v1) / 2)] : [span(v0), span(v1)])
+        : [{ lo: 0, hi: runFt }];
+      const lo = Math.min(...edges.map((e) => e.lo));
+      const hi = Math.max(...edges.map((e) => e.hi));
+      if (hi - lo <= EPS) continue; // the point at the top of a hip end — nothing to cut
+      const off = row % 2 === 1 ? stagger : 0;
+      let u = lo;
+      if (off > 0) {
+        const first = Math.min(lo + off, hi);
+        tiles.push({ u0: lo, u1: first, v0, v1, full: false });
+        u = first;
+      }
+      for (; u < hi - EPS; u += sheetWFt) {
+        const u1 = Math.min(u + sheetWFt, hi);
+        tiles.push({ u0: u, u1, v0, v1, full: u1 - u >= sheetWFt - EPS && v1 - v >= sheetHFt - EPS });
+      }
     }
   }
   return tiles;
@@ -403,8 +422,106 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
         }
       }
     }
+    emit.members.push(...generateRidgeCaps(planes, nominal, cite, stageRoofing,
+      rafterHalfFt + deckThick + TOLERANCE.surfaceLiftFt,
+      // A cap is nailed on BOTH sides of the joint it straddles, in the same fastener as the
+      // courses under it. Both phrasings below are ones `fasteners.ts` already reads, and that
+      // is not a coincidence to preserve by luck: its unparsed-schedule gate failed this file
+      // the moment the caps shipped with prose nobody could count.
+      isRoll
+        ? 'roofing nails @ 6" each side of the joint, lapped downhill (PH)'
+        : 'lead-head nails at every 3rd corrugation, each side of the joint (PH)'));
   }
 
+  return emit.members;
+}
+
+// ── Ridge and hip caps ───────────────────────────────────────────────────────
+
+type V3 = [number, number, number];
+const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const len = (a: V3): number => Math.hypot(a[0], a[1], a[2]);
+
+/** A point on a plane, from its own (u, v). */
+function atUV(p: RoofPlane, u: number, v: number): V3 {
+  return [
+    p.origin[0] + p.alongEave[0] * u + p.upSlope[0] * v,
+    p.origin[1] + p.alongEave[1] * u + p.upSlope[1] * v,
+    p.origin[2] + p.alongEave[2] * u + p.upSlope[2] * v,
+  ];
+}
+
+/**
+ * The caps over every ridge and every hip.
+ *
+ * WHY THIS HAS TO EXIST. Roofing courses are rectangles, and a rectangle cannot be cut on a
+ * diagonal — so where two slopes meet, the courses are cut ON the line and their cut edges ARE
+ * the roof. On a gable that is a ridge board's worth of joint; on a hip roof it is four
+ * diagonals; on a pyramid cab it is four diagonals meeting at a point, which is precisely the
+ * bare patch at the peak of the guard tower. A cap is the piece that closes it, it is a real
+ * item somebody has to draw from supply, and until now the toolkit neither drew it nor billed
+ * it — a roof that would have leaked at every seam, quietly, on paper.
+ *
+ * The lines come from the planes themselves rather than from each roof kind's own geometry, so
+ * a new roof shape gets its caps for free: a plane's TOP edge is a ridge, and its slanted side
+ * edges are hips. A rectangle's sides are vertical in (u, v) — a gable rake, not a hip — and are
+ * correctly skipped. Adjacent planes share every line, so they are deduplicated by midpoint.
+ */
+export function generateRidgeCaps(
+  planes: readonly RoofPlane[],
+  nominal: string,
+  cite: string,
+  stage: number,
+  liftFt: number,
+  nailing: string,
+): Member[] {
+  const emit = makeEmitter('CP');
+  const capW = (ROOFING.capWidthIn.value as number) / IN_PER_FT;
+  const seen = new Set<string>();
+
+  const lines: { a: V3; b: V3; hip: boolean }[] = [];
+  for (const p of planes) {
+    const top = planeSpanAt(p, p.slopeLengthFt);
+    const foot = planeSpanAt(p, 0);
+    // The top edge: a ridge wherever the plane still has width up there. A hip end tapers to a
+    // point and has none, which is why a pyramid has four hips and no ridge at all.
+    if (top.hi - top.lo > EPS) {
+      lines.push({ a: atUV(p, top.lo, p.slopeLengthFt), b: atUV(p, top.hi, p.slopeLengthFt), hip: false });
+    }
+    // The side edges, but only where the plane actually tapers — otherwise they are the rake of
+    // a gable, which is trimmed with a barge board and not capped.
+    if (p.topLengthFt !== undefined) {
+      lines.push({ a: atUV(p, foot.lo, 0), b: atUV(p, top.lo, p.slopeLengthFt), hip: true });
+      lines.push({ a: atUV(p, foot.hi, 0), b: atUV(p, top.hi, p.slopeLengthFt), hip: true });
+    }
+  }
+
+  for (const line of lines) {
+    const d = sub(line.b, line.a);
+    const l = len(d);
+    if (l <= EPS) continue;
+    const mid: V3 = [(line.a[0] + line.b[0]) / 2, (line.a[1] + line.b[1]) / 2, (line.a[2] + line.b[2]) / 2];
+    const key = mid.map((n) => Math.round(n * 100)).join(',');
+    if (seen.has(key)) continue; // the plane on the other side of the same line
+    seen.add(key);
+    const u: V3 = [d[0] / l, d[1] / l, d[2] / l];
+    // Solving Ry(ry)·Rx(rx)·Rz(rz) for "length along `u`, face width HORIZONTAL across it":
+    // taking rz = PI/2 makes the face-width column (-cos ry, 0, sin ry), which is horizontal for
+    // any ry — and then the length column is (sin ry·sin rx, cos rx, cos ry·sin rx), which is
+    // `u` at rx = acos(u.y) and ry = atan2(u.x, u.z). A cap sits ON the joint, so its face lies
+    // across the two slopes and its thickness stands off them.
+    const rx = Math.acos(Math.max(-1, Math.min(1, u[1])));
+    const ry = Math.atan2(u[0], u[2]);
+    emit('ridgeCap', nominal, {
+      cutLengthFt: l,
+      position: [mid[0], mid[1] + liftFt, mid[2]],
+      rotation: [rx, ry, Math.PI / 2],
+      stage,
+      actual: { w: ROOFING.coveringThickIn.value as number, d: capW * IN_PER_FT },
+      nailing,
+      doctrineRef: cite,
+    });
+  }
   return emit.members;
 }
 

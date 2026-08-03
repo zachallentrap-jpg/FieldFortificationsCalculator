@@ -284,6 +284,9 @@ export const ROOFING = {
   corrugatedSideLapCorrugations: doc(1.5, 'FM 5-426 corrugated side lap'),
   corrugatedSideLapIn: doc(3.25, 'FM 5-426 corrugated side lap (1.5 corrugations at 2 1/6 in pitch)', { unit: 'in' }),
   coveringThickIn: doc(0.25, 'roofing course thickness as modeled (roll goods lie flat)', { unit: 'in' }),
+  // A cap straddles the joint, so half its width lands on each slope. Roll goods are cut from
+  // the same stock; corrugated comes as a formed ridge/hip piece in about the same girth.
+  capWidthIn: doc(12, 'FM 5-426 ridge and hip cap (PH)', { unit: 'in' }),
   feltWidthIn: doc(36, 'FM 5-426 felt underlayment', { unit: 'in' }),
   feltLapIn: doc(2, 'FM 5-426 felt lap', { unit: 'in' }),
   squareSf: doc(100, 'roofing square = 100 sf', { unit: 'sf', ph: false }),

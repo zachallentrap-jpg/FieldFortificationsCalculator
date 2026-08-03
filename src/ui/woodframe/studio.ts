@@ -147,7 +147,7 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
       );
       p.add(new THREE.Mesh(geo, new THREE.MeshToonMaterial({ color: CONCRETE, gradientMap: toonGradient() })));
       group.add(p);
-    } else if (m.role === 'roofingCourse') {
+    } else if (m.role === 'roofingCourse' || m.role === 'ridgeCap') {
       // Roll goods vs. corrugated metal — two different materials, told apart by the nominal the
       // engine already wrote. `repeatAlong` keeps the granule/rib scale constant on any run
       // length: a course is as long as the eave, so one stretched tile would be nonsense.
