@@ -284,6 +284,43 @@ export const SIDING = {
   boardLapIn: doc(0, 'FM 5-426 board-and-batten: boards butt, battens cover', { unit: 'in' }),
 } as const;
 
+// ── Span tables (FM 5-426 Tables 6-1/6-2 (PH)) ───────────────────────────────
+// Maximum clear span, in feet, for a member of this nominal at this spacing. LS-tagged
+// without exception: a joist past its span is a floor that deflects under the load it was
+// built for, and the failure mode is the floor.
+//
+// WHAT THIS IS NOT: an engineering model. It is a lookup, and the tool's rule (mandate #2) is
+// that it WARNS and never silently resizes. A tool that quietly upsizes a joist to make its own
+// check pass has taught the operator nothing and handed a crew a different building than the
+// one on the drawing. `src/timber/spans.ts` reads the table; nothing else does.
+export const SPAN = {
+  joist: doc(
+    {
+      '2x6': { 16: 9.5, 24: 8.25 },
+      '2x8': { 16: 12.5, 24: 10.75 },
+      '2x10': { 16: 15.75, 24: 13.5 },
+      '2x12': { 16: 19, 24: 16.5 },
+    } as Record<string, Record<number, number>>,
+    'FM 5-426 Table 6-2 floor-joist spans (PH — table not page-checked)',
+    { unit: 'ft', lifeSafety: true },
+  ),
+  rafter: doc(
+    {
+      '2x4': { 16: 7.5, 24: 6.5 },
+      '2x6': { 16: 12, 24: 10.5 },
+      '2x8': { 16: 16, 24: 14 },
+      '2x10': { 16: 20, 24: 17.5 },
+    } as Record<string, Record<number, number>>,
+    'FM 5-426 Table 6-3 rafter spans (PH — table not page-checked)',
+    { unit: 'ft', lifeSafety: true },
+  ),
+  header: doc(
+    { '2x4': 3, '2x6': 5, '2x8': 7, '2x10': 8.5, '2x12': 10 } as Record<string, number>,
+    'FM 5-426 header table by span (PH — table not page-checked)',
+    { unit: 'ft', lifeSafety: true },
+  ),
+} as const;
+
 // ── Labor (placeholder rates — TM 5-303 / NAVFAC P-405 pending, plan §2.1) ───
 // Values equal the legacy bom.ts constants exactly; the doctrine test pins that.
 export const LABOR = {
@@ -305,7 +342,7 @@ export interface LsEntry {
 
 const GROUPS: Record<string, Record<string, Doc<unknown>>> = {
   LUMBER, PANEL, LAYOUT, FOUNDATION, STAIR, LADDER, RAIL, RAMP, ROOFING, SIDING, LABOR,
-  HUT, LATRINE, TOWER, TENT, OPENING, PLATFORM,
+  HUT, LATRINE, TOWER, TENT, OPENING, PLATFORM, SPAN,
 } as unknown as Record<string, Record<string, Doc<unknown>>>;
 
 /** Every doctrine constant, flattened — the source for the doc-integrity tests. */

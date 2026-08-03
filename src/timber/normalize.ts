@@ -23,7 +23,9 @@ import type { WallId } from './types';
 
 export interface SpecIssue {
   path: string; // dotted spec path
-  kind: 'clamped' | 'dropped' | 'forced' | 'ls-note';
+  // 'span': a member is past its span table. Distinct from 'clamped' on purpose — nothing
+  // was changed, which is the whole point of mandate #2.
+  kind: 'clamped' | 'dropped' | 'forced' | 'ls-note' | 'span';
   message: string; // plain language — this is shown to the user, not logged
   severity?: 'info' | 'warn' | 'error';
 }

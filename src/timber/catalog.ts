@@ -139,7 +139,12 @@ const STORAGE_SHED: FamilyDef = {
     stories: [{
       wallHeightFt: 8,
       letInBracing: true,
-      openings: { S: [{ kind: 'door', offsetFt: 6, widthFt: 8, heightFt: 7, sillHeightFt: 0, fill: 'rough' }] },
+      // headerNominal is EXPLICIT here because the engine does not size headers by span: it uses
+      // LUMBER.headerNominal for every opening. An 8-ft door under a 2x6 is what the span checker
+      // found on this very preset the day it was written, and the card's "per span table" lock was
+      // describing an intention rather than the code. Auto-sizing belongs in the engine and lands
+      // with the compat-lock work; until then the standard design carries the header it needs.
+      openings: { S: [{ kind: 'door', offsetFt: 6, widthFt: 8, heightFt: 7, sillHeightFt: 0, fill: 'rough', headerNominal: '2x10' }] },
     }],
     roof: { kind: 'gable', risePer12: 4, overhangFt: 1 },
     foundation: { kind: 'skids' },

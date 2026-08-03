@@ -499,6 +499,41 @@ option, implement it, and log it here.
   equation exists ONCE and feeds both the renderer and the raycast filter, so clicking through
   a cut selects what you see; stage scrubbing toggles visibility rather than rebuilding; and
   `unlockToCustom` preserves the family (a tower stays a tower) with a per-family test.
+## 2026-08-02 — The span checker found a bad header in our own standard design on day one
+
+T8's span check (plan mandate #2) is a lookup against `doctrine.SPAN`, and its governing rule is
+a design decision rather than an implementation detail: **it warns and never resizes.** A tool
+that quietly upsizes a joist to make its own check pass has taught the operator nothing and has
+handed the crew a different building from the one on the drawing they are holding. Every message
+ends with "the tool has NOT changed it", and a test asserts that sentence is there.
+
+Writing it was mostly about not crying wolf, because a checker that fires on the tool's own
+presets is one people learn to scroll past. Three passes to get there:
+
+1. **A joist's clear span is not its length.** FM 5-426 puts a girder down the middle of a
+   building precisely so a 20-ft joist spans 10 ft twice. Checked at full length, every building
+   this tool makes condemns itself.
+2. **Nor is it length over a bay count.** A shed on three skids bears in thirds. The checker now
+   gathers every line a floor can bear on — girders, skids and sills — and takes the LARGEST gap
+   between consecutive ones. Largest, not average: the governing span is the worst one, and this
+   makes no assumption that the lines are evenly spaced.
+3. **A rafter is checked on its horizontal run, not its sloped length**, or the same building at
+   12-in-12 warns where at 2-in-12 it did not, over the same span carrying the same load.
+
+**And then it found something.** The storage shed's 8-ft door had a 2x6 header; the table allows
+5 ft. The engine does not size headers by span — it uses `LUMBER.headerNominal` for every
+opening — and the shed card's "Wide-door header: per span table" lock was describing an
+intention rather than the code. The preset now carries an explicit `headerNominal: '2x10'`, with
+the reason written at the line.
+
+**The gap is recorded, not closed:** header auto-sizing belongs in the engine, and doing it
+properly changes what `generateFrame` emits for any wide opening — which is a compat-lock event
+and needs its own change with the goldens regenerated and a reason. Two other holes are open in
+the same spirit: ceiling joists are NOT checked, because the floor table does not apply to them
+and no ceiling table is in `doctrine` yet (checking them against the wrong table condemned the
+GP building by four tenths of a foot), and the tables themselves are (PH) — which prints with
+every warning, because a warning that overstates its own authority is worse than none.
+
 ## 2026-08-02 — Three phases of the catalog, and the same rotation mistake three times
 
 T4, T5 and T6a shipped together: the picker went from 3 cards to 13. What is worth recording
