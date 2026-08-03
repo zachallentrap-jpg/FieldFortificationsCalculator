@@ -37,6 +37,9 @@ export default defineConfig({
         'woodframe-plan': fileURLToPath(new URL('src/ui/woodframe-plan.html', import.meta.url)),
         'woodframe-learn': fileURLToPath(new URL('src/ui/woodframe-learn.html', import.meta.url)),
         woodframe: fileURLToPath(new URL('src/ui/woodframe.html', import.meta.url)),
+        // Toolkit-level trainer: decks, the piece dictionary and the build sequences. Its own
+        // page rather than a tab inside a tool — see the hub card.
+        learn: fileURLToPath(new URL('src/ui/learn.html', import.meta.url)),
       },
     },
   },

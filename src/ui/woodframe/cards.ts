@@ -1,24 +1,25 @@
-// Flashcards for the LEARNING app.
+// Flashcards for the wood-frame LEARNING app — the quick flip deck inside the studio.
 //
-// Every card is generated from the structure on screen — its own members, its own stage plan,
-// its own doctrine references — rather than typed into a list. Two reasons, and the second is
-// the important one:
+// ONE DECK COMPILER (FD1). This file used to author its own cards from the member list; it now
+// PROJECTS the shared `compileDeck` output into the studio's flip-card shape. Two decks
+// compiled from the same model by two different files is two decks that agree the day they are
+// written and drift after that — and the one that gets less attention is the one that ends up
+// teaching a nominal the engine stopped emitting.
 //
-//   1. A hand-written deck goes stale the moment the engine changes a nominal or a nailing
-//      schedule, and a teaching aid that quietly teaches the wrong thing is worse than none.
-//   2. The cards then adapt to what the student is actually looking at. Change the building to a
-//      shed roof and the rafter cards go away; add a basement and stair cards appear. You drill
-//      on the thing in front of you, not on a generic house.
+// The projection is not lossless and is not meant to be: the studio deck is a fast flip over
+// the building currently on screen, so it takes the same facts and asks them in the direction
+// a person is actually asked to work in on a site — told the job, produce the piece.
 //
-// CARD DESIGN, learned the hard way: the FRONT must be answerable. An early pass asked "what
-// carries this? — 2x4", which no one can answer, because six different roles are all 2x4. The
-// front is therefore always the DESCRIPTION or the JOB, and the back is the name, the size and
-// the doctrine behind it — the direction a person is actually asked to work in on a site.
+// WHAT CHANGED WHEN THIS MOVED, and it is worth stating: the size/length card used to print
+// the member's `doctrineRef` under it. That is a manual reference under a number the OPERATOR
+// chose by setting the building's dimensions, which is precisely the laundering TR-2b exists
+// to prevent. Sizes and lengths now say where they really came from.
 
 import type { StructureModel } from '../../timber/families/index';
-import type { Member, MemberRole } from '../../timber/types';
+import { compileDeck } from '../../timber/train/compile';
+import { mulberry32, shuffle as fisherYates, type CardSpec } from '../../timber/train/core';
+import { fmtFtIn } from '../../timber/units';
 import { plainName, whatItDoes } from './labels';
-import { fmtFtIn } from './studio';
 
 export interface Card {
   /** Stable, so a deck can be reshuffled without a card changing identity mid-drill. */
@@ -43,70 +44,87 @@ export function groupLabel(g: Card['group']): string {
   return GROUP_LABEL[g];
 }
 
-/** One representative member per role — the deck asks about roles, not 741 individual sticks. */
-function byRole(members: Member[]): Map<MemberRole, Member> {
-  const out = new Map<MemberRole, Member>();
-  for (const m of members) if (!out.has(m.role)) out.set(m.role, m);
-  return out;
+const factText = (card: CardSpec, label: string): string | undefined =>
+  card.back.facts.find((f) => f.label === label)?.text;
+
+const factCite = (card: CardSpec, label: string): string | undefined =>
+  card.back.facts.find((f) => f.label === label)?.cite;
+
+/** The one doctrinal reference on a card, for the "source" line under an answer. */
+function reference(card: CardSpec): string {
+  const doctrinal = card.back.facts.find((f) => f.source === 'doctrine' && f.cite);
+  return doctrinal?.cite ?? card.back.regimeLine;
 }
 
 export function buildDeck(model: StructureModel): Card[] {
-  const cards: Card[] = [];
-  const roles = byRole(model.members);
-  const counts = new Map<MemberRole, number>();
-  for (const m of model.members) counts.set(m.role, (counts.get(m.role) ?? 0) + 1);
+  const deck = compileDeck({
+    model,
+    deckId: 'live',
+    title: 'This build',
+    labels: { plainName, whatItDoes },
+    fmtFtIn,
+  });
 
-  for (const [role, m] of roles) {
-    const name = plainName(role);
-    const job = whatItDoes(role);
-    if (job) {
-      // Job → name. This is the direction the work goes: you are told what has to happen and you
-      // have to know what to cut.
+  const cards: Card[] = [];
+  for (const c of deck.cards) {
+    const name = c.back.name;
+    // Job → name. This is the direction the work goes: you are told what has to happen and you
+    // have to know what to cut.
+    cards.push({
+      id: `piece:${c.id}`,
+      front: `${c.back.plain}\n\nWhat is this piece called?`,
+      back: name,
+      source: reference(c),
+      group: 'pieces',
+    });
+
+    const stock = factText(c, 'Stock');
+    const cut = factText(c, 'Cut to');
+    const count = factText(c, 'How many');
+    if (stock && cut) {
       cards.push({
-        id: `piece:${role}`,
-        front: `${job}\n\nWhat is this piece called?`,
-        back: name,
-        source: m.doctrineRef,
-        group: 'pieces',
+        id: `size:${c.id}`,
+        front: `What stock does this building use for the ${name.toLowerCase()}, and how long does it cut?`,
+        back: `${stock} — ${cut}${count && count !== '1' ? ` (${count} of them)` : ''}`,
+        // NOT a doctrine reference: these are this structure's own numbers.
+        source: 'From this structure — your dimensions produced it, not a doctrinal minimum.',
+        group: 'numbers',
       });
     }
-    cards.push({
-      id: `size:${role}`,
-      front: `What stock does this building use for the ${name.toLowerCase()}, and how long does it cut?`,
-      back: `${m.nominal} — ${fmtFtIn(m.cutLength)}${(counts.get(role) ?? 0) > 1 ? ` (${counts.get(role)} of them)` : ''}`,
-      source: m.doctrineRef,
-      group: 'numbers',
-    });
-    if (m.nailing && !/^\d+d common \(PH\)$/.test(m.nailing)) {
+
+    const fastened = factText(c, 'Fastened');
+    if (fastened) {
       cards.push({
-        id: `nail:${role}`,
+        id: `nail:${c.id}`,
         front: `How is the ${name.toLowerCase()} fastened?`,
-        back: m.nailing.replace(/\s*\(PH\)\s*$/, ''),
-        source: m.doctrineRef,
+        back: fastened,
+        source: factCite(c, 'Fastened') ?? reference(c),
         group: 'fastening',
       });
     }
   }
 
   // Sequence: the stage plan, asked both ways round — what comes next, and why this order.
-  model.stagePlan.forEach((s, i) => {
-    const next = model.stagePlan[i + 1];
+  deck.stageDrill.forEach((s, i) => {
+    const next = deck.stageDrill[i + 1];
     if (next) {
       cards.push({
         id: `next:${s.ordinal}`,
         front: `You have just finished: ${s.label}.\n\nWhat goes up next?`,
         back: next.label,
-        source: next.detail,
+        source: next.detail ?? '',
         group: 'sequence',
       });
     }
-    cards.push({
-      id: `why:${s.ordinal}`,
-      front: `Why is "${s.label}" done at this point and not later?`,
-      back: s.detail,
-      source: `Stage ${s.ordinal} of ${model.stagePlan.length}`,
-      group: 'sequence',
-    });
+    if (s.detail) {
+      cards.push({
+        id: `why:${s.ordinal}`,
+        front: `Why is "${s.label}" done at this point and not later?`,
+        back: s.detail,
+        source: `Stage ${s.ordinal} of ${deck.stageDrill.length} — this app's build order, not a numbered list from a manual.`,
+        group: 'sequence',
+      });
+    }
   });
 
   return cards;
@@ -116,14 +134,11 @@ export function buildDeck(model: StructureModel): Card[] {
  * Deterministic shuffle. `Math.random` would reshuffle on every re-render and make the "next"
  * button jump around; a seed the caller controls means the order is stable within a session and
  * different between sessions.
+ *
+ * The permutation itself is the PINNED one from the training core — one shuffle in the code
+ * base, so the deck a student sees here and the deck they see in the trainer are ordered by the
+ * same rule.
  */
 export function shuffle<T>(items: T[], seed: number): T[] {
-  const out = [...items];
-  let s = seed >>> 0 || 1;
-  for (let i = out.length - 1; i > 0; i--) {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    const j = s % (i + 1);
-    [out[i], out[j]] = [out[j]!, out[i]!];
-  }
-  return out;
+  return fisherYates(items, mulberry32(seed >>> 0 || 1));
 }

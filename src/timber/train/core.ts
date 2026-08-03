@@ -45,6 +45,13 @@ export interface SceneHighlight {
   readonly stageOrdinal: number;
   readonly view: string;
   readonly cutaway: { axis: 'x' | 'y' | 'z'; frac: number } | null;
+  /**
+   * Which structure these member ids belong to (a catalog family id). Normally the deck's own,
+   * and omitted; the cross-family "framing pieces" deck is the case that needs it, because a
+   * card drawn from the guard tower and a card drawn from a hut sit side by side in one deck
+   * and each has to be drawn against the building it actually came from.
+   */
+  readonly source?: string;
 }
 
 export type CardArt =

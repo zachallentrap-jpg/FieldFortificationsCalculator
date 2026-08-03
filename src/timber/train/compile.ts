@@ -33,6 +33,11 @@ export interface CompileInput {
   labels: LabelSource;
   /** Feet-inches formatter, injected for the same reason. */
   fmtFtIn(inches: number): string;
+  /**
+   * Catalog id of the structure being compiled, stamped onto every card's scene highlight.
+   * Only the cross-family deck needs it — see `SceneHighlight.source`.
+   */
+  artSource?: string;
 }
 
 /** The line every TIMBER card carries. Content, not chrome — it prints with the card. */
@@ -93,10 +98,16 @@ function factsFor(role: MemberRole, members: Member[], fmtFtIn: (n: number) => s
   return facts;
 }
 
-/** Which modes a card can be drilled in. Every card flips; scene modes need a real member. */
-function modesFor(role: MemberRole, members: Member[]): QuizMode[] {
+/**
+ * Which modes a card can be drilled in. Every card flips; the scene modes need a real member to
+ * point at; `stage-order` needs a build sequence with enough steps to make four plausible
+ * choices, which the cross-family deck deliberately does not have — the same piece goes in at
+ * different points in different buildings, so there is no single right answer to grade.
+ */
+function modesFor(members: Member[], stageCount: number): QuizMode[] {
   const modes: QuizMode[] = ['flip', 'flip-reverse', 'identify'];
   if (members.length > 0) modes.push('name-to-part');
+  if (stageCount >= 4) modes.push('stage-order');
   return modes;
 }
 
@@ -130,6 +141,7 @@ export function compileDeck(input: CompileInput): DeckSpec {
             stageOrdinal: minStage,
             view: 'iso-se',
             cutaway: null,
+            ...(input.artSource ? { source: input.artSource } : {}),
           },
         },
         prompt: 'Say it out loud, then flip.',
@@ -141,7 +153,7 @@ export function compileDeck(input: CompileInput): DeckSpec {
         facts: factsFor(role, members, fmtFtIn),
         regimeLine: TIMBER_REGIME_LINE,
       },
-      modes: modesFor(role, members),
+      modes: modesFor(members, model.stagePlan.length),
       fallbackArt: false,
       minStage,
     });

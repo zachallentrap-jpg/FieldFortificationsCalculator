@@ -28,6 +28,7 @@ import {
   type CutawayState, type Aabb,
 } from './cutaway';
 import { cameraRigsFor, memberAabb, type CameraRig } from './camera';
+import { fmtFtIn } from '../../timber/units';
 
 export interface StudioHandles {
   setModel(model: StructureModel): void;
@@ -46,16 +47,11 @@ function propFor(nominal: string): LumberSize {
   return nominal.startsWith('2x') ? '2x6' : '4x4';
 }
 
-/** Carpenter-readable feet-inches: 92.625" → 7'-8 5/8". */
-export function fmtFtIn(inches: number): string {
-  const eighths = Math.round(inches * 8);
-  const ft = Math.floor(eighths / 96);
-  let rem = eighths - ft * 96;
-  const inch = Math.floor(rem / 8);
-  rem -= inch * 8;
-  const frac = rem === 0 ? '' : rem % 4 === 0 ? ' 1/2' : rem % 2 === 0 ? ` ${rem / 2}/4` : ` ${rem}/8`;
-  return `${ft}'-${inch}${frac}"`;
-}
+/**
+ * Carpenter-readable feet-inches: 92.625" → 7'-8 5/8". Re-exported rather than defined here so
+ * the trainer, which runs under `node --test`, can format a length without importing the DOM.
+ */
+export { fmtFtIn };
 
 const esc = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

@@ -351,6 +351,32 @@ FieldFortificationsCalculator/
 
 Everything in this section was re-verified during this audit, not taken from docs.
 
+### 5.0 1371 LEARNING — the toolkit-level trainer (added after the audit above)
+
+A fourth page on the hub, `learn.html`, beside SAP-2 and the two wood-frame apps. It is
+toolkit-level rather than a tab inside a tool because the vocabulary is what transfers between
+jobs: a Marine who knows what a jack stud is knows it in a hut, a tower and a bunker.
+
+| Surface | What it is |
+|---|---|
+| **Decks** | Fourteen decks — one per shipped structure, plus a cross-family "Framing pieces" deck that teaches each of the ~49 roles in the simplest structure that has one. Scheduled by session (Leitner, clock-free), modes escalate from flip to identify / point-at-it / stage-order as a card is learned. |
+| **Pieces** | The whole framing dictionary, searchable, with which structures each piece appears in. |
+| **Sequence** | Every structure's build order, with a drawing of the structure as it stood at the end of each step — all frames at the finished building's scale, so it reads as one building growing. |
+
+Three properties are worth stating because they are what the tests protect:
+
+- **Nothing is hand-authored.** Decks, card art and sequences all compile from the same
+  `Member[]` the planners use (FD1). Change the building — swap a gable for a shed, switch a
+  bunker to crib walls — and the deck changes with it.
+- **The art is the model, drawn.** Card fronts are runtime SVG from `thumbnails.ts`, so there
+  are no image files, no build step, and no three.js on this page — 21 kB of app code.
+- **"Known" means something.** A self-graded flip cannot promote a card past "learning"; a card
+  has to be produced under a mode that could have caught a wrong answer (FD10).
+
+Pinned: `test/fixtures/train-vectors.json` fixes the PRNG, the shuffle and the session builder,
+so a learner's card order is reproducible across builds. Regenerate only via
+`npm run gen:train-vectors`, in the same PR as the change that moved it.
+
 ### Verification runs (2026-08-01)
 
 | Check | Result |
