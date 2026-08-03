@@ -365,6 +365,19 @@ export const SPAN = {
     'FM 5-426 Table 6-3 rafter spans (PH — table not page-checked)',
     { unit: 'ft', lifeSafety: true },
   ),
+  // Ceiling joists carry a ceiling, not a floor, so they get their own (longer) rows. Without
+  // this they were left UNCHECKED rather than checked against the floor table, which condemned
+  // the standard GP building by four tenths of a foot — see the T8 entry in DECISIONS.
+  ceilingJoist: doc(
+    {
+      '2x4': { 16: 8.5, 24: 7.5 },
+      '2x6': { 16: 13.5, 24: 11.75 },
+      '2x8': { 16: 17.75, 24: 15.5 },
+      '2x10': { 16: 22, 24: 19 },
+    } as Record<string, Record<number, number>>,
+    'FM 5-426 ceiling-joist spans (PH — table not page-checked)',
+    { unit: 'ft', lifeSafety: true },
+  ),
   header: doc(
     { '2x4': 3, '2x6': 5, '2x8': 7, '2x10': 8.5, '2x12': 10 } as Record<string, number>,
     'FM 5-426 header table by span (PH — table not page-checked)',

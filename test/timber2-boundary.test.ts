@@ -115,7 +115,7 @@ test('§2.7: a shared spec carries no cover depth, but a stored one does', () =>
 
   const link = encodeSpec(spec);
   const roundTripped = decodeSpec(link)!;
-  assert.equal((roundTripped as Record<string, unknown>).designCoverDepthFt, undefined,
+  assert.equal((roundTripped as unknown as Record<string, unknown>).designCoverDepthFt, undefined,
     'a share link must not carry a survivability number off the device');
   assert.ok(isShareSafe(JSON.stringify(roundTripped)));
 

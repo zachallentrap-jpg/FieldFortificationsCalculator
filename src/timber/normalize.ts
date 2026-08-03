@@ -20,6 +20,7 @@ import type {
 } from './spec';
 import { SPEC_PATH_DEFS, WALL_ORDER, specPath } from './spec';
 import type { WallId } from './types';
+import { SPAN, LUMBER } from './doctrine';
 
 export interface SpecIssue {
   path: string; // dotted spec path
@@ -61,6 +62,24 @@ function clampPath(value: number, path: string, issues: SpecIssue[], label?: str
     });
   }
   return out;
+}
+
+/**
+ * The smallest header the table allows for this span. Past the deepest row it hands back that
+ * row and lets the span checker say so — the same discipline as the bunker's stringer table: a
+ * lookup does not get to extrapolate past where somebody has looked.
+ */
+export function headerForSpan(widthFt: number): string {
+  const table = SPAN.header.value as Record<string, number>;
+  const rows = Object.entries(table).sort((a, b) => a[1] - b[1]);
+  // Never SMALLER than the doctrine default. The first cut of this function returned the
+  // smallest row that fit, which quietly shaved every 3-ft window from a 2x6 down to a 2x4 —
+  // weakening the standard design in the name of a check meant to catch openings that are too
+  // WIDE. The floor is what FM 5-426 frames a header out of; the table only ever deepens it.
+  const floorIdx = rows.findIndex(([n]) => n === (LUMBER.headerNominal.value as string));
+  const fitIdx = rows.findIndex(([, max]) => max >= widthFt - 1e-6);
+  const pick = Math.max(floorIdx, fitIdx === -1 ? rows.length - 1 : fitIdx);
+  return rows[pick]![0];
 }
 
 function normalizeOpenings(

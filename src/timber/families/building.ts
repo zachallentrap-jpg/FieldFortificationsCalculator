@@ -23,10 +23,11 @@ import { generateFloor, floorLevels, type FloorInput, type FloorLevels } from '.
 import { generateWalls, type Opening } from '../walls';
 import { generateRoof } from '../roof';
 import { wallContract, type WallsContract } from '../subsystems/wallSystem';
-import { roofPlanes, generateShed, generatePurlins } from '../subsystems/roofFamilies';
+import { roofPlanes, generateShed, generatePurlins, generateHip } from '../subsystems/roofFamilies';
 import { generateRoofCovering, generateWallCovering, generateSkids } from '../subsystems/coverings';
 import { generateFloorOnBearings, joistNominalFor } from '../subsystems/floorSystem';
 import { LUMBER, PANEL, IN_PER_FT } from '../doctrine';
+import { headerForSpan } from '../normalize';
 
 export interface BuildingResult {
   members: Member[];
@@ -57,13 +58,22 @@ export function legacyOpenings(spec: BuildingSpec, storyIndex = 0): Opening[] {
   const out: Opening[] = [];
   for (const wall of WALL_ORDER) {
     for (const o of story.openings[wall] ?? []) {
+      // HEADER SIZING (T8). Every opening used to get `LUMBER.headerNominal` no matter how wide
+      // it was, so an 8-ft door carried the same 2x6 as a 3-ft window — which the span checker
+      // found on our own storage-shed preset the day it was written. Sized HERE, at the
+      // translation into the generator's input, rather than in normalization: normalizeSpec must
+      // stay idempotent and must not write a value into the user's spec that then reads as a
+      // decision they made. An explicit `headerNominal` on the opening always wins.
+      //
+      // This changes what `generateFrame` emits for any opening past the 2x6 row, which is a
+      // compat-lock event: both golden sets move with this commit and DECISIONS records why.
       out.push({
         wall,
         offsetFt: o.offsetFt,
         widthFt: o.widthFt,
         heightFt: o.heightFt,
         sillHeightFt: o.sillHeightFt,
-        ...(o.headerNominal ? { headerNominal: o.headerNominal } : {}),
+        headerNominal: o.headerNominal ?? headerForSpan(o.widthFt),
       });
     }
   }
@@ -171,6 +181,8 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
         atticAccess: spec.atticAccess,
       }),
     );
+  } else if (spec.roof.kind === 'hip') {
+    members.push(...generateHip({ spec, walls, stageRoofFrame: requireOrdinal(stagePlan, 'roof-frame') }));
   } else if (spec.roof.kind === 'shed' || spec.roof.kind === 'flat') {
     members.push(...generateShed({ spec, walls, stageRoofFrame: requireOrdinal(stagePlan, 'roof-frame') }));
   }

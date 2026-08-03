@@ -112,7 +112,7 @@ const GP_FRAME: FamilyDef = {
     { path: 'floor.joistSizing', label: 'Joist & girder sizing', value: 'per span tables', cite: 'FM 5-426 Tables 6-1/6-2 (PH)', lifeSafety: true },
     { path: 'header.sizing', label: 'Header sizing', value: 'per span', cite: 'FM 5-426 header table (PH)', lifeSafety: true },
   ],
-  roofs: ['gable', 'shed', 'flat'],
+  roofs: ['gable', 'hip', 'shed', 'flat'],
   coverings: {
     siding: ['none', 'plywood', 'boards', 'boardAndBatten'],
     roofing: ['none', 'roll', 'rollDouble', 'corrugated'],
@@ -190,7 +190,7 @@ const CUSTOM: FamilyDef = {
     foundation: { kind: 'piers', crawlFt: 1.5 },
   },
   locks: [], // nothing locked — that is the point of the card
-  roofs: ['gable', 'shed', 'flat', 'none'],
+  roofs: ['gable', 'hip', 'shed', 'flat', 'none'],
   coverings: {
     wallSheathing: ['none', 'plywood', 'boards'],
     siding: ['none', 'plywood', 'boards', 'boardAndBatten'],
@@ -249,7 +249,7 @@ function hutCard(
       { path: 'girt', label: 'Wall girts', value: `${HUT.girtNominal.value} at ${HUT.girtSpacingFt.value} ft`, cite: citeOf(HUT.girtSpacingFt) },
       { path: 'header.sizing', label: 'Header sizing', value: 'per span', cite: 'FM 5-426 header table (PH)', lifeSafety: true },
     ],
-    roofs: ['gable', 'shed'],
+    roofs: ['gable', 'hip', 'shed'],
     coverings: {
       siding: ['none', 'plywood', 'boards', 'boardAndBatten'],
       roofing: ['none', 'roll', 'rollDouble', 'corrugated'],

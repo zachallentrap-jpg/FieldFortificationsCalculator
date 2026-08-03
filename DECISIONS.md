@@ -499,6 +499,48 @@ option, implement it, and log it here.
   equation exists ONCE and feeds both the renderer and the raycast filter, so clicking through
   a cut selects what you see; stage scrubbing toggles visibility rather than rebuilding; and
   `unlockToCustom` preserves the family (a tower stays a tower) with a per-family test.
+## 2026-08-02 — The catalog is complete, and the last three gaps closed the way they should have
+
+T7 finished the roster at 14 cards and T8's leftovers closed behind it. Four things worth
+keeping, three of which are about how a gap gets closed rather than what got built.
+
+**The bunker boundary is now enforced, not just written down.** Plan §2.7 says the
+survivability tool owns how much earth defeats what, and this one owns the wood. That line is
+worth drawing only if crossing it fails a build, so `test/timber2-boundary.test.ts` implements
+§6.4: a word-boundary lexicon over shipped string literals, a publication denylist that makes
+"configuration reference only" testable, and positive assertions that the boundary sentence
+renders on the card, the input's help, the ghost label and the BOM header. It found something on
+its first run — a tower doctrine key named for a word with a survivability meaning. Renamed to
+`ladderClearanceFt`, which is clearer anyway. The gate is scoped to the engine and the
+wood-frame UI: SAP-1's retired app legitimately carries that vocabulary, and gating it would be
+gating the wrong side of the line.
+
+**Header sizing turned out not to be a compat-lock event, and the reason is instructive.** The
+first cut returned the smallest table row that fit — which quietly shaved every 3-ft window from
+a 2x6 to a 2x4 and moved eleven goldens. That is a *weakening* of the standard design, produced
+by a check written to catch openings that are too WIDE. Floored at the doctrine default, the
+function only ever deepens, no golden moves at all, and the only shipped opening past the 2x6
+row already carried an explicit 2x10. **A change that moves a golden is worth re-reading before
+it is worth regenerating.**
+
+It also landed in the right place on the second try. Sizing in `normalizeSpec` broke
+idempotency — the first pass emitted an issue and wrote `headerNominal` into the spec, the
+second saw the value and stayed quiet — and it polluted the user's spec with a value that then
+read as a decision they had made. It belongs in `legacyOpenings`, at the translation into the
+generator's input: the spec the operator holds is untouched, normalization stays pure, and an
+explicit `headerNominal` still wins.
+
+**Ceiling joists are checked now.** The T8 entry above recorded them as a known gap, unchecked
+because the floor table did not apply and no ceiling table existed. There is one now.
+
+**And one gap is left open on purpose.** A hip roof's FRAMING is complete — commons, four hips
+on the diagonal run, and jacks whose constant shortening is asserted against the framing-square
+formula rather than a snapshot (a golden would have frozen the bug as happily as the fix). Its
+COVERING is not: `roofPlanes` treats a hip as a gable and returns two rectangular planes, so a
+hip shows roofing on its long slopes and bare framing on its two triangular ends. Closing it
+needs a tiler that can lay sheet goods on a triangle. The limitation is written at the branch
+that causes it, so the next person finds it before the render does.
+
 ## 2026-08-02 — The span checker found a bad header in our own standard design on day one
 
 T8's span check (plan mandate #2) is a lookup against `doctrine.SPAN`, and its governing rule is

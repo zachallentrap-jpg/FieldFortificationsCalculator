@@ -9,6 +9,8 @@ import assert from 'node:assert/strict';
 import { spanWarnings, summarizeSpanWarnings } from '../src/timber/spans';
 import { generateStructure } from '../src/timber/families/index';
 import { familyById, shippedFamilies } from '../src/timber/catalog';
+import { headerForSpan } from '../src/timber/normalize';
+import { LUMBER } from '../src/timber/doctrine';
 
 const preset = (id: string) => JSON.parse(JSON.stringify(familyById(id as never)!.preset));
 
@@ -82,4 +84,24 @@ test('identical members collapse into one line with a count', () => {
   const lines = summarizeSpanWarnings(warnings);
   assert.equal(lines.length, 1, 'three identical warnings are one sentence, not three');
   assert.ok(lines[0]!.startsWith('3× '));
+});
+
+test('headers are sized by span, and never smaller than the doctrine default', () => {
+  // The floor matters as much as the ceiling here. The first cut of headerForSpan returned the
+  // smallest row that fit, which quietly shaved every 3-ft window from a 2x6 to a 2x4 —
+  // weakening the standard design in the name of a check meant to catch openings that are too
+  // WIDE. Both directions are pinned.
+  assert.equal(headerForSpan(3), LUMBER.headerNominal.value, 'a standard window keeps the standard header');
+  assert.equal(headerForSpan(0.5), LUMBER.headerNominal.value, 'and so does a vent');
+  assert.equal(headerForSpan(8), '2x10', 'an 8-ft opening gets what the table says it needs');
+  assert.equal(headerForSpan(10), '2x12');
+  assert.equal(headerForSpan(40), '2x12', 'past the table it hands back the deepest row rather than extrapolating');
+});
+
+test('an opening that names its own header keeps it', () => {
+  // A spec that names a member is a decision somebody made, and sizing must not overrule it.
+  const spec = preset('gp-frame');
+  spec.stories[0].openings.S[0].headerNominal = '2x12';
+  const model = generateStructure(spec);
+  assert.ok(model.members.some((m) => m.role === 'header' && m.nominal === '2x12'));
 });

@@ -72,6 +72,13 @@ export function roofPlanes(spec: BuildingSpec, plateTopY: number): RoofPlane[] {
   const { slope, lenPerFtRun } = slopeOf(roof);
   const oh = roof.overhangFt; // 'none' returned above, so every remaining kind has one
 
+  // KNOWN LIMITATION, stated rather than left to be discovered: a hip is treated here as a
+  // gable, which gives the two long slopes and NOT the two triangular hip ends. The FRAMING is
+  // complete (see `generateHip` — commons, hips and jacks are all emitted and the jack sequence
+  // is asserted in `timber2-hip`); what is missing is covering over the two ends, so a hip roof
+  // shows deck and roofing on its long slopes and bare framing on its hip ends. Closing it means
+  // returning four planes here, two of them triangular, which the rectangular tiler in
+  // `coverings.ts` cannot lay out yet.
   if (roof.kind === 'gable' || roof.kind === 'hip') {
     const halfSpan = W / 2;
     const run = halfSpan + oh;
@@ -274,6 +281,140 @@ export function generatePurlins(planes: RoofPlane[], stage: number): Member[] {
         stage,
         nailing: '2-16d each rafter (PH)',
         doctrineRef: citeOf(LAYOUT.purlinSpacingMaxIn),
+      });
+    }
+  }
+  return emit.members;
+}
+
+// ── Hip (T8) ─────────────────────────────────────────────────────────────────
+//
+// An equal-pitch hip: four slopes, a ridge over the middle of a rectangular plan, and hip
+// rafters running out to the four corners. Two pieces of arithmetic define it, and both are
+// asserted in `timber2-hip`:
+//
+//   THE HIP RUN IS DIAGONAL. A common rafter rises over a run of half the span; a hip rises
+//   over the DIAGONAL of that run, so its length per foot of run is √(2 + slope²) rather than
+//   √(1 + slope²). Using the common-rafter figure is the classic hip mistake and it produces a
+//   hip that is short by about a foot in twelve.
+//
+//   JACK RAFTERS SHORTEN IN AN ARITHMETIC SEQUENCE. Each jack is one common-rafter spacing
+//   further along the plate, so it is shorter than its neighbour by exactly the same amount
+//   every time. That constant difference is the number a framing square gives you, and it is
+//   what makes a hip layable-out without measuring each stick.
+
+export interface HipInput {
+  spec: BuildingSpec;
+  walls: WallsContract;
+  stageRoofFrame: number;
+}
+
+/** Length per foot of COMMON run, for a hip rafter running the diagonal. */
+export function hipLenPerFtRun(slope: number): number {
+  return Math.sqrt(2 + slope * slope);
+}
+
+/** The constant by which each successive jack rafter shortens, in feet. */
+export function jackDifference(slope: number, spacingFt: number): number {
+  return spacingFt * Math.sqrt(1 + slope * slope);
+}
+
+export function generateHip(input: HipInput): Member[] {
+  const emit = makeEmitter('HP');
+  const { spec, walls, stageRoofFrame: stage } = input;
+  const roof = spec.roof;
+  if (roof.kind !== 'hip') return emit.members;
+  const { slope, lenPerFtRun } = slopeOf(roof);
+  const L = spec.dims.lengthFt;
+  const W = spec.dims.widthFt;
+  const oh = roof.overhangFt;
+  const halfSpan = W / 2;
+  const plateTopY = walls.plateTopY;
+  const ridgeY = plateTopY + halfSpan * slope;
+  const rafterNominal = LUMBER.rafterNominal.value as string;
+  const ridgeNominal = LUMBER.ridgeNominal.value as string;
+  const spacingFt = spec.spacing.rafterSpacingIn / IN_PER_FT;
+
+  // The ridge runs the length, stopping halfSpan short of each end — that is where the hips
+  // converge on it, and it is why a hip roof's ridge is shorter than its building.
+  const ridgeLen = Math.max(0.5, L - 2 * halfSpan);
+  emit('ridge', ridgeNominal, {
+    cutLengthFt: ridgeLen,
+    position: [L / 2, ridgeY, W / 2],
+    rotation: [0, 0, 0],
+    stage,
+    nailing: 'commons and hips 3-16d ea (PH)',
+    doctrineRef: `${citeOf(LUMBER.ridgeNominal)} — hip ridge is shortened by half the span at each end`,
+  });
+
+  // Common rafters along the ridge's length, both slopes.
+  const commonLen = (halfSpan + oh) * lenPerFtRun;
+  for (let x = L / 2 - ridgeLen / 2; x <= L / 2 + ridgeLen / 2 + 1e-6; x += spacingFt) {
+    for (const side of [-1, 1] as const) {
+      const zEave = side === -1 ? -oh : W + oh;
+      emit('rafter', rafterNominal, {
+        cutLengthFt: commonLen,
+        position: [x, (plateTopY - oh * slope + ridgeY) / 2, (zEave + W / 2) / 2],
+        rotation: [0, side === -1 ? -Math.PI / 2 : Math.PI / 2, Math.atan2(halfSpan * slope, halfSpan + oh)],
+        stage,
+        angles: { plumbCut: 90 - (Math.atan(slope) * 180) / Math.PI, seatCut: (Math.atan(slope) * 180) / Math.PI },
+        nailing: '3-16d at ridge, bird’s-mouth toenail 3-8d (PH)',
+        doctrineRef: citeOf(LUMBER.rafterNominal),
+      });
+    }
+  }
+
+  // Four hips, corner to ridge end. The run is the DIAGONAL, which is the whole difference.
+  const hipLen = (halfSpan + oh) * hipLenPerFtRun(slope);
+  for (const [cx, cz] of [[-oh, -oh], [L + oh, -oh], [L + oh, W + oh], [-oh, W + oh]] as [number, number][]) {
+    const rx = cx < L / 2 ? L / 2 - ridgeLen / 2 : L / 2 + ridgeLen / 2;
+    const run = Math.hypot(rx - cx, W / 2 - cz);
+    emit('hipRafter', rafterNominal, {
+      cutLengthFt: hipLen,
+      position: [(cx + rx) / 2, (plateTopY - oh * slope + ridgeY) / 2, (cz + W / 2) / 2],
+      rotation: [0, Math.atan2(-(W / 2 - cz), rx - cx), Math.atan2(ridgeY - (plateTopY - oh * slope), run)],
+      stage,
+      nailing: '3-16d at the ridge; jacks bear on it both sides (PH)',
+      doctrineRef: `${citeOf(LUMBER.rafterNominal)} — hip run is the diagonal: ${hipLenPerFtRun(slope).toFixed(3)} ft per ft of common run`,
+    });
+  }
+
+  // Jacks. A hip on an equal-pitch roof runs at 45 degrees in plan, so a jack landing `back`
+  // feet from the corner meets the hip after exactly `back` feet of run — which is why the
+  // sequence is arithmetic and why the framing square can give you one number for the whole
+  // set. Length is (back + overhang) x the common length per foot of run; adding the same tail
+  // to every jack leaves the difference between them untouched.
+  //
+  // Each jack is placed from its EAVE end to its HIP end, so the position and the length come
+  // from the same two points. The first cut of this built the length from one formula and the
+  // position from another, and the jacks came out fanned across the corners in mid-air.
+  const diff = jackDifference(slope, spacingFt);
+  void diff; // the sequence is implied by the geometry below; exported for the test and the card
+  for (const [cx, cz, dirX, dirZ] of [
+    [0, 0, 1, 1], [L, 0, -1, 1], [L, W, -1, -1], [0, W, 1, -1],
+  ] as [number, number, number, number][]) {
+    for (let back = spacingFt; back < halfSpan - 1e-6; back += spacingFt) {
+      const lenFt = (back + oh) * lenPerFtRun;
+      const yEave = plateTopY - oh * slope;
+      const yHip = plateTopY + back * slope;
+      const pitch = Math.atan(slope);
+      // Jack on the LONG wall: fixed x, running in z from the eave up to the hip.
+      emit('jackRafter', rafterNominal, {
+        cutLengthFt: lenFt,
+        position: [cx + dirX * back, (yEave + yHip) / 2, cz + (dirZ * (back - oh)) / 2],
+        rotation: [0, dirZ > 0 ? -Math.PI / 2 : Math.PI / 2, pitch],
+        stage,
+        nailing: 'bevel-cut to the hip, 3-16d; bird’s-mouth toenail 3-8d (PH)',
+        doctrineRef: `${citeOf(LUMBER.rafterNominal)} — jacks shorten ${jackDifference(slope, spacingFt).toFixed(3)} ft each at ${spec.spacing.rafterSpacingIn} in o.c.`,
+      });
+      // Jack on the SHORT wall: fixed z, running in x.
+      emit('jackRafter', rafterNominal, {
+        cutLengthFt: lenFt,
+        position: [cx + (dirX * (back - oh)) / 2, (yEave + yHip) / 2, cz + dirZ * back],
+        rotation: [0, dirX > 0 ? 0 : Math.PI, pitch],
+        stage,
+        nailing: 'bevel-cut to the hip, 3-16d; bird’s-mouth toenail 3-8d (PH)',
+        doctrineRef: `${citeOf(LUMBER.rafterNominal)} — jacks shorten ${jackDifference(slope, spacingFt).toFixed(3)} ft each at ${spec.spacing.rafterSpacingIn} in o.c.`,
       });
     }
   }

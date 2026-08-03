@@ -42,11 +42,10 @@ export function spanWarnings(
   /**
    * Top of the floor deck. Members above it that carry the `joist` role are CEILING joists, and
    * the floor table does not apply to them — a ceiling joist carries a ceiling, not a floor, and
-   * FM 5-426 gives it its own (longer) row. Checking one against the floor table condemns the
-   * standard GP building by four tenths of a foot, which is exactly the kind of false alarm that
-   * teaches people to ignore the real ones. No ceiling table is in `doctrine` yet, so they are
-   * NOT CHECKED rather than checked against the wrong one — and this comment is the record of
-   * that gap.
+   * gets its own longer rows. Checking one against the floor table condemned the standard GP
+   * building by four tenths of a foot, which is exactly the kind of false alarm that teaches
+   * people to ignore the real ones. They now have their own table (`SPAN.ceilingJoist`); this
+   * parameter is what tells the two apart.
    */
   floorTopY = Infinity,
 ): SpanWarning[] {
@@ -76,6 +75,7 @@ export function spanWarnings(
   };
   const joistTable = SPAN.joist.value as Record<string, Record<number, number>>;
   const rafterTable = SPAN.rafter.value as Record<string, Record<number, number>>;
+  const ceilingTable = SPAN.ceilingJoist.value as Record<string, Record<number, number>>;
   const headerTable = SPAN.header.value as Record<string, number>;
 
   for (const m of members) {
@@ -88,6 +88,18 @@ export function spanWarnings(
           memberId: m.id, role: m.role, nominal: m.nominal, spanFt, allowedFt: col.allowed, spacingIn: col.spacing,
           message: `${m.nominal} joist spans ${spanFt.toFixed(1)} ft; the table allows ${col.allowed} ft at ${col.spacing} in o.c. Deepen the joist, close the spacing, or add a bearing line — the tool has NOT changed it.`,
           cite: citeOf(SPAN.joist),
+        });
+      }
+    } else if (m.role === 'joist' && m.position[1] > floorTopY + 1e-6) {
+      // Above the deck: a CEILING joist, on its own table.
+      const row = ceilingTable[m.nominal];
+      const col = row && columnFor(row, spacing.joistSpacingIn);
+      const spanFt = worstBay(m.cutLength / IN_PER_FT / 2, m.position[2]);
+      if (col && spanFt > col.allowed + 1e-6) {
+        out.push({
+          memberId: m.id, role: m.role, nominal: m.nominal, spanFt, allowedFt: col.allowed, spacingIn: col.spacing,
+          message: `${m.nominal} ceiling joist spans ${spanFt.toFixed(1)} ft; the ceiling table allows ${col.allowed} ft at ${col.spacing} in o.c. Deepen it, close the spacing, or add a bearing partition — the tool has NOT changed it.`,
+          cite: citeOf(SPAN.ceilingJoist),
         });
       }
     } else if (m.role === 'rafter') {

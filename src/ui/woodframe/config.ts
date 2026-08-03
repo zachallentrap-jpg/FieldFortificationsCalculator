@@ -53,7 +53,7 @@ const ROOF_LABELS: Record<string, string> = {
   gable: 'Gable (peak in the middle)',
   shed: 'Shed (one slope)',
   flat: 'Flat (drains one way)',
-  hip: 'Hip',
+  hip: 'Hip (slopes on all four sides)',
   pyramid: 'Pyramid',
   none: 'No roof',
 };
