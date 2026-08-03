@@ -244,3 +244,28 @@ footer { padding: 22px 16px 34px; font-size: 11.5px; color: var(--label-2); text
   * { transition: none !important; }
   .deck:hover { transform: none; }
 }
+
+/* ── Print-the-deck dialog ─────────────────────────────────────────────────
+   Shares the studio's dialog shape so the two apps feel like one toolkit;
+   duplicated rather than imported because learn.css is deliberately
+   standalone (this page loads no three.js and no studio stylesheet). */
+.pktdlg {
+  border: 0; border-radius: var(--r-lg); padding: 0; max-width: 420px; width: calc(100% - 32px);
+  background: var(--raised); color: var(--label); box-shadow: var(--shadow-2);
+}
+.pktdlg::backdrop { background: rgba(0, 0, 0, 0.34); }
+.pktdlg form { padding: 18px 20px 16px; display: flex; flex-direction: column; gap: 13px; }
+.pktdlg h2 { font-size: 17px; font-weight: 640; letter-spacing: -0.015em; }
+.pktdlg > form > p { margin: -6px 0 0; font-size: 13px; color: var(--label-2); line-height: 1.45; }
+.pktdlg label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 560; }
+.pktdlg select {
+  font: inherit; font-weight: 400; padding: 8px 10px; border: 0; border-radius: var(--r);
+  background: var(--raised); color: var(--label); box-shadow: inset 0 0 0 0.5px var(--sep-strong);
+}
+.pktdlg small { font-size: 11.5px; font-weight: 400; color: var(--label-2); line-height: 1.4; }
+.pktdlg-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 3px; }
+.pktdlg .chip {
+  min-height: 34px; padding: 7px 15px; border: 0; border-radius: var(--r);
+  background: var(--fill); color: var(--label); font-size: 14px; font-weight: 530; cursor: pointer;
+}
+.pktdlg .chip--go { background: var(--accent); color: #fff; font-weight: 590; }

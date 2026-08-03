@@ -32,6 +32,7 @@ import { PLAIN, WHAT, plainName, whatItDoes } from '../woodframe/labels';
 import { familyById, shippedFamilies, type FamilyId } from '../../timber/catalog';
 import { generateStructure } from '../../timber/families/index';
 import { cardArt, deckArt, stageArt } from './art';
+import { printPaperDeck } from './paper';
 import { loadTrain, progressFor, resetDeck, saveTrain, withProgress, type TrainState } from './store';
 
 const esc = (s: string): string =>
@@ -317,6 +318,7 @@ function renderDrill(deckId: string): void {
         <p class="sub">Nothing is due yet. Come back after another session, or start this deck over.</p>
         <div class="row" style="margin-top:22px">
           <button class="btn" data-go="#/">Back to decks</button>
+          <button class="btn" data-print="${esc(deckId)}">Print the deck</button>
           <button class="btn quiet" data-reset="${esc(deckId)}">Start over</button>
         </div>
       </div>`;
@@ -383,6 +385,7 @@ function renderSummary(entry: DeckEntry): void {
       </div>
       <div class="row">
         <button class="btn primary" data-again="${esc(entry.deck.id)}">Another round</button>
+        <button class="btn" data-print="${esc(entry.deck.id)}">Print the deck</button>
         <button class="btn" data-go="#/">Back to decks</button>
       </div>
       <p class="sub" style="margin-top:20px;font-size:12.5px">
@@ -479,7 +482,7 @@ function renderSequence(familyId: string): void {
 // ── Events ───────────────────────────────────────────────────────────────────
 
 app.addEventListener('click', (ev) => {
-  const el = (ev.target as HTMLElement).closest<HTMLElement>('[data-go],[data-reveal],[data-grade],[data-pick],[data-next],[data-again],[data-reset]');
+  const el = (ev.target as HTMLElement).closest<HTMLElement>('[data-go],[data-reveal],[data-grade],[data-pick],[data-next],[data-again],[data-reset],[data-print]');
   if (!el) return;
 
   const goTo = el.dataset['go'];
@@ -487,6 +490,13 @@ app.addEventListener('click', (ev) => {
 
   const again = el.dataset['again'];
   if (again) { startSession(again); render(); return; }
+
+  const print = el.dataset['print'];
+  if (print) {
+    const e = byId.get(print)!;
+    void printPaperDeck(e.deck, e.tileFamilyId ?? e.familyId);
+    return;
+  }
 
   const reset = el.dataset['reset'];
   if (reset) { state = resetDeck(state, reset); persist(); session = null; render(); return; }

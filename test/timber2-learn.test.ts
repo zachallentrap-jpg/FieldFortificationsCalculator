@@ -18,6 +18,7 @@ import {
   type QuizMode,
 } from '../src/timber/train/core';
 import { CHOICE_COUNT, buildQuestion, isSelfGraded, pickMode, promptFor } from '../src/timber/train/drill';
+import { TIMBER_REGIME_LINE } from '../src/timber/train/compile';
 import { FUNDAMENTALS_ID, allDecks, fundamentalsDeck } from '../src/timber/train/decks';
 import { loadTrain, progressFor, resetDeck, saveTrain, withProgress, STORAGE_KEY, type StorageLike } from '../src/ui/learn/store';
 import { plainName, whatItDoes } from '../src/ui/woodframe/labels';
@@ -27,6 +28,9 @@ import { fmtFtIn } from '../src/timber/units';
 import { thumbnailFor } from '../src/timber/thumbnails';
 import { generateStructure } from '../src/timber/families/index';
 import { cardArt, deckArt, stageArt } from '../src/ui/learn/art';
+import {
+  COLS, DUPLEX_LABEL, PER_SHEET, ROWS, mirrorCell, paperDeckHtml, sheetsFor, type DuplexMode,
+} from '../src/timber/train/print';
 
 const LABELS = { plainName, whatItDoes };
 
@@ -367,6 +371,95 @@ test('the fundamentals tile shows one of every piece, not a fifteenth building',
   assert.ok(art.includes('#c2410c'));
   // And a plain structure tile is genuinely different from it.
   assert.notEqual(deckArt('gp-frame'), art);
+});
+
+// ── The paper deck ───────────────────────────────────────────────────────────
+
+test('the duplex mirror is right for each binding, and both degenerate cases are identities', () => {
+  // Get this wrong and every card has somebody else's answer on its back — which a corporal
+  // discovers after running off six sheets, and then never uses the feature again.
+  assert.deepEqual(mirrorCell('long-edge', 0, 0), { r: 0, c: 1 }, 'long edge flips columns');
+  assert.deepEqual(mirrorCell('long-edge', 1, 1), { r: 1, c: 0 });
+  assert.deepEqual(mirrorCell('short-edge', 0, 0), { r: 1, c: 0 }, 'short edge flips rows');
+  assert.deepEqual(mirrorCell('short-edge', 1, 1), { r: 0, c: 1 });
+  assert.deepEqual(mirrorCell('manual', 1, 0), { r: 1, c: 0 }, 'a re-feed is not mirrored at all');
+
+  // A one-column grid: `cols - 1 - c` is 0 for c=0, so a broken mirror passes here by accident.
+  assert.deepEqual(mirrorCell('long-edge', 3, 0, 4, 1), { r: 3, c: 0 });
+  assert.deepEqual(mirrorCell('short-edge', 0, 2, 1, 4), { r: 0, c: 2 });
+});
+
+test('the mirror is its own inverse — applying it twice returns the cell', () => {
+  for (const mode of ['long-edge', 'short-edge', 'manual'] as DuplexMode[]) {
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const once = mirrorCell(mode, r, c);
+        assert.deepEqual(mirrorCell(mode, once.r, once.c), { r, c }, `${mode} at (${r},${c})`);
+      }
+    }
+  }
+});
+
+test('a card\'s back lands where the printer will put it', () => {
+  const deck = fakeDeck(4);
+  const sheets = sheetsFor(deck.cards, 'long-edge');
+  assert.equal(sheets.length, 2, 'four cards is one sheet, two sides');
+  const [front, back] = sheets;
+  assert.equal(front!.side, 'front');
+  assert.equal(back!.side, 'back');
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const m = mirrorCell('long-edge', r, c);
+      assert.equal(back!.cells[m.r * COLS + m.c], front!.cells[r * COLS + c],
+        `the back of (${r},${c}) must be at (${m.r},${m.c})`);
+    }
+  }
+});
+
+test('a manual run is all fronts, then all backs — not interleaved', () => {
+  // A single-sided printer cannot alternate. Interleaving would have the operator re-feed the
+  // stack between every sheet.
+  const sides = sheetsFor(fakeDeck(9).cards, 'manual').map((s) => s.side);
+  assert.deepEqual(sides, ['front', 'front', 'front', 'back', 'back', 'back']);
+  // …and a duplexer DOES alternate, because it flips in the machine.
+  assert.deepEqual(sheetsFor(fakeDeck(9).cards, 'long-edge').map((s) => s.side),
+    ['front', 'back', 'front', 'back', 'front', 'back']);
+});
+
+test('a short last sheet is padded with blanks, never wrapped', () => {
+  // Wrapping would print card 1 twice and leave a Marine holding a duplicate.
+  const sheets = sheetsFor(fakeDeck(5).cards, 'long-edge');
+  assert.equal(sheets.length, 4, 'five cards is two sheets');
+  const last = sheets[2]!;
+  assert.equal(last.cells.filter(Boolean).length, 1);
+  assert.equal(last.cells.length, PER_SHEET, 'the grid is always full-size');
+  const printed = sheets.filter((s) => s.side === 'front').flatMap((s) => s.cells).filter(Boolean);
+  assert.equal(printed.length, 5, 'every card printed exactly once');
+  assert.equal(new Set(printed).size, 5);
+});
+
+test('every card in a real deck reaches the paper, front and back', () => {
+  const deck = allDecks(LABELS).find((d) => d.familyId === 'gp-frame')!.deck;
+  const html = paperDeckHtml({
+    deck,
+    mode: 'long-edge',
+    art: (card) => cardArt(card, { spec: null, deckId: deck.id }, { width: 320, height: 230 }),
+  });
+  for (const card of deck.cards) {
+    assert.ok(html.includes(card.back.plain.slice(0, 30)), `${card.id}: its back never printed`);
+  }
+  assert.ok(html.includes(TIMBER_REGIME_LINE), 'the (PH) line travels onto the paper');
+  assert.ok(html.includes(DUPLEX_LABEL['long-edge']), 'the chosen mode prints in the margin');
+  assert.ok(!/<script|https?:/i.test(html.replace(/http:\/\/www\.w3\.org\/2000\/svg/g, '')), 'self-contained');
+});
+
+test('the paper deck is deterministic and capped', () => {
+  const deck = allDecks(LABELS).find((d) => d.familyId === 'gp-frame')!.deck;
+  const opts = { deck, mode: 'short-edge' as DuplexMode, art: () => null };
+  assert.equal(paperDeckHtml(opts), paperDeckHtml(opts));
+  // A 23-card deck is 12 sheets; nobody means to print that by accident, so the caller can cap.
+  const capped = paperDeckHtml({ ...opts, maxCards: 4 });
+  assert.equal((capped.match(/class="sheet"/g) ?? []).length, 2, 'four cards is one sheet, two sides');
 });
 
 // ── Storage ──────────────────────────────────────────────────────────────────
