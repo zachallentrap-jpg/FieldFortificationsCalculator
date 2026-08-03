@@ -99,6 +99,14 @@ export const TOLERANCE = {
   epsFt: 0.01,
   /** Infill studs shorter than this are not worth cutting; the plate covers the gap. */
   minInfillStudFt: 0.2,
+  /**
+   * How far a course of roofing may overhang the hip it is cut against — the width of a hip
+   * cap, which is what covers that joint on a real roof. Past this the course is cut into more
+   * pieces up the slope, because a rectangle cannot be cut on a diagonal.
+   */
+  hipCapFt: 4 / IN_PER_FT,
+  /** Ceiling on that subdivision, so a degenerate plane cannot emit a thousand offcuts. */
+  maxTaperBands: 8,
 } as const;
 
 // ── Foundations ──────────────────────────────────────────────────────────────

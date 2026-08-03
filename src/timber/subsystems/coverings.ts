@@ -340,12 +340,30 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
         // is ceil(slopeLength / exposure), so every v0 is already short of the ridge and this
         // can never produce an empty course.
         const v1 = Math.min(v0 + courseWFt, plane.slopeLengthFt);
-        // A hip's courses get SHORTER toward the ridge, and on its triangular ends they run
-        // out to nothing. Roofing is the VISIBLE surface, so it takes the course's widest edge
-        // and is complete: averaging it leaves stripes of bare deck along both hips. The small
-        // overlap where it crosses a hip reads as the hip cap it would have on a real roof.
-        const a = planeSpanAt(plane, v0);
-        const b = planeSpanAt(plane, v1);
+        // A hip's courses get SHORTER toward the ridge, and on its triangular ends they run out
+        // to nothing. Roofing is the VISIBLE surface, so a course takes its WIDEST edge and is
+        // complete: averaging leaves stripes of bare deck along both hips.
+        //
+        // THAT RULE IS RIGHT AND IT IS NOT ENOUGH ON ITS OWN, which the guard tower's cab found.
+        // The overhang a widest-edge course leaves past the hip is the plane's taper over one
+        // course height — negligible on a 40-ft building whose hip ends taper an inch a course,
+        // and enormous on an 8-ft pyramid roof with a 5-ft slope, where a 26-in course tapers
+        // FOUR FEET and every course flapped two feet out past the hip on each side. Four faces
+        // of that is the dark wings the owner would have found on the cab.
+        //
+        // So a course is cut into as many pieces up the slope as it takes to keep that overhang
+        // down to a hip-cap's worth. On a rectangle the taper is zero and this is exactly one
+        // piece, byte-for-byte what it was before. On a triangle it is several pieces of
+        // different lengths — which is also what cutting corrugated to a rake actually gives
+        // you, so the bill gets truer at the same time as the picture.
+        const taper = Math.abs(planeSpanAt(plane, v0).hi - planeSpanAt(plane, v0).lo
+          - (planeSpanAt(plane, v1).hi - planeSpanAt(plane, v1).lo));
+        const bands = Math.min(TOLERANCE.maxTaperBands, Math.max(1, Math.ceil(taper / TOLERANCE.hipCapFt)));
+        for (let k = 0; k < bands; k++) {
+        const vb0 = v0 + ((v1 - v0) * k) / bands;
+        const vb1 = v0 + ((v1 - v0) * (k + 1)) / bands;
+        const a = planeSpanAt(plane, vb0);
+        const b = planeSpanAt(plane, vb1);
         const lo = Math.min(a.lo, b.lo);
         const hi = Math.max(a.hi, b.hi);
         const courseRun = hi - lo;
@@ -369,7 +387,7 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
           const coveringThick = (ROOFING.coveringThickIn.value as number) / IN_PER_FT;
           const p = roofTilePlacement(
             plane,
-            { u0, u1, v0, v1 },
+            { u0, u1, v0: vb0, v1: vb1 },
             rafterHalfFt + deckThick + TOLERANCE.surfaceLiftFt + c * coveringThick + coveringThick / 2,
           );
           emit('roofingCourse', nominal, {
@@ -377,10 +395,11 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
             position: p.position,
             rotation: [Math.PI / 2 - p.pitch, p.yaw, 0],
             stage: stageRoofing,
-            actual: { w: ROOFING.coveringThickIn.value as number, d: (v1 - v0) * IN_PER_FT },
+            actual: { w: ROOFING.coveringThickIn.value as number, d: (vb1 - vb0) * IN_PER_FT },
             nailing: isRoll ? 'roofing nails @ 6" laps (PH)' : 'lead-head nails at every 3rd corrugation (PH)',
             doctrineRef: cite,
           });
+        }
         }
       }
     }
