@@ -170,11 +170,60 @@ test('R-T2: the honesty strip is on the cover AND repeats on every printed sheet
   // Chrome does not implement CSS margin boxes, so `@page { @bottom-left }` renders NOWHERE.
   // A position:fixed footer is what actually repeats — if this assertion is ever "fixed" by
   // going back to margin boxes, the warning silently leaves every page but the first.
-  assert.ok(
-    !/@bottom-\w+\s*\{\s*content/.test(html),
-    'a margin-box footer renders NOWHERE in Chrome — use the fixed footer',
-  );
-  assert.match(html, /\.runfoot\s*\{[^}]*position:\s*fixed/s, 'the repeating footer must be position:fixed in print');
+  // Two earlier mechanisms failed, differently, and neither failure is visible on screen:
+  //   `@page { @bottom-left { content } }` — Chrome does not implement margin boxes at all.
+  //   `position: fixed`                    — repeats in Chrome, prints ONCE in Firefox.
+  // A <tfoot> on a document-wrapping table repeats per page fragment in both engines.
+  assert.ok(!/@bottom-\w+\s*\{\s*content/.test(html), 'margin boxes render nowhere in Chrome');
+  assert.ok(!/\.runfoot\s*\{[^}]*position:\s*fixed/s.test(html), 'position:fixed prints once in Firefox');
+  assert.match(html, /<table class="pagewrap">\s*<tfoot>/, 'the strip must ride a repeating tfoot');
+  assert.ok(html.indexOf('<tfoot>') < html.indexOf('<tbody>'), 'tfoot before tbody, for older engines');
+});
+
+test('FD81: nothing forces a page break before the FIRST section', () => {
+  // A break-before on every section — or a break-after on the cover plus a break-before on
+  // what follows — makes engines emit a leading blank sheet, and an S-4 handed a packet whose
+  // page 1 is blank distrusts the rest of it.
+  const html = HTML();
+  assert.match(html, /section \+ section\.page\s*\{[^}]*break-before:\s*page/s, 'only a FOLLOWING section breaks');
+  assert.ok(!/\.cover\s*\{[^}]*break-after/s.test(html), 'a break-after on the cover doubles the break');
+  // FD76: WebKit honours the legacy spelling far more reliably than the modern one.
+  assert.match(html, /page-break-before:\s*always/, 'emit the legacy property too');
+});
+
+test('FD75: no unbreakable ancestor can clip a long table', () => {
+  // A materials table longer than a page inside `break-inside: avoid` does not flow onto the
+  // next sheet — it CLIPS, and the cut lines that fall off the bottom leave no symptom on
+  // screen. Headings hold to their rows instead; tables repeat their header and break freely.
+  const html = HTML();
+  assert.ok(!/section\s*\{[^}]*break-inside:\s*avoid/s.test(html), 'sections must not be unbreakable');
+  assert.match(html, /thead\s*\{\s*display:\s*table-header-group/, 'a table that breaks must repeat its header');
+});
+
+test('FD79: nothing on the page is below the 9 pt / 8 pt type floor', () => {
+  // Photocopied in grey, duplexed, read in bad light. 8 pt body fits more on a page and costs
+  // legibility in exactly the conditions this document has to survive. Pages are cheap.
+  const html = HTML();
+  const css = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+  const sizes = [...css.matchAll(/font-size:\s*([\d.]+)px/g)].map((m) => Number(m[1]));
+  assert.ok(sizes.length > 8, 'the CSS should declare plenty of sizes to check');
+  const floorPx = 8 * (96 / 72); // 8 pt is the footnote floor; body rules are checked below
+  for (const px of sizes) assert.ok(px >= floorPx - 0.01, `${px}px is ${(px * 72 / 96).toFixed(1)} pt`);
+  assert.match(css, /body\s*\{\s*font:\s*12px/, 'body sits at the 9 pt floor');
+});
+
+test('FD74: regime marks never depend on a background the printer drops', () => {
+  // Chrome and Firefox drop background colours in print unless the operator ticks "Background
+  // graphics". Anything carrying meaning has to be ink: a border, a rule, a stroke.
+  const html = HTML();
+  const css = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+  assert.match(css, /print-color-adjust:\s*exact/);
+  for (const cls of ['.strip', '.warn', '.boundary', '.decision', '.rate']) {
+    const rule = css.slice(css.indexOf(cls));
+    const body = rule.slice(rule.indexOf('{'), rule.indexOf('}'));
+    assert.ok(/border/.test(body), `${cls} must carry its meaning in ink, not a fill`);
+    assert.ok(!/background:\s*#(?!fff)/.test(body), `${cls} leans on a background the printer may drop`);
+  }
 });
 
 test('the strip counts agree with the pages behind them', () => {

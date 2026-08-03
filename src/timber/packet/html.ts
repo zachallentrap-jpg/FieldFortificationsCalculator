@@ -33,7 +33,7 @@ const blank = (label: string, width = '100%'): string =>
 const rows = (body: string): string => body || '<tr><td colspan="9" class="none">none in this build</td></tr>';
 
 function coverPage(p: PacketModel): string {
-  return `<section class="cover">
+  return `<section class="page cover">
     <div class="strip">${esc(honestyStrip(p))}</div>
     <h1>${esc(p.title)}</h1>
     <p class="sum">${esc(p.summaryLine)}</p>
@@ -56,8 +56,12 @@ function coverPage(p: PacketModel): string {
 }
 
 function execPage(p: PacketModel): string {
+  // Command's first question is "why is it this big", and the answers that answer it are the
+  // ones with a number in them. A span TABLE ("table by 2x4 / 2x6 / …") is a pointer, not an
+  // answer, so scalars lead and tables fall to the citation register where they belong.
   const why: string[] = [];
-  for (const r of p.ls.slice(0, 3)) why.push(`${r.label} fixed at ${r.value} — ${r.cite}`);
+  const scalars = p.ls.filter((r) => !r.value.startsWith('table by'));
+  for (const r of scalars.slice(0, 3)) why.push(`${r.label} fixed at ${r.value} — ${r.cite}`);
   for (const i of p.issues.slice(0, 3)) why.push(i.message);
   for (const c of p.cites.slice(0, Math.max(0, 6 - why.length))) why.push(`${c.cite} (${c.members} members)`);
 
@@ -260,74 +264,98 @@ export function packetHtml(p: PacketModel): string {
 <html lang="en"><head><meta charset="utf-8" />
 <title>${esc(p.title)} — command packet ${esc(p.specHash)}</title>
 <style>
-  @page { size: letter portrait; margin: 0.62in 0.6in 0.72in; }
+  /* Letter and A4 both. A4 is the narrower of the two at 8.268 in, so the content box is sized
+     to it: at 0.6 in side margins that leaves 7.068 in, and every block is capped below that.
+     A box sized to Letter overflows A4 by a hair and Chrome silently clips the right edge. */
+  @page { size: letter portrait; margin: 0.6in; }
   * { box-sizing: border-box; }
-  body { font: 10.5px/1.42 -apple-system, "Segoe UI", system-ui, sans-serif; color: #111; margin: 0; }
-  h1 { font-size: 21px; margin: 0 0 3px; letter-spacing: -0.015em; }
-  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; margin: 15px 0 6px;
-       padding-bottom: 3px; border-bottom: 1.2px solid #111; }
-  h3 { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: #333; margin: 12px 0 4px; }
+  /* TYPE FLOOR 9 pt (12 px at 96 dpi), footnotes 8 pt. This document is photocopied in grey,
+     duplexed, and read in bad light; 8 pt body was chosen to fit more on a page and would have
+     cost legibility in exactly the conditions it has to survive. Pages are cheap. */
+  body { font: 12px/1.45 -apple-system, "Segoe UI", system-ui, sans-serif; color: #111; margin: 0;
+         -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  h1 { font-size: 22px; margin: 0 0 3px; letter-spacing: -0.015em; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; margin: 16px 0 6px;
+       padding-bottom: 3px; border-bottom: 1.2px solid #111;
+       break-after: avoid; page-break-after: avoid; }
+  h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #333; margin: 13px 0 4px;
+       break-after: avoid; page-break-after: avoid; }
   p { margin: 4px 0; }
-  ul, ol { margin: 4px 0; padding-left: 17px; }
-  li { margin: 1.5px 0; }
-  table { width: 100%; border-collapse: collapse; font-size: 9.5px; margin-top: 3px; }
-  th, td { text-align: left; padding: 2.2px 6px 2.2px 0; border-bottom: 0.5px solid #ccc; vertical-align: top; }
-  th { font-weight: 650; border-bottom: 1px solid #666; }
+  ul, ol { margin: 4px 0; padding-left: 18px; }
+  li { margin: 2px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 4px; }
+  th, td { text-align: left; padding: 2.6px 6px 2.6px 0; border-bottom: 0.5px solid #999; vertical-align: top; }
+  th { font-weight: 650; border-bottom: 1px solid #444; }
   td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  tr.off td { color: #777; font-style: italic; }
-  td.none { color: #777; font-style: italic; text-align: center; padding: 6px 0; }
+  tr.off td { color: #555; font-style: italic; }
+  td.none { color: #555; font-style: italic; text-align: center; padding: 6px 0; }
   /* Operator-fill columns print as a ruled cell, never as an omitted column: a Class IV list
      with no on-hand column and no lead time is not actionable. */
-  th.fillcol { color: #555; font-weight: 500; font-size: 8.5px; }
-  td.fillcell { border-bottom: 0.5px solid #ccc; min-width: 46px; }
-  .sum { font-size: 12px; font-weight: 550; margin: 0 0 2px; }
-  .lineage { font-size: 9.5px; color: #555; margin: 0 0 8px; }
-  .fine { font-size: 8.7px; color: #444; line-height: 1.4; }
-  .rate { font-size: 9.5px; background: #f2f2f2; padding: 5px 7px; border-left: 2.5px solid #111; }
-  .ph { color: #7a3a00; }
-  .decision { font-size: 10px; border: 1px solid #111; padding: 6px 8px; }
-  .warn { border-left: 3px solid #8a1a12; padding-left: 8px; font-size: 9.3px; }
-  .boundary { border-left: 3px solid #111; padding-left: 8px; font-size: 9.3px; font-weight: 550; }
-  .strip { font-size: 8.5px; letter-spacing: 0.02em; border: 1px solid #111; padding: 4px 7px; margin-bottom: 12px; }
+  th.fillcol { color: #444; font-weight: 500; font-size: 10.7px; }
+  td.fillcell { border-bottom: 0.5px solid #999; min-width: 46px; }
+  .sum { font-size: 13px; font-weight: 550; margin: 0 0 2px; }
+  .lineage { font-size: 11px; color: #444; margin: 0 0 8px; }
+  .fine { font-size: 10.7px; color: #333; line-height: 1.42; }
+  /* Border, not a background fill: print drops backgrounds unless the operator ticks
+     "Background graphics", and a rate block that vanishes takes the provenance with it. */
+  .rate { font-size: 11px; padding: 5px 8px; border: 1px solid #111; border-left-width: 3px; }
+  .ph { color: #6b3200; }
+  .decision { font-size: 11.5px; border: 1px solid #111; padding: 7px 9px; }
+  .warn { border-left: 3px solid #8a1a12; padding-left: 9px; font-size: 11px; }
+  .boundary { border-left: 3px solid #111; padding-left: 9px; font-size: 11px; font-weight: 550; }
+  .strip { font-size: 10.7px; letter-spacing: 0.02em; border: 1px solid #111; padding: 5px 8px; margin-bottom: 12px; }
   .art { margin: 8px 0; text-align: center; }
   .art svg { width: 100%; max-width: 4.6in; height: auto; }
-  .shot { display: block; width: 100%; height: 2.9in; object-fit: cover; object-position: center;
-          border: 0.5px solid #bbb; margin-top: 6px; }
-  .grid1 { display: grid; gap: 13px 0; margin: 7px 0 4px; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 13px 26px; margin: 7px 0 4px; }
+  .shot { display: block; width: 100%; max-width: 7in; height: 3in; object-fit: cover; object-position: center;
+          border: 0.5px solid #777; margin-top: 6px; }
+  .grid1 { display: grid; gap: 14px 0; margin: 8px 0 4px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 26px; margin: 8px 0 4px; }
   .fill { display: block; }
-  .fill i { display: block; border-bottom: 1px solid #111; height: 15px; }
-  .fill em { font-style: normal; font-size: 8px; letter-spacing: 0.05em; color: #555; text-transform: uppercase; }
-  .toc { font-size: 10px; }
-  .tools { font-size: 9.3px; columns: 2; }
-  .key { display: block; font-size: 7.5px; color: #888; font-family: ui-monospace, Menlo, monospace; }
-  section { break-inside: avoid-page; }
-  section.page { break-before: page; }
-  .cover { break-after: page; }
+  .fill i { display: block; border-bottom: 1px solid #111; height: 16px; }
+  .fill em { font-style: normal; font-size: 10.7px; letter-spacing: 0.05em; color: #444; text-transform: uppercase; }
+  .toc { font-size: 12px; }
+  .tools { font-size: 11px; columns: 2; }
+  .key { display: block; font-size: 10.7px; color: #555; font-family: ui-monospace, Menlo, monospace; }
 
-  /* R-T2 — THE STRIP REPEATS ON EVERY PRINTED SHEET.
-     Not via \`@page { @bottom-left }\`: Chrome does not implement CSS margin boxes at all, so
-     the footer this rule was originally written as silently rendered NOWHERE, and the one
-     warning that has to survive a photocopy would have been on the cover only. A
-     position:fixed element is what Chrome actually repeats per page.
-     Packets get photocopied a section at a time; a middle sheet that has lost "PLANNING
+  /* FD81 — no blank first page. \`break-before\` on EVERY section (or a break-after on the
+     cover plus a break-before on what follows) makes engines emit a leading blank sheet, and
+     an S-4 handed a packet whose page 1 is blank distrusts the rest of it. Only a section that
+     FOLLOWS another one breaks. Legacy \`page-break-*\` alongside the modern spelling because
+     WebKit honours the old names far more reliably (FD76). */
+  section + section.page { break-before: page; page-break-before: always; }
+  /* Deliberately NOT \`break-inside: avoid\` on sections: a materials table longer than a page
+     inside an unbreakable box does not overflow onto the next sheet, it CLIPS, and the cut
+     lines that fall off the bottom leave no symptom on screen. Headings hold to their first
+     rows instead (break-after: avoid above), which is the part that actually reads badly. */
+  thead { display: table-header-group; }
+
+  /* R-T2 — THE STRIP REPEATS ON EVERY PRINTED SHEET, IN BOTH ENGINES.
+     Two earlier attempts failed differently and neither failure is visible on screen:
+       a CSS margin box in @page — Chrome does not implement margin boxes at all, so
+         it rendered nowhere at all.
+       \`position: fixed\` — repeats per page in Chrome, prints ONCE in Firefox, so a six-page
+         packet would ship with page 1 stamped and five bare.
+     A \`<tfoot>\` on a document-wrapping table repeats per page fragment in BOTH engines. That
+     is why the whole body is inside one table; it is not layout, it is the warning.
+     Packets get photocopied a section at a time, and a middle sheet that has lost "PLANNING
      ESTIMATE — not a build-to field document" is a middle sheet somebody builds from. */
-  .runfoot { font-size: 8.5px; color: #444; border-top: 1px solid #111; padding-top: 4px; margin-top: 16px; }
-  @media print {
-    .runfoot {
-      position: fixed; bottom: 0; left: 0; right: 0;
-      margin: 0; padding: 3px 0 0; font-size: 7.5px; background: #fff;
-    }
-    body { padding-bottom: 0.16in; }
+  table.pagewrap { border-collapse: collapse; width: 100%; font-size: inherit; margin: 0; }
+  table.pagewrap > tbody > tr > td, table.pagewrap > tfoot > tr > td {
+    padding: 0; border: 0; vertical-align: top;
   }
+  .runfoot { font-size: 10.7px; color: #222; border-top: 1px solid #111; padding-top: 3px; margin-top: 10px; }
 </style></head>
 <body>
+<table class="pagewrap">
+  <tfoot><tr><td><div class="runfoot">${strip}</div></td></tr></tfoot>
+  <tbody><tr><td>
 ${coverPage(p)}
 ${execPage(p)}
 ${materialsPage(p)}
 ${laborPage(p)}
 ${assumptionsPage(p)}
 ${p.viewImage ? `<section class="page"><h2>Annex A — as designed</h2><img class="shot" src="${p.viewImage}" alt="View of the structure as configured" /></section>` : ''}
-<p class="runfoot">${strip}</p>
+  </td></tr></tbody>
+</table>
 </body></html>`;
 }
