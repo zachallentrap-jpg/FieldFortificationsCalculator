@@ -82,18 +82,26 @@ export function tileSurface(
   let row = 0;
   for (let v = 0; v < heightFt - EPS; v += sheetHFt, row++) {
     const v1 = Math.min(v + sheetHFt, heightFt);
-    // AT THE COURSE'S MID-HEIGHT, and the choice is the difference between a right bill and a
-    // wrong one. Clipping at the course's widest edge covers the whole surface but bills the
-    // triangular offcuts as if they were laid — 14% over on a 48x20 hip. Clipping at the
-    // narrowest leaves the same 14% of the roof bare. The taper is linear in v, so the width at
-    // mid-height is the course's exact average and the areas cancel to the square foot.
+    // AT THE COURSE'S WIDEST EDGE — the sheet is cut from stock big enough to reach the hip,
+    // and the diagonal offcut is waste. Two other rules were tried and both are worse:
     //
-    // What it costs, stated: the drawn pieces step across the hip line by half a course rather
-    // than following it, because a rectangle cannot be cut on a diagonal. The roof is covered
-    // and the quantity is right; the hip line is a staircase at course resolution.
-    const s = span ? span((v + v1) / 2) : { lo: 0, hi: runFt };
-    const lo = s.lo;
-    const hi = s.hi;
+    //   mid-height: the areas cancel exactly, which is a satisfying number and a roof with
+    //     HOLES. Measured on a 48x20 hip: 3.5% of each long slope and 15% of each end left
+    //     bare, in diamonds along the hip lines with framing showing through them. It was
+    //     billing the average and covering the average, in the wrong places.
+    //   narrowest edge: the same holes, twice as large.
+    //
+    // Widest covers everything, and the extra it bills is not an error — it is the offcut. A
+    // hip genuinely consumes more sheet material than a gable of the same roof area, because
+    // every sheet along a hip is cut on a diagonal and the triangle goes in the scrap pile.
+    // Billing the covered area instead would send a section out short by exactly that waste.
+    //
+    // What it costs, stated: a rectangle cannot be cut on a diagonal, so the drawn pieces
+    // overhang the hip line by up to half a course and interleave with the adjacent slope's.
+    const a = span ? span(v) : { lo: 0, hi: runFt };
+    const b = span ? span(v1) : { lo: 0, hi: runFt };
+    const lo = Math.min(a.lo, b.lo);
+    const hi = Math.max(a.hi, b.hi);
     if (hi - lo <= EPS) continue; // the point at the top of a hip end — nothing to cut
     const off = row % 2 === 1 ? stagger : 0;
     let u = lo;
@@ -326,12 +334,14 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
         // is ceil(slopeLength / exposure), so every v0 is already short of the ridge and this
         // can never produce an empty course.
         const v1 = Math.min(v0 + courseWFt, plane.slopeLengthFt);
-        // A hip's courses get SHORTER toward the ridge, and on its triangular ends they run out
-        // to nothing. Mid-height for the same reason as the deck tiler above: the taper is
-        // linear, so the average width is exact and the quantity is right.
-        const s = planeSpanAt(plane, (v0 + v1) / 2);
-        const lo = s.lo;
-        const hi = s.hi;
+        // A hip's courses get SHORTER toward the ridge, and on its triangular ends they run
+        // out to nothing. Widest edge, for the same reason as the deck tiler above: roll goods
+        // are cut to reach the hip and the diagonal offcut is waste, so covering the average
+        // would leave stripes of bare deck along both hips.
+        const a = planeSpanAt(plane, v0);
+        const b = planeSpanAt(plane, v1);
+        const lo = Math.min(a.lo, b.lo);
+        const hi = Math.max(a.hi, b.hi);
         const courseRun = hi - lo;
         if (courseRun <= TOLERANCE.epsFt) continue;
         const sheetLen = isRoll ? courseRun : (ROOFING.corrugatedLengthFt.value as number);

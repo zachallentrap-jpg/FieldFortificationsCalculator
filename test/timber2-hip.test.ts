@@ -7,6 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateStructure } from '../src/timber/families/index';
+import { tileSurface } from '../src/timber/subsystems/coverings';
 import { familyById } from '../src/timber/catalog';
 import { hipLenPerFtRun, jackDifference, planeSpanAt, roofPlanes } from '../src/timber/subsystems/roofFamilies';
 
@@ -88,15 +89,62 @@ test('a hip has FOUR roof surfaces, two of them triangular', () => {
   assert.equal(new Set(planes.map((p) => p.slopeLengthFt.toFixed(6))).size, 1);
 });
 
-test('THE AREA CHECK: an equal-pitch hip and gable on one plan have the same roof area', () => {
-  // The strongest available assertion on the covering, and it is a fact about roofs rather
-  // than about this code: swapping a gable for a hip re-shapes the surface, it does not add or
-  // remove any. A tiler that clips at the course's widest edge over-bills by 14%; one that
-  // clips at the narrowest leaves 14% of the roof bare. Both pass "the hip has covering".
+/** Fraction of a plane's true outline that some tile actually lands on. */
+function coverageOf(plane: ReturnType<typeof roofPlanes>[number], sheetW: number, sheetH: number): number {
+  const tiles = tileSurface(plane.eaveLengthFt, plane.slopeLengthFt, sheetW, sheetH, 0, (v) => planeSpanAt(plane, v));
+  let inside = 0;
+  let covered = 0;
+  const N = 140;
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      const v = ((i + 0.5) / N) * plane.slopeLengthFt;
+      const u = ((j + 0.5) / N) * plane.eaveLengthFt;
+      const s = planeSpanAt(plane, v);
+      if (u < s.lo || u > s.hi) continue;
+      inside += 1;
+      if (tiles.some((t) => u >= t.u0 && u <= t.u1 && v >= t.v0 && v <= t.v1)) covered += 1;
+    }
+  }
+  return inside === 0 ? 1 : covered / inside;
+}
+
+test('THE COVERAGE CHECK: no part of a hip is left bare', () => {
+  // The failure this exists for is subtle and looks fine in a summary: clipping each course at
+  // its MID-height makes the billed area come out exactly right, and leaves the roof full of
+  // diamond-shaped holes along the hip lines with framing showing through. Measured, before the
+  // fix: 96.5% of each long slope and 85.1% of each end. A number that averages correctly is
+  // not the same as a roof that is covered.
+  const spec = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset));
+  spec.roof = { kind: 'hip', risePer12: 6, overhangFt: 1 };
+  for (const plane of roofPlanes(spec, 0)) {
+    const c = coverageOf(plane, 4, 8);
+    assert.ok(c > 0.999, `${plane.id}: only ${(c * 100).toFixed(1)}% covered`);
+  }
+});
+
+test('a hip bills MORE sheet than its area, because the offcuts are real', () => {
+  // Not an error and not a fudge: every sheet along a hip is cut on a diagonal and the triangle
+  // goes in the scrap pile. Billing the covered area would send a section out short by exactly
+  // that waste. A gable has no diagonal cuts, so its material IS its area.
   const hip = areaOf(hipModel(), 'roofPanel');
   const gable = areaOf(gableModel(), 'roofPanel');
-  assert.ok(hip > 0, 'a hip with no deck is the bug this test exists for');
-  assert.ok(Math.abs(hip - gable) < 1, `hip ${hip.toFixed(1)} sf vs gable ${gable.toFixed(1)} sf`);
+  assert.ok(hip > 0, 'a hip with no deck is the bug all of this exists for');
+  assert.ok(hip > gable, `a hip cannot need less sheet than a gable: ${hip.toFixed(0)} vs ${gable.toFixed(0)}`);
+  // Bounded — this is trim waste, not a second roof.
+  assert.ok(hip < gable * 1.25, `${(100 * (hip / gable - 1)).toFixed(0)}% waste is too much to be trim`);
+});
+
+test('the two roofs cover the same PLAN — the surfaces themselves are equal', () => {
+  // The geometric identity the material figure above sits on top of, checked without the tiler
+  // in the way: an equal-pitch hip and gable on one plan have the same roof area.
+  const spec = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset));
+  const planeArea = (kind: 'hip' | 'gable') => {
+    spec.roof = { kind, risePer12: 6, overhangFt: 1 };
+    return roofPlanes(spec, 0).reduce(
+      (a, p) => a + ((p.eaveLengthFt + (p.topLengthFt ?? p.eaveLengthFt)) / 2) * p.slopeLengthFt, 0);
+  };
+  assert.ok(Math.abs(planeArea('hip') - planeArea('gable')) < 0.01,
+    `hip ${planeArea('hip').toFixed(2)} vs gable ${planeArea('gable').toFixed(2)}`);
 });
 
 test('nothing the hip lays hangs off the roof', () => {
