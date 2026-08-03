@@ -1,0 +1,168 @@
+// TIMBER-2 — the plain-language dictionary (plan §5.3, §11.1, I-14).
+//
+// Two lines per role, and they do different jobs:
+//   PLAIN  what a carpenter CALLS it — the name that appears on the member card and the strip.
+//   WHAT   what it DOES, in one sentence, for someone meeting the term for the first time.
+//
+// The invariant (I-14) is that every role an engine actually emits resolves here. A member the
+// tool can build but cannot name is a member the tool cannot teach, and the sync test fails
+// the build rather than showing a raw enum value like `headerJoist` to a Marine.
+
+import type { MemberRole } from '../../timber/types';
+
+export const PLAIN: Record<MemberRole, string> = {
+  // Foundation & floor
+  post: 'post',
+  footing: 'footing (concrete)',
+  foundationWall: 'foundation wall (concrete)',
+  slab: 'slab (concrete)',
+  skid: 'skid runner',
+  sill: 'sill',
+  girder: 'girder (built-up)',
+  capBeam: 'cap beam',
+  joist: 'joist',
+  rimJoist: 'rim joist',
+  bridging: 'bridging',
+  subfloor: 'subfloor panel',
+  deckPlank: 'deck plank',
+  trimmerJoist: 'trimmer joist (doubled)',
+  headerJoist: 'header joist (doubled)',
+  tailJoist: 'tail joist',
+  // Walls
+  solePlate: 'sole plate',
+  stud: 'stud',
+  cripple: 'cripple',
+  jackStud: 'jack stud (trimmer)',
+  kingStud: 'king stud',
+  header: 'header',
+  topPlate: 'top plate',
+  capPlate: 'cap plate (double top)',
+  brace: 'let-in brace',
+  girt: 'girt',
+  ponyStud: 'pony-wall stud',
+  rakeStud: 'rake stud',
+  // Roof
+  rafter: 'rafter',
+  ridge: 'ridge board',
+  collarTie: 'collar tie',
+  hipRafter: 'hip rafter',
+  jackRafter: 'jack rafter',
+  purlin: 'purlin',
+  roofPanel: 'roof sheathing panel',
+  roofingCourse: 'roofing course',
+  felt: 'felt underlayment',
+  // Skin
+  sheathingPanel: 'wall sheathing panel',
+  siding: 'siding panel',
+  sidingBoard: 'siding board',
+  batten: 'batten',
+  buildingPaper: 'building paper',
+  screenFrame: 'screen frame',
+  screenPanel: 'screen panel',
+  // Access & safety
+  stringer: 'stair stringer',
+  tread: 'stair tread',
+  ladderRail: 'ladder rail',
+  ladderRung: 'ladder rung',
+  railPost: 'rail post',
+  railTop: 'top rail',
+  railMid: 'midrail',
+  toeBoard: 'toe board',
+  // Tower / tents / bunker
+  towerLeg: 'tower leg',
+  towerBrace: 'X-brace',
+  bentPost: 'bent post',
+  bentRafter: 'bent rafter',
+  bentCollar: 'bent collar',
+  cribLog: 'crib log',
+  lagging: 'lagging',
+  ohcStringer: 'overhead stringer',
+  baffleWall: 'baffle wall',
+  soilGhost: 'soil cover (stated, not computed)',
+  // Built openings & hardware
+  doorBoard: 'door board',
+  doorLedge: 'door ledge',
+  doorBrace: 'door brace',
+  shutter: 'shutter',
+  riserBox: 'riser box',
+  hardware: 'hardware',
+};
+
+export const WHAT: Record<MemberRole, string> = {
+  post: 'Short column carrying the sills down to its footer — the building bears on these.',
+  footing: 'Concrete that spreads the load onto the soil so nothing sinks.',
+  foundationWall: 'Continuous concrete wall under the sills; the sill bolts down to it.',
+  slab: 'Concrete floor poured inside the foundation walls.',
+  skid: 'Heavy runner the whole building sits on, so it can be dragged to a new site.',
+  sill: 'Flat starter plate: on the foundation it seats the floor; in a window bay it is the rough sill the cripples stand on.',
+  girder: 'Built-up beam down the middle that cuts the joist span in half.',
+  capBeam: 'Beam across the posts that the floor above bears on.',
+  joist: 'Repeating beam carrying the deck load to the sills and girder.',
+  rimJoist: 'Closes off the joist ends and keeps them standing straight.',
+  bridging: 'Bracing between joists — spreads load to neighbors and stops twisting.',
+  subfloor: 'Deck panels that tie the joists into one stiff floor.',
+  deckPlank: 'Plank decking — the walking surface on a platform or tower.',
+  trimmerJoist: 'Doubled joist along the side of an opening; carries the headers.',
+  headerJoist: 'Doubled joist across the end of an opening; carries the cut-off tail joists.',
+  tailJoist: 'Shortened joist running from the opening header back to its bearing.',
+  solePlate: 'Bottom plate of a wall; the studs nail down through it into the floor.',
+  stud: 'Vertical wall member on the layout grid; carries the plates above it.',
+  cripple: 'Short stud above a header or below a window sill — keeps the layout grid going.',
+  jackStud: 'Shortened stud under each header end — carries the header load down.',
+  kingStud: 'Full-height stud beside the opening; the jack nails to it.',
+  header: 'Doubled beam over an opening; picks up the load of the studs that were cut.',
+  topPlate: 'Upper plate tying the studs; doubled by the cap plate.',
+  capPlate: 'Second top plate; it laps the corners so the walls lock together.',
+  brace: '1x4 let into the stud faces at an angle — keeps the wall square against racking.',
+  girt: 'Horizontal band across the posts that siding or screen nails to.',
+  ponyStud: 'Short stud above the wall plate, making up the height a shed roof needs on its high side.',
+  rakeStud: 'Infill stud stepping up the wall under a sloping roof.',
+  rafter: 'Sloped roof beam from the wall plate to the ridge.',
+  ridge: 'Board at the peak the rafter pairs bear against.',
+  collarTie: 'Horizontal tie across a rafter pair — resists spreading.',
+  hipRafter: 'Rafter running out to a corner where two roof slopes meet.',
+  jackRafter: 'Shortened rafter running from the plate up to a hip.',
+  purlin: 'Horizontal member across the rafters that metal roofing nails to — no solid deck needed.',
+  roofPanel: 'Roof deck panel nailed over the rafters.',
+  roofingCourse: 'A course of roofing, laid from the eave up so every lap sheds water downhill.',
+  felt: 'Underlayment between deck and roofing.',
+  sheathingPanel: 'Panel closing the wall frame and bracing it against racking.',
+  siding: 'Exterior panel that keeps weather off the frame.',
+  sidingBoard: 'Vertical siding board; battens cover the joints between boards.',
+  batten: 'Narrow strip over a siding joint, so the gap that opens as boards shrink stays covered.',
+  buildingPaper: 'Weather barrier behind the siding.',
+  screenFrame: 'Light frame holding a screen panel in a wall opening.',
+  screenPanel: 'Insect screen filling a bay — the SEA hut band is built this way.',
+  stringer: 'Sloped stair beam; the treads bear on it. The card shows the riser/tread layout.',
+  tread: 'The board you step on. Its depth is a life-safety minimum, not a preference.',
+  ladderRail: 'The side rail of a fixed ladder; rungs let into it.',
+  ladderRung: 'The step of a fixed ladder — spacing is a life-safety number.',
+  railPost: 'Post carrying the guardrail; spacing is a life-safety number.',
+  railTop: 'Top rail at 42 in — the fall-protection height.',
+  railMid: 'Midrail at 21 in, so nobody goes through the gap.',
+  toeBoard: 'Low board at the deck edge that stops tools being kicked off onto people below.',
+  towerLeg: 'Battered corner leg carrying the tower; it leans in as it rises.',
+  towerBrace: 'Diagonal in the tower face — this is what keeps it from racking over.',
+  bentPost: 'Upright of a tent frame bent.',
+  bentRafter: 'Sloped member of a tent frame bent, following the canvas line.',
+  bentCollar: 'Tie across a bent, holding the rafters together.',
+  cribLog: 'Log or timber laid in alternating courses to build a crib wall.',
+  lagging: 'Boards spanning between posts to hold back earth.',
+  ohcStringer: 'Overhead beam carrying the stated cover load.',
+  baffleWall: 'Short wall offsetting an entrance so nothing travels straight in.',
+  soilGhost: 'The stated cover depth, drawn for reference. Protective sizing is a survivability decision, not computed here.',
+  doorBoard: 'One board of a ledged door face.',
+  doorLedge: 'Horizontal batten holding the door boards together.',
+  doorBrace: 'Diagonal in a ledged door — its foot goes at the hinge side, so it works in compression.',
+  shutter: 'Board or plywood cover for an opening; side-hinged or propped open.',
+  riserBox: 'The seat box over a latrine pit.',
+  hardware: 'Counted item — hinges, hasps, bolts, straps.',
+};
+
+export function plainName(role: MemberRole): string {
+  return PLAIN[role] ?? role;
+}
+
+export function whatItDoes(role: MemberRole): string | undefined {
+  return WHAT[role];
+}

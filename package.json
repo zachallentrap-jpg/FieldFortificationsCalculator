@@ -13,16 +13,18 @@
     "start": "node scripts/serve-suite.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
-    "verify": "npm run typecheck && npm run test && npm run check:offline",
+    "verify": "npm run typecheck && npm run test && npm run check:offline && npm run check:assets",
     "build": "vite build && vite build -c vite.standalone.config.ts && node --import tsx scripts/build-standalone.ts && npm run check:offline",
     "build:standalone": "node --import tsx scripts/build-standalone.ts",
     "check:offline": "node --import tsx scripts/check-offline.ts",
+    "check:assets": "node --import tsx scripts/check-assets.ts",
     "check:offline:dist": "node --import tsx scripts/check-offline.ts --require-dist",
+    "gen:compat-goldens": "node --import tsx scripts/gen-compat-goldens.ts",
+    "gen:frame-goldens": "node --import tsx scripts/gen-frame-goldens.ts",
     "build:woodframe": "vite build -c vite.woodframe.config.ts",
     "build:suite": "node scripts/build-suite.mjs",
-    "check:assets": "node --import tsx scripts/check-assets.ts",
-    "gen:frame-goldens": "node --import tsx scripts/gen-frame-goldens.ts",
-    "verify:full": "npm run verify && npm run build:suite && npm run check:assets && npm run check:offline:dist"
+    "update:thumb-goldens": "node --import tsx scripts/gen-thumb-goldens.ts",
+    "verify:full": "npm run verify && npm run build:suite && npm run check:offline:dist"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

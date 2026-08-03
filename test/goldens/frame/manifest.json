@@ -26,8 +26,8 @@
  },
  {
   "case": "negative-crawl",
-  "sha256": "f19fe8176fa7a162a81a896ba3df71e750942f2f4e94189a9223966c84f02b88",
-  "members": 276
+  "sha256": "866daf98a6bb30460966beaadbfd96c7b584f6efce082adc005bc56c8b7748c4",
+  "members": 288
  },
  {
   "case": "no-overhang",
@@ -51,8 +51,8 @@
  },
  {
   "case": "slab-on-grade-crawl0",
-  "sha256": "a8b211528088efb65caf94e48224fb135679662027476a25a75bd37e61e49f58",
-  "members": 276
+  "sha256": "68b08247e32df68cc5bb92d86fe0f0426a34de306aba8dc1e7db524da8b50112",
+  "members": 288
  },
  {
   "case": "spacing-24",

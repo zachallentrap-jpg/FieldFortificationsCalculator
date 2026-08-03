@@ -1,10 +1,20 @@
-// TIMBER-1 engine — FrameModel assembly (design doc §1). One call composes every generator
-// into the single Member[] all consumers project from. Pure and deterministic.
+// TIMBER-1 engine — FrameModel assembly (design doc §1), now the TIMBER-2 compatibility port.
+//
+// The API below is FROZEN: `BuildingInput` in, the same `Member[]` out, byte for byte. What
+// changed underneath is that `generateFrame` no longer composes the generators itself — it
+// maps its input onto a `BuildingSpec` and delegates to `generateStructure`, which is the one
+// entry point every new family also goes through.
+//
+// `specFromBuildingInput` is the migration table from plan §2.4 written as code, and
+// `test/timber2-compat.test.ts` runs the demo building through it and asserts the result
+// deep-equals the goldens snapshotted before any of this existed.
 
 import type { Member } from './types';
-import { generateFloor, floorLevels, stairPlan, type FloorLevels, type FoundationType, type BridgingType } from './floor';
-import { generateWalls, type Opening } from './walls';
-import { generateRoof } from './roof';
+import { stairPlan, type FloorLevels, type FoundationType, type BridgingType } from './floor';
+import type { Opening } from './walls';
+import type { BuildingSpec, WallOpenings } from './spec';
+import { WALL_ORDER } from './spec';
+import { generateStructure } from './families/index';
 
 export interface BuildingInput {
   lengthFt: number;
@@ -33,42 +43,60 @@ export interface FrameModel {
   levels: FloorLevels; // vertical datum info (grade line for the render layer's ground)
 }
 
-export function generateFrame(input: BuildingInput): FrameModel {
-  const floorInput = {
-    lengthFt: input.lengthFt,
-    widthFt: input.widthFt,
-    joistSpacingIn: input.joistSpacingIn,
-    crawlFt: input.crawlFt,
-    foundation: input.foundation,
-    basementDepthFt: input.basementDepthFt,
-    bridging: input.bridging,
-    stairs: input.stairs,
-  };
-  const members: Member[] = [
-    ...generateFloor(floorInput),
-    ...generateWalls({
-      lengthFt: input.lengthFt,
-      widthFt: input.widthFt,
-      wallHeightFt: input.wallHeightFt,
-      studSpacingIn: input.studSpacingIn,
-      openings: input.openings,
-      letInBracing: input.letInBracing,
-    }),
-    ...generateRoof({
-      lengthFt: input.lengthFt,
-      widthFt: input.widthFt,
-      wallHeightFt: input.wallHeightFt,
-      risePer12: input.risePer12,
-      rafterSpacingIn: input.rafterSpacingIn,
-      overhangFt: input.overhangFt,
-      atticAccess: input.atticAccess,
-    }),
-  ];
+/**
+ * The §2.4 migration table, in code. Two details carry the compat lock:
+ *
+ *   Order — openings are grouped per wall in the const wall order and kept in their supplied
+ *   sequence inside each wall. The legacy generator walks walls in that same order and emits
+ *   opening framing in array order, and per-role id counters bake both in (TD5).
+ *
+ *   Defaults — `stairs` defaults to TRUE under a basement, matching `floor.ts`. Reproducing a
+ *   default wrong is how a "pure refactor" quietly changes what the tool builds.
+ */
+export function specFromBuildingInput(input: BuildingInput): BuildingSpec {
+  const openings: WallOpenings = {};
+  for (const wall of WALL_ORDER) {
+    const forWall = input.openings.filter((o) => o.wall === wall);
+    if (forWall.length === 0) continue;
+    openings[wall] = forWall.map((o) => ({
+      // A rough opening with a sill is a window; one that starts at the plate is a door.
+      kind: o.sillHeightFt > 0 ? ('window' as const) : ('door' as const),
+      offsetFt: o.offsetFt,
+      widthFt: o.widthFt,
+      heightFt: o.heightFt,
+      sillHeightFt: o.sillHeightFt,
+      ...(o.headerNominal ? { headerNominal: o.headerNominal } : {}),
+      fill: 'rough' as const,
+    }));
+  }
+
+  const foundation: BuildingSpec['foundation'] =
+    input.foundation === 'basement'
+      ? { kind: 'basement', depthFt: input.basementDepthFt ?? 7.5, stairs: input.stairs ?? true }
+      : input.foundation === 'wall'
+        ? { kind: 'wall', crawlFt: input.crawlFt }
+        : { kind: 'piers', crawlFt: input.crawlFt };
+
   return {
-    input,
-    members,
-    levels: floorLevels(floorInput),
+    family: 'building',
+    dims: { lengthFt: input.lengthFt, widthFt: input.widthFt },
+    spacing: {
+      studSpacingIn: input.studSpacingIn,
+      joistSpacingIn: input.joistSpacingIn,
+      rafterSpacingIn: input.rafterSpacingIn,
+    },
+    coverings: { wallSheathing: 'none', siding: 'none', roofDeck: 'plywood', roofing: 'none' },
+    stories: [{ wallHeightFt: input.wallHeightFt, openings, letInBracing: input.letInBracing }],
+    roof: { kind: 'gable', risePer12: input.risePer12, overhangFt: input.overhangFt },
+    foundation,
+    bridging: input.bridging,
+    atticAccess: input.atticAccess,
   };
+}
+
+export function generateFrame(input: BuildingInput): FrameModel {
+  const model = generateStructure(specFromBuildingInput(input));
+  return { input, members: model.members, levels: model.levels };
 }
 
 export { stairPlan };

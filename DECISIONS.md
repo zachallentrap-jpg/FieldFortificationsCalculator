@@ -395,6 +395,408 @@ option, implement it, and log it here.
   stays inside the placeholder regime — no new fabricated doctrine values, every cite still
   (PH) pending page verification.
 
+- **D37 — TIMBER-2 T0: the compat lock is committed bytes, and every "we promise" became a
+  machine.** Executing `docs/TIMBER2_PLAN.md` phase T0. Four guardrails, all of which had to
+  exist BEFORE the engine is touched: (1) `test/goldens/frame-compat/` — `generateFrame` snapshotted
+  at the pre-refactor commit into 12 curated full-JSON goldens (one per distinct code path,
+  one member per line so a regression reads as a reviewable diff) plus a hashed index over the
+  entire 72-row timber-features option matrix. Full-matrix coverage for 1.3 MB instead of
+  10 MB, and `test/timber2-compat.test.ts` diffs against those bytes FOREVER — never against a
+  live `generateFrame`, which goes self-referential the moment frame.ts delegates (plan TD12).
+  The comparator (TD13) is exact-deep-equal first, then a 1e-12 epsilon pass with per-field
+  diffs, so benign FP wobble from an extraction can never be mistaken for the project's kill
+  criterion. (2) `.github/workflows/toolkit.yml` — `npm run verify` + `npm run build:suite` on
+  every push/PR, plus a merge-base diff that fails the build if a legacy timber suite was
+  edited (I-8/K2: the compat suite is the only sanctioned bridge). (3) `scripts/check-assets.ts`
+  wired into `verify` — the "no new dist assets" promise behind TD11's runtime-SVG thumbnails
+  is now an allowlist gate; it immediately caught the pre-existing `icons/icon.svg`, which was
+  added to the baseline explicitly rather than pattern-waived. (4) `public/sw.js` deleted
+  (TD16): it was SAP-1's cache-first worker listing files that no longer exist in suite builds,
+  while `build-suite.mjs` already writes the cache-killer `dist/sw.js` — the toolkit ships no
+  service worker, and now nothing claims otherwise. Reciprocal doc edits per plan §6.5: the
+  SAP-2 blueprint's TIMBER row no longer binds carpentry to SAP's ship-empty regime (TD1) and
+  names exactly which gate classes apply to `src/timber` (offline/determinism/doctrine YES;
+  watermark/commissioning NO — LS-GATE replaces them); R5b gains the crib-bunker reconciliation
+  entry condition so the bunker boundary is owned on both sides.
+
+- **D38 — TIMBER-2 T1: the parametric engine exists, and the legacy output did not move by one
+  bit.** `generateFrame` no longer composes the generators itself: it maps `BuildingInput` onto
+  a `BuildingSpec` (the §2.4 migration table, written as `specFromBuildingInput`) and delegates
+  to `generateStructure`, the single entry point every future family also goes through. The
+  frozen goldens from D37 passed unchanged through the delegation on the first run — exact
+  deep-equal, not epsilon — across all 12 curated fixtures and all 72 matrix rows. New modules:
+  `spec.ts` (the StructureSpec discriminated union + the SPEC_PATH registry), `normalize.ts`,
+  `stagePlan.ts`, `doctrine.ts`, `families/{building,index}.ts`, `subsystems/wallSystem.ts`.
+  Four decisions worth recording. **(1) C-10 taken literally:** `floor.ts`/`walls.ts`/`roof.ts`
+  ARE the frozen branch — not rewritten, not edited, wrapped. Breadth arrives as sibling code
+  reading a published contract, so the byte-pinned path is never in its way and never in a
+  refactor's blast radius. **(2) The wall placement convention is now OWNED** (C-4): where a
+  wall sits was knowledge duplicated between `walls.ts` and `elevation.ts` and about to be
+  copied a third and fourth time by coverings and second stories. `wallSystem.wallContract()`
+  publishes `bearings` (what a floor above can sit on) and `surfaces` (each wall plane with its
+  opening cutouts), and the test checks the contract against the framing the frozen generator
+  actually emitted — not against itself. **(3) Two normalizers, deliberately:** `normalizeSpec`
+  clamps and reports but NEVER reorders (TD5 — the legacy generator bakes opening input order
+  into member ids, so a helpful sort would silently renumber members the goldens pin);
+  `canonicalizeSpec` does sort, and is used only for presets, serialization and hashing.
+  **(4) `bomSummary` throws past its stage plan** (TD18) instead of filtering: hand a tower's
+  members to the legacy 11-stage plan and the old code silently dropped everything above stage
+  11, producing a bill that was short and looked fine. Also this phase: `doctrine.ts` mirrors
+  the frozen modules' magnitudes rather than moving them, with a test asserting the mirror is
+  true, so the two cannot drift; DRESSED/BF_PER_LF gained the TIMBER-2 sizes with a lockstep
+  test making the emitters' `{1.5,3.5}` fallback unreachable in real output; and
+  `timber2-number-free` scans the new generator surface for inline magnitudes the way
+  `number-free.test.ts` already does for SAP.
+
+- **D39 — TIMBER-2 T2: breadth arrives as siblings, and the tests found two real bugs.** Shed
+  and flat roofs, the full coverings system, skid/slab foundations, the small-plan rule, the
+  catalog and runtime card art — all added without the frozen legacy branch moving one byte
+  (the compat goldens stayed exact through every step). Decisions worth recording. **TD6 in
+  practice:** a shed needs a taller wall on its high side, and `generateWalls` is frozen and
+  only makes rectangular walls. Rather than unfreeze it, the ROOF module emits the difference
+  itself — a pony wall above the high cap plate plus rake infill up the two side walls — which
+  is exactly how the legacy roof generator already handles gable-end studs, so the pattern is
+  the repo's own. A test asserts all four cap plates stay at one height, proving the frozen
+  generator was never asked for an unequal wall. **C-9 double-decking avoided:** the gable's
+  stage-9 deck comes from the frozen roof generator, so the covering pass decks only the NEW
+  roof kinds — otherwise the roof would be sheathed twice and the bill would silently double;
+  the test pins the `RF-` prefix on legacy panels and `CV-` on the new ones. **Two real bugs,
+  both found by tests rather than by eye:** (1) the seeded sweep caught a NEGATIVE post length
+  at crawl heights below ~0.65 ft — the built-up girder hangs 9 1/4 in below the sill, so a
+  shallower crawl buries its posts; the `crawlFt` bound is now floored at 1 ft with the
+  geometry, not a preference, recorded as the reason. (2) The C-5 conservation check caught
+  board siding billing a third of a square foot heavy per wall: boards were spaced at a
+  computed cell width but billed at their nominal 9 1/4 in face. Boards now run at their true
+  dressed width with the last one ripped — what happens on site — and the arithmetic closes to
+  1e-6 sf. **Thumbnails (TD11):** runtime SVG projected from the engine's own members, so no
+  build step, no asset files, and no possible drift from the structure depicted. First cut blew
+  the 140 KB budget at 147 KB by drawing all twelve edges of every 1.5-in stud; thin members
+  now draw as centerlines, which is both 4x smaller and more legible at card size. **The
+  number-free gate earned its keep** — it rejected a dozen inline constants during this phase,
+  which became either cited doctrine entries or a named `TOLERANCE` block for the genuine
+  geometry bookkeeping (z-fight lifts, sliver minimums) that no manual has an opinion about.
+
+- **D40 — TIMBER-2 T3: the app opens on a picker, and the browser caught four bugs the unit
+  tests could not.** The UI is now a package (`src/ui/woodframe/*`) with everything testable
+  kept pure and node-tested — cutaway plane math, camera rigs, session store (injected
+  storage), router/share codec, config schema, label dictionaries — and a thin DOM layer over
+  it (picker, studio, boot). happy-dom is not installed at the root and adding it needs a
+  lockfile change, so the DOM layer is verified in a REAL browser via Playwright instead,
+  which is stronger than a shim and caught things a shim would not have. Four real bugs, all
+  found by looking at pixels: **(1)** `memberAabb` applied each member's half-LENGTH on all
+  three axes, so a 48-ft girder inflated the bounding box to 69×64×73 ft and every camera
+  framed a phantom — the model rendered as a toy in an empty viewport. Replaced with a proper
+  oriented-box projection (`Σ|R[i][j]|·h[j]`); the box is now the real 48.9×14.8×22.2 and the
+  fit distance dropped from 204 ft to 99. **(2)** Shed rafters were rotated with the wrong
+  sign for Z-running slopes: correct length, correct cut angles, running downhill toward the
+  high wall and sitting above their own deck. Length-and-angle assertions passed it; a
+  direction-vector test now catches it, plus a rafters-under-the-deck test. **(3)** The
+  clip-plane pass forced `side = FrontSide` on EVERY material including the cartoon outline
+  shells, whose entire trick is being back-side — every outline became a solid black box
+  wrapping its member, painting a board-and-batten wall pure black. **(4)** Mobile inputs
+  overflowed the viewport; rows now stack and the model sits above the config panel, because a
+  config panel above the thing it configures makes every edit blind. Also: the cut plane
+  equation exists ONCE and feeds both the renderer and the raycast filter, so clicking through
+  a cut selects what you see; stage scrubbing toggles visibility rather than rebuilding; and
+  `unlockToCustom` preserves the family (a tower stays a tower) with a per-family test.
+## 2026-08-02 — The catalog is complete, and the last three gaps closed the way they should have
+
+T7 finished the roster at 14 cards and T8's leftovers closed behind it. Four things worth
+keeping, three of which are about how a gap gets closed rather than what got built.
+
+**The bunker boundary is now enforced, not just written down.** Plan §2.7 says the
+survivability tool owns how much earth defeats what, and this one owns the wood. That line is
+worth drawing only if crossing it fails a build, so `test/timber2-boundary.test.ts` implements
+§6.4: a word-boundary lexicon over shipped string literals, a publication denylist that makes
+"configuration reference only" testable, and positive assertions that the boundary sentence
+renders on the card, the input's help, the ghost label and the BOM header. It found something on
+its first run — a tower doctrine key named for a word with a survivability meaning. Renamed to
+`ladderClearanceFt`, which is clearer anyway. The gate is scoped to the engine and the
+wood-frame UI: SAP-1's retired app legitimately carries that vocabulary, and gating it would be
+gating the wrong side of the line.
+
+**Header sizing turned out not to be a compat-lock event, and the reason is instructive.** The
+first cut returned the smallest table row that fit — which quietly shaved every 3-ft window from
+a 2x6 to a 2x4 and moved eleven goldens. That is a *weakening* of the standard design, produced
+by a check written to catch openings that are too WIDE. Floored at the doctrine default, the
+function only ever deepens, no golden moves at all, and the only shipped opening past the 2x6
+row already carried an explicit 2x10. **A change that moves a golden is worth re-reading before
+it is worth regenerating.**
+
+It also landed in the right place on the second try. Sizing in `normalizeSpec` broke
+idempotency — the first pass emitted an issue and wrote `headerNominal` into the spec, the
+second saw the value and stayed quiet — and it polluted the user's spec with a value that then
+read as a decision they had made. It belongs in `legacyOpenings`, at the translation into the
+generator's input: the spec the operator holds is untouched, normalization stays pure, and an
+explicit `headerNominal` still wins.
+
+**Ceiling joists are checked now.** The T8 entry above recorded them as a known gap, unchecked
+because the floor table did not apply and no ceiling table existed. There is one now.
+
+**And one gap is left open on purpose.** A hip roof's FRAMING is complete — commons, four hips
+on the diagonal run, and jacks whose constant shortening is asserted against the framing-square
+formula rather than a snapshot (a golden would have frozen the bug as happily as the fix). Its
+COVERING is not: `roofPlanes` treats a hip as a gable and returns two rectangular planes, so a
+hip shows roofing on its long slopes and bare framing on its two triangular ends. Closing it
+needs a tiler that can lay sheet goods on a triangle. The limitation is written at the branch
+that causes it, so the next person finds it before the render does.
+
+## 2026-08-02 — The span checker found a bad header in our own standard design on day one
+
+T8's span check (plan mandate #2) is a lookup against `doctrine.SPAN`, and its governing rule is
+a design decision rather than an implementation detail: **it warns and never resizes.** A tool
+that quietly upsizes a joist to make its own check pass has taught the operator nothing and has
+handed the crew a different building from the one on the drawing they are holding. Every message
+ends with "the tool has NOT changed it", and a test asserts that sentence is there.
+
+Writing it was mostly about not crying wolf, because a checker that fires on the tool's own
+presets is one people learn to scroll past. Three passes to get there:
+
+1. **A joist's clear span is not its length.** FM 5-426 puts a girder down the middle of a
+   building precisely so a 20-ft joist spans 10 ft twice. Checked at full length, every building
+   this tool makes condemns itself.
+2. **Nor is it length over a bay count.** A shed on three skids bears in thirds. The checker now
+   gathers every line a floor can bear on — girders, skids and sills — and takes the LARGEST gap
+   between consecutive ones. Largest, not average: the governing span is the worst one, and this
+   makes no assumption that the lines are evenly spaced.
+3. **A rafter is checked on its horizontal run, not its sloped length**, or the same building at
+   12-in-12 warns where at 2-in-12 it did not, over the same span carrying the same load.
+
+**And then it found something.** The storage shed's 8-ft door had a 2x6 header; the table allows
+5 ft. The engine does not size headers by span — it uses `LUMBER.headerNominal` for every
+opening — and the shed card's "Wide-door header: per span table" lock was describing an
+intention rather than the code. The preset now carries an explicit `headerNominal: '2x10'`, with
+the reason written at the line.
+
+**The gap is recorded, not closed:** header auto-sizing belongs in the engine, and doing it
+properly changes what `generateFrame` emits for any wide opening — which is a compat-lock event
+and needs its own change with the goldens regenerated and a reason. Two other holes are open in
+the same spirit: ceiling joists are NOT checked, because the floor table does not apply to them
+and no ceiling table is in `doctrine` yet (checking them against the wrong table condemned the
+GP building by four tenths of a foot), and the tables themselves are (PH) — which prints with
+every warning, because a warning that overstates its own authority is worse than none.
+
+## 2026-08-02 — Three phases of the catalog, and the same rotation mistake three times
+
+T4, T5 and T6a shipped together: the picker went from 3 cards to 13. What is worth recording
+is not the breadth — TD2 predicted that a hut would be a data change — but the two things the
+work kept teaching.
+
+**One engine, six huts.** SEA hut, SWA hut, B-hut, squad hut, guard shack and the field latrine
+are one `families/hut.ts` that translates a `HutSpec` into the `BuildingSpec` the existing
+engine already builds, then adds girts, the screened band and the riser box. No new framing
+code. The band is the interesting part: it enters as a wall-covering CUTOUT, because siding laid
+over a screened band is a band that does not exist, and `wallContract` grew a `bands` parameter
+so the covering pass can see it. The pit under the latrine is deliberately NOT a member —
+nothing is built out of it — so its depth travels on the spec and prints on the sheet, where a
+digging task belongs.
+
+**The tower is where the safety machinery had to become real.** `subsystems/railings.ts` and
+`subsystems/access.ts` exist as their own modules because the platform family needed them a
+phase later, and because the one decision a caller can get wrong — "does this edge need a rail"
+— should not be theirs. `railRequired()` answers it from the deck height. A ladder's rails are
+generated running 36 in past the landing, which is the most commonly omitted part of a
+field-built ladder and the part you hold when your feet leave the top rung. Ask for a ladder at
+24 or 32 ft and `normalizeSpec` switches it to a switchback stair and says so in the banner —
+checked in a browser, not only in a test.
+
+**And the lesson, which arrived three times in one session.** A member's rotation is not a thing
+to eyeball:
+
+  1. Roof tiles carried a spurious `-Math.sign(upSlope.z)`, so the near slope's courses ran
+     downhill under the deck.
+  2. `screenPanel` and `roofingCourse` were both drawn through `plywoodSheet`, so a screened
+     band and a roll roof came out as tan boards — a wall where the drawing says an opening.
+  3. Ramp planks were emitted at rotation zero, so they stayed horizontal and a 24-ft ramp read
+     as a fan of sticks in mid-air.
+
+Every one of them is the same shape: composing `Ry(yaw)·Rx(rx)` sends a member's face-width axis
+to `(sin rx·sin yaw, cos rx, sin rx·cos yaw)`, and there is exactly one `rx` that puts it on the
+surface you meant. Guessing produces something that looks nearly right from the default camera
+and is wrong from every other angle. The derivation is now written down at each placement
+helper. **None of these were caught by a test, because no test renders** — they were caught by
+looking, and by a numeric probe that walks a coordinate and prints which surface is on top.
+That probe is the cheap version of looking and is worth reaching for before theorising.
+
+The number-free gate earned its keep across all three phases: every inline magnitude in five new
+generators was caught and moved into `doctrine.ts` with a citation, including the ones that are
+genuinely tolerances rather than doctrine (those now say so in a comment where they live).
+
+## 2026-08-02 — The wood-frame tool is two apps now, and they are not the same tool twice
+
+The owner's instruction was explicit: *"we should actually branch here. one sub app should be
+woodframe construction learning, and one should be woodframe construction planning."* Learning
+gets the flashcards and the tools, but is a teaching aid — *"its not meant to show manhours or
+things for the command, you get the principle and expand on it."* Planning is *"explicitly made
+for 1371s to be able to choose everything they want... all the way down to the hardware, the
+quantity, everything about it"*, ending in *"a clean sheet for their command to send off or
+print out."*
+
+**ONE code base, two pages.** `src/ui/woodframe/mode.ts` reads `<body data-app>` and exports a
+short list of feature predicates; `woodframe-plan.html` and `woodframe-learn.html` are the same
+shell with a different flag, a different title, and the same script. Forking the studio was the
+obvious alternative and it is the wrong one: two copies of a 500-line workbench drift, and the
+half that gets less attention rots. The difference between the two products is now a list you
+can read in one file instead of a diff nobody re-reads.
+
+`woodframe.html` stays, as a shim that forwards to the planning app carrying `location.hash`
+across. It is deployed and linked and someone has a shared build URL pointing at it; deleting it
+to make the naming tidy would 404 every one of those.
+
+**What planning gained, because it had to.** A cut list tells a crew what to saw; it does not
+tell them how many pounds of 16d to draw. `src/timber/fasteners.ts` reads the nailing schedule
+each member already carries — "2-16d ea end", `8d @ 6" edges / 12" field` — and turns it into
+counts and weights. This is an AGGREGATION over the same members the scene draws (I-3), not a
+second model of how the building is fastened, and those strings are byte-pinned by the compat
+goldens, so they cannot drift under it silently. The parser's rules encode real distinctions
+that a naive scan gets wrong: an "or" is an alternative and is billed once, not twice; the ridge
+board's "rafters 3-16d ea" is the same joint each rafter already bought and is skipped rather
+than double-counted. **Anything it cannot read is printed, not dropped** — a supply list that
+silently omits what it did not understand is worse than a short one, because it looks complete —
+and a test walks every member of a shipped family and fails if any schedule goes unread.
+
+`src/ui/woodframe/sheet.ts` is the deliverable: one document with the structure, the effort, a
+still of the view the operator actually set up, the build sequence, the cut list, what to draw
+from supply, and a signature block. Two refusals are deliberate. Nothing is pre-filled — unit,
+date, prepared-by and approver are blank lines, because a document that signs itself is one
+nobody checked. And every (PH) stays visible, including on the labor rates, because the whole
+point of a command sheet is that the person signing it can see which numbers have been
+page-checked and which have not.
+
+**What learning gained, and what it deliberately does not have.** Flashcards, generated from the
+model on screen rather than typed into a list — change the roof to a shed and the rafter cards
+go away, add a basement and stair cards appear, so a student drills the building in front of
+them. Card fronts are always the DESCRIPTION or the JOB and the back is the name and the size,
+because the earlier direction ("what carries this? — 2x4") is unanswerable when six roles share
+a nominal. Man-hours are gone from the stage panel; there is no hardware take-off and no command
+sheet. Board-feet stay, because that is a property of the building rather than an estimate. A
+classroom model that prints labor projections invites someone to hand a lesson to their CO.
+
+## 2026-08-02 — Adding a window should be one click, and editing one should not delete them all
+
+The openings editor put six controls on a line — a type popup and five bare number inputs —
+under a header strip that only lined up with the first row. Four windows on a wall was twenty
+anonymous numbers. The owner's note was "why are the adding things so confusing, should be
+incredibly simple", which is the correct standard, so it was rebuilt around four rules:
+
+- **Adding is one click.** `+ Door` `+ Window` `+ Vent` each place a real rough opening at the
+  standard-design size the presets already use (a door is 3'-0" x 6'-8"), positioned in the
+  middle of the widest clear stretch of that wall. Nothing has to be typed for the result to be
+  correct, and a new opening never lands on top of an existing one — having the tool's first
+  act be making a mess the user has to clean up is worse than not helping at all.
+- **A placed opening reads as a sentence**, in feet and inches: "Door · 3' x 6'-8" · 12'-3" from
+  left". No column headers to look up, no decimal feet to convert.
+- **Editing is named fields**, one row unfolded at a time, and only the fields that apply — a
+  door has no sill, so a door never shows a sill box.
+- **Only the warning that can actually happen.** `normalizeSpec` already slides an opening back
+  inside its wall and drops one too wide to fit, with a message each time, so a row warning
+  about those would be decoration. Overlap is the one condition normalization deliberately does
+  NOT fix (TD5 keeps opening order verbatim, and silently reordering someone's wall is worse),
+  so overlap is what the row says out loud, naming the neighbour it collides with.
+
+**And the bug the rewrite exposed.** `renderConfigPanel` wired its controls with
+`panel.querySelectorAll('[data-path]')`. The openings editor's container is a `<div>` that also
+carries `data-path`, to say which spec branch it edits. `change` bubbles — so committing a value
+anywhere inside the openings editor re-entered the config handler with `el` bound to that div,
+fell through to the final `setPath(spec, path, el.value)`, and wrote **undefined over
+`stories.0.openings`**. Every door and window in the building disappeared the moment you
+adjusted one of them: 741 members to 625, no error, no message. It had been shipping since the
+panel was written; the old editor simply never re-rendered itself afterwards, so nothing on
+screen contradicted the model and the deletion was only visible if you were counting members.
+The selector is now `input[data-path], select[data-path]`.
+
+Two smaller repairs came with it: the per-opening handlers re-read `current.spec` instead of
+closing over `stories[0]` (which `regenerate()` replaces with the normalized copy on every
+edit, so anything captured is one edit stale), and `dims.lengthFt` / `dims.widthFt` lost their
+"engine envelope (multi-girder > 24 ft is IN-later)" hint, which was a note to ourselves printed
+where a Marine reads what the limit means.
+
+**The lesson:** an attribute that means "this element identifies a spec path" and a selector
+that means "this element edits a spec path" are different claims, and using one attribute for
+both let a container impersonate a control. Wire handlers to the tags that can actually hold a
+value.
+
+## 2026-08-02 — "What the heck are these boards on the roof?"
+
+Driving the deployed build, the owner pointed at the roof of the GP building. It was covered
+in wide tan boards. Four separate faults were stacked under that one question, and each was
+invisible until the one above it was cleared — worth recording because the sequence is the
+lesson, not any single fix.
+
+1. **The plywood face texture was drawn at the wrong scale.** Twelve wavy grain lines across a
+   canvas that maps to an 8-ft sheet is a dark stripe every eight inches with five inches of
+   wobble. Rewritten with every dimension stated in inches of real sheet: half-inch grain, an
+   eighth of an inch of wander, and the only high-contrast mark is a soft joint inset at the
+   perimeter so a rank of 4x8s reads as panels. Knots and mineral streaks came OUT — one
+   texture instance is shared by every sheet, so a recognisable shape repeats identically on
+   all thirty-six roof panels and stops looking like wood.
+2. **Roll roofing was being drawn as plywood.** `buildMemberMesh` routed `roofingCourse`
+   through `plywoodSheet`, so five overlapping courses of mineral-surfaced asphalt came out as
+   five overlapping tan boards. They now have their own material — granulated near-black for
+   roll goods, ribbed galvanised for corrugated, tiled at the material's real width.
+3. **Every roof tile was rotated with a spurious sign.** `-Math.sign(upSlope.z) * (PI/2 -
+   pitch)` corrected the far slope a second time (its yaw is already PI, which does the
+   mirroring) and tilted the near slope BACKWARDS: its courses ran downhill, sinking under the
+   deck at their upper edge and lifting off it at their lower one. The deck striped through
+   between them, which is what the tan bands actually were. Composing Ry(yaw)·Rx(rx) admits
+   exactly one answer, `rx = +(PI/2 - pitch)`, and the derivation is now written at the
+   placement helper so the next person does not re-guess it.
+4. **The roofing did not know the deck was there.** C-9 keeps the gable's stage-9 deck in the
+   frozen `roof.ts`, so `building.ts` passed `deck: 'none'` to the covering pass to avoid
+   billing it twice — and `deckThick`, the term that lifts roofing over the deck, went to zero
+   with it. The first course sat half an inch INSIDE the deck. `deckLaidElsewhere` now says
+   "someone else placed this" without also claiming it is absent.
+
+Two smaller things fell out of the same pass. Lapped courses were all placed at one lift, so
+the shared six inches of every lap was two slabs in the same plane, z-fighting; each course now
+rides on the ones beneath it. And the top course kept its full 36-in width past the ridge —
+`Math.max(slopeLength, v0 + exposure)` — leaving nine inches of roofing standing in mid-air
+above the peak, which is the stepped lip the aerial shots caught. It is cut at the ridge now.
+
+Scene lighting was rebalanced in the same commit for a related reason: hemi 1.1 + ambient 0.55
++ sun 1.0 pinned every surface to the top band of the toon ramp, so a roof plane, a wall, and a
+gable end came out the same value. The sun now carries the light and the fills only keep the
+shaded sides off black.
+
+**The lesson:** the owner reported ONE symptom and there were four causes, three of them in
+code that had passed review and 366 green tests. Geometry that is never looked at is geometry
+that is not checked — the sign error had been shipping since T2, and no test could see it
+because no test renders. The numeric probe that found it (walk z across the slope, print which
+surface is on top) is the cheap version of looking, and is worth reaching for before theorising.
+
+## 2026-08-02 — Two sessions built T0 twice, and the second copy caught a real bug
+
+This branch and `main` each executed TIMBER-2 T0 independently, so the repo briefly held two
+snapshots of `generateFrame`: a 12-case set with a hashed option matrix (this branch, the
+anchor `test/timber2-compat.test.ts` diffs the new engine against forever) and a 17-case set
+with a sha256 manifest (`main`, which also byte-locks the goldens themselves against silent
+edits). Merging them, the obvious move was to delete one. Both were kept instead, the first
+renamed to `test/goldens/frame-compat/`, because on the very first joint run the second set
+failed on two cases the first never covered — which is the entire argument for redundant
+locks, made concretely.
+
+**What it caught.** `negative-crawl` (crawlFt −0.5) and `slab-on-grade-crawl0` (crawlFt 0)
+each gained **12 `4x4` posts**. Neither fixture names a foundation, so both are PIER
+foundations. Pre-T1, `floor.ts` computed `postLen = sillBottom − gradeY`, and with a crawl
+shallower than the built-up girder's 9 1/4 in of hang the length came out ≤ 0.1 ft, so the
+`if (postLen > 0.1)` guard **skipped every post** — emitting twelve concrete pads and a
+building resting on nothing. The guard existed to avoid a negative-length member and did its
+job; what it did not do was tell anyone the foundation had vanished.
+
+T1 routed `generateFrame` through `normalizeSpec`, which floors `foundation.crawlFt` at 1 ft
+for exactly this reason (the bound is geometry — the girder's depth below the sill — and is
+stated once, in `SPEC_PATH_DEFS`). The clamp raises a `clamped` issue the caller can surface,
+so the number is corrected out loud rather than silently. Both goldens were regenerated in
+this commit, which is the sanctioned path (deliberate change + a recorded reason); the kill
+criterion K-F1 forbids regenerating to make red go green, not regenerating a change you can
+explain. `slab-on-grade-crawl0` is misnamed and stays that way for now: it never set a
+foundation, so it was always piers-with-zero-crawl, and renaming a fixture rewrites its sha
+for no gain.
+
+**The lesson, which is the same shape as the offline-gate entry above:** a guard that skips
+work when its input is degenerate is not a check. `postLen > 0.1` and `dist/ not present —
+pass` are the same failure wearing different clothes.
+
 ## 2026-08-02 — The offline gate was passing without checking anything
 
 The first run of `.github/workflows/toolkit.yml` (TIMBER-2 T0) came back green on all

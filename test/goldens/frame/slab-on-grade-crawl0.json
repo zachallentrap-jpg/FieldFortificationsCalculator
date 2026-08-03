@@ -23,7 +23,7 @@
    "cutLength": 16,
    "position": [
     0.22916666666666666,
-    -1.125,
+    -2.125,
     0.22916666666666666
    ],
    "rotation": [
@@ -35,6 +35,30 @@
    "grade": "No. 2 common",
    "nailing": "poured on undisturbed soil (PH)",
    "doctrineRef": "FM 5-426 post footers (PH page)"
+  },
+  {
+   "id": "FL-post-01",
+   "role": "post",
+   "nominal": "4x4",
+   "actual": {
+    "w": 3.5,
+    "d": 3.5
+   },
+   "cutLength": 11.999999999999998,
+   "position": [
+    0.22916666666666666,
+    -1.2916666666666665,
+    0.22916666666666666
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "16d common (PH)",
+   "doctrineRef": "FM 5-426 post & footer spacing 6-10 ft (PH page)"
   },
   {
    "id": "FL-footing-02",
@@ -47,7 +71,7 @@
    "cutLength": 16,
    "position": [
     0.22916666666666666,
-    -1.125,
+    -2.125,
     15.770833333333334
    ],
    "rotation": [
@@ -59,6 +83,30 @@
    "grade": "No. 2 common",
    "nailing": "poured on undisturbed soil (PH)",
    "doctrineRef": "FM 5-426 post footers (PH page)"
+  },
+  {
+   "id": "FL-post-02",
+   "role": "post",
+   "nominal": "4x4",
+   "actual": {
+    "w": 3.5,
+    "d": 3.5
+   },
+   "cutLength": 11.999999999999998,
+   "position": [
+    0.22916666666666666,
+    -1.2916666666666665,
+    15.770833333333334
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "16d common (PH)",
+   "doctrineRef": "FM 5-426 post & footer spacing 6-10 ft (PH page)"
   },
   {
    "id": "FL-footing-03",
@@ -71,7 +119,7 @@
    "cutLength": 16,
    "position": [
     6.743055555555556,
-    -1.125,
+    -2.125,
     0.22916666666666666
    ],
    "rotation": [
@@ -83,6 +131,30 @@
    "grade": "No. 2 common",
    "nailing": "poured on undisturbed soil (PH)",
    "doctrineRef": "FM 5-426 post footers (PH page)"
+  },
+  {
+   "id": "FL-post-03",
+   "role": "post",
+   "nominal": "4x4",
+   "actual": {
+    "w": 3.5,
+    "d": 3.5
+   },
+   "cutLength": 11.999999999999998,
+   "position": [
+    6.743055555555556,
+    -1.2916666666666665,
+    0.22916666666666666
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "16d common (PH)",
+   "doctrineRef": "FM 5-426 post & footer spacing 6-10 ft (PH page)"
   },
   {
    "id": "FL-footing-04",
@@ -95,7 +167,7 @@
    "cutLength": 16,
    "position": [
     6.743055555555556,
-    -1.125,
+    -2.125,
     15.770833333333334
    ],
    "rotation": [
@@ -107,6 +179,30 @@
    "grade": "No. 2 common",
    "nailing": "poured on undisturbed soil (PH)",
    "doctrineRef": "FM 5-426 post footers (PH page)"
+  },
+  {
+   "id": "FL-post-04",
+   "role": "post",
+   "nominal": "4x4",
+   "actual": {
+    "w": 3.5,
+    "d": 3.5
+   },
+   "cutLength": 11.999999999999998,
+   "position": [
+    6.743055555555556,
+    -1.2916666666666665,
+    15.770833333333334
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "16d common (PH)",
+   "doctrineRef": "FM 5-426 post & footer spacing 6-10 ft (PH page)"
   },
   {
    "id": "FL-footing-05",
@@ -119,7 +215,7 @@
    "cutLength": 16,
    "position": [
     13.256944444444445,
-    -1.125,
+    -2.125,
     0.22916666666666666
    ],
    "rotation": [
@@ -131,6 +227,30 @@
    "grade": "No. 2 common",
    "nailing": "poured on undisturbed soil (PH)",
    "doctrineRef": "FM 5-426 post footers (PH page)"
+  },
+  {
+   "id": "FL-post-05",
+   "role": "post",
+   "nominal": "4x4",
+   "actual": {
+    "w": 3.5,
+    "d": 3.5
+   },
+   "cutLength": 11.999999999999998,
+   "position": [
+    13.256944444444445,
+    -1.2916666666666665,
+    0.22916666666666666
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "16d common (PH)",
+   "doctrineRef": "FM 5-426 post & footer spacing 6-10 ft (PH page)"
   },
   {
    "id": "FL-footing-06",
@@ -143,7 +263,7 @@
    "cutLength": 16,
    "position": [
     13.256944444444445,
-    -1.125,
+    -2.125,
     15.770833333333334
    ],
    "rotation": [
@@ -157,6 +277,30 @@
    "doctrineRef": "FM 5-426 post footers (PH page)"
   },
   {
+   "id": "FL-post-06",
+   "role": "post",
+   "nominal": "4x4",
+   "actual": {
+    "w": 3.5,
+    "d": 3.5
+   },
+   "cutLength": 11.999999999999998,
+   "position": [
+    13.256944444444445,
+    -1.2916666666666665,
+    15.770833333333334
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "16d common (PH)",
+   "doctrineRef": "FM 5-426 post & footer spacing 6-10 ft (PH page)"
+  },
+  {
    "id": "FL-footing-07",
    "role": "footing",
    "nominal": "conc pad 16x16x8",
@@ -167,7 +311,7 @@
    "cutLength": 16,
    "position": [
     19.770833333333336,
-    -1.125,
+    -2.125,
     0.22916666666666666
    ],
    "rotation": [
@@ -181,6 +325,30 @@
    "doctrineRef": "FM 5-426 post footers (PH page)"
   },
   {
+   "id": "FL-post-07",
+   "role": "post",
+   "nominal": "4x4",
+   "actual": {
+    "w": 3.5,
+    "d": 3.5
+   },
+   "cutLength": 11.999999999999998,
+   "position": [
+    19.770833333333336,
+    -1.2916666666666665,
+    0.22916666666666666
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "16d common (PH)",
+   "doctrineRef": "FM 5-426 post & footer spacing 6-10 ft (PH page)"
+  },
+  {
    "id": "FL-footing-08",
    "role": "footing",
    "nominal": "conc pad 16x16x8",
@@ -191,7 +359,7 @@
    "cutLength": 16,
    "position": [
     19.770833333333336,
-    -1.125,
+    -2.125,
     15.770833333333334
    ],
    "rotation": [
@@ -205,6 +373,30 @@
    "doctrineRef": "FM 5-426 post footers (PH page)"
   },
   {
+   "id": "FL-post-08",
+   "role": "post",
+   "nominal": "4x4",
+   "actual": {
+    "w": 3.5,
+    "d": 3.5
+   },
+   "cutLength": 11.999999999999998,
+   "position": [
+    19.770833333333336,
+    -1.2916666666666665,
+    15.770833333333334
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "16d common (PH)",
+   "doctrineRef": "FM 5-426 post & footer spacing 6-10 ft (PH page)"
+  },
+  {
    "id": "FL-footing-09",
    "role": "footing",
    "nominal": "conc pad 16x16x8",
@@ -215,7 +407,7 @@
    "cutLength": 16,
    "position": [
     0.22916666666666666,
-    -1.125,
+    -2.125,
     8
    ],
    "rotation": [
@@ -227,6 +419,30 @@
    "grade": "No. 2 common",
    "nailing": "poured on undisturbed soil (PH)",
    "doctrineRef": "FM 5-426 post footers (PH page)"
+  },
+  {
+   "id": "FL-post-09",
+   "role": "post",
+   "nominal": "4x4",
+   "actual": {
+    "w": 3.5,
+    "d": 3.5
+   },
+   "cutLength": 4.249999999999998,
+   "position": [
+    0.22916666666666666,
+    -1.6145833333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "16d common (PH)",
+   "doctrineRef": "FM 5-426 post & footer spacing 6-10 ft (PH page)"
   },
   {
    "id": "FL-footing-10",
@@ -239,7 +455,7 @@
    "cutLength": 16,
    "position": [
     6.743055555555556,
-    -1.125,
+    -2.125,
     8
    ],
    "rotation": [
@@ -251,6 +467,30 @@
    "grade": "No. 2 common",
    "nailing": "poured on undisturbed soil (PH)",
    "doctrineRef": "FM 5-426 post footers (PH page)"
+  },
+  {
+   "id": "FL-post-10",
+   "role": "post",
+   "nominal": "4x4",
+   "actual": {
+    "w": 3.5,
+    "d": 3.5
+   },
+   "cutLength": 4.249999999999998,
+   "position": [
+    6.743055555555556,
+    -1.6145833333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "16d common (PH)",
+   "doctrineRef": "FM 5-426 post & footer spacing 6-10 ft (PH page)"
   },
   {
    "id": "FL-footing-11",
@@ -263,7 +503,7 @@
    "cutLength": 16,
    "position": [
     13.256944444444445,
-    -1.125,
+    -2.125,
     8
    ],
    "rotation": [
@@ -277,6 +517,30 @@
    "doctrineRef": "FM 5-426 post footers (PH page)"
   },
   {
+   "id": "FL-post-11",
+   "role": "post",
+   "nominal": "4x4",
+   "actual": {
+    "w": 3.5,
+    "d": 3.5
+   },
+   "cutLength": 4.249999999999998,
+   "position": [
+    13.256944444444445,
+    -1.6145833333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "16d common (PH)",
+   "doctrineRef": "FM 5-426 post & footer spacing 6-10 ft (PH page)"
+  },
+  {
    "id": "FL-footing-12",
    "role": "footing",
    "nominal": "conc pad 16x16x8",
@@ -287,7 +551,7 @@
    "cutLength": 16,
    "position": [
     19.770833333333336,
-    -1.125,
+    -2.125,
     8
    ],
    "rotation": [
@@ -299,6 +563,30 @@
    "grade": "No. 2 common",
    "nailing": "poured on undisturbed soil (PH)",
    "doctrineRef": "FM 5-426 post footers (PH page)"
+  },
+  {
+   "id": "FL-post-12",
+   "role": "post",
+   "nominal": "4x4",
+   "actual": {
+    "w": 3.5,
+    "d": 3.5
+   },
+   "cutLength": 4.249999999999998,
+   "position": [
+    19.770833333333336,
+    -1.6145833333333333,
+    8
+   ],
+   "rotation": [
+    0,
+    0,
+    1.5707963267948966
+   ],
+   "stage": 1,
+   "grade": "No. 2 common",
+   "nailing": "16d common (PH)",
+   "doctrineRef": "FM 5-426 post & footer spacing 6-10 ft (PH page)"
   },
   {
    "id": "FL-sill-01",
@@ -6847,6 +7135,6 @@
   "subfloorTop": 0,
   "joistTop": -0.0625,
   "sillTop": -0.6666666666666666,
-  "gradeY": -0.7916666666666666
+  "gradeY": -1.7916666666666665
  }
 }
