@@ -462,3 +462,20 @@
   .pktdlg small { font-size: 11px; font-weight: 400; color: var(--label-2); line-height: 1.4; }
   .pktdlg-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 3px; }
   .pktdlg-row .chip { min-height: 32px; padding: 6px 14px; }
+
+  /* ── First-run hint over the Learning viewport ──────────────────────────
+     pointer-events: none is load-bearing: the pill is asking for a tap and must never be the
+     thing that swallows it. It floats clear of the bottom edge so it misses both the orbit
+     gesture's natural start point and the iOS home indicator. */
+  .tap-hint {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    pointer-events: none; white-space: nowrap; z-index: 5;
+    font-size: 12.5px; font-weight: 560; color: var(--label);
+    background: var(--chrome); -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    padding: 8px 14px; border-radius: 999px;
+    box-shadow: var(--shadow-2), inset 0 0 0 0.5px var(--sep-strong);
+    animation: tap-hint-in 0.5s 0.8s ease-out backwards;
+  }
+  @keyframes tap-hint-in { from { opacity: 0; transform: translateX(-50%) translateY(6px); } }
+  @media (prefers-reduced-motion: reduce) { .tap-hint { animation: none; } }

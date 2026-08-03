@@ -338,18 +338,13 @@ function questionBody(q: Question, deckId: string, s: Session, style: DeckStyle)
     // the flip would mean animating in something that was not there, and the browser has no way
     // to tween that. `backface-visibility` hides whichever side is pointing away.
     return `<div class="flipcard${s.revealed ? ' turned' : ''}" data-flip="1" role="button" tabindex="0"
-              aria-label="${s.revealed ? 'Showing the answer. Click to turn the card back.' : 'Click to turn the card over.'}">
+              aria-label="${flipAria(s.revealed)}">
         <div class="inner">
           <div class="side front">${artBlock}</div>
           <div class="side back-face">${cardBack(q.card, style)}</div>
         </div>
       </div>
-      ${s.revealed
-        ? `<div class="grade">
-             <button class="btn miss" data-grade="0">Missed it</button>
-             <button class="btn good" data-grade="1">Got it</button>
-           </div>`
-        : '<p class="turnhint">Tap the card to turn it over</p>'}`;
+      <div class="flipcontrols">${flipControlsHtml(s.revealed)}</div>`;
   }
 
   if (q.mode === 'flip-reverse') {
@@ -390,6 +385,44 @@ function questionBody(q: Question, deckId: string, s: Session, style: DeckStyle)
     ${s.picked === null ? '' : '<div class="grade" style="grid-template-columns:1fr"><button class="btn primary wide" data-next="1">Next</button></div>'}`;
 }
 
+const flipAria = (revealed: boolean): string =>
+  revealed ? 'Showing the answer. Click to turn the card back.' : 'Click to turn the card over.';
+
+/**
+ * The controls UNDER a flip card: the grade pair once it is turned, a hint until then. Kept in
+ * one function because the flip swaps them in place — see `toggleFlip`.
+ */
+function flipControlsHtml(revealed: boolean): string {
+  return revealed
+    ? `<div class="grade">
+         <button class="btn miss" data-grade="0">Missed it<kbd>1</kbd></button>
+         <button class="btn good" data-grade="1">Got it<kbd>2</kbd></button>
+       </div>`
+    : '<p class="turnhint">Tap the card to turn it over<span class="kbdhint"> — or press Space</span></p>';
+}
+
+/**
+ * Turn the card over IN PLACE — the one interaction in the drill that must not re-render.
+ *
+ * The first cut of the flip called `render()`, which rebuilds `app.innerHTML` with `.turned`
+ * already present — and a CSS transition cannot tween an element that is CREATED in its end
+ * state, so the marquee interaction of the whole trainer silently never animated: the card
+ * snapped. Toggling the class on the LIVE node is what makes the turn a turn, and it also
+ * keeps scroll position and keyboard focus (the card keeps being the focused element), which
+ * a full re-render was quietly throwing away every time.
+ */
+function toggleFlip(): void {
+  const s = session;
+  if (!s) return;
+  const card = app.querySelector<HTMLElement>('.flipcard');
+  const controls = app.querySelector<HTMLElement>('.flipcontrols');
+  if (!card || !controls) { s.revealed = !s.revealed; render(); return; }
+  s.revealed = !s.revealed;
+  card.classList.toggle('turned', s.revealed);
+  card.setAttribute('aria-label', flipAria(s.revealed));
+  controls.innerHTML = flipControlsHtml(s.revealed);
+}
+
 function renderDrill(deckId: string): void {
   if (!session || session.deckId !== deckId) startSession(deckId);
   const s = session!;
@@ -428,6 +461,10 @@ function renderDrill(deckId: string): void {
         ${questionBody(q, deckId, s, entry.style)}
       </div>
     </div>`;
+  // Focus lands on the card itself, so Space works for the WHOLE session — the innerHTML swap
+  // between cards otherwise dropped focus on <body> and stranded a keyboard user at the top of
+  // the document after every single answer.
+  app.querySelector<HTMLElement>('.flipcard')?.focus({ preventScroll: true });
 }
 
 function grade(got: boolean, via: QuizMode): void {
@@ -572,13 +609,36 @@ function renderSequence(familyId: string): void {
 
 // ── Events ───────────────────────────────────────────────────────────────────
 
+/**
+ * The whole drill from the keyboard, without hunting for focus:
+ *
+ *   SPACE / ENTER   turn the card over (and back — a second look is free)
+ *   1 / ArrowLeft   missed it          2 / ArrowRight   got it
+ *
+ * The grade keys work from anywhere in the drill, not only with the card focused, because a
+ * full re-render between cards used to drop focus on <body> and strand a keyboard user at the
+ * top of the document. Real buttons keep their native activation: Space with a button focused
+ * is that button's press, never intercepted.
+ */
 app.addEventListener('keydown', (ev) => {
-  if (ev.key !== 'Enter' && ev.key !== ' ') return;
-  const card = (ev.target as HTMLElement).closest<HTMLElement>('[data-flip]');
-  if (!card || !session) return;
-  ev.preventDefault();
-  session.revealed = !session.revealed;
-  render();
+  const s = session;
+  const q = s?.question;
+  if (!s || !q || !isSelfGraded(q.mode)) return;
+  const t = ev.target as HTMLElement;
+  if (t.closest('input, select, textarea')) return;
+
+  if (ev.key === '1' || ev.key === 'ArrowLeft' || ev.key === '2' || ev.key === 'ArrowRight') {
+    if (!s.revealed) return; // grading an unseen answer is not a thing
+    ev.preventDefault();
+    grade(ev.key === '2' || ev.key === 'ArrowRight', q.mode);
+    advance();
+    return;
+  }
+  if ((ev.key === ' ' || ev.key === 'Enter') && !t.closest('button')) {
+    ev.preventDefault();
+    if (q.mode === 'flip') toggleFlip();
+    else { s.revealed = !s.revealed; render(); }
+  }
 });
 
 app.addEventListener('click', (ev) => {
@@ -628,7 +688,7 @@ app.addEventListener('click', (ev) => {
   if (el.dataset['reveal']) { s.revealed = true; render(); return; }
   // Turning the card is not answering it: the grade is still the learner's to give, so a flip
   // toggles and nothing is recorded until they say whether they had it.
-  if (el.dataset['flip']) { s.revealed = !s.revealed; render(); return; }
+  if (el.dataset['flip']) { toggleFlip(); return; }
   if (el.dataset['next']) { advance(); return; }
 
   const gradeAttr = el.dataset['grade'];

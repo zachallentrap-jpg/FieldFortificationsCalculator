@@ -122,8 +122,33 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
   const persp = new THREE.PerspectiveCamera(40, 1, 0.1, 800);
   const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, -400, 800);
   let camera: THREE.Camera = persp;
-  let controls = new OrbitControls(persp, renderer.domElement);
-  controls.enableDamping = true;
+  /**
+   * One place configures every OrbitControls this studio ever makes (the rig switch between
+   * perspective and orthographic disposes and recreates them, so settings applied only at boot
+   * silently vanished on the first Plan-view click).
+   *
+   * The polar clamp is the finding from watching someone orbit: nothing stopped the camera
+   * going UNDER the ground plane, and the reward for doing so is a screen-filling grey
+   * underside with the building gone — a state that looks like a crash and that a trackpad
+   * fling lands in easily. 99° leaves a deliberate few degrees below level, enough to look up
+   * under a pier deck or a ramp, not enough to leave the world.
+   */
+  const tuneControls = (c: OrbitControls): OrbitControls => {
+    c.enableDamping = true;
+    return c;
+  };
+  /**
+   * The camera never goes underground. `maxPolarAngle` cannot express this — it bounds the
+   * ANGLE around the target, and with the target at mid-building height and ninety feet of
+   * orbit distance, even a few degrees below level dives the camera well under grade. So the
+   * floor is on the camera's own height, applied after every controls update: OrbitControls
+   * recomputes its spherical state from the actual position each frame, so nudging y up is a
+   * legitimate input to it, not a fight with it — the orbit simply flattens out at eye level
+   * instead of leaving the world. Half a foot, not zero, so the grazing view along the ground
+   * still shows the ground's top face rather than z-fighting with it.
+   */
+  const EYE_FLOOR_FT = 0.5;
+  let controls = tuneControls(new OrbitControls(persp, renderer.domElement));
 
   const group = new THREE.Group();
   scene.add(group);
@@ -392,8 +417,7 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     if (next !== camera) {
       controls.dispose();
       camera = next;
-      controls = new OrbitControls(camera as THREE.PerspectiveCamera, renderer.domElement);
-      controls.enableDamping = true;
+      controls = tuneControls(new OrbitControls(camera as THREE.PerspectiveCamera, renderer.domElement));
     }
     camera.position.set(...rig.position);
     camera.up.set(...rig.up);
@@ -562,6 +586,29 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
 
   // ── Picking ────────────────────────────────────────────────────────────────
 
+  // ── First-run hint ─────────────────────────────────────────────────────────
+  //
+  // The Learning app's whole promise is "tap any piece to find out what it is", and nothing on
+  // a fresh viewport says so — a 3D scene reads as a picture until something proves it is not.
+  // One pill, above the model, once ever: it ignores the pointer entirely (so it can never
+  // block the tap it is asking for), disappears on the first successful pick, and never comes
+  // back. Its own localStorage key rather than the versioned session store, because a hint is
+  // not state worth migrating.
+  const TAP_HINT_KEY = 'timber.hint.tap-piece';
+  let tapHint: HTMLElement | null = null;
+  if (FEATURES.flashcards && !window.localStorage.getItem(TAP_HINT_KEY)) {
+    tapHint = document.createElement('div');
+    tapHint.className = 'tap-hint';
+    tapHint.textContent = 'Tap any piece to see what it is';
+    dom.viewport.appendChild(tapHint);
+  }
+  function dismissTapHint(): void {
+    if (!tapHint) return;
+    tapHint.remove();
+    tapHint = null;
+    try { window.localStorage.setItem(TAP_HINT_KEY, '1'); } catch { /* private mode: shows again, harmless */ }
+  }
+
   const raycaster = new THREE.Raycaster();
 
   /** The member under the pointer, or null. One implementation, so hover and click agree. */
@@ -585,6 +632,7 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
 
   renderer.domElement.addEventListener('click', (ev) => {
     selected = memberAt(ev);
+    if (selected) dismissTapHint();
     applyStage();
     renderMemberCard();
   });
@@ -610,8 +658,9 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
   });
 
   window.addEventListener('resize', () => {
+    // fitViewport alone: aspect and ortho frustum follow the new box, the POSE stays. Re-running
+    // the rig here meant every phone address-bar show/hide snapped the camera home mid-orbit.
     fitViewport();
-    useRig(activeRig);
   });
 
   // ── Boot ───────────────────────────────────────────────────────────────────
@@ -637,17 +686,33 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
   const loop = (): void => {
     raf = requestAnimationFrame(loop);
     controls.update();
+    if (camera.position.y < EYE_FLOOR_FT) camera.position.y = EYE_FLOOR_FT;
     renderer.render(scene, camera);
   };
   loop();
 
   return {
     setModel(next) {
+      // THE CAMERA IS THE USER'S, NOT THE MODEL'S. This used to end in `useRig(activeRig)`,
+      // which snaps the camera back to the preset — so typing ONE DIGIT into Length threw away
+      // whatever viewpoint the operator had orbited to, on every keystroke. The pose is kept
+      // unless the structure's overall size or position changed enough that the old framing is
+      // pointing at empty air (dimension edits at that scale genuinely need a re-frame; a
+      // spacing or covering edit never does).
+      const before = memberAabb(model.members);
       model = next;
       if (selected && !model.members.some((m) => m.id === selected)) selected = null;
       rebuild();
       renderViews();
-      useRig(activeRig);
+      const after = memberAabb(model.members);
+      const size = (b: Aabb): number => Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]);
+      const drift = Math.hypot(
+        (after.min[0] + after.max[0]) - (before.min[0] + before.max[0]),
+        (after.min[1] + after.max[1]) - (before.min[1] + before.max[1]),
+        (after.min[2] + after.max[2]) - (before.min[2] + before.max[2]),
+      ) / 2;
+      const grew = size(after) / Math.max(1e-6, size(before));
+      if (grew > 1.25 || grew < 0.8 || drift > size(after) * 0.25) useRig(activeRig);
       renderStages();
       renderStagePanel();
       renderMemberCard();
