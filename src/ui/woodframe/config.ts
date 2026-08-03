@@ -29,6 +29,12 @@ export interface PanelRow {
   cite?: string;
   /** Openings arrays are `preset` on standards: editable, badged STD, per-wall reset (TD38). */
   lock?: 'preset';
+  /**
+   * A select whose options are numbers. `<select>.value` is always a string, and writing "16"
+   * where the spec wants 16 makes a spec that typechecks, serializes, and then compares wrong
+   * everywhere downstream. The renderer coerces when this is set.
+   */
+  numeric?: true;
   help?: string;
 }
 
@@ -87,6 +93,58 @@ export function configSchemaFor(familyId: FamilyId): PanelSchema {
   if (!family) return { family: familyId, groups: [] };
 
   const groups: PanelGroup[] = [];
+
+  // A tower is not a building with different numbers — it has no walls, no openings and no
+  // foundation choice in the building sense, so it gets its own panel rather than a building
+  // panel with four fifths of its rows suppressed. The knobs below are exactly the ones its
+  // drawing leaves open, and the two that matter most (height, access) are the two EM 385-1-1
+  // has an opinion about: choose a ladder at 24 ft and normalizeSpec switches it and says so.
+  if (family.specBranch === 'tower') {
+    groups.push({
+      title: '1 · THE TOWER',
+      rows: [
+        {
+          path: 'platformHeightFt', label: 'Platform height', control: 'select', numeric: true,
+          options: ['10', '16', '24', '32'],
+          cite: 'TM 5-302 guard tower heights (PH)',
+          help: 'Above 20 ft a fixed ladder is not an acceptable sole means of access (EM 385-1-1) — the tool switches to a stair and tells you.',
+        },
+        { path: 'cabPlanFt', label: 'Cab plan', control: 'select', numeric: true, options: ['6', '8'], help: 'Square, in feet.' },
+      ],
+    });
+    groups.push({
+      title: '2 · GETTING UP',
+      rows: [
+        {
+          path: 'access', label: 'Way up', control: 'select', options: ['ladder', 'stair'],
+          cite: 'EM 385-1-1 fixed-ladder cage threshold',
+          help: 'A ladder\u2019s rails run 36 in past the landing so there is something to hold when your feet leave the top rung. A stair switchbacks to stay inside the footprint.',
+        },
+      ],
+    });
+    groups.push({
+      title: '3 · THE CAB',
+      rows: [
+        {
+          path: 'cab.walls', label: 'Cab walls', control: 'select',
+          options: ['open-rail', 'half-wall', 'half-wall-screen'],
+          help: 'Open rail · half-wall you can fire over · half-wall with screen above.',
+        },
+        { path: 'cab.roof', label: 'Cab roof', control: 'select', options: ['pyramid', 'shed'] },
+        { path: 'coverings.roofing', label: 'Roofing', control: 'select', options: family.coverings.roofing ?? ['corrugated'] },
+      ],
+    });
+    groups.push({
+      title: '4 · WHAT IT STANDS ON',
+      rows: [
+        {
+          path: 'footing', label: 'Footing', control: 'select', options: ['timber-mudsill', 'concrete-pad'],
+          help: 'A timber mudsill spreads the leg load over tamped fill and can be built with what is on the truck. A poured pad is the deliberate version.',
+        },
+      ],
+    });
+    return { family: familyId, groups };
+  }
 
   // 1 · SHAPE
   const shape: PanelRow[] = [];
@@ -153,6 +211,15 @@ export function configSchemaFor(familyId: FamilyId): PanelSchema {
     { path: 'stories.0.letInBracing', label: 'Let-in corner bracing', control: 'toggle' },
     { path: 'atticAccess', label: 'Attic hatch', control: 'toggle' },
   );
+  if (family.specBranch === 'hut') {
+    skin.push({
+      path: 'screenBand',
+      label: 'Screened band',
+      control: 'toggle',
+      help: 'The band under the eaves that lets a closed hut breathe. The siding is cut around it.',
+      cite: 'TM 5-302 SEA hut screened band (PH)',
+    });
+  }
   groups.push({ title: '4 · CLOSING IN', rows: skin });
 
   return { family: familyId, groups };

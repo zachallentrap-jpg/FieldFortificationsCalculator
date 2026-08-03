@@ -14,7 +14,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { lumberPiece, plywoodSheet, roofingSheet, disposeObject, toonGradient } from '../three-viewer';
+import { lumberPiece, plywoodSheet, roofingSheet, screenSheet, disposeObject, toonGradient } from '../three-viewer';
 import type { LumberSize } from '../three-viewer';
 import type { Member } from '../../timber/types';
 import type { StructureModel } from '../../timber/families/index';
@@ -151,7 +151,11 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
       const tileFt = corrugated ? 26 / 12 : 3;
       p = roofingSheet(group, corrugated ? 'corrugated' : 'roll', Math.round(m.cutLength / 12 / tileFt), corrugated ? 1 : Math.round(m.actual.d / 36));
       p.scale.set(m.cutLength / 12, m.actual.d / 12, Math.max(0.02, m.actual.w / 12));
-    } else if (m.nominal.includes('panel') || m.role === 'screenPanel') {
+    } else if (m.role === 'screenPanel') {
+      // See-through, because that is what the member IS. Drawn as plywood it read as a wall.
+      p = screenSheet(group, m.cutLength, m.actual.d);
+      p.scale.set(m.cutLength / 12, m.actual.d / 12, Math.max(0.02, m.actual.w / 12));
+    } else if (m.nominal.includes('panel')) {
       p = plywoodSheet(group);
       p.scale.set(m.cutLength / 12, m.actual.d / 12, Math.max(0.02, m.actual.w / 12));
     } else {

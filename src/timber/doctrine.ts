@@ -225,6 +225,13 @@ export const TOWER = {
   batterPerSideFt: doc(1.5, 'TM 5-302 tower batter (PH)', { unit: 'ft', lifeSafety: true }),
   mudsillNominal: doc('6x8', 'TM 5-302 timber mudsill (PH)', { lifeSafety: true }),
   mudsillLengthFt: doc(4, 'TM 5-302 timber mudsill (PH)', { unit: 'ft' }),
+  padSideIn: doc(24, 'TM 5-302 tower concrete footing (PH)', { unit: 'in', lifeSafety: true }),
+  padDepthIn: doc(12, 'TM 5-302 tower concrete footing (PH)', { unit: 'in', lifeSafety: true }),
+  // The ladder or stair well through the deck edge, and how far the ladder foot stands out.
+  accessWidthFt: doc(2.5, 'EM 385-1-1 minimum clear width of a means of access', { unit: 'ft', lifeSafety: true }),
+  ladderStandoffFt: doc(0.6, 'EM 385-1-1 ladder standoff from the structure', { unit: 'ft', lifeSafety: true }),
+  /** The four platform heights this family's drawing covers. */
+  platformHeightsFt: doc([10, 16, 24, 32] as const, 'TM 5-302 guard tower heights (PH)', { unit: 'ft' }),
   cabWallHeightFt: doc(7, 'TM 5-302 tower cab (PH)', { unit: 'ft' }),
   cabHalfWallFt: doc(3.5, 'TM 5-302 tower cab half-wall (PH)', { unit: 'ft' }),
   cabRisePer12: doc(4, 'TM 5-302 tower cab roof (PH)', { unit: 'in/ft' }),

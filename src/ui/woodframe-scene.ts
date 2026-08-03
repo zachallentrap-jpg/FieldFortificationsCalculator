@@ -14,6 +14,7 @@ import { onPropAssetsReady } from './three-viewer';
 import { renderPicker } from './woodframe/picker';
 import { createStudio, type StudioHandles } from './woodframe/studio';
 import { configSchemaFor, type PanelRow } from './woodframe/config';
+import { HUT } from '../timber/doctrine';
 import { layoutStrip } from '../timber/elevation';
 import {
   loadSession, saveSession, commitBuild, buildFromFamily, findBuild, nextCustomId,
@@ -26,6 +27,9 @@ import { buildDeck, groupLabel, shuffle, type Card } from './woodframe/cards';
 
 const esc = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** The screened band a hut gets when its toggle is switched on. */
+const HUT_BAND = { sillFt: HUT.screenBandSillFt.value as number, heightFt: HUT.screenBandHeightFt.value as number };
 
 const app = document.getElementById('app')!;
 const noticeBar = document.getElementById('notices')!;
@@ -359,7 +363,13 @@ function renderConfigPanel(): void {
     el.addEventListener('change', () => {
       const path = el.dataset.path!;
       const spec = current!.spec as BuildingSpec;
-      if (path === 'roof.kind') setRoofKind(spec, (el as HTMLSelectElement).value as RoofSpec['kind']);
+      if (path === 'screenBand') {
+        // The toggle is "does this hut breathe"; the spec value is the band itself, or null.
+        // Mapping it here keeps the doctrine numbers out of the control and out of the panel.
+        (spec as unknown as Record<string, unknown>).screenBand = (el as HTMLInputElement).checked
+          ? { sillFt: HUT_BAND.sillFt, heightFt: HUT_BAND.heightFt }
+          : null;
+      } else if (path === 'roof.kind') setRoofKind(spec, (el as HTMLSelectElement).value as RoofSpec['kind']);
       else if (path === 'foundation.kind') setFoundationKind(spec, (el as HTMLSelectElement).value as FoundationSpec['kind']);
       else if (el instanceof HTMLInputElement && el.type === 'checkbox') setPath(spec, path, el.checked);
       else if (el instanceof HTMLInputElement && el.type === 'number') {
@@ -371,7 +381,11 @@ function renderConfigPanel(): void {
         }
         el.classList.remove('blocked');
         setPath(spec, path, n);
-      } else setPath(spec, path, (el as HTMLSelectElement).value);
+      } else {
+        const raw = (el as HTMLSelectElement).value;
+        const row = schema.groups.flatMap((g) => g.rows).find((r) => r.path === path);
+        setPath(spec, path, row?.numeric ? Number(raw) : raw);
+      }
       regenerate();
       renderConfigPanel();
     });

@@ -10,6 +10,7 @@ import type { StagePlanEntry } from '../stagePlan';
 import { normalizeSpec, type SpecIssue } from '../normalize';
 import { generateBuilding } from './building';
 import { generateHut } from './hut';
+import { generateTower } from './tower';
 import type { FloorLevels } from '../floor';
 
 /** Vertical datum info the render layer needs (grade line, deck heights). */
@@ -42,8 +43,15 @@ export function generateStructure(spec: StructureSpec): StructureModel {
       const r = generateHut(normalized);
       return { spec: normalized, members: r.members, levels: r.levels, stagePlan: r.stagePlan, issues };
     }
+    case 'tower': {
+      // T4. Everything about a tower is life-safety, which is why `normalizeSpec` has already
+      // forced a stair above the cage threshold by the time this runs — the generator builds
+      // what it is handed and never quietly substitutes a safer thing without saying so.
+      const r = generateTower(normalized);
+      return { spec: normalized, members: r.members, levels: r.levels, stagePlan: r.stagePlan, issues };
+    }
     default:
-      // Families land in their phases (tower T4, platform/tent T6, bunker T7). Until then
+      // Families land in their phases (platform/tent T6, bunker T7). Until then
       // this is unreachable through the catalog — the picker only offers built families.
       throw new Error(
         `generateStructure: the "${normalized.family}" family is not implemented yet — see docs/TIMBER2_PLAN.md §7 for its phase.`,

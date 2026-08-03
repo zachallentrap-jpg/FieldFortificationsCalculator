@@ -418,6 +418,54 @@ function roofingSheet(parent: THREE.Group, kind: 'roll' | 'corrugated', repeatAl
   return wrapper;
 }
 
+// INSECT SCREEN. Same trap the roofing fell into: `screenPanel` went through `plywoodSheet`, so
+// a SEA hut's screened band and a tower cab's screen came out as tan boards — a wall where the
+// drawing says an opening. Screen is a dark mesh you can see through, and the seeing-through is
+// the entire point of the member, so it is drawn transparent with a woven grid.
+let screenTexCache: THREE.Texture | null = null;
+function screenTexture(): THREE.Texture {
+  if (screenTexCache) return screenTexCache;
+  const N = 32; // one tile = one inch of cloth; the caller repeats it per real foot
+  const c = document.createElement('canvas');
+  c.width = c.height = N;
+  const g = c.getContext('2d')!;
+  g.clearRect(0, 0, N, N);
+  g.fillStyle = 'rgba(38,42,40,0.85)';
+  for (let i = 0; i < N; i += 4) {
+    g.fillRect(i, 0, 1.4, N);
+    g.fillRect(0, i, N, 1.4);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.anisotropy = 8;
+  screenTexCache = tex;
+  sharedTextures.add(tex);
+  return tex;
+}
+
+/**
+ * A panel of insect screen in its frame. `repeatX`/`repeatY` are the cloth's real size in
+ * inches, so the weave stays weave-sized on a band of any length.
+ */
+function screenSheet(parent: THREE.Group, repeatX: number, repeatY: number): THREE.Group {
+  const map = screenTexture().clone();
+  map.needsUpdate = true;
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.repeat.set(Math.max(1, repeatX / 6), Math.max(1, repeatY / 6));
+  sharedTextures.add(map);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xffffff, map, transparent: true, alphaTest: 0.18, side: THREE.DoubleSide, depthWrite: false,
+  });
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
+  const wrapper = new THREE.Group();
+  wrapper.add(mesh);
+  parent.add(wrapper);
+  return wrapper;
+}
+
 // Role colors now come from the diorama palette and switch WITH the theme — night is a
 // hue-shifted second palette (moonlit blue-slate with the sandbags kept lightest so the taught
 // geometry stays legible), never just the day colors under dimmer lights. setTheme() swaps
@@ -1637,4 +1685,4 @@ export function onPropAssetsReady(cb: () => void): () => void {
   return () => rerenderCallbacks.delete(cb);
 }
 
-export { disposeObject, toonGradient, lumberPiece, plywoodSheet, roofingSheet };
+export { disposeObject, toonGradient, lumberPiece, plywoodSheet, roofingSheet, screenSheet };

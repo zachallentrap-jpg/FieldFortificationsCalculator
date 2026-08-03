@@ -11,7 +11,7 @@
 // different tool than the code is impossible rather than merely discouraged.
 
 import type { StructureSpec, RoofSpec, CoveringSpec, StructureFamily } from './spec';
-import { HUT, LATRINE, citeOf } from './doctrine';
+import { HUT, LATRINE, TOWER, RAIL, LADDER, citeOf } from './doctrine';
 import { hutDims } from './families/hut';
 
 export type FamilyId =
@@ -327,9 +327,50 @@ const LATRINE_CARD = hutCard(
   { latrine: { seats: 4, depthFt: LATRINE.pitDepthFt.value as number } },
 );
 
+// ── The guard tower (T4) ─────────────────────────────────────────────────────
+// The owner's first-named type, and the first structure here where being wrong drops someone.
+// Its locks are the life-safety rows: they render with the LS mark and they are the same values
+// the printable register enumerates.
+
+const TOWER_CARD: FamilyDef = {
+  id: 'tower',
+  group: 'towers',
+  name: 'Guard tower',
+  oneLiner: 'A railed platform on four battered legs, with a cab on top and a way up that suits the height.',
+  specBranch: 'tower',
+  lineage: 'TM 5-302 guard tower (PH — sheet pending); EM 385-1-1 for access, rails and fall protection',
+  capacity: '2 observers',
+  shipped: true,
+  rationale:
+    'Framing dimensions are the figures this type is commonly built to, carried as (PH). The ACCESS and '
+    + 'FALL-PROTECTION numbers are different in kind: they come from EM 385-1-1 and they are the reason a '
+    + '24-ft tower will not accept a ladder here — the tool switches it to a stair and tells you it did.',
+  preset: {
+    family: 'tower',
+    dims: { lengthFt: 12, widthFt: 12 },
+    spacing: STD_SPACING,
+    coverings: { wallSheathing: 'none', siding: 'plywood', roofDeck: 'plywood', roofing: 'corrugated' },
+    platformHeightFt: 16,
+    cabPlanFt: 8,
+    access: 'ladder',
+    cab: { walls: 'half-wall-screen', roof: 'pyramid', roofing: 'corrugated' },
+    footing: 'timber-mudsill',
+  } as StructureSpec,
+  locks: [
+    { path: 'access', label: 'Ladder height limit', value: `stair required above ${TOWER.ladderMaxHeightFt.value} ft`, cite: citeOf(TOWER.ladderMaxHeightFt), lifeSafety: true },
+    { path: 'rail.topHeightIn', label: 'Guardrail height', value: `${RAIL.topHeightIn.value} in`, cite: citeOf(RAIL.topHeightIn), lifeSafety: true },
+    { path: 'ladder.topExtensionIn', label: 'Ladder rail extension', value: `${LADDER.topExtensionIn.value} in above the landing`, cite: citeOf(LADDER.topExtensionIn), lifeSafety: true },
+    { path: 'tower.batter', label: 'Leg batter', value: `${TOWER.batterPerSideFt.value} ft per side`, cite: citeOf(TOWER.batterPerSideFt), lifeSafety: true },
+  ],
+  roofs: ['pyramid', 'shed'],
+  coverings: { roofing: ['corrugated', 'roll'] },
+  cutaway: { axis: 'z', frac: 0.5, keep: -1, reason: 'Cut through the middle — see the batter, every brace bay, and how the platform lands on the legs.' },
+};
+
 /** The one table (TD3). Families land as their phases ship; `shipped` gates the picker. */
 export const FAMILY_TABLE: readonly FamilyDef[] = [
-  GP_FRAME, SEA_HUT, SWA_HUT, B_HUT, SQUAD_HUT, GUARD_SHACK, STORAGE_SHED, LATRINE_CARD, CUSTOM,
+  GP_FRAME, SEA_HUT, SWA_HUT, B_HUT, SQUAD_HUT, GUARD_SHACK, STORAGE_SHED,
+  TOWER_CARD, LATRINE_CARD, CUSTOM,
 ];
 
 export function familyById(id: FamilyId): FamilyDef | undefined {
