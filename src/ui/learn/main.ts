@@ -368,7 +368,7 @@ function questionBody(q: Question, deckId: string, s: Session, style: DeckStyle)
     const choices = q.choices.map((c, i) => {
       const svg = artFor(c, deckId, 320, 230);
       const cls = s.picked === null ? '' : i === q.answer ? ' right' : i === s.picked ? ' wrong' : '';
-      return `<button class="ans${cls}" data-pick="${i}"${s.picked === null ? '' : ' disabled'}>${svg ?? esc(c.back.name)}</button>`;
+      return `<button class="ans${cls}" data-pick="${i}"${s.picked === null ? '' : ' disabled'}>${svg ?? esc(c.back.name)}<kbd class="anskey">${i + 1}</kbd></button>`;
     }).join('');
     return `<div class="answers arts">${choices}</div>
       ${s.picked === null ? '' : cardBack(q.card, style)}
@@ -377,7 +377,7 @@ function questionBody(q: Question, deckId: string, s: Session, style: DeckStyle)
 
   const choices = q.choices.map((c, i) => {
     const cls = s.picked === null ? '' : i === q.answer ? ' right' : i === s.picked ? ' wrong' : '';
-    return `<button class="ans${cls}" data-pick="${i}"${s.picked === null ? '' : ' disabled'}>${esc(c)}</button>`;
+    return `<button class="ans${cls}" data-pick="${i}"${s.picked === null ? '' : ' disabled'}>${esc(c)}<kbd class="anskey">${i + 1}</kbd></button>`;
   }).join('');
   return `${artBlock}
     <div class="answers">${choices}</div>
@@ -494,6 +494,20 @@ function renderSummary(entry: DeckEntry): void {
   const s = session!;
   const right = s.results.filter((r) => r === true).length;
   const m = deckMastery(entry.deck, progressFor(state, entry.deck.id));
+  // THE MISSES ARE THE LESSON. A bare score tells you how the session went; the three pieces
+  // you blanked on, shown by picture and name one more time, are the only part worth carrying
+  // out of the room — and re-seeing them immediately is itself a rehearsal. The scheduler will
+  // bring them back anyway; this is the free extra look while they still sting.
+  const missed = s.queue
+    .map((id, i) => (s.results[i] === false ? entry.deck.cards.find((c) => c.id === id) : undefined))
+    .filter((c): c is CardSpec => !!c);
+  const recap = missed.length === 0 ? '' : `<div class="recap">
+      <h3>Worth another look</h3>
+      <div class="recaps">${missed.map((c) => {
+        const art = cardArt(c, { spec: null, deckId: entry.deck.id }, { width: 200, height: 130, context: 0.8 });
+        return `<div class="recapcard">${art ? `<span class="mini">${art}</span>` : ''}<span class="rname">${esc(titleCase(c.back.name))}</span></div>`;
+      }).join('')}</div>
+    </div>`;
   app.innerHTML = `<div class="done">
       <h2>${esc(entry.deck.title)}</h2>
       <div class="score">${right} / ${s.results.length}</div>
@@ -503,6 +517,7 @@ function renderSummary(entry: DeckEntry): void {
         <div><b>${m.learning}</b>learning</div>
         <div><b>${m.unseen}</b>new</div>
       </div>
+      ${recap}
       <div class="row">
         <button class="btn primary" data-again="${esc(entry.deck.id)}">Another round</button>
         <button class="btn" data-print="${esc(entry.deck.id)}">Print the deck</button>
@@ -623,9 +638,23 @@ function renderSequence(familyId: string): void {
 app.addEventListener('keydown', (ev) => {
   const s = session;
   const q = s?.question;
-  if (!s || !q || !isSelfGraded(q.mode)) return;
+  if (!s || !q) return;
   const t = ev.target as HTMLElement;
   if (t.closest('input, select, textarea')) return;
+
+  if (!isSelfGraded(q.mode)) {
+    // Choice modes: the number keys ARE the answer buttons, and once answered, Space moves on.
+    // Routed through the real buttons' click() so the keyboard can never take a path the
+    // pointer could not.
+    if (s.picked === null && /^[1-9]$/.test(ev.key)) {
+      const btn = app.querySelectorAll<HTMLButtonElement>('[data-pick]')[Number(ev.key) - 1];
+      if (btn) { ev.preventDefault(); btn.click(); }
+    } else if (s.picked !== null && (ev.key === ' ' || ev.key === 'Enter') && !t.closest('button')) {
+      ev.preventDefault();
+      app.querySelector<HTMLButtonElement>('[data-next]')?.click();
+    }
+    return;
+  }
 
   if (ev.key === '1' || ev.key === 'ArrowLeft' || ev.key === '2' || ev.key === 'ArrowRight') {
     if (!s.revealed) return; // grading an unseen answer is not a thing

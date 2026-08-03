@@ -116,6 +116,7 @@ function render(): void {
 // ── Picker screen ───────────────────────────────────────────────────────────
 
 function renderPickerScreen(): void {
+  workbenchToken += 1; // cancel any workbench build still waiting on its paint frames
   if (studio) {
     studio.dispose();
     studio = null;
@@ -150,13 +151,15 @@ function renderIssues(messages: string[]): void {
   el.innerHTML = messages.map((m) => `<p>${esc(m)}</p>`).join('');
 }
 
-function renderWorkbench(build: StoredBuild): void {
-  current = build;
-  document.body.dataset.screen = 'build';
-  const family = familyById(build.familyId);
-  model = generateStructure(build.spec);
+/**
+ * Guards the two-phase workbench open: bumped on every navigation, checked before the deferred
+ * heavy build runs. Clicking Back during the yield must win — a build that fires anyway would
+ * resurrect a screen the user already left.
+ */
+let workbenchToken = 0;
 
-  app.innerHTML = `
+function workbenchHtml(build: StoredBuild, family: ReturnType<typeof familyById>, opening: boolean): string {
+  return `
     <div class="workbench">
       <header class="wb-head">
         <button class="back" id="backBtn" type="button">◀ Structures</button>
@@ -182,7 +185,9 @@ function renderWorkbench(build: StoredBuild): void {
         <section class="pane pane--config" aria-label="Configure">
           <div id="configPanel"></div>
         </section>
-        <div id="viewport" class="viewport"></div>
+        <div id="viewport" class="viewport">${opening
+          ? '<div class="opening" role="status"><span class="ring" aria-hidden="true"></span><p>Laying out the frame…</p></div>'
+          : ''}</div>
         <aside class="pane pane--inspect" aria-label="Inspect">
           <div id="memberCard" class="member-card" hidden></div>
           <div id="stagePanel"></div>
@@ -197,6 +202,39 @@ function renderWorkbench(build: StoredBuild): void {
         </aside>
       </main>
     </div>`;
+}
+
+/**
+ * RESPOND FIRST, BUILD SECOND.
+ *
+ * Opening a structure used to be one synchronous run: generate the model, build seven hundred
+ * meshes, then paint — and the click did NOTHING VISIBLE for up to 1.7 seconds (measured,
+ * gp-frame, this machine). A press with no response for that long reads as a dead button, and
+ * people click again. So the workbench chrome — title, toolbar, an opening line where the model
+ * will be — paints immediately, the browser is given two frames to actually put it on screen
+ * (one is not enough: rAF fires BEFORE paint, so the heavy work would still beat the pixels),
+ * and the expensive part runs after. Back works during the wait, and navigating away cancels
+ * the deferred build via the token.
+ */
+function renderWorkbench(build: StoredBuild): void {
+  current = build;
+  document.body.dataset.screen = 'build';
+  const family = familyById(build.familyId);
+  const token = ++workbenchToken;
+
+  app.innerHTML = workbenchHtml(build, family, true);
+  document.getElementById('backBtn')!.addEventListener('click', () => go('#/'));
+
+  window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+    if (token !== workbenchToken) return; // the user already left
+    finishWorkbench(build, family);
+  }));
+}
+
+function finishWorkbench(build: StoredBuild, family: ReturnType<typeof familyById>): void {
+  model = generateStructure(build.spec);
+
+  app.innerHTML = workbenchHtml(build, family, false);
 
   studio = createStudio(
     {
