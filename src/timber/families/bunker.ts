@@ -34,6 +34,14 @@ import { stagePlan, requireOrdinal, type StagePlanEntry } from '../stagePlan';
 import { generateCribWall } from '../subsystems/cribwork';
 import type { FloorLevels } from '../floor';
 
+/**
+ * Clear width of the doorway, in feet. Geometry, not doctrine: the header used to be cut to a
+ * flat 4 ft with no stated opening at all, so there was no number anywhere saying how wide the
+ * way in was. Four feet is that same figure, named — wide enough for a man with a casualty on a
+ * litter, which is the load that sets a bunker entrance.
+ */
+const ENTRY_WIDTH_FT = 4;
+
 export interface BunkerResult {
   members: Member[];
   levels: FloorLevels;
@@ -207,25 +215,74 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
   }
 
   // ── Entrance: straight through, or offset so the way in turns.
-  if (spec.entrance === 'baffle') {
-    const offset = BUNKER.baffleOffsetFt.value as number;
-    emit('baffleWall', postNominal, {
-      cutLengthFt: Math.min(offset * 2, outerW),
-      position: [-offset / 2, H / 2, outerW / 2],
-      rotation: [0, Math.PI / 2, Math.PI / 2],
+  //
+  // The doorway is in the -X end wall, on the centreline. Two pieces frame it and both used to
+  // be placed by hand against no datum at all:
+  //
+  //   THE BAFFLE was one 6x6, eight feet long, rotated so its LENGTH stood vertical — a single
+  //   post out in the open two feet clear of the bunker, a quarter of it underground and a foot
+  //   of it over the cap. A baffle is a WALL you have to walk around, and a wall is posts with
+  //   something spanning them, standing on the ground and no taller than what it shields.
+  //   THE HEADER spanned the doorway a foot and a half inboard of it, bearing on nothing. Over
+  //   a crib bunker — whose ends are open by construction — it hung in mid-air.
+  const doorWidth = Math.min(ENTRY_WIDTH_FT, outerW - 2 * wallThick);
+  const doorZ0 = outerW / 2 - doorWidth / 2;
+  const doorZ1 = outerW / 2 + doorWidth / 2;
+  const jambNominal = postNominal;
+  const jambT = DRESSED[jambNominal]!.w / IN_PER_FT;
+  // Jambs first: the header has to land on something, and on a crib bunker there is no end wall
+  // for it to land on.
+  for (const z of [doorZ0 - jambT / 2, doorZ1 + jambT / 2]) {
+    emit('post', jambNominal, {
+      cutLengthFt: H,
+      position: [wallThick / 2, H / 2, z],
+      rotation: [0, 0, Math.PI / 2],
       stage: sEntry,
-      nailing: 'framed as a free-standing wall; braced back (PH)',
-      doctrineRef: citeOf(BUNKER.baffleOffsetFt),
+      nailing: 'set against the end of the wall run; capped (PH)',
+      doctrineRef: citeOf(BUNKER.postNominal),
     });
   }
-  emit('header', LUMBER.headerNominal.value as string, {
-    cutLengthFt: 4,
-    position: [wallThick / 2, H, outerW / 2],
+  const headerNominal = LUMBER.headerNominal.value as string;
+  emit('header', headerNominal, {
+    cutLengthFt: doorWidth + 2 * jambT,
+    position: [wallThick / 2, H + DRESSED[headerNominal]!.d / IN_PER_FT / 2, outerW / 2],
     rotation: [0, Math.PI / 2, 0],
     stage: sEntry,
     nailing: '3-16d ea end (PH)',
     doctrineRef: 'FM 5-426 header table by span (PH)',
   });
+
+  if (spec.entrance === 'baffle') {
+    const offset = BUNKER.baffleOffsetFt.value as number;
+    // A short wall standing off the doorway, overlapping it far enough that you cannot see or
+    // shoot straight in. Posts to the ground, lagging across them — the same two pieces the
+    // bunker's own walls are made of, so it reads as part of the same structure.
+    const baffleZ0 = outerW / 2 - jambT;
+    const baffleZ1 = Math.min(outerW, baffleZ0 + offset * 1.5);
+    const run = baffleZ1 - baffleZ0;
+    const posts = Math.max(2, Math.round(run / postSpacing) + 1);
+    for (let i = 0; i < posts; i++) {
+      emit('baffleWall', postNominal, {
+        cutLengthFt: H,
+        position: [-offset, H / 2, baffleZ0 + (run * i) / (posts - 1)],
+        rotation: [0, 0, Math.PI / 2],
+        stage: sEntry,
+        nailing: 'free-standing: set in the ground and braced back to the entrance (PH)',
+        doctrineRef: citeOf(BUNKER.baffleOffsetFt),
+      });
+    }
+    const lagH = DRESSED[lagNominal]!.d / IN_PER_FT;
+    for (let y = lagH / 2; y < H; y += lagH) {
+      emit('baffleWall', lagNominal, {
+        cutLengthFt: run,
+        position: [-offset - DRESSED[postNominal]!.w / IN_PER_FT / 2, Math.min(y, H - lagH / 2), (baffleZ0 + baffleZ1) / 2],
+        rotation: [0, Math.PI / 2, 0],
+        stage: sEntry,
+        nailing: 'spiked to each post (PH)',
+        doctrineRef: citeOf(BUNKER.baffleOffsetFt),
+      });
+    }
+  }
 
   // ── Soil, as MASSING. Zero board-feet, never material: it is here so a person can see what
   // the structure sits under, and its label is the boundary sentence itself.

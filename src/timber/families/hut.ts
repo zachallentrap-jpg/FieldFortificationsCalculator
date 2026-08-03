@@ -181,31 +181,45 @@ function generateRiserBox(lengthFt: number, widthFt: number, seats: 2 | 4, stage
   const depth = LATRINE.riserBoxDepthFt.value as number;
   const spacing = LATRINE.seatSpacingFt.value as number;
   const runFt = Math.min(lengthFt - 1, seats * spacing);
-  const zBack = widthFt - depth / 2 - 0.5;
-  // Front and top boards run the length of the bench; the ends and the seat dividers cross it.
+  const thick = DRESSED[nominal]!.w / IN_PER_FT;
+  // THE BOX HAS TO CLOSE. Three parts were each placed against a different datum — the front
+  // board hung off `h` minus half its FACE WIDTH, the top sat exactly ON `h`, and the dividers
+  // were centred at `h/2` and so came up short of both. The result was a bench whose lid
+  // floated four inches above its own dividers and eight inches behind its own front board.
+  // One datum fixes it: `h` is the SEAT HEIGHT — the top of the lid — and everything hangs off
+  // that, which is also the only number on this bench a person interacts with.
+  const zFront = widthFt - depth - 0.5;
+  const zBack = widthFt - 0.5;
+  const lidY = h - thick / 2;
+  // The lid, flat, spanning the full depth from the front board to the wall.
   emit('riserBox', nominal, {
     cutLengthFt: runFt,
-    position: [lengthFt / 2, h - DRESSED[nominal]!.d / IN_PER_FT / 2, widthFt - depth - 0.5],
-    rotation: [0, 0, 0],
+    position: [lengthFt / 2, lidY, (zFront + zBack) / 2],
+    rotation: [-Math.PI / 2, 0, 0],
     stage,
-    nailing: '3-8d ea stud (PH)',
-    doctrineRef: citeOf(LATRINE.riserBoxHeightFt),
-  });
-  emit('riserBox', nominal, {
-    cutLengthFt: runFt,
-    position: [lengthFt / 2, h, zBack],
-    rotation: [Math.PI / 2, 0, 0],
-    stage,
+    actual: { w: DRESSED[nominal]!.w, d: depth * IN_PER_FT },
     nailing: '3-8d ea stud (PH)',
     doctrineRef: citeOf(LATRINE.riserBoxDepthFt),
   });
+  // The front board, standing on edge under the lid's front edge and reaching the ground.
+  emit('riserBox', nominal, {
+    cutLengthFt: runFt,
+    position: [lengthFt / 2, (h - thick) / 2, zFront + thick / 2],
+    rotation: [0, 0, 0],
+    stage,
+    actual: { w: DRESSED[nominal]!.w, d: (h - thick) * IN_PER_FT },
+    nailing: '3-8d ea stud (PH)',
+    doctrineRef: citeOf(LATRINE.riserBoxHeightFt),
+  });
+  // Ends and seat dividers, crossing front to back, full height under the lid.
   for (let i = 0; i <= seats; i++) {
     const x = lengthFt / 2 - runFt / 2 + (runFt * i) / seats;
     emit('riserBox', nominal, {
       cutLengthFt: depth,
-      position: [x, h / 2, zBack],
+      position: [x, (h - thick) / 2, (zFront + zBack) / 2],
       rotation: [0, Math.PI / 2, 0],
       stage,
+      actual: { w: DRESSED[nominal]!.w, d: (h - thick) * IN_PER_FT },
       nailing: '3-8d ea end (PH)',
       doctrineRef: citeOf(LATRINE.seatSpacingFt),
     });
