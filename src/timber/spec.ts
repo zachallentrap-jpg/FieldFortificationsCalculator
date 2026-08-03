@@ -122,6 +122,11 @@ export interface BuildingSpec extends SpecCommon {
   atticAccess?: boolean;
   interiorStairs?: boolean; // default true at 2 stories; false is LEGAL (ladder instead)
   openFront?: WallId; // storage shed: posts + header; that wall takes no openings
+  /**
+   * Full-run horizontal bands the wall covering is cut around — the hut family's screened band.
+   * Heights are above the sole-plate top, like an opening's sill.
+   */
+  wallBands?: { v0: number; v1: number }[];
   partitions?: PartitionSpec[];
   entrySteps?: boolean;
 }

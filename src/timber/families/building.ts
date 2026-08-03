@@ -104,7 +104,7 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
   const story = spec.stories[0]!;
   const { lengthFt: L, widthFt: W } = spec.dims;
   const stagePlan = stagePlanForLegacyBuilding();
-  const walls = wallContract(L, W, story.wallHeightFt, story.openings);
+  const walls = wallContract(L, W, story.wallHeightFt, story.openings, 0, spec.wallBands ?? []);
   const members: Member[] = [];
   let levels: FloorLevels;
 

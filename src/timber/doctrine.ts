@@ -155,6 +155,95 @@ export const RAMP = {
   stringerNominal: doc('2x12', 'TM 5-302 ramp stringers', { lifeSafety: true }),
 } as const;
 
+// ── Standard rough openings ──────────────────────────────────────────────────
+// The sizes a door and a window are framed to when nobody has said otherwise. They live here
+// rather than in the generators because they are used in three places that must agree: the hut
+// family's default openings, the planning app's "+ Door / + Window / + Vent" buttons, and the
+// catalog presets. Three copies of "a door is 3 by 6 foot 8" is three chances to disagree.
+export const OPENING = {
+  doorWidthFt: doc(3, 'FM 5-426 door rough opening (PH)', { unit: 'ft' }),
+  doorHeightFt: doc(6.7, 'FM 5-426 door rough opening — 6 ft 8 in (PH)', { unit: 'ft' }),
+  windowWidthFt: doc(3, 'FM 5-426 window rough opening (PH)', { unit: 'ft' }),
+  windowHeightFt: doc(3.5, 'FM 5-426 window rough opening (PH)', { unit: 'ft' }),
+  windowSillFt: doc(3.5, 'FM 5-426 window sill height (PH)', { unit: 'ft' }),
+  ventWidthFt: doc(1.5, 'FM 5-426 gable/wall vent (PH)', { unit: 'ft' }),
+  ventHeightFt: doc(1, 'FM 5-426 gable/wall vent (PH)', { unit: 'ft' }),
+  ventSillFt: doc(6.5, 'FM 5-426 vent set high in the wall (PH)', { unit: 'ft' }),
+  /** Clear wall a window is set back from a corner, so the king stud is not the corner post. */
+  cornerSetbackFt: doc(2, 'FM 5-426 opening layout (PH)', { unit: 'ft' }),
+  /** Spacing between the windows a long wall gets by default. */
+  windowPitchFt: doc(12, 'FM 5-426 opening layout (PH)', { unit: 'ft' }),
+} as const;
+
+// ── Named structure dimensions (plan §2.2 — the "exhaustive hut family") ─────
+// These are the plan sizes the TO hut family is commonly built to. They are (PH) like every
+// other magnitude here, and for a sharper reason than usual: the hut family's lineage is thin
+// (plan §2.2), so a card exists BECAUSE a preset can express it, not because a sheet has been
+// read. Each family's `rationale` in catalog.ts says so on the card, and every one of these is
+// an operator-adjustable number, never a locked value pretending to be doctrine.
+export const HUT = {
+  seaHut: doc({ lengthFt: 32, widthFt: 16, wallHeightFt: 8 }, 'TM 5-302 SEA hut (PH — sheet pending)'),
+  swaHut: doc({ lengthFt: 32, widthFt: 20, wallHeightFt: 8 }, 'TM 5-302 SWA hut (PH — sheet pending)'),
+  bHut: doc({ lengthFt: 36, widthFt: 16, wallHeightFt: 8 }, 'TM 5-302 B-hut (PH — sheet pending)'),
+  squadHut: doc({ lengthFt: 50, widthFt: 20, wallHeightFt: 8 }, 'TM 5-302 squad hut (PH — sheet pending)'),
+  guardShack: doc({ lengthFt: 8, widthFt: 8, wallHeightFt: 7.5 }, 'TM 5-302 guard shack (PH — sheet pending)'),
+  latrine: doc({ lengthFt: 12, widthFt: 8, wallHeightFt: 8 }, 'TM 5-302 field latrine (PH — sheet pending)'),
+  // The screened band under the eaves is what makes a SEA hut a SEA hut: ventilation with the
+  // walls otherwise closed. Sill height and band height, in feet above the deck.
+  screenBandSillFt: doc(6, 'TM 5-302 SEA hut screened band (PH)', { unit: 'ft' }),
+  screenBandHeightFt: doc(1.5, 'TM 5-302 SEA hut screened band (PH)', { unit: 'ft' }),
+  // Girts stiffen a stud wall that carries siding but no sheathing, and they are what the
+  // screen band and shutters hang on.
+  girtNominal: doc('2x4', 'TM 5-302 hut wall girts (PH)'),
+  screenClothThickIn: doc(0.06, 'insect screen as modeled — cloth over a frame (PH)', { unit: 'in' }),
+  girtSpacingFt: doc(4, 'TM 5-302 hut wall girts (PH)', { unit: 'ft' }),
+  // A B-hut is a hut divided into bays; this is the count along its length.
+  bHutBays: doc(4, 'TM 5-302 B-hut partitioning (PH)'),
+} as const;
+
+export const LATRINE = {
+  seatSpacingFt: doc(2.5, 'TM 5-302 latrine seat spacing (PH)', { unit: 'ft' }),
+  riserBoxHeightFt: doc(1.4, 'TM 5-302 latrine riser box (PH)', { unit: 'ft' }),
+  riserBoxDepthFt: doc(2, 'TM 5-302 latrine riser box (PH)', { unit: 'ft' }),
+  boxNominal: doc('2x8', 'TM 5-302 latrine riser box framing (PH)'),
+  // Pit depth is a HEALTH number, not a fall number — LS-tagged anyway: an unshored pit a
+  // person can fall into is exactly the failure mode the gate exists for.
+  pitDepthFt: doc(6, 'TM 5-302 latrine pit depth (PH)', { unit: 'ft', lifeSafety: true }),
+  aisleWidthFt: doc(3, 'TM 5-302 latrine aisle (PH)', { unit: 'ft' }),
+} as const;
+
+// ── Guard tower (TM 5-302 (PH); EM 385-1-1 for everything that can drop you) ──
+export const TOWER = {
+  legNominal: doc('6x6', 'TM 5-302 tower legs (PH)', { lifeSafety: true }),
+  girtNominal: doc('2x6', 'TM 5-302 tower girts (PH)', { lifeSafety: true }),
+  braceNominal: doc('2x6', 'TM 5-302 tower X-bracing (PH)', { lifeSafety: true }),
+  platformJoistNominal: doc('2x8', 'TM 5-302 tower platform framing (PH)', { lifeSafety: true }),
+  // Bay height between girt/brace levels up the legs. The tower is framed in bays, and the
+  // brace pattern repeats per bay — this is the number that sets how many.
+  bayHeightFt: doc(8, 'TM 5-302 tower bracing bays (PH)', { unit: 'ft', lifeSafety: true }),
+  // Legs batter inward going up: the base is wider than the cab by this much per side.
+  batterPerSideFt: doc(1.5, 'TM 5-302 tower batter (PH)', { unit: 'ft', lifeSafety: true }),
+  mudsillNominal: doc('6x8', 'TM 5-302 timber mudsill (PH)', { lifeSafety: true }),
+  mudsillLengthFt: doc(4, 'TM 5-302 timber mudsill (PH)', { unit: 'ft' }),
+  cabWallHeightFt: doc(7, 'TM 5-302 tower cab (PH)', { unit: 'ft' }),
+  cabHalfWallFt: doc(3.5, 'TM 5-302 tower cab half-wall (PH)', { unit: 'ft' }),
+  cabRisePer12: doc(4, 'TM 5-302 tower cab roof (PH)', { unit: 'in/ft' }),
+  cabOverhangFt: doc(1, 'TM 5-302 tower cab roof overhang (PH)', { unit: 'ft' }),
+  // EM 385-1-1: a fixed ladder past the cage threshold is not the answer here; the answer is
+  // a stair. normalizeSpec FORCES stair above this height and says so.
+  ladderMaxHeightFt: doc(20, 'EM 385-1-1 fixed-ladder cage threshold — stair required above', { unit: 'ft', lifeSafety: true }),
+} as const;
+
+// ── Tent frames (TM 10-8340 (PH)) ────────────────────────────────────────────
+export const TENT = {
+  gpSmall: doc({ widthFt: 17.5, lengthFt: 29.5, eaveFt: 5.5, ridgeFt: 10 }, 'TM 10-8340 GP Small (PH)'),
+  gpMedium: doc({ widthFt: 16, lengthFt: 32, eaveFt: 5.5, ridgeFt: 11 }, 'TM 10-8340 GP Medium (PH)'),
+  temper: doc({ widthFt: 20, bayFt: 8, eaveFt: 6.5, ridgeFt: 10.5 }, 'TM 10-8340 TEMPER (PH)'),
+  bentSpacingFt: doc(4, 'TM 10-8340 tent-frame bent spacing (PH)', { unit: 'ft' }),
+  bentNominal: doc('2x4', 'TM 10-8340 tent frame (PH)'),
+  deckNominal: doc('2x6', 'TM 10-8340 tent floor decking (PH)'),
+} as const;
+
 // ── Roofing & coverings ──────────────────────────────────────────────────────
 export const ROOFING = {
   rollWidthIn: doc(36, 'FM 5-426 roll roofing: 36-in rolls', { unit: 'in' }),
@@ -199,6 +288,7 @@ export interface LsEntry {
 
 const GROUPS: Record<string, Record<string, Doc<unknown>>> = {
   LUMBER, PANEL, LAYOUT, FOUNDATION, STAIR, LADDER, RAIL, RAMP, ROOFING, SIDING, LABOR,
+  HUT, LATRINE, TOWER, TENT, OPENING,
 } as unknown as Record<string, Record<string, Doc<unknown>>>;
 
 /** Every doctrine constant, flattened — the source for the doc-integrity tests. */

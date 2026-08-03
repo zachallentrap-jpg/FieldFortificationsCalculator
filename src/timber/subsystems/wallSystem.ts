@@ -97,6 +97,14 @@ export function wallContract(
   wallHeightFt: number,
   openings: WallOpenings | undefined,
   baseY = 0,
+  /**
+   * Full-run bands that are NOT openings but still interrupt the wall covering — the SEA hut's
+   * screened band is the first one. They enter as cutouts because that is what they are to
+   * anything laid on the wall: the siding is cut around a screened band exactly the way it is
+   * cut around a window, and a band the siding covers over is a band that does not exist.
+   * Measured from the sole-plate TOP, like an opening's sill, so callers use one convention.
+   */
+  bands: { v0: number; v1: number }[] = [],
 ): WallsContract {
   const surfaces: WallSurface[] = [];
   const bearings: BearingLine[] = [];
@@ -114,6 +122,17 @@ export function wallContract(
       v0: PLATE_THICK_FT + o.sillHeightFt,
       v1: PLATE_THICK_FT + o.sillHeightFt + o.heightFt,
     }));
+    for (const band of bands) {
+      cutouts.push({
+        // Negative indices: a band is not an entry in the openings array, and giving it a real
+        // index would make `openingIndex` ambiguous for anything that resolves it back.
+        openingIndex: -1 - cutouts.length,
+        u0: 0,
+        u1: f.runFt,
+        v0: PLATE_THICK_FT + band.v0,
+        v1: PLATE_THICK_FT + band.v1,
+      });
+    }
     surfaces.push({
       wall: f.wall,
       runFt: f.runFt,
