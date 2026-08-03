@@ -17,3 +17,14 @@ export function fmtFtIn(inches: number): string {
   const frac = rem === 0 ? '' : rem % 4 === 0 ? ' 1/2' : rem % 2 === 0 ? ` ${rem / 2}/4` : ` ${rem}/8`;
   return `${ft}'-${inch}${frac}"`;
 }
+
+/** An inch measurement the way a supply catalogue writes it: 0.75 → `3/4`, 1.5 → `1 1/2`. */
+export function fracIn(inches: number): string {
+  const eighths = Math.round(inches * 8);
+  const whole = Math.floor(eighths / 8);
+  const rem = eighths - whole * 8;
+  if (rem === 0) return `${whole}`;
+  const frac = rem % 4 === 0 ? '1/2' : rem % 2 === 0 ? `${rem / 2}/4` : `${rem}/8`;
+  return whole === 0 ? frac : `${whole} ${frac}`;
+}
+
