@@ -66,10 +66,30 @@ export function subtractCutouts(tile: Rect, cutouts: Rect[]): Rect[] {
  *
  * `span` clips each course to the surface's own width at that height. A rectangle passes the
  * full run at every height and comes out exactly as before; a hip's trapezoid narrows toward
- * the ridge and its ends narrow to a point, and the cut pieces are billed at the width they
- * are actually cut to. The clip is per COURSE rather than per tile because that is how the
- * material is cut on site — you snap a line and cut the row.
+ * the ridge and its ends narrow to a point. The clip is per COURSE rather than per tile
+ * because that is how the material is cut on site — you snap a line and cut the row.
+ *
+ * WHERE a tapered course is clipped is the whole problem, because a rectangle cannot be cut on
+ * a diagonal and every choice leaves an artifact somewhere:
+ *
+ *   'cover' takes the course's WIDEST edge. Nothing is left bare, and the pieces overhang the
+ *     hip by up to half a course into the neighbouring slope's airspace.
+ *   'average' takes the MID-height width. Exact area — the taper is linear, so mid-height is
+ *     the course's true average — and nothing overhangs, at the cost of thin triangular gaps
+ *     hugging the hip lines.
+ *
+ * Both are used, one per layer, and the pairing is what makes a hip look right:
+ * the DECK averages (its gaps sit under the roofing, unseen, and its diagonal offcuts are
+ * genuinely reusable because a hip's four corners are mirror pairs — the triangle cut off at
+ * one is the piece needed at another), and the ROOFING covers (it is the visible surface, so
+ * it must be complete, and a small overlap along the hip reads as the hip cap it would have).
+ *
+ * Getting this backwards is what the first two attempts did, and both looked plausible in a
+ * summary: averaging BOTH layers put diamond-shaped holes along every hip with framing showing
+ * through, and covering both floated tan deck panels above the neighbouring roofing.
  */
+export type TaperClip = 'cover' | 'average';
+
 export function tileSurface(
   runFt: number,
   heightFt: number,
@@ -77,31 +97,17 @@ export function tileSurface(
   sheetHFt: number,
   stagger = 0,
   span?: (v: number) => { lo: number; hi: number },
+  clip: TaperClip = 'cover',
 ): Tile[] {
   const tiles: Tile[] = [];
   let row = 0;
   for (let v = 0; v < heightFt - EPS; v += sheetHFt, row++) {
     const v1 = Math.min(v + sheetHFt, heightFt);
-    // AT THE COURSE'S WIDEST EDGE — the sheet is cut from stock big enough to reach the hip,
-    // and the diagonal offcut is waste. Two other rules were tried and both are worse:
-    //
-    //   mid-height: the areas cancel exactly, which is a satisfying number and a roof with
-    //     HOLES. Measured on a 48x20 hip: 3.5% of each long slope and 15% of each end left
-    //     bare, in diamonds along the hip lines with framing showing through them. It was
-    //     billing the average and covering the average, in the wrong places.
-    //   narrowest edge: the same holes, twice as large.
-    //
-    // Widest covers everything, and the extra it bills is not an error — it is the offcut. A
-    // hip genuinely consumes more sheet material than a gable of the same roof area, because
-    // every sheet along a hip is cut on a diagonal and the triangle goes in the scrap pile.
-    // Billing the covered area instead would send a section out short by exactly that waste.
-    //
-    // What it costs, stated: a rectangle cannot be cut on a diagonal, so the drawn pieces
-    // overhang the hip line by up to half a course and interleave with the adjacent slope's.
-    const a = span ? span(v) : { lo: 0, hi: runFt };
-    const b = span ? span(v1) : { lo: 0, hi: runFt };
-    const lo = Math.min(a.lo, b.lo);
-    const hi = Math.max(a.hi, b.hi);
+    const edges = span
+      ? (clip === 'average' ? [span((v + v1) / 2)] : [span(v), span(v1)])
+      : [{ lo: 0, hi: runFt }];
+    const lo = Math.min(...edges.map((e) => e.lo));
+    const hi = Math.max(...edges.map((e) => e.hi));
     if (hi - lo <= EPS) continue; // the point at the top of a hip end — nothing to cut
     const off = row % 2 === 1 ? stagger : 0;
     let u = lo;
@@ -292,7 +298,7 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
     const sheetH = PANEL.widthFt.value as number; // 4 ft up the slope
     for (const plane of planes) {
       for (const t of tileSurface(plane.eaveLengthFt, plane.slopeLengthFt, sheetW, sheetH, 0,
-        (v) => planeSpanAt(plane, v))) {
+        (v) => planeSpanAt(plane, v), 'average')) {
         const p = roofTilePlacement(plane, t, rafterHalfFt + thick / 2);
         emit('roofPanel', `${PANEL.widthFt.value}x${PANEL.lengthFt.value} panel`, {
           cutLengthFt: t.u1 - t.u0,
@@ -335,9 +341,9 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
         // can never produce an empty course.
         const v1 = Math.min(v0 + courseWFt, plane.slopeLengthFt);
         // A hip's courses get SHORTER toward the ridge, and on its triangular ends they run
-        // out to nothing. Widest edge, for the same reason as the deck tiler above: roll goods
-        // are cut to reach the hip and the diagonal offcut is waste, so covering the average
-        // would leave stripes of bare deck along both hips.
+        // out to nothing. Roofing is the VISIBLE surface, so it takes the course's widest edge
+        // and is complete: averaging it leaves stripes of bare deck along both hips. The small
+        // overlap where it crosses a hip reads as the hip cap it would have on a real roof.
         const a = planeSpanAt(plane, v0);
         const b = planeSpanAt(plane, v1);
         const lo = Math.min(a.lo, b.lo);

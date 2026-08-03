@@ -90,8 +90,8 @@ test('a hip has FOUR roof surfaces, two of them triangular', () => {
 });
 
 /** Fraction of a plane's true outline that some tile actually lands on. */
-function coverageOf(plane: ReturnType<typeof roofPlanes>[number], sheetW: number, sheetH: number): number {
-  const tiles = tileSurface(plane.eaveLengthFt, plane.slopeLengthFt, sheetW, sheetH, 0, (v) => planeSpanAt(plane, v));
+function coverageOf(plane: ReturnType<typeof roofPlanes>[number], sheetW: number, sheetH: number, clip: 'cover' | 'average' = 'cover'): number {
+  const tiles = tileSurface(plane.eaveLengthFt, plane.slopeLengthFt, sheetW, sheetH, 0, (v) => planeSpanAt(plane, v), clip);
   let inside = 0;
   let covered = 0;
   const N = 140;
@@ -108,30 +108,56 @@ function coverageOf(plane: ReturnType<typeof roofPlanes>[number], sheetW: number
   return inside === 0 ? 1 : covered / inside;
 }
 
-test('THE COVERAGE CHECK: no part of a hip is left bare', () => {
+test('THE COVERAGE CHECK: the VISIBLE surface of a hip is complete', () => {
   // The failure this exists for is subtle and looks fine in a summary: clipping each course at
   // its MID-height makes the billed area come out exactly right, and leaves the roof full of
   // diamond-shaped holes along the hip lines with framing showing through. Measured, before the
   // fix: 96.5% of each long slope and 85.1% of each end. A number that averages correctly is
-  // not the same as a roof that is covered.
+  // not the same as a roof that is covered — which is why the ROOFING covers.
   const spec = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset));
   spec.roof = { kind: 'hip', risePer12: 6, overhangFt: 1 };
   for (const plane of roofPlanes(spec, 0)) {
-    const c = coverageOf(plane, 4, 8);
-    assert.ok(c > 0.999, `${plane.id}: only ${(c * 100).toFixed(1)}% covered`);
+    const c = coverageOf(plane, 3, 3, 'cover');
+    assert.ok(c > 0.999, `${plane.id}: only ${(c * 100).toFixed(1)}% of the visible surface covered`);
   }
 });
 
-test('a hip bills MORE sheet than its area, because the offcuts are real', () => {
-  // Not an error and not a fudge: every sheet along a hip is cut on a diagonal and the triangle
-  // goes in the scrap pile. Billing the covered area would send a section out short by exactly
-  // that waste. A gable has no diagonal cuts, so its material IS its area.
+test('the two layers are clipped differently, and the pairing is the point', () => {
+  // Covering BOTH floats tan deck panels above the neighbouring slope's roofing where they
+  // cross a hip — the artifact the render showed. Averaging both puts holes in the visible
+  // surface. Deck averages (its gaps hide under the roofing) and roofing covers.
+  const spec = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset));
+  spec.roof = { kind: 'hip', risePer12: 6, overhangFt: 1 };
+  const end = roofPlanes(spec, 0).find((p) => p.topLengthFt === 0)!;
+  const cover = tileSurface(end.eaveLengthFt, end.slopeLengthFt, 4, 8, 0, (v) => planeSpanAt(end, v), 'cover');
+  const avg = tileSurface(end.eaveLengthFt, end.slopeLengthFt, 4, 8, 0, (v) => planeSpanAt(end, v), 'average');
+  // How far the TOP course reaches, not how wide one sheet is — sheets are capped at 4 ft
+  // either way, so a per-sheet comparison would have found no difference at all.
+  const topReach = (t: typeof cover) => {
+    const vTop = Math.max(...t.map((x) => x.v0));
+    const row = t.filter((x) => x.v0 === vTop);
+    return Math.max(...row.map((x) => x.u1)) - Math.min(...row.map((x) => x.u0));
+  };
+  assert.ok(topReach(cover) > topReach(avg), `covering ${topReach(cover)} must reach further than averaging ${topReach(avg)}`);
+  assert.ok(coverageOf(end, 4, 8, 'average') < 0.999, 'averaging genuinely leaves gaps — that is the trade');
+});
+
+test('the deck bills its true area — a hip\'s offcuts are reusable', () => {
+  // A hip's four corners are mirror pairs, so the diagonal triangle cut off at one is the piece
+  // needed at another. That is why the DECK is counted at its true area rather than at the
+  // rectangle each sheet is cut from, and why it comes out equal to the gable's.
   const hip = areaOf(hipModel(), 'roofPanel');
   const gable = areaOf(gableModel(), 'roofPanel');
   assert.ok(hip > 0, 'a hip with no deck is the bug all of this exists for');
-  assert.ok(hip > gable, `a hip cannot need less sheet than a gable: ${hip.toFixed(0)} vs ${gable.toFixed(0)}`);
-  // Bounded — this is trim waste, not a second roof.
-  assert.ok(hip < gable * 1.25, `${(100 * (hip / gable - 1)).toFixed(0)}% waste is too much to be trim`);
+  assert.ok(Math.abs(hip - gable) < 1, `deck: hip ${hip.toFixed(1)} sf vs gable ${gable.toFixed(1)} sf`);
+});
+
+test('the roofing bills MORE than the deck, because it has to reach the hip', () => {
+  const hipRoofing = areaOf(hipModel(), 'roofingCourse');
+  const gableRoofing = areaOf(gableModel(), 'roofingCourse');
+  assert.ok(hipRoofing > gableRoofing, `${hipRoofing.toFixed(0)} vs ${gableRoofing.toFixed(0)}`);
+  // Bounded — this is trim at the hips, not a second roof.
+  assert.ok(hipRoofing < gableRoofing * 1.25, `${(100 * (hipRoofing / gableRoofing - 1)).toFixed(0)}% is too much to be trim`);
 });
 
 test('the two roofs cover the same PLAN — the surfaces themselves are equal', () => {
