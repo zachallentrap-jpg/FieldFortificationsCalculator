@@ -19,6 +19,7 @@ import type { StructureModel } from '../../timber/families/index';
 import type { BuildingSpec } from '../../timber/spec';
 import { bomSummary, classifyNominal } from '../../timber/bom';
 import { fastenerTakeoff, sheetTakeoff } from '../../timber/fasteners';
+import { COVER_DEPTH_NOTE } from '../../timber/doctrine';
 import { fmtFtIn } from './studio';
 import { plainName } from './labels';
 
@@ -166,6 +167,7 @@ export function commandSheetHtml(input: SheetInput): string {
 <body>
   <h1>${esc(title)}</h1>
   <p class="lineage">${esc(lineage)}</p>
+  ${model.spec.family === 'bunker' ? `<p class="warn">${esc(COVER_DEPTH_NOTE)}</p>` : ''}
 
   <div class="two">
     <section>

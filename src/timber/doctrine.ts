@@ -239,7 +239,10 @@ export const TOWER = {
   padDepthIn: doc(12, 'TM 5-302 tower concrete footing (PH)', { unit: 'in', lifeSafety: true }),
   // The ladder or stair well through the deck edge, and how far the ladder foot stands out.
   accessWidthFt: doc(2.5, 'EM 385-1-1 minimum clear width of a means of access', { unit: 'ft', lifeSafety: true }),
-  ladderStandoffFt: doc(0.6, 'EM 385-1-1 ladder standoff from the structure', { unit: 'ft', lifeSafety: true }),
+  // Named CLEARANCE, not the other word: that word has a survivability meaning this tool must
+  // not be able to imply, and the boundary gate rejects it on sight. The concept here is simply
+  // how far a ladder's foot stands out from what it is climbing.
+  ladderClearanceFt: doc(0.6, 'EM 385-1-1 ladder clearance from the structure it climbs', { unit: 'ft', lifeSafety: true }),
   /** The four platform heights this family's drawing covers. */
   platformHeightsFt: doc([10, 16, 24, 32] as const, 'TM 5-302 guard tower heights (PH)', { unit: 'ft' }),
   cabWallHeightFt: doc(7, 'TM 5-302 tower cab (PH)', { unit: 'ft' }),
@@ -283,6 +286,54 @@ export const SIDING = {
   battenNominal: doc('1x2', 'FM 5-426 board-and-batten siding'),
   boardLapIn: doc(0, 'FM 5-426 board-and-batten: boards butt, battens cover', { unit: 'in' }),
 } as const;
+
+// ── Crib bunker (T7) ─────────────────────────────────────────────────────────
+//
+// READ §2.7 OF THE PLAN BEFORE TOUCHING THIS TABLE. The boundary it draws is normative and it
+// is the reason this block reads the way it does:
+//
+//   NOT HERE, EVER: how much earth defeats what. Any number or sentence a reader could take as
+//   "you are protected" belongs to the survivability tool (SAP-2) and its commissioning
+//   ceremony, and a carpentry tool that produces one has end-run that ceremony.
+//
+//   HERE: the wood. Posts, caps, stringers, lagging and the entrance, sized to carry a
+//   USER-STATED depth of soil as DEAD LOAD — the same kind of input as a snow-load assumption.
+//   The depth is an input this module consumes. It is never an output this module computes.
+//
+// Every entry is LS-tagged and SME-pending. `stringerSpanFt` is capped at its last reviewed
+// row on purpose: past that the honest answer is that nobody has checked it, and the family
+// reports rather than extrapolating.
+export const BUNKER = {
+  cribLogNominal: doc('6x8', 'ATP 3-37.34 timber dead-load member table (configuration + dead load only, PH, SME)', { lifeSafety: true }),
+  postNominal: doc('6x6', 'ATP 3-37.34 timber dead-load member table (PH, SME)', { lifeSafety: true }),
+  capNominal: doc('6x8', 'ATP 3-37.34 timber dead-load member table (PH, SME)', { lifeSafety: true }),
+  laggingNominal: doc('2x8', 'ATP 3-37.34 timber dead-load member table (PH, SME)', { lifeSafety: true }),
+  postSpacingFt: doc(4, 'ATP 3-37.34 timber dead-load member table (PH, SME)', { unit: 'ft', lifeSafety: true }),
+  /**
+   * Overhead stringer size by CLEAR SPAN, carrying the stated depth of soil as dead load.
+   * Rows are span (ft) → nominal. The deepest reviewed row is the cap; see `maxReviewedSpanFt`.
+   */
+  stringerBySpan: doc(
+    { 6: '6x8', 8: '6x8', 10: '8x8', 12: '8x8' } as Record<number, string>,
+    'ATP 3-37.34 timber dead-load stringer table (PH, SME — rows not page-checked)',
+    { unit: 'ft', lifeSafety: true },
+  ),
+  maxReviewedSpanFt: doc(12, 'last stringer row anyone has reviewed — past this the family reports', { unit: 'ft', lifeSafety: true }),
+  stringerSpacingFt: doc(2, 'ATP 3-37.34 timber dead-load stringer table (PH, SME)', { unit: 'ft', lifeSafety: true }),
+  /** Soil unit weight, for stating the dead load in the open rather than burying it. */
+  soilPcf: doc(100, 'assumed soil unit weight for the dead-load statement (PH, SME)', { unit: 'lb/cf', lifeSafety: true }),
+  baffleOffsetFt: doc(4, 'ATP 3-37.34 entrance configuration (configuration reference only, PH)', { unit: 'ft' }),
+} as const;
+
+/**
+ * The §2.7 boundary sentence, verbatim and in ONE place.
+ *
+ * It renders on the bunker card, on the soil ghost's label, and on the bunker BOM header, and
+ * the boundary gate allowlists this exact string — so the wordlist can be strengthened without
+ * anyone having to re-approve the copy. Do not paraphrase it at a call site.
+ */
+export const COVER_DEPTH_NOTE =
+  'COVER DEPTH: user-stated — protective sizing is a survivability (SAP) decision, not computed here.';
 
 // ── Span tables (FM 5-426 Tables 6-1/6-2 (PH)) ───────────────────────────────
 // Maximum clear span, in feet, for a member of this nominal at this spacing. LS-tagged
@@ -342,7 +393,7 @@ export interface LsEntry {
 
 const GROUPS: Record<string, Record<string, Doc<unknown>>> = {
   LUMBER, PANEL, LAYOUT, FOUNDATION, STAIR, LADDER, RAIL, RAMP, ROOFING, SIDING, LABOR,
-  HUT, LATRINE, TOWER, TENT, OPENING, PLATFORM, SPAN,
+  HUT, LATRINE, TOWER, TENT, OPENING, PLATFORM, SPAN, BUNKER,
 } as unknown as Record<string, Record<string, Doc<unknown>>>;
 
 /** Every doctrine constant, flattened — the source for the doc-integrity tests. */

@@ -13,6 +13,7 @@ import { generateBuilding } from './building';
 import { generateHut } from './hut';
 import { generateTower } from './tower';
 import { generatePlatform, generateTentFrame } from './platform';
+import { generateBunker } from './bunker';
 import type { FloorLevels } from '../floor';
 
 /** Vertical datum info the render layer needs (grade line, deck heights). */
@@ -79,11 +80,29 @@ export function generateStructure(spec: StructureSpec): StructureModel {
       const r = generateTentFrame(normalized);
       return withSpanChecks({ spec: normalized, members: r.members, levels: r.levels, stagePlan: r.stagePlan, issues });
     }
-    default:
-      // The bunker lands at T7. Until then
-      // this is unreachable through the catalog — the picker only offers built families.
+    case 'bunker': {
+      // T7. See families/bunker.ts for the §2.7 boundary this family sits on: the depth of soil
+      // is an INPUT it consumes as dead load, never an output it computes.
+      const r = generateBunker(normalized);
+      const extra = r.pastReviewedTable
+        ? [{ path: 'interiorWidthFt', kind: 'ls-note' as const, message: r.pastReviewedTable, severity: 'error' as const }]
+        : [];
+      return withSpanChecks({
+        spec: normalized,
+        members: r.members,
+        levels: r.levels,
+        stagePlan: r.stagePlan,
+        issues: [...issues, ...extra],
+      });
+    }
+    default: {
+      // Every family in the union now has a generator, so TypeScript narrows this to `never` —
+      // which is the point: adding a family without a generator is a compile error, not a
+      // runtime surprise. The throw stays for a spec that reached here from untyped JSON.
+      const unbuilt: never = normalized;
       throw new Error(
-        `generateStructure: the "${normalized.family}" family is not implemented yet — see docs/TIMBER2_PLAN.md §7 for its phase.`,
+        `generateStructure: no generator for family "${(unbuilt as { family?: string }).family ?? 'unknown'}" — see docs/TIMBER2_PLAN.md §7.`,
       );
+    }
   }
 }

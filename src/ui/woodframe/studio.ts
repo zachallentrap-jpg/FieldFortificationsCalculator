@@ -21,6 +21,7 @@ import type { StructureModel } from '../../timber/families/index';
 import { bomSummary } from '../../timber/bom';
 import { fastenerTakeoff, sheetTakeoff } from '../../timber/fasteners';
 import { FEATURES } from './mode';
+import { COVER_DEPTH_NOTE } from '../../timber/doctrine';
 import { plainName, whatItDoes } from './labels';
 import {
   planeForState, initialCutawayState, toggleAxis, setDepth, passesCut, CUT_AXES, axisById,
@@ -151,6 +152,15 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
       const tileFt = corrugated ? 26 / 12 : 3;
       p = roofingSheet(group, corrugated ? 'corrugated' : 'roll', Math.round(m.cutLength / 12 / tileFt), corrugated ? 1 : Math.round(m.actual.d / 36));
       p.scale.set(m.cutLength / 12, m.actual.d / 12, Math.max(0.02, m.actual.w / 12));
+    } else if (m.role === 'soilGhost') {
+      // MASSING, not material. Translucent and unlit so it can never be mistaken for something
+      // that was built, and its member card carries the boundary sentence as its doctrine ref.
+      p = new THREE.Group();
+      p.add(new THREE.Mesh(
+        new THREE.BoxGeometry(Math.max(0.05, m.cutLength / 12), Math.max(0.05, m.actual.w / 12), Math.max(0.05, m.actual.d / 12)),
+        new THREE.MeshBasicMaterial({ color: 0x8a7a5e, transparent: true, opacity: 0.22, depthWrite: false }),
+      ));
+      group.add(p);
     } else if (m.role === 'screenPanel') {
       // See-through, because that is what the member IS. Drawn as plywood it read as a wall.
       p = screenSheet(group, m.cutLength, m.actual.d);
@@ -444,7 +454,13 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     const forHardware = showAll ? model.members : model.members.filter((m) => m.stage <= stage);
     const hardware = FEATURES.hardwareTakeoff ? hardwareHtml(forHardware, showAll ? null : stage) : '';
 
-    dom.stagePanel.innerHTML = `${detail}${note}
+    // Plan §2.7: the boundary sentence renders on the bunker's BOM header, on its card, and on
+    // the soil ghost's label. Three surfaces, one string, taken from doctrine and never retyped.
+    const boundary = model.spec.family === 'bunker'
+      ? `<p class="doctrine boundary">${esc(COVER_DEPTH_NOTE)}</p>`
+      : '';
+
+    dom.stagePanel.innerHTML = `${detail}${note}${boundary}
       <h2>Cut list${cur ? ' — this stage' : ''}</h2>
       <table><thead><tr><th>Stock</th><th class="num">Cut</th><th class="num">Pcs</th><th>Use</th></tr></thead><tbody>${lines}</tbody></table>
       ${hardware}`;

@@ -218,7 +218,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
   const accessEdgeGap: [number, number] = [spec.cabPlanFt / 2 - accessWidth / 2, spec.cabPlanFt / 2 + accessWidth / 2];
   if (spec.access === 'ladder') {
     const { members } = generateLadder({
-      base: [cx, cx - deckHalf - (TOWER.ladderStandoffFt.value as number)],
+      base: [cx, cx - deckHalf - (TOWER.ladderClearanceFt.value as number)],
       facing: [0, 1],
       baseY: 0,
       landingY: deckY,

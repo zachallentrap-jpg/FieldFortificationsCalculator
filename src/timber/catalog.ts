@@ -11,7 +11,7 @@
 // different tool than the code is impossible rather than merely discouraged.
 
 import type { StructureSpec, RoofSpec, CoveringSpec, StructureFamily } from './spec';
-import { HUT, LATRINE, TOWER, TENT, RAIL, RAMP, LADDER, citeOf } from './doctrine';
+import { HUT, LATRINE, TOWER, TENT, RAIL, RAMP, LADDER, BUNKER, COVER_DEPTH_NOTE, citeOf } from './doctrine';
 import { hutDims } from './families/hut';
 
 export type FamilyId =
@@ -466,10 +466,55 @@ const STRONGBACK: FamilyDef = {
   cutaway: { axis: 'z', frac: 0.5, keep: -1, reason: 'Cut down the length — see every bent and the ridge running over them.' },
 };
 
+// ── The crib bunker (T7) ─────────────────────────────────────────────────────
+// The one card that sits on the §2.7 boundary. Its blurb carries the boundary sentence
+// verbatim (from doctrine.COVER_DEPTH_NOTE, never retyped), and the boundary gate allowlists
+// exactly that string so the wordlist can be tightened without re-approving the copy.
+
+const CRIB_BUNKER: FamilyDef = {
+  id: 'crib-bunker',
+  group: 'bunkers',
+  name: 'Crib bunker',
+  oneLiner: `The timber only: crib or post-and-plank walls, caps, and overhead stringers sized for a depth of soil you state. ${COVER_DEPTH_NOTE}`,
+  specBranch: 'bunker',
+  lineage: 'ATP 3-37.34 timber dead-load member/stringer tables (configuration + dead load only, PH, SME review pending); FM 5-426 ch. 6 for the carpentry',
+  capacity: 'by interior plan',
+  shipped: true,
+  rationale:
+    'What this card computes is a wood cut list for a stated dead load, the same way a roof is '
+    + 'sized for a stated snow load. Excavation, spoil and cover depth are survivability decisions '
+    + 'and stay in the survivability tool. The stringer table is capped at its last reviewed row: '
+    + 'past that the card tells you nobody has checked it rather than extrapolating.',
+  preset: {
+    family: 'bunker',
+    dims: { lengthFt: 16, widthFt: 10 },
+    spacing: STD_SPACING,
+    coverings: NO_COVERINGS,
+    interiorLengthFt: 16,
+    interiorWidthFt: 10,
+    clearHeightFt: 6.5,
+    designCoverDepthFt: 2,
+    wallType: 'post-plank',
+    entrance: 'baffle',
+    showSoilCover: true,
+  } as StructureSpec,
+  locks: [
+    { path: 'stringer', label: 'Overhead stringers', value: 'from the dead-load table by clear span', cite: citeOf(BUNKER.stringerBySpan), lifeSafety: true },
+    // Cited to the boundary decision, not to a manual, because there is no manual page that
+    // makes this number true — the operator states it and this tool consumes it. The sentence
+    // itself renders on the card, the input's help, the ghost label and the BOM header.
+    { path: 'designCoverDepthFt', label: 'Cover depth', value: 'user-stated input, consumed as dead load', cite: 'TIMBER2_PLAN §2.7 boundary — stated by the operator, never computed here', lifeSafety: true },
+    { path: 'post.spacing', label: 'Post spacing', value: `${BUNKER.postSpacingFt.value} ft`, cite: citeOf(BUNKER.postSpacingFt), lifeSafety: true },
+  ],
+  roofs: ['none'],
+  coverings: {},
+  cutaway: { axis: 'z', frac: 0.5, keep: -1, reason: 'Cut through the entrance — see the wall section, the caps, and the stringers over the clear span.', ghost: 'soil' },
+};
+
 /** The one table (TD3). Families land as their phases ship; `shipped` gates the picker. */
 export const FAMILY_TABLE: readonly FamilyDef[] = [
   GP_FRAME, SEA_HUT, SWA_HUT, B_HUT, SQUAD_HUT, GUARD_SHACK, STORAGE_SHED,
-  TOWER_CARD, TENT_FLOOR, STRONGBACK, PLATFORM_CARD, LATRINE_CARD, CUSTOM,
+  TOWER_CARD, TENT_FLOOR, STRONGBACK, PLATFORM_CARD, CRIB_BUNKER, LATRINE_CARD, CUSTOM,
 ];
 
 export function familyById(id: FamilyId): FamilyDef | undefined {

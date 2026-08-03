@@ -46,7 +46,15 @@ test('every lock names its value AND its citation', () => {
     for (const lock of f.locks) {
       assert.ok(lock.label.length > 0, `${f.id}: a lock with no label is a mystery`);
       assert.ok(lock.value.length > 0, `${f.id}/${lock.label}: no value`);
-      assert.ok(/\(PH\)|FM |TM |EM |UFC /.test(lock.cite), `${f.id}/${lock.label}: cite "${lock.cite}"`);
+      // A lock's authority is normally a publication. One category is not: a value the OPERATOR
+      // states, which this tool consumes rather than derives — the bunker's cover depth is the
+      // only one, and its authority is the plan's §2.7 boundary decision itself. That is a real
+      // citation, just not a field manual, so the gate learns about it rather than being
+      // loosened: anything else still has to name a publication or carry (PH).
+      assert.ok(
+        /\(PH\)|FM |TM |EM |UFC |TIMBER2_PLAN §/.test(lock.cite),
+        `${f.id}/${lock.label}: cite "${lock.cite}"`,
+      );
     }
   }
 });

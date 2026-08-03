@@ -12,6 +12,7 @@
 
 import type { FamilyDef, FamilyId } from '../../timber/catalog';
 import { familyById } from '../../timber/catalog';
+import { COVER_DEPTH_NOTE } from '../../timber/doctrine';
 import { SPEC_PATH_DEFS, specPath } from '../../timber/spec';
 
 export type ControlKind = 'number' | 'select' | 'toggle' | 'openings-editor';
@@ -141,6 +142,35 @@ export function configSchemaFor(familyId: FamilyId): PanelSchema {
           path: 'footing', label: 'Footing', control: 'select', options: ['timber-mudsill', 'concrete-pad'],
           help: 'A timber mudsill spreads the leg load over tamped fill and can be built with what is on the truck. A poured pad is the deliberate version.',
         },
+      ],
+    });
+    return { family: familyId, groups };
+  }
+
+  if (family.specBranch === 'bunker') {
+    groups.push({
+      title: '1 · THE INSIDE',
+      rows: ['interiorLengthFt', 'interiorWidthFt', 'clearHeightFt']
+        .map((p) => numberRow(p, family)).filter(Boolean) as PanelRow[],
+    });
+    groups.push({
+      title: '2 · THE TIMBER',
+      rows: [
+        { path: 'wallType', label: 'Walls', control: 'select', options: ['post-plank', 'crib'], help: 'Posts with lagging behind them, or courses of logs laid at right angles to each other.' },
+        { path: 'entrance', label: 'Entrance', control: 'select', options: ['open', 'baffle'], help: 'Straight through, or offset so the way in turns.' },
+      ],
+    });
+    groups.push({
+      title: '3 · DEAD LOAD',
+      rows: [
+        {
+          ...(numberRow('designCoverDepthFt', family) ?? { path: 'designCoverDepthFt', label: 'Cover depth', control: 'number' as const }),
+          // The one input on this panel that is NOT a carpentry decision. Its help text is the
+          // boundary sentence, verbatim, so the person typing the number reads what it means.
+          help: COVER_DEPTH_NOTE,
+          cite: 'stated design load — like a snow-load assumption',
+        },
+        { path: 'showSoilCover', label: 'Show cover as massing', control: 'toggle', help: 'Draws the stated depth as a ghost so you can see what the timber is under. It is never billed.' },
       ],
     });
     return { family: familyId, groups };
