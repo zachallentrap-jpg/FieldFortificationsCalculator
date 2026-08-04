@@ -116,6 +116,30 @@ something real to show and an empty record honestly means *none*.
 does a roofing course, and insect screen is a `MeshBasicMaterial` because it has to be
 see-through. Clicking a panel highlighted zero pixels.
 
+**Duplicate stage-plan keys stamped hip and shed members into "Ceiling joists".** The legacy
+building plan spelled its subfloor row `floor` and its ceiling row `roof-frame`, and
+`requireOrdinal` — first match, by design — answered with the FIRST one. Every ridge, hip, common
+and jack on a hip roof landed at ordinal 7 and the member card printed *"Stage 7 — Ceiling
+joists"* under a hip rafter, which is how it was caught. The plan is now built per roof kind
+(`stagePlanForBuilding`) with unique keys — `subfloor` and `ceiling` joined the vocabulary — a
+shed's plan has no ceiling row at all, and a hip emits real ceiling joists so its ceiling stage
+is never an empty stop. Pinned by a uniqueness test over every roof kind.
+
+**Purlins ran full eave length on tapered planes and sat inside the rafters.** `generatePurlins`
+never consulted `planeSpanAt`, so on a hip every upper course lanced past the hip lines and hung
+over the neighbouring slope; its lift was half its own thickness instead of rafter-half plus
+that, so the sticks were also buried in the rafters' top halves; and the roofing counted purlin
+thickness as zero, landing flush with the hip rafters' top edges and letting them break through
+the metal. One member frame convention (`roofTilePlacement`'s), one clip per course at its
+up-slope edge, and purlin thickness in the covering's deck stack fixed all three. Pinned by a
+plane-coordinate contract test (offset, both ends inside the span, nothing past the peak).
+
+**The stage scrubber's ghosts were clickable.** three.js raycasters test meshes the renderer is
+hiding (`visible === false` is checked in the renderer, not `Raycaster`), so with a build
+scrubbed back to the frame stage a tap on a rafter selected the invisible roofing above it and
+the card named a piece that was not on screen. `memberAt` now skips hidden hits, so the ray
+falls through to what you can actually see — same rule the cutaway already enforced.
+
 ---
 
 ## 3. The invariants that now hold

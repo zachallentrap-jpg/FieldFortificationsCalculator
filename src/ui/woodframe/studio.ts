@@ -625,7 +625,13 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
       if (!passesCut([h.point.x, h.point.y, h.point.z], eq)) continue;
       let o: THREE.Object3D | null = h.object;
       while (o && !o.userData.memberId) o = o.parent;
-      if (o?.userData.memberId) return o.userData.memberId as string;
+      if (!o?.userData.memberId) continue;
+      // Same rule for the stage scrubber: three's raycaster tests meshes the renderer is
+      // hiding, so with the build scrubbed back to stage 8 a tap on a rafter would select
+      // the invisible roofing above it — and the card would name a piece that is not on
+      // screen. What you see is what you pick; a hidden hit lets the ray keep going.
+      if (!o.visible) continue;
+      return o.userData.memberId as string;
     }
     return null;
   }

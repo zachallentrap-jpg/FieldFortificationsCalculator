@@ -307,8 +307,14 @@ export interface RoofCoveringInput {
 export function generateRoofCovering(input: RoofCoveringInput): Member[] {
   const emit = makeEmitter('CV');
   const { planes, deck, roofing, stageDeck, stageRoofing, rafterHalfFt, deckLaidElsewhere } = input;
-  // What is UNDER the roofing, regardless of who put it there.
-  const deckThick = deck === 'plywood' || deck === 'boards' ? (PANEL.roofDeckThickIn.value as number) / IN_PER_FT : 0;
+  // What is UNDER the roofing, regardless of who put it there. Purlins are emitted by
+  // `generatePurlins`, not here — but they are still a deck, and their flat thickness is what
+  // holds the roofing off the rafters. Ignoring it left the corrugated sheets at rafter
+  // height with the hip rafters' top edges breaking through them.
+  const deckThick =
+    deck === 'plywood' || deck === 'boards' ? (PANEL.roofDeckThickIn.value as number) / IN_PER_FT
+    : deck === 'purlins' ? DRESSED[LUMBER.purlinNominal.value as string]!.w / IN_PER_FT
+    : 0;
 
   // ── Deck
   if (!deckLaidElsewhere && (deck === 'plywood' || deck === 'boards')) {

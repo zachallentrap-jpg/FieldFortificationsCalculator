@@ -16,9 +16,11 @@ export type StageKey =
   | 'layout'
   | 'foundation'
   | 'floor'
+  | 'subfloor'
   | 'walls'
   | 'walls-l2'
   | 'plates'
+  | 'ceiling'
   | 'roof-frame'
   | 'roof-deck'
   | 'roofing'
@@ -41,13 +43,66 @@ export interface StagePlanEntry {
 }
 
 export const STAGE_KEYS: readonly StageKey[] = [
-  'layout', 'foundation', 'floor', 'walls', 'walls-l2', 'plates', 'roof-frame', 'roof-deck',
-  'roofing', 'sheathing', 'siding', 'openings-built', 'stairs-access', 'railings', 'platform',
-  'tent-frame', 'cribwork', 'soil-ghost', 'finish',
+  'layout', 'foundation', 'floor', 'subfloor', 'walls', 'walls-l2', 'plates', 'ceiling',
+  'roof-frame', 'roof-deck', 'roofing', 'sheathing', 'siding', 'openings-built',
+  'stairs-access', 'railings', 'platform', 'tent-frame', 'cribwork', 'soil-ghost', 'finish',
 ] as const;
 
 export function stagePlan(rows: { key: StageKey; label: string; detail: string }[]): StagePlanEntry[] {
   return rows.map((r, i) => ({ ordinal: i + 1, ...r }));
+}
+
+/**
+ * The building plan, shaped by the roof. Rows 1–6 never move — the frozen floor and wall
+ * generators stamp those ordinals as literals — but the roof rows are the roof's own:
+ *
+ *   gable | hip | pyramid   ceiling joists (7), then rafters (8) — the full legacy sequence.
+ *   shed | flat             no ceiling frame; the rafters span low plate to high plate and
+ *                           tie the walls themselves, so the rafter row IS row 7.
+ *   none                    walls, then closing in. No roof rows at all — a plan that lists
+ *                           stages nothing will ever land in is a scrubber full of dead stops.
+ *
+ * EVERY KEY IN A PLAN IS UNIQUE. The first cut of this spelled the deck row 'floor' and the
+ * ceiling row 'roof-frame', and `requireOrdinal` — first match by design — quietly stamped
+ * every hip and shed member into "Ceiling joists". The member card even printed it. Unique
+ * keys make "which ordinal is X" a question with one answer.
+ */
+export function stagePlanForBuilding(
+  roofKind: 'gable' | 'hip' | 'pyramid' | 'shed' | 'flat' | 'none',
+): StagePlanEntry[] {
+  const base: { key: StageKey; label: string; detail: string }[] = [
+    { key: 'layout', label: STAGES[0]!.name, detail: 'Batter boards, posts and footers set to the building lines.' },
+    { key: 'foundation', label: STAGES[1]!.name, detail: 'Sills bedded and the built-up girder set — everything above bears on this.' },
+    { key: 'floor', label: STAGES[2]!.name, detail: 'Joists over the girder, bridging rows to share the load between them.' },
+    { key: 'subfloor', label: STAGES[3]!.name, detail: 'Deck panels tie the joists into one stiff floor to build the walls on.' },
+    { key: 'walls', label: STAGES[4]!.name, detail: 'Walls framed flat and raised: plates, studs, and the framing around every opening.' },
+    { key: 'plates', label: STAGES[5]!.name, detail: 'Cap plates lap the corners and the let-in braces square the walls.' },
+  ];
+  const siding = {
+    key: 'siding' as StageKey,
+    label: STAGES[10]!.name,
+    detail: 'Siding and exterior finish close the building in.',
+  };
+  if (roofKind === 'shed' || roofKind === 'flat') {
+    return stagePlan([
+      ...base,
+      { key: 'roof-frame', label: 'Rafters set', detail: 'Rafters bear low plate to high plate; the pony wall and rake studs frame the height difference.' },
+      { key: 'roof-deck', label: STAGES[8]!.name, detail: 'Sheathing decks the rafters and braces the whole roof plane.' },
+      { key: 'roofing', label: STAGES[9]!.name, detail: 'Roofing covers the deck, laid from the eave up so every lap sheds water.' },
+      siding,
+    ]);
+  }
+  if (roofKind === 'none') {
+    return stagePlan([...base, siding]);
+  }
+  return stagePlan([
+    ...base,
+    { key: 'ceiling', label: STAGES[6]!.name, detail: 'Ceiling joists tie the wall tops together against the rafter thrust.' },
+    { key: 'roof-frame', label: STAGES[7]!.name, detail: 'Rafters bear on the plates against the ridge, cut by the framing-square method.' },
+    { key: 'roof-deck', label: STAGES[8]!.name, detail: 'Sheathing decks the rafters and braces the whole roof plane.' },
+    { key: 'roofing', label: STAGES[9]!.name, detail: 'Roofing covers the deck, laid from the eave up so every lap sheds water.' },
+    siding,
+  ]);
 }
 
 /**
@@ -56,29 +111,7 @@ export function stagePlan(rows: { key: StageKey; label: string; detail: string }
  * `test/timber2-stages.test.ts` asserts, and the reason the compat lock holds for free.
  */
 export function stagePlanForLegacyBuilding(): StagePlanEntry[] {
-  const keys: StageKey[] = [
-    'layout', 'foundation', 'floor', 'floor', 'walls', 'plates',
-    'roof-frame', 'roof-frame', 'roof-deck', 'roofing', 'siding',
-  ];
-  const details: string[] = [
-    'Batter boards, posts and footers set to the building lines.',
-    'Sills bedded and the built-up girder set — everything above bears on this.',
-    'Joists over the girder, bridging rows to share the load between them.',
-    'Deck panels tie the joists into one stiff floor to build the walls on.',
-    'Walls framed flat and raised: plates, studs, and the framing around every opening.',
-    'Cap plates lap the corners and the let-in braces square the walls.',
-    'Ceiling joists tie the wall tops together against the rafter thrust.',
-    'Rafters bear on the plates against the ridge, cut by the framing-square method.',
-    'Sheathing decks the rafters and braces the whole roof plane.',
-    'Roofing covers the deck, laid from the eave up so every lap sheds water.',
-    'Siding and exterior finish close the building in.',
-  ];
-  return STAGES.map((s, i) => ({
-    ordinal: s.id,
-    key: keys[i]!,
-    label: s.name,
-    detail: details[i]!,
-  }));
+  return stagePlanForBuilding('gable');
 }
 
 /** Ordinal of the first entry with this key, or undefined. Families use it to stamp emits. */

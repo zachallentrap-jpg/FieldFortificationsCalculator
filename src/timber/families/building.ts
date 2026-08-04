@@ -18,7 +18,7 @@ import { DRESSED } from '../types';
 import type { BuildingSpec, RoofSpec } from '../spec';
 import { WALL_ORDER, toLegacySpacing } from '../spec';
 import type { StagePlanEntry } from '../stagePlan';
-import { stagePlanForLegacyBuilding, requireOrdinal } from '../stagePlan';
+import { stagePlanForBuilding, requireOrdinal } from '../stagePlan';
 import { generateFloor, floorLevels, type FloorInput, type FloorLevels } from '../floor';
 import { generateWalls, type Opening } from '../walls';
 import { generateRoof } from '../roof';
@@ -113,7 +113,7 @@ function gableOf(roof: RoofSpec): { risePer12: number; overhangFt: number } {
 export function generateBuilding(spec: BuildingSpec): BuildingResult {
   const story = spec.stories[0]!;
   const { lengthFt: L, widthFt: W } = spec.dims;
-  const stagePlan = stagePlanForLegacyBuilding();
+  const stagePlan = stagePlanForBuilding(spec.roof.kind);
   const walls = wallContract(L, W, story.wallHeightFt, story.openings, 0, spec.wallBands ?? []);
   const members: Member[] = [];
   let levels: FloorLevels;
@@ -137,7 +137,7 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
         bearings: walls.bearings,
         deck: 'panel',
         stageFloor: requireOrdinal(stagePlan, 'floor'),
-        stageDeck: requireOrdinal(stagePlan, 'floor') + 1, // the deck follows the joists in the legacy plan
+        stageDeck: requireOrdinal(stagePlan, 'subfloor'),
         prefix: 'FL',
       }),
     );
@@ -182,7 +182,12 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
       }),
     );
   } else if (spec.roof.kind === 'hip') {
-    members.push(...generateHip({ spec, walls, stageRoofFrame: requireOrdinal(stagePlan, 'roof-frame') }));
+    members.push(...generateHip({
+      spec,
+      walls,
+      stageCeiling: requireOrdinal(stagePlan, 'ceiling'),
+      stageRoofFrame: requireOrdinal(stagePlan, 'roof-frame'),
+    }));
   } else if (spec.roof.kind === 'shed' || spec.roof.kind === 'flat') {
     members.push(...generateShed({ spec, walls, stageRoofFrame: requireOrdinal(stagePlan, 'roof-frame') }));
   }
@@ -199,13 +204,17 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
   const deck = deckedByFrozenPath ? 'none' : spec.coverings.roofDeck;
 
   if (spec.coverings.roofDeck === 'purlins' && planes.length > 0) {
-    members.push(...generatePurlins(planes, requireOrdinal(stagePlan, 'roof-deck')));
+    // Purlins sit ON the rafters — the lift is the same half-depth the sheet deck gets.
+    members.push(...generatePurlins(planes, requireOrdinal(stagePlan, 'roof-deck'), rafterHalf));
   }
   if (planes.length > 0 && (deck !== 'none' || spec.coverings.roofing !== 'none')) {
     members.push(
       ...generateRoofCovering({
         planes,
-        deck: spec.coverings.roofDeck === 'purlins' ? 'none' : spec.coverings.roofDeck,
+        // 'purlins' passes through UN-mapped: the covering module emits nothing for it (the
+        // rows above are the deck) but counts its thickness, so the roofing lands on the
+        // purlins instead of floating at rafter height with the hips poking through.
+        deck: spec.coverings.roofDeck,
         deckLaidElsewhere: deckedByFrozenPath,
         roofing: spec.coverings.roofing,
         buildingPaper: spec.coverings.buildingPaper,

@@ -9,9 +9,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateStructure } from '../src/timber/families/index';
 import { subtractCutouts, tileSurface, type Rect } from '../src/timber/subsystems/coverings';
+import { generatePurlins, pyramidPlanes, planeSpanAt } from '../src/timber/subsystems/roofFamilies';
 import { wallContract } from '../src/timber/subsystems/wallSystem';
 import { specFromBuildingInput, type BuildingInput } from '../src/timber/frame';
 import type { BuildingSpec, CoveringSpec } from '../src/timber/spec';
+import { DRESSED } from '../src/timber/types';
+import { LUMBER } from '../src/timber/doctrine';
 
 const area = (r: Rect): number => Math.max(0, r.u1 - r.u0) * Math.max(0, r.v1 - r.v0);
 const overlap = (a: Rect, b: Rect): number =>
@@ -191,6 +194,58 @@ test('purlins give corrugated something to land on without a solid deck (the SEA
   assert.ok(purlins.length >= 3, `expected purlin rows, got ${purlins.length}`);
   assert.equal(model.members.filter((m) => m.role === 'roofPanel').length, 0, 'purlins REPLACE the solid deck');
   assert.ok(model.members.some((m) => m.role === 'roofingCourse'), 'and the metal still goes on');
+});
+
+test('purlins are clipped to their plane and ride ON the rafters — every course, every plane', () => {
+  // The owner's hip roof: purlin sticks ran full eave length on the tapered planes, lancing
+  // out past the hips, and sat half-buried in the rafters. The contract, checked in plane
+  // coordinates: normal offset is exactly rafterHalf + thick/2, both ends inside
+  // `planeSpanAt` at the course's UP-slope edge, and no course crosses the ridge or peak.
+  const rafterHalf = 0.229;
+  const planes = pyramidPlanes([8, 8], 5, 10, 3); // four triangular planes — worst-case taper
+  const purlins = generatePurlins(planes, 4, rafterHalf);
+  assert.ok(purlins.length >= 8, `expected rows on four planes, got ${purlins.length}`);
+  const nominal = LUMBER.purlinNominal.value as string;
+  const thick = DRESSED[nominal]!.w / 12;
+  const face = DRESSED[nominal]!.d / 12;
+  const lift = rafterHalf + thick / 2;
+  const dot = (a: readonly number[], b: readonly number[]): number =>
+    a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
+  for (const m of purlins) {
+    const homes = planes.filter((p) => {
+      const d = [m.position[0] - p.origin[0], m.position[1] - p.origin[1], m.position[2] - p.origin[2]];
+      return Math.abs(dot(d, p.normal) - lift) < 1e-6 && dot(d, p.upSlope) > -1e-6;
+    });
+    assert.equal(homes.length, 1, `${m.id}: expected exactly one home plane, got ${homes.length}`);
+    const p = homes[0]!;
+    const d = [m.position[0] - p.origin[0], m.position[1] - p.origin[1], m.position[2] - p.origin[2]];
+    const u = dot(d, p.alongEave);
+    const v = dot(d, p.upSlope);
+    assert.ok(v <= p.slopeLengthFt - face / 2 + 1e-6, `${m.id}: crosses the peak (v=${v.toFixed(2)})`);
+    const span = planeSpanAt(p, v + face / 2);
+    const halfLen = m.cutLength / 12 / 2; // Member.cutLength is inches
+    assert.ok(u - halfLen >= span.lo - 1e-6, `${m.id}: left end past the hip`);
+    assert.ok(u + halfLen <= span.hi + 1e-6, `${m.id}: right end past the hip`);
+  }
+  const lens = purlins.map((m) => m.cutLength / 12);
+  assert.ok(Math.min(...lens) < Math.max(...lens) - 1, 'tapered planes must produce tapered courses');
+});
+
+test('the owner’s roof: hip + purlins + corrugated stacks and stages correctly end to end', () => {
+  const spec = withCoverings({ roofDeck: 'purlins', roofing: 'corrugated' });
+  const hip: BuildingSpec = { ...spec, roof: { kind: 'hip', risePer12: 4, overhangFt: 1 } };
+  const model = generateStructure(hip);
+  const purlins = model.members.filter((m) => m.role === 'purlin');
+  assert.ok(purlins.length >= 12, `four planes of rows, got ${purlins.length}`);
+  const eaveMax = 20 + 2 * 1; // longest plane width, overhang included
+  for (const m of purlins) {
+    const lenFt = m.cutLength / 12;
+    assert.ok(lenFt <= eaveMax + 1e-6, `${m.id} is ${lenFt.toFixed(1)} ft — wider than the roof`);
+  }
+  const deckStage = model.stagePlan.find((e) => e.key === 'roof-deck')!;
+  for (const m of purlins) assert.equal(m.stage, deckStage.ordinal, `${m.id} outside the deck stage`);
+  assert.ok(model.members.some((m) => m.role === 'roofingCourse'), 'the metal goes on');
+  assert.ok(model.members.some((m) => m.role === 'ridgeCap'), 'ridge and hips get caps');
 });
 
 test('coverings default to none, so the compat path never sees them', () => {

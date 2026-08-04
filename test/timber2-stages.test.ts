@@ -10,7 +10,7 @@ import { generateFrame, specFromBuildingInput, type BuildingInput } from '../src
 import { generateStructure } from '../src/timber/families/index';
 import { bomSummary, boardFeet } from '../src/timber/bom';
 import { STAGES } from '../src/timber/types';
-import { stagePlanForLegacyBuilding, STAGE_KEYS, ordinalOf } from '../src/timber/stagePlan';
+import { stagePlanForBuilding, stagePlanForLegacyBuilding, STAGE_KEYS, ordinalOf } from '../src/timber/stagePlan';
 
 const demo: BuildingInput = {
   lengthFt: 20, widthFt: 16, wallHeightFt: 8,
@@ -32,6 +32,54 @@ test('every plan entry has a key from the closed vocabulary and a real sequence 
   for (const e of stagePlanForLegacyBuilding()) {
     assert.ok(STAGE_KEYS.includes(e.key), `${e.key} is not in the StageKey vocabulary`);
     assert.ok(e.detail.length > 20, `stage ${e.ordinal}: the detail line is what teaches the sequence`);
+  }
+});
+
+test('every building plan has UNIQUE keys — requireOrdinal must have exactly one answer', () => {
+  // The defect this pins down: the legacy plan spelled the subfloor row 'floor' and the
+  // ceiling row 'roof-frame', so requireOrdinal (first match, by design) stamped every hip
+  // and shed member into "Ceiling joists" — and the member card printed it.
+  for (const kind of ['gable', 'hip', 'pyramid', 'shed', 'flat', 'none'] as const) {
+    const plan = stagePlanForBuilding(kind);
+    const keys = plan.map((e) => e.key);
+    assert.equal(new Set(keys).size, keys.length, `${kind}: duplicate keys in [${keys.join(', ')}]`);
+    for (const e of plan) {
+      assert.ok(STAGE_KEYS.includes(e.key), `${kind}: ${e.key} is not in the vocabulary`);
+      assert.ok(e.detail.length > 20, `${kind} stage ${e.ordinal}: missing sequence note`);
+    }
+  }
+});
+
+test('a hip frames at "Rafters & ridge" and ties its plates at "Ceiling joists"', () => {
+  const spec = specFromBuildingInput(demo);
+  const model = generateStructure({ ...spec, roof: { kind: 'hip', risePer12: 4, overhangFt: 1 } });
+  const frame = model.stagePlan.find((e) => e.key === 'roof-frame')!;
+  assert.equal(frame.label, 'Rafters & ridge', 'the hip frame stage is the rafter stage');
+  for (const role of ['ridge', 'rafter', 'hipRafter', 'jackRafter'] as const) {
+    const ms = model.members.filter((m) => m.role === role);
+    assert.ok(ms.length > 0, `hip roof has no ${role}`);
+    for (const m of ms) {
+      assert.equal(m.stage, frame.ordinal, `${m.id} landed at stage ${m.stage}, not ${frame.ordinal}`);
+    }
+  }
+  const ceiling = model.stagePlan.find((e) => e.key === 'ceiling')!;
+  assert.equal(ceiling.label, 'Ceiling joists');
+  const joists = model.members.filter((m) => m.stage === ceiling.ordinal);
+  assert.ok(joists.length >= 3, 'a hip thrusts on its plates like a gable — the ceiling stage must tie them');
+  for (const j of joists) assert.equal(j.role, 'joist');
+});
+
+test('a shed plan has no ceiling row, and its rafters are the roof-frame stage', () => {
+  const spec = specFromBuildingInput(demo);
+  const model = generateStructure({
+    ...spec,
+    roof: { kind: 'shed', risePer12: 2, overhangFt: 1, highSide: 'N' },
+  });
+  assert.equal(model.stagePlan.find((e) => e.key === 'ceiling'), undefined, 'a shed has no ceiling frame');
+  const frame = model.stagePlan.find((e) => e.key === 'roof-frame')!;
+  assert.ok(model.members.some((m) => m.role === 'rafter' && m.stage === frame.ordinal));
+  for (const m of model.members) {
+    assert.ok(m.stage >= 1 && m.stage <= model.stagePlan.length, `${m.id}: stage ${m.stage} outside the shed plan`);
   }
 });
 

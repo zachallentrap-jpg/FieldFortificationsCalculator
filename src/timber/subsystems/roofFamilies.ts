@@ -380,24 +380,51 @@ export function generateShed(input: ShedInput): Member[] {
   return emit.members;
 }
 
-/** Purlin deck (SEA-hut pattern): 2x4 flat, spaced up the slope, for corrugated roofing. */
-export function generatePurlins(planes: RoofPlane[], stage: number): Member[] {
+/**
+ * Purlin deck (SEA-hut pattern): 2x4 flat, spaced up the slope, for corrugated roofing.
+ *
+ * Three placement rules, each earned by a screenshot of the roof doing without it:
+ *
+ *   CLIPPED TO THE PLANE. A course is only as long as the plane is wide at its UP-SLOPE edge
+ *   (`planeSpanAt`) — on a hip that edge is the narrow one, so the stick is mitered back to
+ *   the hip lines instead of running full eave length and lancing out over the neighbouring
+ *   slope, which is exactly what the first cut of this drew.
+ *
+ *   ON the rafters. `rafterHalfFt` lifts the underside to the rafter tops, the same lift the
+ *   sheet deck gets; without it the purlins sat embedded in the upper half of the rafters.
+ *
+ *   PITCHED with the slope, the `roofTilePlacement` rotation convention — flat but lying IN
+ *   the plane, not floating horizontal with one edge dug in.
+ */
+export function generatePurlins(planes: RoofPlane[], stage: number, rafterHalfFt: number): Member[] {
   const emit = makeEmitter('RF');
   const nominal = LUMBER.purlinNominal.value as string;
   const spacing = (LAYOUT.purlinSpacingMaxIn.value as number) / IN_PER_FT;
-  const thick = DRESSED[nominal]!.w / IN_PER_FT;
+  const thick = DRESSED[nominal]!.w / IN_PER_FT; // laid flat: the 1½-in way is the thickness
+  const face = DRESSED[nominal]!.d / IN_PER_FT; // the 3½-in face lies along the slope
+  const lift = rafterHalfFt + thick / 2;
   for (const p of planes) {
-    const rows = Math.max(2, Math.ceil(p.slopeLengthFt / spacing) + 1);
+    // The top course stops half a face short of the ridge or peak, so nothing crosses it —
+    // the two long slopes of a hip otherwise both put a stick exactly ON the ridge line.
+    const vTop = p.slopeLengthFt - face / 2;
+    if (vTop <= 0) continue;
+    const rows = Math.max(2, Math.ceil(vTop / spacing) + 1);
     for (let i = 0; i < rows; i++) {
-      const v = Math.min(p.slopeLengthFt, i * (p.slopeLengthFt / (rows - 1)));
-      const cx = p.origin[0] + p.upSlope[0] * v + p.alongEave[0] * (p.eaveLengthFt / 2) + p.normal[0] * thick / 2;
-      const cy = p.origin[1] + p.upSlope[1] * v + p.alongEave[1] * (p.eaveLengthFt / 2) + p.normal[1] * thick / 2;
-      const cz = p.origin[2] + p.upSlope[2] * v + p.alongEave[2] * (p.eaveLengthFt / 2) + p.normal[2] * thick / 2;
+      const v = Math.min(vTop, i * (vTop / (rows - 1)));
+      const span = planeSpanAt(p, v + face / 2);
+      const len = span.hi - span.lo;
+      // A stub shorter than its own face is layout noise, not a purlin.
+      if (len < face) continue;
+      const uMid = (span.lo + span.hi) / 2;
+      const cx = p.origin[0] + p.upSlope[0] * v + p.alongEave[0] * uMid + p.normal[0] * lift;
+      const cy = p.origin[1] + p.upSlope[1] * v + p.alongEave[1] * uMid + p.normal[1] * lift;
+      const cz = p.origin[2] + p.upSlope[2] * v + p.alongEave[2] * uMid + p.normal[2] * lift;
       const yaw = Math.atan2(-p.alongEave[2]!, p.alongEave[0]!);
+      const pitch = Math.asin(Math.max(-1, Math.min(1, p.upSlope[1]!)));
       emit('purlin', nominal, {
-        cutLengthFt: p.eaveLengthFt,
+        cutLengthFt: len,
         position: [cx, cy, cz],
-        rotation: [-Math.PI / 2, yaw, 0],
+        rotation: [Math.PI / 2 - pitch, yaw, 0],
         stage,
         nailing: '2-16d each rafter (PH)',
         doctrineRef: citeOf(LAYOUT.purlinSpacingMaxIn),
@@ -426,6 +453,7 @@ export function generatePurlins(planes: RoofPlane[], stage: number): Member[] {
 export interface HipInput {
   spec: BuildingSpec;
   walls: WallsContract;
+  stageCeiling: number;
   stageRoofFrame: number;
 }
 
@@ -441,7 +469,7 @@ export function jackDifference(slope: number, spacingFt: number): number {
 
 export function generateHip(input: HipInput): Member[] {
   const emit = makeEmitter('HP');
-  const { spec, walls, stageRoofFrame: stage } = input;
+  const { spec, walls, stageCeiling, stageRoofFrame: stage } = input;
   const roof = spec.roof;
   if (roof.kind !== 'hip') return emit.members;
   const { slope, lenPerFtRun } = slopeOf(roof);
@@ -454,6 +482,23 @@ export function generateHip(input: HipInput): Member[] {
   const rafterNominal = LUMBER.rafterNominal.value as string;
   const ridgeNominal = LUMBER.ridgeNominal.value as string;
   const spacingFt = spec.spacing.rafterSpacingIn / IN_PER_FT;
+
+  // Ceiling joists first — a hip thrusts on its plates no less than a gable, and the tie is
+  // the same one the frozen gable path lays: joists on edge across the width, bearing on both
+  // cap plates, interior stations only. Emitted before the roof frame because they are BUILT
+  // before it, and they are why the plan's ceiling stage is never an empty stop on a hip.
+  const cjNominal = LUMBER.ceilingJoistNominal.value as string;
+  const cjD = DRESSED[cjNominal]!.d / IN_PER_FT;
+  for (let x = spacingFt; x < L - spacingFt / 2 - TOLERANCE.epsFt; x += spacingFt) {
+    emit('joist', cjNominal, {
+      cutLengthFt: W,
+      position: [x, plateTopY + cjD / 2, W / 2],
+      rotation: [0, -Math.PI / 2, 0],
+      stage: stageCeiling,
+      nailing: '3-16d toenail ea plate + 16d to rafter (PH)',
+      doctrineRef: citeOf(LUMBER.ceilingJoistNominal),
+    });
+  }
 
   // The ridge runs the length, stopping halfSpan short of each end — that is where the hips
   // converge on it, and it is why a hip roof's ridge is shorter than its building.
