@@ -139,6 +139,19 @@ now resolves that combination to the deck a gable actually gets, the panel stops
 purlins under a gable, and switching a purlin roof to gable carries the consequence into the
 spec so the control never displays a value it does not hold.
 
+**The ground was a lid.** The scene stood on a solid slab three footprints wide, and the orbit was
+clamped above it — a floor on the camera's own height, because dropping below the slab filled the
+screen with grey. Between them they made the underside of every structure unreachable: the pier
+posts a building stands on, the joists and bridging over them, a deck's underside, a bunker's
+overhead stringers, how far a basement actually drops. All of it was behind an opaque surface
+nobody could get past. Grade is now a **line grid** at the same height — 4-ft modules, no depth
+write, so it carries the datum, which way is down, and a ruler while occluding nothing — and the
+orbit is a full sphere. Two consequences had to come with it, or the new angle would have been
+worthless: a ground-bounce light from below (one sun overhead left every downward-facing surface
+in the bottom band of the toon ramp, so the underside came back as one black mass), and the grid
+fading to a hint when the camera drops beneath it, since from below it sits between the eye and
+the framing.
+
 **The stage scrubber's ghosts were clickable.** three.js raycasters test meshes the renderer is
 hiding (`visible === false` is checked in the renderer, not `Raycaster`), so with a build
 scrubbed back to the frame stage a tap on a rafter selected the invisible roofing above it and

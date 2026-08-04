@@ -91,8 +91,8 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
   // saturated thing in the frame.
   const darkAppearance = window.matchMedia('(prefers-color-scheme: dark)');
   const sceneColors = () => (darkAppearance.matches
-    ? { sky: 0x1c1c1e, ground: 0x2c2c2e, bounce: 0x14161a, ambient: 0.30 }
-    : { sky: 0xf2f2f5, ground: 0xdedee2, bounce: 0x4a3a22, ambient: 0.26 });
+    ? { sky: 0x1c1c1e, grid: 0x3a3a3d, gridAxis: 0x55555a, bounce: 0x14161a, ambient: 0.30 }
+    : { sky: 0xf2f2f5, grid: 0xc9c9ce, gridAxis: 0xa8a8b0, bounce: 0x4a3a22, ambient: 0.26 });
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(sceneColors().sky);
@@ -107,12 +107,27 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
   const sun = new THREE.DirectionalLight(0xffffff, 1.15);
   sun.position.set(12, 20, 8);
   scene.add(sun);
+  // GROUND BOUNCE, and it is not decoration. With one sun overhead every downward-facing
+  // surface sat in the bottom band of the toon ramp — which was invisible but harmless while a
+  // solid ground slab meant nobody could get under the building. Now that the orbit goes all
+  // the way beneath, the underside is a view people will actually use, and unlit it comes back
+  // as one black mass with the framing lost inside it. This light points UP, so it reaches
+  // only the faces the sun cannot and leaves every lit surface exactly as tuned above.
+  const bounceUp = new THREE.DirectionalLight(0xffffff, 0.62);
+  bounceUp.position.set(-9, -16, -7);
+  scene.add(bounceUp);
   darkAppearance.addEventListener('change', () => {
     const s = sceneColors();
     scene.background = new THREE.Color(s.sky);
     hemi.groundColor.setHex(s.bounce);
     ambient.intensity = s.ambient;
-    if (ground) (ground.material as THREE.MeshToonMaterial).color.setHex(s.ground);
+    // The grid bakes its two colors into vertex colors, so it is remade rather than recolored.
+    if (ground) {
+      scene.remove(ground);
+      (ground as THREE.GridHelper).dispose();
+      ground = makeGrade();
+      scene.add(ground);
+    }
     // The render loop is continuous, so the next frame picks this up on its own.
   });
   // Warm fill from inside, so a cut face is lit rather than a black hole.
@@ -127,32 +142,41 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
    * perspective and orthographic disposes and recreates them, so settings applied only at boot
    * silently vanished on the first Plan-view click).
    *
-   * The polar clamp is the finding from watching someone orbit: nothing stopped the camera
-   * going UNDER the ground plane, and the reward for doing so is a screen-filling grey
-   * underside with the building gone — a state that looks like a crash and that a trackpad
-   * fling lands in easily. 99° leaves a deliberate few degrees below level, enough to look up
-   * under a pier deck or a ramp, not enough to leave the world.
+   * THE ORBIT IS A FULL SPHERE, on purpose. It used to stop at grade — there was a solid ground
+   * slab and a floor on the camera's own height, because dropping below it filled the screen
+   * with a grey underside and the building vanished. The slab is gone (see `rebuild`), so
+   * "below grade" is now the most useful angle in the tool rather than a dead end: it is the
+   * only way to look up at what a floor is built from, how a pier deck is carried, what a
+   * bunker's overhead stringers land on, or how deep a basement actually goes.
    */
   const tuneControls = (c: OrbitControls): OrbitControls => {
     c.enableDamping = true;
     return c;
   };
-  /**
-   * The camera never goes underground. `maxPolarAngle` cannot express this — it bounds the
-   * ANGLE around the target, and with the target at mid-building height and ninety feet of
-   * orbit distance, even a few degrees below level dives the camera well under grade. So the
-   * floor is on the camera's own height, applied after every controls update: OrbitControls
-   * recomputes its spherical state from the actual position each frame, so nudging y up is a
-   * legitimate input to it, not a fight with it — the orbit simply flattens out at eye level
-   * instead of leaving the world. Half a foot, not zero, so the grazing view along the ground
-   * still shows the ground's top face rather than z-fighting with it.
-   */
-  const EYE_FLOOR_FT = 0.5;
   let controls = tuneControls(new OrbitControls(persp, renderer.domElement));
 
   const group = new THREE.Group();
   scene.add(group);
-  let ground: THREE.Mesh | null = null;
+  /**
+   * GRADE IS A GRID, NOT A FLOOR. This used to be a solid slab three footprints wide, and it
+   * did exactly what a floor does: it hid everything under it. The pier posts a building stands
+   * on, the joists and bridging over them, the underside of a deck, a bunker's overhead
+   * stringers, how far a basement really drops — all of it was on the far side of an opaque
+   * surface, and the orbit was clamped above that surface precisely because dropping below it
+   * showed nothing but grey.
+   *
+   * A line grid carries everything the slab was actually for — where grade is, which way is
+   * down, and a 4-ft module to read size against — while occluding nothing. Look up from
+   * underneath and the whole structure is there, with the grid drawn across it like a
+   * survey line rather than a lid.
+   */
+  const GRID_MODULE_FT = 4; // one plywood module, so the squares are a ruler and not decoration
+  // Seen from above, grade is a datum and reads at full strength. Seen from BELOW it is between
+  // the eye and the framing — a mesh of lines laid over the very thing you dropped down there to
+  // look at — so it fades back to a hint that still says where grade is without veiling anything.
+  const GRID_OPACITY = 0.55;
+  const GRID_OPACITY_UNDER = 0.14;
+  let ground: THREE.Object3D | null = null;
   const byId = new Map<string, THREE.Group>();
   const clipPlanes: THREE.Plane[] = [];
 
@@ -276,6 +300,32 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     });
   }
 
+  /**
+   * The grade grid, sized to whatever is standing. Square and generous — grade does not stop at
+   * the eave — and snapped to whole modules so the lines stay on foot marks at any building
+   * size. Non-writing depth and a low opacity are what keep it a reference rather than a
+   * surface: it never hides a member, from above or from below.
+   */
+  function makeGrade(): THREE.Object3D {
+    const box = memberAabb(model.members);
+    const span = Math.max(box.max[0] - box.min[0], box.max[2] - box.min[2]);
+    const size = Math.ceil((span * 2 + 20) / GRID_MODULE_FT) * GRID_MODULE_FT;
+    const c = sceneColors();
+    const grid = new THREE.GridHelper(size, size / GRID_MODULE_FT, c.gridAxis, c.grid);
+    const mat = grid.material as THREE.LineBasicMaterial;
+    mat.transparent = true;
+    mat.opacity = GRID_OPACITY;
+    mat.depthWrite = false;
+    grid.position.set(
+      (box.min[0] + box.max[0]) / 2,
+      model.levels.gradeY ?? 0,
+      (box.min[2] + box.max[2]) / 2,
+    );
+    // Behind everything built, so a member and the grid never fight over the same pixel.
+    grid.renderOrder = -1;
+    return grid;
+  }
+
   function rebuild(): void {
     disposeObject(group);
     group.clear();
@@ -285,16 +335,12 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
       byId.set(m.id, mesh);
     }
     if (ground) {
-      disposeObject(ground);
+      // A GridHelper is LineSegments, which `disposeObject` (Mesh/Sprite only) would skip —
+      // it frees its own geometry and material instead.
       scene.remove(ground);
+      (ground as THREE.GridHelper).dispose();
     }
-    const box = memberAabb(model.members);
-    const gy = model.levels.gradeY ?? 0;
-    ground = new THREE.Mesh(
-      new THREE.BoxGeometry((box.max[0] - box.min[0]) * 3 + 20, 0.05, (box.max[2] - box.min[2]) * 3 + 20),
-      new THREE.MeshToonMaterial({ color: sceneColors().ground, gradientMap: toonGradient() }),
-    );
-    ground.position.set((box.min[0] + box.max[0]) / 2, gy - 0.03, (box.min[2] + box.max[2]) / 2);
+    ground = makeGrade();
     scene.add(ground);
     applyClipping();
     applyStage();
@@ -692,7 +738,11 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
   const loop = (): void => {
     raf = requestAnimationFrame(loop);
     controls.update();
-    if (camera.position.y < EYE_FLOOR_FT) camera.position.y = EYE_FLOOR_FT;
+    if (ground) {
+      const gridMat = (ground as THREE.GridHelper).material as THREE.LineBasicMaterial;
+      const want = camera.position.y < ground.position.y ? GRID_OPACITY_UNDER : GRID_OPACITY;
+      if (gridMat.opacity !== want) gridMat.opacity = want;
+    }
     renderer.render(scene, camera);
   };
   loop();
