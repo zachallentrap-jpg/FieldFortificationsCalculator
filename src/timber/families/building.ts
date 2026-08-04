@@ -203,7 +203,11 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
   // thickness still lifts the roofing off the rafters.
   const deck = deckedByFrozenPath ? 'none' : spec.coverings.roofDeck;
 
-  if (spec.coverings.roofDeck === 'purlins' && planes.length > 0) {
+  // A FROZEN-DECKED GABLE CANNOT TAKE PURLINS. Its stage-9 solid deck is part of the frozen
+  // branch's output (C-9), not an option — so emitting purlins too would double the deck
+  // system on the roof and on the bill. Under a gable the purlin choice resolves to the deck
+  // that is actually there, and the config panel does not offer it in the first place.
+  if (spec.coverings.roofDeck === 'purlins' && !deckedByFrozenPath && planes.length > 0) {
     // Purlins sit ON the rafters — the lift is the same half-depth the sheet deck gets.
     members.push(...generatePurlins(planes, requireOrdinal(stagePlan, 'roof-deck'), rafterHalf));
   }
@@ -214,7 +218,7 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
         // 'purlins' passes through UN-mapped: the covering module emits nothing for it (the
         // rows above are the deck) but counts its thickness, so the roofing lands on the
         // purlins instead of floating at rafter height with the hips poking through.
-        deck: spec.coverings.roofDeck,
+        deck: deckedByFrozenPath && spec.coverings.roofDeck === 'purlins' ? 'plywood' : spec.coverings.roofDeck,
         deckLaidElsewhere: deckedByFrozenPath,
         roofing: spec.coverings.roofing,
         buildingPaper: spec.coverings.buildingPaper,

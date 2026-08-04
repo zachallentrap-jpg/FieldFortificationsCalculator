@@ -248,6 +248,16 @@ test('the owner’s roof: hip + purlins + corrugated stacks and stages correctly
   assert.ok(model.members.some((m) => m.role === 'ridgeCap'), 'ridge and hips get caps');
 });
 
+test('a frozen-decked gable resolves purlins to its own solid deck — one deck system, one bill', () => {
+  // The gable's stage-9 deck is part of the frozen branch's output (C-9), not an option.
+  // Emitting purlins too would put two deck systems on the roof and both on the bill.
+  const spec = withCoverings({ roofDeck: 'purlins', roofing: 'corrugated' }); // demo roof is gable
+  const model = generateStructure(spec);
+  assert.equal(model.members.filter((m) => m.role === 'purlin').length, 0, 'no purlins over a frozen deck');
+  assert.ok(model.members.filter((m) => m.role === 'roofPanel').length > 0, 'the frozen stage-9 deck IS the deck');
+  assert.ok(model.members.some((m) => m.role === 'roofingCourse'), 'and the metal still goes on');
+});
+
 test('coverings default to none, so the compat path never sees them', () => {
   const model = generateStructure(specFromBuildingInput(demo));
   for (const role of ['siding', 'sheathingPanel', 'roofingCourse', 'batten', 'sidingBoard', 'purlin'] as const) {

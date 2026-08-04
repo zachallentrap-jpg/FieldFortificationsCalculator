@@ -228,8 +228,32 @@ test('every family gets a panel with real sections and no duplicate paths', () =
       // disclosure-level vocabulary and means nothing to a reader).
       assert.ok(!/\blevel\b/i.test(g.title), `${family.id}: "${g.title}" uses the word Level`);
     }
-    const paths = schemaPaths(schema);
-    assert.equal(new Set(paths).size, paths.length, `${family.id}: duplicate control paths`);
+    // Duplicate paths are legal ONLY as conditional alternates — twin rows whose
+    // applies-predicates can never both hold (the roof-deck row is one row under a gable,
+    // another under the shapes that can take purlins). What must NEVER happen is two visible
+    // controls editing the same path, so visibility is checked the way the renderer decides
+    // it, against the preset spec and against every roof shape the family offers.
+    const rows = schema.groups.flatMap((g) => g.rows);
+    const count = new Map<string, number>();
+    for (const r of rows) count.set(r.path, (count.get(r.path) ?? 0) + 1);
+    for (const r of rows) {
+      if ((count.get(r.path) ?? 0) > 1) {
+        assert.ok(r.applies, `${family.id}/${r.path}: duplicate rows must be conditional alternates`);
+      }
+    }
+    const preset = buildFromFamily(family.id)!.spec as { roof?: unknown };
+    const variants: unknown[] = [preset];
+    if (preset.roof || family.specBranch === 'hut') {
+      variants.push(
+        { ...preset, roof: { kind: 'gable', risePer12: 4, overhangFt: 1 } },
+        { ...preset, roof: { kind: 'hip', risePer12: 4, overhangFt: 1 } },
+        { ...preset, roof: { kind: 'shed', risePer12: 2, overhangFt: 1, highSide: 'N' } },
+      );
+    }
+    for (const v of variants) {
+      const visible = rows.filter((r) => !r.applies || r.applies(v)).map((r) => r.path);
+      assert.equal(new Set(visible).size, visible.length, `${family.id}: duplicate VISIBLE control paths`);
+    }
   }
 });
 

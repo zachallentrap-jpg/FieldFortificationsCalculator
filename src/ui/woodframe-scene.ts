@@ -445,7 +445,16 @@ function renderConfigPanel(): void {
         (spec as unknown as Record<string, unknown>).screenBand = (el as HTMLInputElement).checked
           ? { sillFt: HUT_BAND.sillFt, heightFt: HUT_BAND.heightFt }
           : null;
-      } else if (path === 'roof.kind') setRoofKind(spec, (el as HTMLSelectElement).value as RoofSpec['kind']);
+      } else if (path === 'roof.kind') {
+        setRoofKind(spec, (el as HTMLSelectElement).value as RoofSpec['kind']);
+        // A consequence of THIS choice, carried with it: the frozen gable lays its own solid
+        // deck, so a purlin deck picked under another roof shape resolves to the deck a gable
+        // actually gets. Left as 'purlins', the panel's gable row could not display the value
+        // it holds — a control showing one thing over a spec meaning another.
+        if (spec.roof.kind === 'gable' && spec.coverings?.roofDeck === 'purlins') {
+          spec.coverings.roofDeck = 'plywood';
+        }
+      }
       else if (path === 'foundation.kind') setFoundationKind(spec, (el as HTMLSelectElement).value as FoundationSpec['kind']);
       else if (el instanceof HTMLInputElement && el.type === 'checkbox') setPath(spec, path, el.checked);
       else if (el instanceof HTMLInputElement && el.type === 'number') {

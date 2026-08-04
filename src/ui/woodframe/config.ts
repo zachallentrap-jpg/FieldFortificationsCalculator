@@ -337,6 +337,27 @@ export function configSchemaFor(familyId: FamilyId): PanelSchema {
     const field = key.split('.')[1] as keyof FamilyDef['coverings'];
     const options = family.coverings[field];
     if (!options || options.length === 0) continue;
+    // Purlins only exist where the roof can take them. The frozen gable branch lays its own
+    // solid deck (C-9), so offering "Purlins (for metal)" under a gable would promise a deck
+    // the engine will not build. Two rows, same path: the applies-predicate picks the one
+    // that tells the truth for the roof as currently configured. A hut's spec may omit the
+    // roof entirely — normalize gives it a gable — so the missing case reads as gable here.
+    if (field === 'roofDeck' && options.includes('purlins')) {
+      const solid = options.filter((o) => o !== 'purlins');
+      const isGable = (spec: unknown): boolean =>
+        ((spec as { roof?: { kind?: string } }).roof?.kind ?? 'gable') === 'gable';
+      skin.push({
+        path: key, label, control: 'select', options: solid,
+        optionLabels: labelsFor(solid, COVERING_LABELS),
+        applies: (spec) => isGable(spec),
+        help: 'A gable here is built the drawing-set way — sheathed solid. Purlins come with the other roof shapes.',
+      }, {
+        path: key, label, control: 'select', options,
+        optionLabels: labelsFor(options, COVERING_LABELS),
+        applies: (spec) => !isGable(spec),
+      });
+      continue;
+    }
     skin.push({
       path: key, label, control: 'select', options,
       optionLabels: labelsFor(options, key === 'coverings.roofing' ? ROOFING_LABELS : COVERING_LABELS),

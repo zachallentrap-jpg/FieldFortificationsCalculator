@@ -133,6 +133,11 @@ thickness as zero, landing flush with the hip rafters' top edges and letting the
 the metal. One member frame convention (`roofTilePlacement`'s), one clip per course at its
 up-slope edge, and purlin thickness in the covering's deck stack fixed all three. Pinned by a
 plane-coordinate contract test (offset, both ends inside the span, nothing past the peak).
+The adjacent corner: every family that offers purlins also offers a gable, whose frozen branch
+lays its own solid deck (C-9) — so gable+purlins double-decked the roof and the bill. The engine
+now resolves that combination to the deck a gable actually gets, the panel stops offering
+purlins under a gable, and switching a purlin roof to gable carries the consequence into the
+spec so the control never displays a value it does not hold.
 
 **The stage scrubber's ghosts were clickable.** three.js raycasters test meshes the renderer is
 hiding (`visible === false` is checked in the renderer, not `Raycaster`), so with a build
