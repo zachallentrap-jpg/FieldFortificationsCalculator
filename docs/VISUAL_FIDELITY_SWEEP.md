@@ -31,6 +31,7 @@ screenshots get read.
 | **Openings vs. the plates they sit under** | **Fixed** — the storage shed's door header ran 1¾ in through the top plate, and the guard shack had three more. |
 | **Sheathing under siding** — the two-layer standoff | **Fixed** — over board sheathing the siding sat a quarter inch inside it, on every wall. |
 | **Building paper / felt under the roofing** | **Fixed** — the option was accepted and ignored; no felt was ever emitted, and no way to ask for it. |
+| **B-hut partitions** — the bays that define it | **Fixed** — the partitions were computed, put on the spec, and never framed. |
 
 ## The shed that had no walls above the plate
 
@@ -207,11 +208,31 @@ lift is measured **square to the slope**, so its vertical rise is the felt's thi
 cos(pitch); the test asserts that rather than the plain thickness, which would pass on a flat
 roof and would not tell a layer stacked along the normal from one nudged straight up.
 
+## The hut whose defining feature was not built
+
+A B-hut is a hut divided into bays; that is what makes it a B-hut rather than a squad hut.
+`bHutPartitions()` computed three dividers, `buildingSpecForHut` put them on the `BuildingSpec`,
+and `isLegacyBuilding` even tested for their presence — while `generateBuilding` never read the
+field. Nothing was framed. The card's own cutaway reads *"cut across the bays — see how the
+partitions land between the studs"*, which pointed a cut plane at empty air.
+
+That is the same shape as the slab, the second story and the building paper: **a field the spec
+carries, the plumbing passes along, and no generator consumes.** Four instances now, all found by
+rendering the thing rather than reading the code — which is the argument for this loop.
+
+Partitions are framed as what they are: a NON-BEARING wall. Sole plate, studs, **one** top plate
+(an exterior wall's doubled cap is what carries a roof; a partition carries nothing), and a
+framed doorway with kings, jacks, a header and cripples over it. They butt between the exterior
+walls rather than running through them, the convention `wallSystem` already uses.
+
+The test checks the stack meets at every joint — floor→sole→studs→plate and jacks→header→
+cripples→plate — and that the squad hut, whose card promises "one long open bay, no partitions",
+has none.
+
 ## Next targets, unchecked
 
 - Skid foundation (rendered incidentally with the storage shed, not examined on its own).
 - The `openFront` storage-shed variant — posts and a header instead of a wall.
-- Partitions (`spec.partitions`) and the B-hut's interior division.
 - Weather barrier BEHIND THE SIDING — the `buildingPaper` role's own label promises it and nothing emits it.
 - Pyramid roof on a building (the tower cab uses it; a building never has been rendered with one).
 - Board-and-batten and board siding at the rake (the infill path renders them, unphotographed).

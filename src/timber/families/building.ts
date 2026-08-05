@@ -26,6 +26,7 @@ import { wallContract, type WallsContract } from '../subsystems/wallSystem';
 import { roofPlanes, generateShed, generatePurlins, generateHip, wallInfillProfiles } from '../subsystems/roofFamilies';
 import { generateRoofCovering, generateWallCovering, generateInfillCovering, generateSkids, generateSlabOnGrade, wallLayerThicknessFt, type InfillSurface } from '../subsystems/coverings';
 import { generateFloorOnBearings, joistNominalFor } from '../subsystems/floorSystem';
+import { generatePartitions } from '../subsystems/partitions';
 import { LUMBER, PANEL, FOUNDATION, IN_PER_FT } from '../doctrine';
 import { headerForSpan } from '../normalize';
 
@@ -173,6 +174,12 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
       letInBracing: story.letInBracing,
     }),
   );
+
+  // ── Interior partitions. They go up with the walls and carry nothing, so they are framed
+  // AFTER the exterior walls (which the frozen generator emits) and before the roof.
+  members.push(...generatePartitions({
+    spec, wallHeightFt: story.wallHeightFt, stage: requireOrdinal(stagePlan, 'walls'),
+  }));
 
   // ── Roof frame
   if (spec.roof.kind === 'gable') {

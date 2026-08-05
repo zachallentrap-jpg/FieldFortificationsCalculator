@@ -6,7 +6,7 @@ import { generateStructure } from '../src/timber/families/index';
 import { specFromBuildingInput } from '../src/timber/frame';
 import { joistNominalFor, SMALL_PLAN_WIDTH_FT } from '../src/timber/subsystems/floorSystem';
 import type { BuildingSpec, FoundationSpec } from '../src/timber/spec';
-import { shippedFamilies } from '../src/timber/catalog';
+import { shippedFamilies, familyById } from '../src/timber/catalog';
 import { maxOpeningTopFt } from '../src/timber/normalize';
 
 function bldg(over: Partial<BuildingSpec> = {}): BuildingSpec {
@@ -17,6 +17,59 @@ function bldg(over: Partial<BuildingSpec> = {}): BuildingSpec {
   });
   return { ...base, ...over };
 }
+
+test('the B-hut has its bays: partitions are framed, and the framing stack meets exactly', () => {
+  // `bHutPartitions()` computed three dividing walls, `buildingSpecForHut` put them on the spec,
+  // `isLegacyBuilding` checked for them — and `generateBuilding` never read the field. Nothing
+  // was framed. The card's cutaway even said "cut across the bays, see how the partitions land
+  // between the studs": a cut plane aimed at empty air.
+  const hut = generateStructure(familyById('b-hut')!.preset);
+  const part = hut.members.filter((m) => m.id.startsWith('PT-'));
+  assert.ok(part.length > 0, 'a B-hut is defined by its bays');
+
+  const vert = (m: { cutLength: number; actual: { w: number; d: number }; rotation: readonly number[]; position: readonly number[] }): [number, number] => {
+    const hx = m.cutLength / 12 / 2, hy = m.actual.d / 12 / 2, hz = m.actual.w / 12 / 2;
+    const [rx, , rz] = m.rotation as [number, number, number];
+    const h = Math.abs(hx * Math.sin(rz)) + Math.abs(hy * Math.cos(rz) * Math.cos(rx)) + Math.abs(hz * Math.sin(rx));
+    return [m.position[1]! - h, m.position[1]! + h];
+  };
+  const one = (role: string) => part.find((m) => m.role === role)!;
+  const [soleLo, soleHi] = vert(one('solePlate'));
+  const [studLo, studHi] = vert(one('stud'));
+  const [topLo, topHi] = vert(one('topPlate'));
+  assert.ok(Math.abs(soleLo) < 1e-9, 'the sole plate sits on the floor');
+  assert.ok(Math.abs(studLo - soleHi) < 1e-9, 'studs stand on the sole plate');
+  assert.ok(Math.abs(topLo - studHi) < 1e-9, 'the top plate lands on the studs');
+  assert.ok(Math.abs(topHi - 8) < 1e-9, 'and stops at wall height, under the ceiling framing');
+
+  // ONE top plate. A partition carries nothing; the doubled cap is what takes a roof.
+  assert.equal(part.filter((m) => m.role === 'capPlate').length, 0, 'a non-bearing wall has no cap plate');
+
+  // The doorway: jacks carry the header, cripples fill from the header to the plate.
+  const [jackLo, jackHi] = vert(one('jackStud'));
+  const [hdrLo, hdrHi] = vert(one('header'));
+  const [cripLo, cripHi] = vert(one('cripple'));
+  assert.ok(Math.abs(jackLo - soleHi) < 1e-9, 'jacks stand on the sole plate too');
+  assert.ok(Math.abs(hdrLo - jackHi) < 1e-9, 'the header bears on the jacks');
+  assert.ok(Math.abs(cripLo - hdrHi) < 1e-9, 'cripples start at the header');
+  assert.ok(Math.abs(cripHi - topLo) < 1e-9, 'and close on the top plate');
+
+  // Bays are equal, and the partitions butt BETWEEN the exterior walls rather than through them.
+  const { lengthFt: L, widthFt: W } = familyById('b-hut')!.preset.dims;
+  const stations = [...new Set(part.map((m) => Math.round(m.position[0] * 100) / 100))].sort((a, b) => a - b);
+  assert.equal(stations.length, 3, 'four bays need three dividers');
+  for (let i = 0; i < stations.length; i++) {
+    assert.ok(Math.abs(stations[i]! - (L * (i + 1)) / 4) < 1e-6, `divider ${i} is off its quarter point`);
+  }
+  for (const m of part) {
+    const z = m.position[2]!;
+    assert.ok(z > 0 && z < W, `${m.id} at z=${z.toFixed(2)} is outside the hut`);
+  }
+
+  // And a hut whose card promises one open bay has none.
+  const squad = generateStructure(familyById('squad-hut')!.preset);
+  assert.equal(squad.members.filter((m) => m.id.startsWith('PT-')).length, 0, 'the squad hut is one open bay');
+});
 
 test('no header is driven through a top plate — on any shipped preset, at any wall height', () => {
   // The storage shed shipped one. Its 8-ft door needs a 2x10 by the span table, a 2x10 is 9¼ in
