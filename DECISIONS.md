@@ -836,3 +836,40 @@ The general lesson, recorded because it will recur: **a gate that cannot disting
 "checked and clean" from "checked nothing" is not a gate.** Every gate this repo adds
 should be asked what it prints when its subject is absent. T0's own acceptance criterion
 was "CI runs and is green" — green was true and meant less than it appeared to.
+
+## 2026-08-05 — A stringer that ran through the basement floor (a compat-lock event)
+
+The visual-fidelity sweep rendered the basement foundation, which nobody had ever actually
+looked at: until the ground stopped being an opaque slab you could not orbit under, the whole
+basement was on the far side of it. Measured against the model's own `slabTop`, the stair
+stringers reached **6.6 inches below the basement floor** — through a four-inch slab and into
+the earth beneath it.
+
+**Two mistakes compounded, and each hid the other.**
+
+The length came from `hypot(runFt, totalRiseFt)`. A flight always has one more riser than
+treads — the top nosing IS the floor above — so `runFt` counts TREADS unit runs while
+`totalRiseFt` counts RISERS unit rises. Those two numbers describe a line at a different pitch
+than `beta`, the pitch the board is actually rotated to. Length and angle disagreed by about
+two degrees and nothing downstream could notice.
+
+The board was then dropped half its depth square to the run. That is right at the TOP, where
+the first nosing is the floor itself, and wrong at the bottom, where a stringer is cut level
+and sits ON the slab.
+
+**The fix places the board off its two real ends instead of off a formula:** the axis length
+that puts the lower corner on the slab while the upper corner stays at the floor above. Both
+errors go away together because neither end is now derived from a length that was never the
+board's length.
+
+**This is a compat-lock event, taken deliberately.** `floor.ts` is the frozen legacy branch;
+both golden sets moved with this commit. The blast radius is exactly what it should be —
+`FL-stringer-01/02/03` in `frame/basement-stairs` and `frame-compat/demo-basement`, three
+members, nothing added and nothing removed. Every other case in the 72-row matrix is unchanged,
+because no other foundation builds a stair.
+
+**The test was pinning the bug.** `timber-features` asserted the stringer length equalled
+`hypot(runFt, totalRiseFt)` — it checked that the code computed what the code computed. It now
+asserts the physical claim instead: the lowest corner sits on the slab and the highest reaches
+the floor above, which is true of any correct stringer at any pitch. A test that restates a
+formula cannot fail when the formula is wrong.

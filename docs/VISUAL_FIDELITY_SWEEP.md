@@ -21,6 +21,7 @@ screenshots get read.
 | Building — **shed roof, closing in** | **Fixed** — see below. Siding stopped at the cap plate and left every raked area as open framing. |
 | Building — gable end, closing in | **Fixed** with the same change; the apex needed a second pass (below). |
 | Grade / underside of every structure | **Fixed** — a solid ground slab and a camera floor made undersides unreachable. |
+| Building — **basement foundation + stair** | **Fixed** — the stair stringers ran 6.6 in below the basement slab, through the floor and into the earth. Walls, footings, slab, opening framing, riser count and tread geometry were all correct. |
 
 ## The shed that had no walls above the plate
 
@@ -44,10 +45,30 @@ to an area test, which is exactly why the loop looks at pictures. The tiler now 
 in fine cells and merges while the top edge stays inside one `rakeStepFt`, so a flat top emits one
 piece per module and a peak breaks the run where it actually is.
 
+## The stair that went through the basement floor
+
+The basement was the first thing worth looking at precisely because nobody could have seen it
+before: until grade stopped being an opaque slab, the entire foundation was behind it. Almost
+everything checked out — walls on their footings, the slab bearing on the footing ledges, the
+opening framed with doubled trimmers and headers, 13 risers and 12 treads landing exactly on
+the slab. The stringers did not: they reached 6.6 in below the basement floor.
+
+Two compounding mistakes, written up in full in `DECISIONS.md` under 2026-08-05. The length came
+from `hypot(runFt, totalRiseFt)`, which mixes TREADS unit runs with RISERS unit rises and so
+describes a line at a different pitch than the board is rotated to; and the board was then
+dropped half its depth square to the run, which is right at the top and wrong at the bottom.
+The board is now placed off its two real ends — lower corner on the slab, upper corner at the
+floor above — and both errors go away together.
+
+This was a **compat-lock event**: `floor.ts` is frozen legacy and both golden sets moved. The
+blast radius was exactly three members in two cases, because no other foundation builds a stair.
+The existing test had been asserting the length equalled `hypot(runFt, totalRiseFt)` — pinning
+the bug rather than the claim — and now asserts the physical endpoints instead.
+
 ## Next targets, unchecked
 
 - Two-story building (`walls-l2`) — the second floor's bearing and the stair between them.
-- Basement foundation with the stair opening; continuous-wall foundation.
+- Continuous-wall foundation.
 - Storage shed's wide door header and its jack/king framing at that span.
 - Tent floor and strongback families.
 - Flat roof at its 1:12 drain slope — the covering path at near-zero pitch.

@@ -428,14 +428,28 @@ export function generateFloor(input: FloorInput): Member[] {
     const urFt = stair.unitRiseIn / FT;
     const urunFt = stair.unitRunIn / FT;
     const rise = stair.totalRiseFt;
-    const run = stair.runFt;
     const beta = Math.atan2(urFt, urunFt);
     const strD = DRESSED['2x12']!.d / FT;
-    const strLen = Math.hypot(run, rise);
-    const midX = stair.x1 - run / 2;
-    const midY = -rise / 2;
-    const cx = midX + (strD / 2) * Math.sin(beta);
-    const cy = midY - (strD / 2) * Math.cos(beta);
+    // A STRINGER RUNS FLOOR TO FLOOR, and this one ran through the basement slab into the
+    // earth — about nine inches of 2x12 below a four-inch floor. Two mistakes compounded:
+    //
+    //   The LENGTH came from `hypot(runFt, totalRise)`, which mixes the opening's run (TREADS
+    //   unit runs) with the full rise (RISERS unit rises). A flight always has one more riser
+    //   than treads — the top nosing is the floor above — so those two numbers describe a line
+    //   at a different pitch than `beta`, the pitch the board is actually rotated to. Length
+    //   and angle disagreed, and nothing downstream could notice.
+    //
+    //   The board was then dropped half its depth square to the run, which is right at the TOP
+    //   (the first nosing IS the floor) and wrong at the bottom, where the cut is level and
+    //   the board sits ON the slab.
+    //
+    // Both go away by placing the board off its two real ends instead: the axis length that
+    // puts the LOWER corner on the slab while the UPPER corner stays at the floor above. The
+    // upper edge still runs past the last tread, which is the sawtooth this rectangle stands
+    // in for.
+    const strLen = (rise - strD * Math.cos(beta)) / Math.sin(beta);
+    const cx = stair.x1 - (strLen / 2) * Math.cos(beta) + (strD / 2) * Math.sin(beta);
+    const cy = -(strLen / 2) * Math.sin(beta) - (strD / 2) * Math.cos(beta);
     const zs = [stair.z1 + 0.1, (stair.z1 + stair.z2) / 2, stair.z2 - 0.1];
     for (const z of zs) {
       emit('stringer', '2x12', strLen, [cx, cy, z], [0, 0, beta], 4, {

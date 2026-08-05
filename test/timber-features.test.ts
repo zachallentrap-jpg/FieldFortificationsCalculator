@@ -112,8 +112,25 @@ test('basement stair: doctrinal riser math, opening framed with double trimmers/
   const treads = members.filter((m) => m.role === 'tread');
   assert.equal(stringers.length, 3);
   assert.equal(treads.length, plan.treads);
-  const expectedLen = Math.hypot(plan.runFt, plan.totalRiseFt) * 12;
-  for (const s of stringers) assert.ok(Math.abs(s.cutLength - expectedLen) < 0.1, `${s.id}: length`);
+  // A STRINGER RUNS FLOOR TO FLOOR. This used to assert the length was
+  // `hypot(runFt, totalRiseFt)` — a formula, and the wrong one: a flight has one more riser
+  // than treads, so that mixes the opening's run with the full rise and describes a line at a
+  // different pitch than the board is rotated to. It pinned the bug rather than the claim, and
+  // the stringers ran nine inches through the basement slab into the earth underneath.
+  //
+  // The claim, stated where it can be seen: the board's LOWEST corner sits on the slab and its
+  // HIGHEST corner reaches the floor above. That is true of any correct stringer at any pitch.
+  const slabTop = -plan.totalRiseFt;
+  for (const s of stringers) {
+    const half = { x: s.cutLength / 12 / 2, y: s.actual.d / 12 / 2 };
+    const [, , rz] = s.rotation;
+    // rz is the only rotation on a stringer, so the corner extremes in y are exact.
+    const reach = Math.abs(half.x * Math.sin(rz)) + Math.abs(half.y * Math.cos(rz));
+    const lowest = s.position[1] - reach;
+    const highest = s.position[1] + reach;
+    assert.ok(Math.abs(lowest - slabTop) < 1e-6, `${s.id}: bottom at ${lowest.toFixed(4)}, slab at ${slabTop.toFixed(4)}`);
+    assert.ok(Math.abs(highest - 0) < 1e-6, `${s.id}: top at ${highest.toFixed(4)}, floor at 0`);
+  }
   const ys = treads.map((m) => m.position[1]).sort((a, b) => b - a);
   for (let i = 1; i < ys.length; i++) {
     assert.ok(ys[i - 1]! - ys[i]! > 0.4 && ys[i - 1]! - ys[i]! < 0.8, `tread step ${i} = ${ys[i - 1]! - ys[i]!}`);
