@@ -534,3 +534,42 @@ test('a cap LANDS ON the roofing, at every pitch — not under it and not floati
       + `highest sheet — a cap is nailed to the roofing, not buried in it or hovering over it`);
   }
 });
+
+// ── The deck that is there vs. the deck this pass places ─────────────────────
+
+test('ROOFING CLEARS THE DECK THAT IS THERE, whoever laid it', () => {
+  // A frozen gable emits its own stage-9 deck whatever the covering spec says. `deckThick` — the
+  // lift that holds the roofing off the rafters — was derived from the spec's `roofDeck` instead,
+  // so picking "no roof deck" on the one roof kind that always has one dropped half an inch of
+  // lift and sank every course into the plywood under it. On screen the deck won the depth test
+  // over the bottom third of the slope: a smooth tan panel where ribbed corrugated should be.
+  //
+  // Straight from the config panel — gable, roof deck "none", corrugated — and the same for roll.
+  // The caller states the rule in its own comment ("its thickness still lifts the roofing off the
+  // rafters"); this asserts it.
+  for (const roofing of ['corrugated', 'roll'] as const) {
+    for (const roofDeck of ['none', 'plywood', 'skip'] as const) {
+      const spec = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset));
+      spec.dims = { lengthFt: 16, widthFt: 12 };
+      spec.roof = { kind: 'gable', risePer12: 4, overhangFt: 1 };
+      spec.coverings = { ...spec.coverings, roofDeck, roofing };
+      const model = generateStructure(spec);
+      const panels = model.members.filter((m) => m.role === 'roofPanel');
+      const courses = model.members.filter((m) => m.role === 'roofingCourse');
+      assert.ok(panels.length > 0, `${roofDeck}/${roofing}: the frozen gable always decks itself`);
+      assert.ok(courses.length > 0, `${roofDeck}/${roofing}: no roofing`);
+      // Both layers lie in the same plane, so comparing them along that plane's NORMAL is the
+      // question: is every course outside every panel it covers? ONE SLOPE AT A TIME — projecting
+      // a north-slope piece onto the south normal reads as 45 in of clearance and asserts nothing.
+      const p = roofPlanes(model.spec as BuildingSpec, 0).find((x) => x.id === 'roof-S')!;
+      const south = (m: (typeof panels)[number]) => m.position[2]! < spec.dims.widthFt / 2 - 0.5;
+      const perp = (m: (typeof panels)[number]) =>
+        [0, 1, 2].reduce((a, i) => a + m.position[i]! * p.normal[i]!, 0);
+      const deckOuter = Math.max(...panels.filter(south).map((m) => perp(m) + m.actual!.w / 24));
+      const courseInner = Math.min(...courses.filter(south).map((m) => perp(m) - m.actual!.w / 24));
+      assert.ok(courseInner >= deckOuter - 1e-9,
+        `${roofDeck}/${roofing}: the roofing's underside is ${((deckOuter - courseInner) * 12).toFixed(3)} in `
+        + `INSIDE the deck — the deck stripes through the roof`);
+    }
+  }
+});

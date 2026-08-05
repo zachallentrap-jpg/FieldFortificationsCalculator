@@ -488,10 +488,26 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
   // `generatePurlins`, not here — but they are still a deck, and their flat thickness is what
   // holds the roofing off the rafters. Ignoring it left the corrugated sheets at rafter
   // height with the hip rafters' top edges breaking through them.
-  const deckThick =
+  //
+  // "REGARDLESS OF WHO PUT IT THERE" was the intent and not the behaviour. A frozen gable lays
+  // its own stage-9 deck whatever the covering spec says — the caller's own comment says so:
+  // "`deckLaidElsewhere` tells it the gable's stage-9 deck already exists so its thickness still
+  // lifts the roofing off the rafters." This expression never read that flag. It read `deck`,
+  // which for a gable is whatever the user picked, so choosing "no roof deck" on the ONE roof
+  // kind that always has one dropped half an inch of lift and sank every course of roofing into
+  // the deck below it. On screen the plywood won the depth test over the bottom third of the
+  // slope: a smooth tan panel where ribbed corrugated should be. Reachable straight from the
+  // panel — gable, roof deck "none", corrugated — and true of `roofing: 'roll'` just the same.
+  //
+  // `Math.max`, so this can only ever ADD lift: every case that was already right is untouched,
+  // including purlins under a non-frozen roof, where nothing is laid elsewhere.
+  const laidElsewhereThick = deckLaidElsewhere ? (PANEL.roofDeckThickIn.value as number) / IN_PER_FT : 0;
+  const deckThick = Math.max(
+    laidElsewhereThick,
     deck === 'plywood' || deck === 'boards' ? (PANEL.roofDeckThickIn.value as number) / IN_PER_FT
     : deck === 'purlins' ? DRESSED[LUMBER.purlinNominal.value as string]!.w / IN_PER_FT
-    : 0;
+    : 0,
+  );
 
   // ── Deck
   if (!deckLaidElsewhere && (deck === 'plywood' || deck === 'boards')) {

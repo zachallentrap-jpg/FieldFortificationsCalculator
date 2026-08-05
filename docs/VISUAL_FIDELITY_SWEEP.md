@@ -51,6 +51,7 @@ screenshots get read.
 | **Hip roof — the four corners** | **Fixed** — every plane stopped over its wall corner while the hip rafters ran on to the true eave corner, so the roof had a square notch at all four corners with a bare hip tail standing in each. |
 | **Hip roof — the common rafters' pitch** | **Fixed** — rotated to a rise measured from the plate over a run measured from the eave, so every common sat 1.84 in proud of the roof at the eave and 1.84 in below the ridge. The jacks and hips were right; only the commons dissented. |
 | **The ridge cap** | **Fixed** — the cap was laid at DECK level and every course of roofing stacked on top of it, so the 2x8 ridge board showed through the piece whose whole job is to be outermost. |
+| **Gable + roof deck "none" + roofing** | **Fixed** — the frozen gable decks itself whatever the spec says, but the roofing's lift was read off the spec, so "no deck" sank every course into the deck that was there and the plywood striped through the roof. |
 
 ## The shed that had no walls above the plate
 
@@ -762,8 +763,42 @@ change that was geometrically reasoned, self-consistent, and still floating.
 
 Nine solid thumbnail goldens moved with it — every family whose roof has a ridge or a hip.
 
+## The deck that was there, and the deck the spec asked for
+
+Two different questions, and one line of code answered the wrong one.
+
+A frozen gable emits its own stage-9 deck **whatever the covering spec says** — that is C-9, not an
+option. The caller knows it and says so: *"`deckLaidElsewhere` tells it the gable's stage-9 deck
+already exists so its thickness still lifts the roofing off the rafters."* But `deckThick`, the
+lift that holds the roofing off the rafters, was derived from the spec's `roofDeck` and never read
+that flag. So on a gable — the default roof kind, and the only one that decks itself — choosing
+**"no roof deck"** dropped half an inch of lift and sank every course of roofing into the plywood
+underneath it. On screen the deck won the depth test over the bottom third of the slope: a smooth
+tan panel where ribbed corrugated should be, and the selected course highlighting as a smooth plank
+instead of a ribbed sheet.
+
+Reachable straight from the config panel — gp-frame, roof deck "none", roofing "corrugated" — and
+true of roll roofing the same way. The control render (the same building with roof deck "plywood")
+is the proof: identical geometry, correct roof. After the fix the two are pixel-identical, which is
+what they should always have been, because the deck is there either way.
+
+Another instance of **"a comment describing intended behaviour is a test nobody ran"**, and this one
+had a witness: the felt block six lines below already wrote `deckThick > 0 || deckLaidElsewhere`.
+The author knew the flag mattered in one place and missed it in the other.
+
+The fix is a `Math.max`, so it can only ever ADD lift — every case that was already right is
+untouched, and no golden moved.
+
 ## What is still open
 
+- **`roofDeck: 'skip'` is a dead option.** Skip sheathing — spaced boards under corrugated — is in
+  both the spec type and the covering module's input type, and nothing produces or consumes it: no
+  card offers it, and no branch builds it. A shared link can still set it (`decodeSpec` validates
+  only that `family` is present, the same door the pyramid roof came in by). With the deck fix
+  above it now renders correctly on a gable, because the frozen deck is counted; on a hip or shed it
+  would still produce a roof with no deck at all. Implementing it properly needs a board spacing
+  from doctrine, which is not page-checked — so it wants either that figure or a normalize
+  downgrade with a warning, the way pyramid → hip was handled.
 - **The roofing stops short of the ridge.** Found while measuring the cap, not fixed here. Each
   course is offset perpendicular from its plane and still cut at `slopeLengthFt`, so its top edge
   pulls back from the ridge by `lift * sin(pitch)` and lands `lift * cos(pitch)` up instead of
@@ -772,9 +807,19 @@ Nine solid thumbnail goldens moved with it — every family whose roof has a rid
   12-in-12 the sheets reach only 3.09 in above the rafter plane while the 2x8 ridge board's top is
   at 3.63 in, so **the ridge board out-reaches the roofing itself** and no cap height can both rest
   on the sheets and cover the board. That is why the cap test asserts 2, 4 and 6-in-12 and says in
-  its own comment why 12 is absent. Closing the notch means extending each plane's top course by
-  `lift * tan(pitch)`, which changes billed roofing area — worth doing deliberately, with the
-  conservation tests in view. Next target.
+  its own comment why 12 is absent.
+
+  **Attempted, and put back.** Extending each plane's top course by `lift * tan(pitch)` does close
+  the ridge — the extended tile's top edge lands exactly on the apex, and the cap then belongs at
+  `lift / cos(pitch)` after all. But it only closes the RIDGE. The same pull-back happens along
+  every hip line, and those tiles are clipped by `planeSpanAt` in plane coordinates, so extending
+  the ridge alone leaves the ridge cap at `lift / cos` and the hip caps at `lift * cos` — a factor
+  of two apart at 12-in-12, and they meet at the ridge ends. Trading a seam at the peak for a step
+  where three caps converge is not an improvement. The real fix is to build the covering stack as a
+  proper OFFSET SURFACE — move each plane out along its normal and re-derive where the offset planes
+  intersect, instead of offsetting each tile individually and letting the folds fall open. That is a
+  refactor of the whole covering path and moves every covering member in the model, so it wants its
+  own pass rather than a patch. The notch is under a 12-in cap at every pitch in the meantime.
 - **`buildingPaper` the ROLE.** The felt under the roofing was fixed in an earlier pass and is
   emitted under the `felt` role. `buildingPaper` remains in the role union, the thumbnail paint
   order, the handout list and `portrait.ts`, and nothing emits it. Its help string reads "Weather
