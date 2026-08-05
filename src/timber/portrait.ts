@@ -159,13 +159,69 @@ function facesOf(m: Member, order: number, isFocus: boolean, dim: number): Face[
     const lambert = Math.max(0, f.n[0] * LX + f.n[1] * LY + f.n[2] * LZ);
     // Never fully black: an unlit face still has to show its edges against its neighbours.
     const shade = (0.62 + 0.38 * lambert) * dim;
-    out.push({
-      pts: world.map(([x, y, z]) => project(x, y, z)),
-      fill: hex(base, shade),
-      z: world.reduce((s, [x, y, z]) => s + depth(x, y, z), 0) / world.length,
-      order,
-      focus: isFocus,
-    });
+    const fill = hex(base, shade);
+    // A PAINTER SORTS POINTS, NOT POLYGONS, and that is the whole difficulty. Sorting each face
+    // by the depth of its CENTRE is exact only while faces are small next to the distances
+    // between them. A rafter is seven feet long and a deck sheet is four by eight; both span
+    // feet of depth, so their centres can order backwards while every actual pixel of the sheet
+    // is nearer than the stick under it. The stick then paints over the sheet — which is why
+    // these pictures came out as a heap of loose lumber lying on the roof rather than a roof.
+    //
+    // Splitting a long face into strips makes each strip's centre a local answer again, which is
+    // what the sort needs. Only faces that actually span depth are split, so the small pieces
+    // that make up most of a model still cost one polygon each.
+    for (const piece of splitByDepth(world)) {
+      out.push({
+        pts: piece.map(([x, y, z]) => project(x, y, z)),
+        fill,
+        z: Math.max(...piece.map(([x, y, z]) => depth(x, y, z))),
+        order,
+        focus: isFocus,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * How much depth one polygon may span before it is cut into strips.
+ *
+ * INFINITY — the splitting is OFF, and the measurement that turned it off is worth keeping. The
+ * theory was sound: a painter sorts points, so cutting long faces into strips should make each
+ * strip's sort key a local answer. In practice it made the picture worse, because the covering
+ * SHEETS get split too, and a strip of roofing then sorts independently of its neighbours —
+ * trading a few big errors for many small ones scattered across the whole roof. It also took the
+ * biggest portrait from 268 KB to 1 MB at a half-foot threshold.
+ *
+ * The machinery is kept because it is the right shape for the real fix (a per-strip sort is a
+ * poor man's depth buffer) and because the next person to have the idea should be able to see
+ * the result rather than re-derive it.
+ */
+const MAX_FACE_DEPTH_FT = Infinity;
+/** Ceiling on the split, so a 60-ft ridge cannot alone add a hundred polygons. */
+const MAX_FACE_STRIPS = 6;
+
+type W3 = [number, number, number];
+
+/** Cut a quad into strips across whichever edge direction carries its depth. */
+function splitByDepth(q: readonly W3[]): W3[][] {
+  const [a, b, c, d] = q as [W3, W3, W3, W3];
+  const dz = q.map(([x, y, z]) => depth(x, y, z));
+  const range = Math.max(...dz) - Math.min(...dz);
+  if (range <= MAX_FACE_DEPTH_FT) return [[a, b, c, d]];
+  const n = Math.min(MAX_FACE_STRIPS, Math.ceil(range / MAX_FACE_DEPTH_FT));
+  // Cut along the edge pair that carries more of the depth: a→b (with d→c) or a→d (with b→c).
+  const alongAB = Math.abs(dz[1]! - dz[0]!) >= Math.abs(dz[3]! - dz[0]!);
+  const lerp = (p: W3, r: W3, t: number): W3 => [
+    p[0] + (r[0] - p[0]) * t, p[1] + (r[1] - p[1]) * t, p[2] + (r[2] - p[2]) * t,
+  ];
+  const out: W3[][] = [];
+  for (let i = 0; i < n; i++) {
+    const t0 = i / n;
+    const t1 = (i + 1) / n;
+    out.push(alongAB
+      ? [lerp(a, b, t0), lerp(a, b, t1), lerp(d, c, t1), lerp(d, c, t0)]
+      : [lerp(a, d, t0), lerp(b, c, t0), lerp(b, c, t1), lerp(a, d, t1)]);
   }
   return out;
 }

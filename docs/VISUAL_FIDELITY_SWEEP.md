@@ -33,6 +33,9 @@ screenshots get read.
 | **Building paper / felt under the roofing** | **Fixed** — the option was accepted and ignored; no felt was ever emitted, and no way to ask for it. |
 | **B-hut partitions** — the bays that define it | **Fixed** — the partitions were computed, put on the spec, and never framed. |
 | **The open front** (`openFront`) | **Fixed** — the card offers it, the spec documents it, normalize honours it, and the wall was framed shut. |
+| Let-in bracing | **Checked, clean.** Proper diagonals let into the studs at every corner. |
+| **Eave / rafter tails** | **Fixed** — no fascia existed, so every roof ended in a row of raw square-cut rafter ends. |
+| **Picker & flashcard portraits** | **Improved, not solved** — the painter sorted polygons by their CENTRE; long members painted over the sheets covering them. |
 
 ## The shed that had no walls above the plate
 
@@ -258,8 +261,35 @@ family drops what the open wall does not have and adds what it does, the same co
 shed and flat roofs already use. The compat goldens cannot move, because `isLegacyBuilding` has
 always refused a spec with an open front.
 
+## "Why are there always pieces of wood sticking out of the roofs?"
+
+The owner, about every render in the repo. Two separate things were behind it.
+
+**In the 3D model: no fascia.** The wedges along every eave were the RAFTER TAILS, and they were
+not poking through anything — measured square to the roof they sit an inch below the roofing,
+exactly where they belong. What was missing is the board that covers them. An eave is finished
+with a fascia across the tails; without one, every roof ended in a row of raw square-cut rafter
+ends. Now emitted at the deck stage, depth matched to the rafter so it covers what it is nailed
+to.
+
+**In the picker thumbnails: the painter's sort.** `portrait.ts` has no depth buffer — it sorts
+polygons and paints them back to front, and it sorted each face by the depth of its CENTRE. That
+is exact only while faces are small next to the distances between them, and a 7-ft rafter next to
+a 4×8 deck sheet is not: both span feet of depth, so their centres can order backwards while
+every actual pixel of the sheet is nearer than the stick under it. The stick paints over the
+sheet, and the card reads as a heap of loose lumber lying on a roof.
+
+Sorting by each face's NEAREST corner instead fixes most of it at zero cost — the roof comes back
+as a roof and the walls as walls. **It does not fix all of it**, and the honest statement is that
+a polygon painter cannot: correctness here needs a per-pixel depth test. Subdividing long faces
+into strips was tried and made things worse, because the covering sheets get split too and then
+sort independently of their neighbours — many small errors instead of a few big ones, at four
+times the file size. That measurement is recorded in the code so the next person to have the idea
+can see the result rather than re-derive it.
+
 ## Next targets, unchecked
 
+- **The portrait painter's residual errors** — the real fix is a depth buffer (rasterise per pixel), or drawing only the outermost skin for a finished building.
 - Skid foundation (rendered incidentally with the storage shed, not examined on its own).
 - Weather barrier BEHIND THE SIDING — the `buildingPaper` role's own label promises it and nothing emits it.
 - Pyramid roof on a building (the tower cab uses it; a building never has been rendered with one).

@@ -483,6 +483,38 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
     }
   }
 
+  // ── Fascia: the board that closes the eave over the rafter tails.
+  //
+  // "Why are there always pieces of wood sticking out of the roofs?" — the owner, about every
+  // render in this repo. They are the RAFTER TAILS, and they were not sticking through anything:
+  // measured square to the roof they sit an inch below the roofing, exactly where they belong.
+  // What was missing is the piece that covers them. An eave is finished with a fascia across the
+  // tails; without one, every roof in the toolkit ended in a row of raw square-cut rafter ends,
+  // which is what a row of little wooden wedges along the eave actually was.
+  //
+  // Depth matches the rafter so the board covers the ends it is nailed to, centred on the rafter
+  // centreline — a 1x6 over a 2x6 — and sitting just outside the eave line so it hides the ends
+  // rather than sharing their space.
+  {
+    const fasciaNominal = LUMBER.fasciaNominal.value as string;
+    const fasciaT = DRESSED[fasciaNominal]!.w / IN_PER_FT;
+    for (const plane of planes) {
+      const back = fasciaT / 2;
+      const x = plane.origin[0] + plane.alongEave[0] * (plane.eaveLengthFt / 2) - plane.upSlope[0] * back;
+      const y = plane.origin[1] + plane.alongEave[1] * (plane.eaveLengthFt / 2) - plane.upSlope[1] * back;
+      const z = plane.origin[2] + plane.alongEave[2] * (plane.eaveLengthFt / 2) - plane.upSlope[2] * back;
+      emit('fascia', fasciaNominal, {
+        cutLengthFt: plane.eaveLengthFt,
+        position: [x, y, z],
+        // Along the eave, standing on edge: the board's face is the vertical one you see.
+        rotation: [0, Math.atan2(-plane.alongEave[2]!, plane.alongEave[0]!), 0],
+        stage: stageDeck,
+        nailing: '2-8d into each rafter tail (PH)',
+        doctrineRef: citeOf(LUMBER.fasciaNominal),
+      });
+    }
+  }
+
   // ── Building paper: felt underlayment between the deck and the roofing.
   //
   // THIS WAS ACCEPTED AND IGNORED. `buildingPaper` arrived in this function's input type, was

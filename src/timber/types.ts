@@ -19,6 +19,7 @@ export type MemberRole =
   | 'sidingBoard' | 'batten' | 'buildingPaper'          // T2 coverings
   | 'purlin' | 'roofingCourse' | 'felt' | 'skid'        // T2 coverings / foundations
   | 'ridgeCap'                                          // the bent piece over a ridge or a hip
+  | 'fascia'                                            // the board that closes an eave over the rafter tails
   | 'ponyStud' | 'rakeStud'                             // T2 shed roof (TD6)
   | 'railPost' | 'railTop' | 'railMid' | 'toeBoard'     // T4 railings (EM 385-1-1)
   | 'ladderRail' | 'ladderRung'                         // T4 access

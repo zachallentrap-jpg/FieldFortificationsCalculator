@@ -50,6 +50,9 @@ export const LUMBER = {
   braceNominal: doc('1x4', 'FM 5-426 let-in corner brace'),
   crossBridgingNominal: doc('1x3', 'FM 5-426 cross bridging'),
   purlinNominal: doc('2x4', 'FM 5-426 purlin roof deck'),
+  // The board across the rafter tails that closes an eave. Matched to the rafter's depth so it
+  // covers the tails it is nailed to — a 1x6 over a 2x6.
+  fasciaNominal: doc('1x6', 'FM 5-426 cornice: fascia over the rafter tails (PH)'),
   girtNominal: doc('2x6', 'TM 5-302 girts at panel lines'),
   deckPlankNominal: doc('2x6', 'TM 5-302 plank deck'),
   skidNominal: doc('4x6', 'TM 5-302 skid runners, PT, chamfered, drift-pinned'),
