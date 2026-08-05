@@ -1025,6 +1025,68 @@ function lumberPiece(group: THREE.Group, size: LumberSize, length: number, width
   return wrapper;
 }
 
+/**
+ * One piece of lumber that has been CUT — a profile in the board's own side elevation, extruded
+ * across its thickness. This is what draws a bird's-mouth.
+ *
+ * The plain `lumberPiece` above is a prop scaled to a box, and a box cannot have a notch in it, so
+ * a rafter drawn that way passes straight through the plate it is supposed to sit on. Hand this
+ * the profile the framing square gives you (local x along the length, local y across the face, in
+ * feet, anticlockwise) and it returns the same toon-shaded, grained, outlined wrapper the box path
+ * returns — already in real feet, so the caller sets rotation and position and nothing else.
+ *
+ * UVs are projected from the profile plane rather than left to ExtrudeGeometry's generator, whose
+ * front/back mapping is in raw feet: on a 12-ft rafter that is 12 texture repeats of grain running
+ * the wrong way. `LUMBER_FACE_U` reproduces the atlas share the GLB props give a board's face, so
+ * a cut rafter and an uncut one carry the same grain at the same scale.
+ */
+function cutLumberPiece(group: THREE.Group, profile: readonly (readonly [number, number])[], thickFt: number): THREE.Group {
+  const shape = new THREE.Shape();
+  shape.moveTo(profile[0]![0], profile[0]![1]);
+  for (const [x, y] of profile.slice(1)) shape.lineTo(x, y);
+  shape.closePath();
+  const t = Math.max(0.02, thickFt);
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false, curveSegments: 1 });
+  geo.translate(0, 0, -t / 2); // extrusion runs 0..depth; the member frame is centred
+  geo.computeVertexNormals();
+
+  const pos = geo.getAttribute('position');
+  const uv = geo.getAttribute('uv');
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < pos.count; i++) {
+    minY = Math.min(minY, pos.getY(i));
+    maxY = Math.max(maxY, pos.getY(i));
+  }
+  const span = Math.max(1e-6, maxY - minY);
+  for (let i = 0; i < uv.count; i++) {
+    // U across the face width (grain lines run the length of the board), V along the length at a
+    // fixed real-world rate so the wander repeats every GRAIN_PERIOD_FT no matter how long the cut.
+    uv.setXY(i, (LUMBER_FACE_U * (pos.getY(i) - minY)) / span, pos.getX(i) / GRAIN_PERIOD_FT);
+  }
+  uv.needsUpdate = true;
+
+  const wrapper = addToonMesh(group, geo, 0xffffff, { map: lumberTexture() });
+  // Same hairline rule as `lumberPiece`: the shared 3.5% shell is calibrated for compact props and
+  // would ink a 12-ft board. Here the geometry is already in feet, so the shell is scaled about
+  // the origin by the ratio that turns a fixed offset into the piece's own extents.
+  const outlineFt = 0.012;
+  const outline = wrapper.children.length > 1 ? (wrapper.children[0] as THREE.Mesh) : null;
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox!;
+  outline?.scale.set(
+    1 + (2 * outlineFt) / Math.max(0.05, bb.max.x - bb.min.x),
+    1 + (2 * outlineFt) / Math.max(0.05, span),
+    1 + (2 * outlineFt) / t,
+  );
+  return wrapper;
+}
+
+/** The share of U a board's face gets in the prop atlas — matched so cut and uncut stock agree. */
+const LUMBER_FACE_U = 0.035;
+/** Feet of board per repeat of the grain wander, along the length. */
+const GRAIN_PERIOD_FT = 2;
+
 // A deck of 2x6 planks over a solid fill body — the standing platform and the firing step are
 // built lumber, not bare earth mounds. Planks run along the longer horizontal dimension, laid
 // side by side across the shorter one, each one a real 2x6 prop (1.5" deck over the fill below).
@@ -1704,4 +1766,4 @@ export function onPropAssetsReady(cb: () => void): () => void {
   return () => rerenderCallbacks.delete(cb);
 }
 
-export { disposeObject, toonGradient, lumberPiece, plywoodSheet, roofingSheet, screenSheet };
+export { disposeObject, toonGradient, lumberPiece, cutLumberPiece, plywoodSheet, roofingSheet, screenSheet };

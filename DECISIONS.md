@@ -873,3 +873,66 @@ because no other foundation builds a stair.
 asserts the physical claim instead: the lowest corner sits on the slab and the highest reaches
 the floor above, which is true of any correct stringer at any pitch. A test that restates a
 formula cannot fail when the formula is wrong.
+
+## 2026-08-05 — The bird's mouth, and the roof plane that had to move to make room for it (a compat-lock event)
+
+`roof.ts` carried this line at the top, and had since the first commit:
+
+> ponytail: bird's-mouth seat geometry is carried as angles on the member (plumb/seat cuts)
+> but not notched in scene geometry, exactly as the design doc §6 prescribes.
+
+Every rafter in the catalog declared `angles: { plumbCut, seatCut }`. Nothing ever cut them. A
+rafter was a straight stick laid at pitch ACROSS the cap plate, **2.9 inches of it inside the
+plate** at every bearing on every roof — and the plate is only 1.5 inches thick, so the rafter
+went through it and out the other side. Scrub to any framing stage and the rafters crossed the
+plates as though the plates were not there.
+
+**Cutting the notch turned out to be the second half of the problem, not the first.**
+
+The notch is derived, not stored: `birdsMouth.ts` takes the rafter and the plate it crosses and
+solves the member's own frame for the two cuts a framing square gives you. That is a pure
+module, adds nothing to the model, and moves no golden. But the first honest notch came out
+**56% of the rafter's face** — past the third of the depth a bending member may lose at its
+bearing, and a shape no framer would recognise. The geometry was right; what it was measuring
+was wrong.
+
+**The engine put the rafter's CENTRE LINE on the plate's outer top corner.** That is not a
+framing convention, it is a modelling shortcut — it sinks the rafter half its own depth into the
+wall and calls the result seated. A real rafter's elevation is set by the seat: the seat is one
+plate wide, the heel is however deep the pitch makes it over that length, and the rafter's height
+above the plate follows.
+
+    plumb depth of the rafter     = face / cos θ
+    plumb depth the notch eats    = plateWidth · tan θ
+    HAP (height above plate)      = the difference
+
+For a 2x6 at 4/12 on a 2x4 plate that is **1¾ inches** of missing elevation. `rafterSeatLiftFt`
+states it once; `roof.ts` (frozen), `roofPlanes`, `generateShed`, `generateHip` and
+`wallInfillProfiles` all read it, so the framing, the deck, the roofing and the siding that
+closes in under the rake cannot drift apart. The notch is now 20% of the face and the seat is
+exactly one plate wide, in every shipped family, on both slopes.
+
+**Two things fell out that were wrong on their own terms.**
+
+The collar tie was placed `ridgeY - (ridgeY - H)/3` — one third down from the ridge measured off
+the PLATE — while its half-length `halfSpan/3` was derived from the RAFTER line. Those are the
+same number only when the rafter line starts at the plate, which it never should have. It reads
+off `eaveDatum` now, and the tie's ends land on the rafters they are nailed to.
+
+The heel was being cut **square across the board** rather than plumb. A plumb line is not a line
+of constant local x on a pitched member, and cutting it that way leans the face out of the plate
+and eats 1/cos²θ more rafter than the joint needs. The apex is solved as the one point on both
+world planes at once — the plate's top and its outer face — which is a rotation and inverts in
+closed form with no case analysis for the slope's sign.
+
+**Blast radius, both golden sets:** 1024 lines in the compat matrix, **nothing added and nothing
+removed**. Every changed member is a rafter, ridge, roof panel, collar tie or gable stud, and
+every delta is either the lift or exactly half of it — half for the gable studs, whose base stays
+on the plate while their top follows the rake. A pure vertical translation of the roof plane is
+what this should look like, and it is what it looks like.
+
+**Two tests were pinning the old datum** by re-deriving the roof plane from `wallHeightFt`. They
+assert real relationships — the ridge top is flush with the rafter tops, the sheathing sits on the
+rafter plane along its normal — so they now read the datum from the same rule the engine does
+instead of restating an elevation. A test that recomputes the thing it is checking cannot fail
+when the thing is wrong.

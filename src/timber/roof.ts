@@ -10,12 +10,16 @@
 // they are nailed), gable studs stop at the rafter underside, and sheathing lies ON the
 // rafter top planes (offset along the slope normal).
 //
-// ponytail: bird's-mouth seat geometry is carried as angles on the member (plumb/seat cuts)
-// but not notched in scene geometry, exactly as the design doc §6 prescribes.
+// The bird's-mouth seat is carried as angles on the member (plumb/seat cuts) and CUT by the
+// viewer, which derives the notch from the rafter and the plate it crosses. What lives here is
+// the other half of that joint: the rafter plane sits at a real height above the plate, so the
+// notch the viewer derives is a plate-wide seat rather than a bite out of the rafter. See
+// `heightAbovePlateFt`.
 
 import type { Member, MemberRole, StageId } from './types';
 import { DRESSED } from './types';
 import { layoutCenters } from './floor';
+import { rafterSeatLiftFt } from './birdsMouth';
 
 const FT = 12;
 
@@ -68,7 +72,11 @@ export function generateRoof(input: RoofInput): Member[] {
   const slope = input.risePer12 / 12; // rise per foot of run
   const lenPerFtRun = Math.sqrt(144 + input.risePer12 ** 2) / 12; // framing-square method
   const halfSpan = W / 2;
-  const ridgeY = H + halfSpan * slope;
+  // The rafter plane's datum at the building line. This USED to be the plate top itself, which
+  // put the rafter's centre line on the plate's outer top corner and buried half the rafter in
+  // the wall. `rafterSeatLiftFt` raises it to where a plate-wide bird's-mouth seat lands.
+  const eaveDatum = H + rafterSeatLiftFt(DRESSED['2x6']!.d, DRESSED['2x4']!.d, slope);
+  const ridgeY = eaveDatum + halfSpan * slope;
   const oc = input.rafterSpacingIn / FT;
   const rafterHalf = DRESSED['2x6']!.d / FT / 2; // half rafter depth, feet
 
@@ -142,7 +150,7 @@ export function generateRoof(input: RoofInput): Member[] {
       // Slope faces -Z (side -1, front/south) or +Z (side +1, rear/north).
       const zEave = side === -1 ? -overhang : W + overhang;
       const zRidge = W / 2 + side * (t / 2); // stop at the ridge board face
-      const yEave = H - overhang * slope;
+      const yEave = eaveDatum - overhang * slope;
       const yRidge = ridgeY - (t / 2) * slope;
       const zC = (zEave + zRidge) / 2;
       const yC = (yEave + yRidge) / 2;
@@ -163,7 +171,10 @@ export function generateRoof(input: RoofInput): Member[] {
   });
   // Collar ties on every third interior rafter pair (≤5 ft apart per manual), at 1/3 down
   // from the ridge, nailed beside their rafters (the gable ends need none).
-  const tieY = ridgeY - (ridgeY - H) / 3;
+  // Measured down from the ridge against the RAFTER LINE — which starts at `eaveDatum`, not at
+  // the plate. `tieHalf` below is derived from that same line, so using the plate top here
+  // would put the tie two thirds of the way to where its own ends are.
+  const tieY = ridgeY - (ridgeY - eaveDatum) / 3;
   // The horizontal half-length at 1/3 of the vertical rise-to-ridge distance is exactly
   // halfSpan/3 for ANY pitch — (ridgeY-H) and the horizontal-per-vertical ratio both scale
   // with risePer12, so it cancels out of ((ridgeY-tieY)*12)/risePer12 algebraically. Writing
@@ -181,7 +192,9 @@ export function generateRoof(input: RoofInput): Member[] {
   const underside = rafterHalf / cosP;
   for (const xEnd of [1.5 * t, L - 1.5 * t]) {
     for (let z = oc; z < W - 0.01; z += oc) {
-      const riseHere = (halfSpan - Math.abs(z - halfSpan)) * slope - underside;
+      // From the cap plate up to the rafter underside — measured off the rafter plane's own
+      // datum, so a gable stud still dies into the rafter when the plane is seated properly.
+      const riseHere = eaveDatum - H + (halfSpan - Math.abs(z - halfSpan)) * slope - underside;
       if (riseHere < 0.2) continue;
       emit('stud', '2x4', riseHere, [xEnd, H + riseHere / 2, z], [0, Math.PI / 2, Math.PI / 2], 8, {
         nailing: 'toenail 2-8d ea end (PH)',
@@ -199,7 +212,7 @@ export function generateRoof(input: RoofInput): Member[] {
   const courses = Math.ceil(slopeLen / 4);
   for (const side of [-1, 1] as const) {
     const zEave = side === -1 ? -overhang : W + overhang;
-    const yEave = H - overhang * slope;
+    const yEave = eaveDatum - overhang * slope;
     const nY = cosP;
     const nZ = side * Math.sin(pitch);
     for (let c = 0; c < courses; c++) {

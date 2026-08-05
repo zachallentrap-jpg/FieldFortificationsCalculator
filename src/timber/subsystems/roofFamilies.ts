@@ -25,6 +25,7 @@ import type { BuildingSpec, RoofSpec } from '../spec';
 import { makeEmitter } from '../emit';
 import { LUMBER, LAYOUT, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
 import type { WallsContract } from './wallSystem';
+import { rafterSeatLiftFt } from '../birdsMouth';
 
 /** A roof surface in its own (u along the eave, v up the slope) coordinates. */
 export interface RoofPlane {
@@ -137,16 +138,36 @@ export function slopeOf(roof: RoofSpec): { slope: number; lenPerFtRun: number; p
 const slopeAlongZ = (highSide: WallId): boolean => highSide === 'N' || highSide === 'S';
 
 /**
+ * Where the rafter CENTRE plane sits at the building line — the datum every roof surface and
+ * every rafter in this file is measured from.
+ *
+ * It is not the plate top. Putting the rafter's centre line on the plate's outer top corner is
+ * how the roof used to be laid out here, and it drops the rafter half its own depth into the
+ * wall: the bird's mouth that would close that gap has to eat more than half the rafter, which
+ * is not a joint. `rafterSeatLiftFt` states the correction once — the height at which a
+ * plate-wide seat lands on the plate top — and gable, shed, flat and hip all read it from here
+ * so they cannot drift apart.
+ */
+export function rafterPlaneDatum(spec: BuildingSpec, plateTopY: number): number {
+  const { slope } = slopeOf(spec.roof);
+  const rafter = DRESSED[LUMBER.rafterNominal.value as keyof typeof DRESSED] ?? DRESSED['2x6']!;
+  const plate = DRESSED[LUMBER.plateNominal.value as keyof typeof DRESSED] ?? DRESSED['2x4']!;
+  return plateTopY + rafterSeatLiftFt(rafter.d, plate.d, slope);
+}
+
+/**
  * The roof's surfaces, for any roof kind. Gable returns two planes, shed/flat one, pyramid
  * four. Every plane's `origin` is at the EAVE, so tiling from v=0 upward lays courses the way
  * a roofer works: from the bottom up, each course lapping the one below.
  */
-export function roofPlanes(spec: BuildingSpec, plateTopY: number): RoofPlane[] {
+export function roofPlanes(spec: BuildingSpec, plateTopYRaw: number): RoofPlane[] {
   const { lengthFt: L, widthFt: W } = spec.dims;
   const roof = spec.roof;
   if (roof.kind === 'none') return [];
   const { slope, lenPerFtRun } = slopeOf(roof);
   const oh = roof.overhangFt; // 'none' returned above, so every remaining kind has one
+  // Not the plate top — the seated rafter plane. See `rafterPlaneDatum`.
+  const plateTopY = rafterPlaneDatum(spec, plateTopYRaw);
 
   // A HIP HAS FOUR SURFACES, and for a long time this returned two — a hip was treated as a
   // gable, so its long slopes got deck and roofing and its two triangular ends showed bare
@@ -277,6 +298,10 @@ export function wallInfillProfiles(
   const { lengthFt: L, widthFt: W } = spec.dims;
   const { slope } = slopeOf(roof);
   const out: { wall: WallId; topAt: (u: number) => number }[] = [];
+  // The whole roof plane sits one seat above the plate (see `rafterPlaneDatum`), so the wall
+  // that closes in under it rises by the same amount — otherwise the siding stops short of the
+  // rake by an inch and three quarters and daylight shows through the gable.
+  const lift = rafterPlaneDatum(spec, 0);
 
   if (roof.kind === 'gable') {
     // The ridge runs along X over z = W/2, so the two walls that run along Z — E and W — carry
@@ -289,7 +314,7 @@ export function wallInfillProfiles(
         wall,
         topAt: (u) => {
           const z = s.origin[1] + s.along[1] * u;
-          return Math.max(0, (W / 2 - Math.abs(z - W / 2)) * slope);
+          return Math.max(0, lift + (W / 2 - Math.abs(z - W / 2)) * slope);
         },
       });
     }
@@ -304,7 +329,7 @@ export function wallInfillProfiles(
   const span = alongZ ? W : L;
   const up = highSide === 'N' || highSide === 'E' ? 1 : -1;
   const high = walls.surfaces.find((q) => q.wall === highSide);
-  if (high) out.push({ wall: highSide, topAt: () => span * slope });
+  if (high) out.push({ wall: highSide, topAt: () => lift + span * slope });
   for (const wall of (alongZ ? ['E', 'W'] : ['S', 'N']) as WallId[]) {
     const s = walls.surfaces.find((q) => q.wall === wall);
     if (!s) continue;
@@ -313,7 +338,7 @@ export function wallInfillProfiles(
       topAt: (u) => {
         const across = alongZ ? s.origin[1] + s.along[1] * u : s.origin[0] + s.along[0] * u;
         const fromLow = up === 1 ? across : span - across;
-        return Math.max(0, fromLow * slope);
+        return Math.max(0, lift + fromLow * slope);
       },
     });
   }
@@ -358,7 +383,9 @@ export function generateShed(input: ShedInput): Member[] {
   for (let s = oc; s < ridgeRun - 1.5 * t; s += oc) centers.push(s);
   centers.push(ridgeRun - t / 2);
 
-  const yLowEave = H - oh * slope;
+  // H is the cap plate top — where the pony wall and the rake infill start. The RAFTERS start
+  // one seat higher, so they bear on the plate instead of running through it.
+  const yLowEave = rafterPlaneDatum(spec, H) - oh * slope;
   const yMid = yLowEave + ((span + 2 * oh) / 2) * slope;
 
   for (const c of centers) {
@@ -424,7 +451,9 @@ export function generateShed(input: ShedInput): Member[] {
       // Distance uphill from the low plate at this station.
       const across = alongZ ? z : x;
       const fromLow = up === 1 ? across : span - across;
-      const riseHere = fromLow * slope - (rafterD / 2) / Math.cos(pitchRad);
+      // Measured from the cap plate up to the rafter underside, off the rafter plane's own
+      // datum — the same correction the gable studs take.
+      const riseHere = rafterPlaneDatum(spec, H) - H + fromLow * slope - (rafterD / 2) / Math.cos(pitchRad);
       if (riseHere < TOLERANCE.minInfillStudFt) continue;
       emit('rakeStud', LUMBER.studNominal.value as string, {
         cutLengthFt: riseHere,
@@ -539,7 +568,10 @@ export function generateHip(input: HipInput): Member[] {
   const oh = roof.overhangFt;
   const halfSpan = W / 2;
   const plateTopY = walls.plateTopY;
-  const ridgeY = plateTopY + halfSpan * slope;
+  // Ceiling joists bear ON the plate top; the roof frame starts one seat above it, so the
+  // commons and jacks have a bird's mouth to cut instead of running through the plate.
+  const roofY = rafterPlaneDatum(spec, plateTopY);
+  const ridgeY = roofY + halfSpan * slope;
   const rafterNominal = LUMBER.rafterNominal.value as string;
   const ridgeNominal = LUMBER.ridgeNominal.value as string;
   const spacingFt = spec.spacing.rafterSpacingIn / IN_PER_FT;
@@ -580,7 +612,7 @@ export function generateHip(input: HipInput): Member[] {
       const zEave = side === -1 ? -oh : W + oh;
       emit('rafter', rafterNominal, {
         cutLengthFt: commonLen,
-        position: [x, (plateTopY - oh * slope + ridgeY) / 2, (zEave + W / 2) / 2],
+        position: [x, (roofY - oh * slope + ridgeY) / 2, (zEave + W / 2) / 2],
         rotation: [0, side === -1 ? -Math.PI / 2 : Math.PI / 2, Math.atan2(halfSpan * slope, halfSpan + oh)],
         stage,
         angles: { plumbCut: 90 - (Math.atan(slope) * 180) / Math.PI, seatCut: (Math.atan(slope) * 180) / Math.PI },
@@ -597,8 +629,8 @@ export function generateHip(input: HipInput): Member[] {
     const run = Math.hypot(rx - cx, W / 2 - cz);
     emit('hipRafter', rafterNominal, {
       cutLengthFt: hipLen,
-      position: [(cx + rx) / 2, (plateTopY - oh * slope + ridgeY) / 2, (cz + W / 2) / 2],
-      rotation: [0, Math.atan2(-(W / 2 - cz), rx - cx), Math.atan2(ridgeY - (plateTopY - oh * slope), run)],
+      position: [(cx + rx) / 2, (roofY - oh * slope + ridgeY) / 2, (cz + W / 2) / 2],
+      rotation: [0, Math.atan2(-(W / 2 - cz), rx - cx), Math.atan2(ridgeY - (roofY - oh * slope), run)],
       stage,
       nailing: '3-16d at the ridge; jacks bear on it both sides (PH)',
       doctrineRef: `${citeOf(LUMBER.rafterNominal)} — hip run is the diagonal: ${hipLenPerFtRun(slope).toFixed(3)} ft per ft of common run`,
@@ -621,8 +653,8 @@ export function generateHip(input: HipInput): Member[] {
   ] as [number, number, number, number][]) {
     for (let back = spacingFt; back < halfSpan - 1e-6; back += spacingFt) {
       const lenFt = (back + oh) * lenPerFtRun;
-      const yEave = plateTopY - oh * slope;
-      const yHip = plateTopY + back * slope;
+      const yEave = roofY - oh * slope;
+      const yHip = roofY + back * slope;
       const pitch = Math.atan(slope);
       // Jack on the LONG wall: fixed x, running in z from the eave up to the hip.
       emit('jackRafter', rafterNominal, {

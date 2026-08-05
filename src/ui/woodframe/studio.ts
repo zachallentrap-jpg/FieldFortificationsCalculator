@@ -14,7 +14,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { lumberPiece, plywoodSheet, roofingSheet, screenSheet, disposeObject, toonGradient } from '../three-viewer';
+import { lumberPiece, cutLumberPiece, plywoodSheet, roofingSheet, screenSheet, disposeObject, toonGradient } from '../three-viewer';
 import type { LumberSize } from '../three-viewer';
 import type { Member } from '../../timber/types';
 import type { StructureModel } from '../../timber/families/index';
@@ -28,6 +28,7 @@ import {
   type CutawayState, type Aabb,
 } from './cutaway';
 import { cameraRigsFor, memberAabb, type CameraRig } from './camera';
+import { seatCutsFor, seatProfile, type SeatCut } from '../../timber/birdsMouth';
 import { fmtFtIn } from '../../timber/units';
 
 export interface StudioHandles {
@@ -185,8 +186,16 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
 
   // ── Scene construction ─────────────────────────────────────────────────────
 
+  /**
+   * Every rafter's bird's-mouth, recomputed with the model. Derived, never stored: the notch is a
+   * consequence of where the engine put the rafter and the plate, so nothing upstream has to know
+   * the viewer draws it and no golden moves when it changes.
+   */
+  let seats = new Map<string, SeatCut>();
+
   function buildMemberMesh(m: Member): THREE.Group {
     let p: THREE.Group;
+    const seat = seats.get(m.id);
     if (m.nominal.includes('conc') || m.role === 'slab' || m.role === 'footing' || m.role === 'foundationWall') {
       p = new THREE.Group();
       const geo = new THREE.BoxGeometry(
@@ -220,6 +229,12 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     } else if (m.nominal.includes('panel')) {
       p = plywoodSheet(group);
       p.scale.set(m.cutLength / 12, m.actual.d / 12, Math.max(0.02, m.actual.w / 12));
+    } else if (seat) {
+      // A NOTCHED rafter. The plain prop is a box, and a box laid at pitch across a cap plate
+      // intersects it — 3 inches of rafter buried in the plate at every bearing, on every roof.
+      // Cut the seat instead: the piece now lands ON the plate, and the notch reads as the
+      // bird's-mouth it is from any angle you orbit to.
+      p = cutLumberPiece(group, seatProfile(m, seat), m.actual.w / 12);
     } else {
       p = lumberPiece(group, propFor(m.nominal), m.cutLength / 12, m.actual.d / 12, m.actual.w / 12);
     }
@@ -330,6 +345,7 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     disposeObject(group);
     group.clear();
     byId.clear();
+    seats = seatCutsFor(model.members);
     for (const m of model.members) {
       const mesh = buildMemberMesh(m);
       byId.set(m.id, mesh);

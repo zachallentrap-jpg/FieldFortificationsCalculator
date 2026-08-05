@@ -15,6 +15,7 @@ import { specFromBuildingInput, type BuildingInput } from '../src/timber/frame';
 import type { BuildingSpec, CoveringSpec } from '../src/timber/spec';
 import { DRESSED } from '../src/timber/types';
 import { LUMBER } from '../src/timber/doctrine';
+import { rafterSeatLiftFt } from '../src/timber/birdsMouth';
 
 const area = (r: Rect): number => Math.max(0, r.u1 - r.u0) * Math.max(0, r.v1 - r.v0);
 const overlap = (a: Rect, b: Rect): number =>
@@ -276,7 +277,11 @@ test('a gable end is CLOSED IN — the triangle above the plate is not left open
   // The gable ends are the walls that BUTT BETWEEN the through walls, so the triangle is cut
   // off a wall thickness at each end: ∫ slope·z dz over the clear run, doubled about the ridge.
   const t = DRESSED['2x4']!.d / 12;
-  const trueTriangle = slope * ((W / 2) ** 2 - t ** 2);
+  // Plus the strip the seated rafter plane adds: the whole roof sits one bird's-mouth above the
+  // plate (`rafterSeatLiftFt`), so the wall that closes in under it is that much taller across
+  // its entire clear run. Leave this out and the siding stops short of the rake.
+  const lift = rafterSeatLiftFt(DRESSED['2x6']!.d, DRESSED['2x4']!.d, slope);
+  const trueTriangle = slope * ((W / 2) ** 2 - t ** 2) + lift * (W - 2 * t);
   for (const wall of ['E', 'W'] as const) {
     const got = infillArea(model, wall);
     assert.ok(
@@ -296,11 +301,12 @@ test('a shed closes in its pony wall and both rakes; a hip has nothing to close 
 
   const shed = generateStructure({ ...base, roof: { kind: 'shed', risePer12: 4, overhangFt: 1, highSide: 'N' } });
   // High wall: a pony wall of constant height over a wall that runs the full length.
-  assert.ok(Math.abs(infillArea(shed, 'N') - L * W * slope) < 1e-6, 'pony wall over the high plate');
+  const lift = rafterSeatLiftFt(DRESSED['2x6']!.d, DRESSED['2x4']!.d, slope);
+  assert.ok(Math.abs(infillArea(shed, 'N') - L * (W * slope + lift)) < 1e-6, 'pony wall over the high plate');
   // The two walls parallel to the slope: a right triangle rising to the high side, over the
   // clear run between the through walls. The profile is linear, so the strips are EXACT.
   const t = DRESSED['2x4']!.d / 12;
-  const rake = (slope * ((W - t) ** 2 - t ** 2)) / 2;
+  const rake = (slope * ((W - t) ** 2 - t ** 2)) / 2 + lift * (W - 2 * t);
   for (const wall of ['E', 'W'] as const) {
     assert.ok(Math.abs(infillArea(shed, wall) - rake) < 1e-6, `${wall}: rake infill ${infillArea(shed, wall)} vs ${rake}`);
   }
@@ -319,9 +325,10 @@ test('infill is cut to the rake, never above it, and carries the wall’s own ma
     assert.ok(pieces.length > 0, `${siding}: nothing closed in`);
     for (const m of pieces) {
       assert.equal(m.role, role, `${siding}: ${m.id} is not the wall's own material`);
-      // Nothing pokes above the ridge: plate top (8 ft) + the gable rise.
+      // Nothing pokes above the ridge: plate top (8 ft), the seat lift, and the gable rise.
       const top = m.position[1] + (role === 'siding' && siding === 'plywood' ? m.actual.d / 12 : m.cutLength / 12) / 2;
-      assert.ok(top <= 8 + (16 / 2) * (4 / 12) + 1e-6, `${m.id} stands ${top.toFixed(2)} ft — above the ridge`);
+      const ridge = 8 + rafterSeatLiftFt(DRESSED['2x6']!.d, DRESSED['2x4']!.d, 4 / 12) + (16 / 2) * (4 / 12);
+      assert.ok(top <= ridge + 1e-6, `${m.id} stands ${top.toFixed(2)} ft — above the ridge at ${ridge.toFixed(2)}`);
     }
   }
 });

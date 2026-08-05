@@ -7,6 +7,7 @@ import { generateFrame, type BuildingInput } from '../src/timber/frame';
 import { bomSummary, cutList, boardFeet } from '../src/timber/bom';
 import { wallElevation, layoutStrip } from '../src/timber/elevation';
 import { STAGES } from '../src/timber/types';
+import { rafterSeatLiftFt } from '../src/timber/birdsMouth';
 
 const golden: BuildingInput = {
   lengthFt: 20,
@@ -85,7 +86,11 @@ test('roof geometry: rafter length is framing-square length LESS half the ridge,
   assert.ok(ridge.position[1] > input.wallHeightFt, 'ridge above the walls');
   // Ridge top edge stays flush with the rafter top planes (no board poking through the roof).
   const pitch = Math.atan2(input.risePer12, 12);
-  const ridgeY = input.wallHeightFt + (input.widthFt / 2) * (input.risePer12 / 12);
+  // The roof plane's datum is NOT the plate top — a seated rafter sits one bird's-mouth above
+  // it (see `rafterSeatLiftFt`). Read it from the same rule the engine uses, so this keeps
+  // testing "the ridge top is flush with the rafter tops" rather than pinning an elevation.
+  const eaveDatum = input.wallHeightFt + rafterSeatLiftFt(5.5, 3.5, input.risePer12 / 12);
+  const ridgeY = eaveDatum + (input.widthFt / 2) * (input.risePer12 / 12);
   const rafterHalf = 5.5 / 12 / 2;
   const ridgeTopExpected = ridgeY + rafterHalf / Math.cos(pitch);
   const ridgeTop = ridge.position[1] + ridge.actual.d / 12 / 2;
@@ -125,8 +130,9 @@ test('roof sheathing lies ON the rafter planes and courses never overlap', () =>
   const { members, input } = generateFrame(golden);
   const slope = input.risePer12 / 12;
   const pitch = Math.atan2(input.risePer12, 12);
-  const ridgeY = input.wallHeightFt + (input.widthFt / 2) * slope;
-  const yEave = input.wallHeightFt - input.overhangFt * slope;
+  const eaveDatum = input.wallHeightFt + rafterSeatLiftFt(5.5, 3.5, slope);
+  const ridgeY = eaveDatum + (input.widthFt / 2) * slope;
+  const yEave = eaveDatum - input.overhangFt * slope;
   for (const p of members.filter((m) => m.role === 'roofPanel')) {
     const side = p.position[2] < input.widthFt / 2 ? -1 : 1;
     const zEave = side === -1 ? -input.overhangFt : input.widthFt + input.overhangFt;
