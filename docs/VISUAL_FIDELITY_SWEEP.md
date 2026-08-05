@@ -50,6 +50,7 @@ screenshots get read.
 | Weather barrier / building paper | **Already covered** — an earlier pass fixed it (row above). All that is left is a stale help string; see below. |
 | **Hip roof — the four corners** | **Fixed** — every plane stopped over its wall corner while the hip rafters ran on to the true eave corner, so the roof had a square notch at all four corners with a bare hip tail standing in each. |
 | **Hip roof — the common rafters' pitch** | **Fixed** — rotated to a rise measured from the plate over a run measured from the eave, so every common sat 1.84 in proud of the roof at the eave and 1.84 in below the ridge. The jacks and hips were right; only the commons dissented. |
+| **The ridge cap** | **Fixed** — the cap was laid at DECK level and every course of roofing stacked on top of it, so the 2x8 ridge board showed through the piece whose whole job is to be outermost. |
 
 ## The shed that had no walls above the plate
 
@@ -736,11 +737,44 @@ families framing one plane disagreed, and only the commons dissented. And the ra
 `angles` block, two lines below the rotation, was already derived from `atan(slope)`: the model and
 the cut list described two different pieces. Both are now asserted.
 
+## The cap that was under the roof it capped
+
+The tan line along the ridge, recorded as open in the previous pass. The raycaster named it: five
+clicks along the line, and the middle one landed on `HP-ridge-01` — the 2x8 ridge board — on a roof
+with deck, felt and corrugated all on it. Measured on a 16 × 12 4-in-12 hip: the cap's top sat
+**0.13 in below** the ridge board's top, so the board pushed through it.
+
+`generateRidgeCaps` was given `rafterHalfFt + deckThick + paperThick + surfaceLift` — the **deck's**
+offset. The roofing courses that go on after it are placed at that same base plus `c * thickness`
+each, so all four courses were laid on top of the one piece whose entire job is to be the outermost
+thing at the joint. The cap now gets the roofing's outer surface: the same base plus `courses`
+layers, then half its own thickness.
+
+**A second bug, and the invariant that caught it.** Every other covering offset in this file is
+measured PERPENDICULAR to the roof and applied through `roofTilePlacement`; the cap's was added
+straight to Y, which clears the roof by only `lift * cos(pitch)`. The obvious correction is to
+divide by `cos` — that lands on the apex where the two roofing planes would meet if extended. It is
+wrong, and `timber2-plausible` said so immediately: *"CP-ridgeCap-01 (ridgeCap, roll roofing):
+touches nothing at all."* The sheets never reach that apex (below), so a cap placed there floats
+3.8 in above the material it is nailed to at 12-in-12. Multiplying by `cos` puts it on the sheets,
+which is where a cap actually goes. The plausibility check is worth more than it looks: it caught a
+change that was geometrically reasoned, self-consistent, and still floating.
+
+Nine solid thumbnail goldens moved with it — every family whose roof has a ridge or a hip.
+
 ## What is still open
 
-- **The ridge line on a finished hip.** A thin tan line shows along the ridge from overhead even
-  with `ridgeCap` members emitted. Present before and after this change, so not from it, and not
-  diagnosed. Next target.
+- **The roofing stops short of the ridge.** Found while measuring the cap, not fixed here. Each
+  course is offset perpendicular from its plane and still cut at `slopeLengthFt`, so its top edge
+  pulls back from the ridge by `lift * sin(pitch)` and lands `lift * cos(pitch)` up instead of
+  `lift / cos(pitch)`. The two slopes' sheets therefore never meet at the peak — there is a notch
+  `2 * lift * sin(pitch)` wide, and the cap is what hides it. Invisible at shallow pitch; at
+  12-in-12 the sheets reach only 3.09 in above the rafter plane while the 2x8 ridge board's top is
+  at 3.63 in, so **the ridge board out-reaches the roofing itself** and no cap height can both rest
+  on the sheets and cover the board. That is why the cap test asserts 2, 4 and 6-in-12 and says in
+  its own comment why 12 is absent. Closing the notch means extending each plane's top course by
+  `lift * tan(pitch)`, which changes billed roofing area — worth doing deliberately, with the
+  conservation tests in view. Next target.
 - **`buildingPaper` the ROLE.** The felt under the roofing was fixed in an earlier pass and is
   emitted under the `felt` role. `buildingPaper` remains in the role union, the thumbnail paint
   order, the handout list and `portrait.ts`, and nothing emits it. Its help string reads "Weather

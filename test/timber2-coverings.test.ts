@@ -9,7 +9,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateStructure } from '../src/timber/families/index';
 import { subtractCutouts, tileSurface, type Rect } from '../src/timber/subsystems/coverings';
-import { generatePurlins, pyramidPlanes, planeSpanAt } from '../src/timber/subsystems/roofFamilies';
+import { generatePurlins, pyramidPlanes, planeSpanAt, roofPlanes } from '../src/timber/subsystems/roofFamilies';
+import { familyById } from '../src/timber/catalog';
 import { wallContract } from '../src/timber/subsystems/wallSystem';
 import { specFromBuildingInput, type BuildingInput } from '../src/timber/frame';
 import type { BuildingSpec, CoveringSpec } from '../src/timber/spec';
@@ -449,4 +450,87 @@ test('board-and-batten carries its BATTENS above the plate, on the wall’s own 
   // And plain board siding gets none — a batten is half of a PAIR, not a decoration.
   const plain = generateStructure(withCoverings({ siding: 'boards' }));
   assert.equal(plain.members.filter((m) => m.role === 'batten').length, 0, 'plain boards grew battens');
+});
+
+// ── The ridge cap: the outermost piece at the joint ──────────────────────────
+
+function roofModel(kind: 'gable' | 'hip', risePer12: number) {
+  const spec = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset));
+  spec.dims = { lengthFt: 16, widthFt: 12 };
+  spec.roof = { kind, risePer12, overhangFt: 1 };
+  spec.coverings = { ...spec.coverings, roofDeck: 'plywood', roofing: 'corrugated' };
+  return generateStructure(spec);
+}
+
+test('THE CAP IS THE OUTERMOST PIECE AT ITS JOINT — the ridge board cannot show through it', () => {
+  // Two mistakes stacked, both pushing the cap down into the roof it is supposed to finish.
+  //
+  // 1. The cap was given the DECK's offset, so every course of roofing was laid on top of the one
+  //    piece whose whole job is to be outermost.
+  // 2. That offset is measured PERPENDICULAR to the roof, like every other covering offset here,
+  //    and it was added straight to Y — which only clears the roof by lift * cos(pitch).
+  //
+  // Measured on a 16x12 4-in-12 hip before the fix: the cap's top sat 0.13 in BELOW the top of the
+  // 2x8 ridge board, so the ridge board showed through the cap as a tan line along the peak,
+  // plainly visible from overhead on a fully finished roof.
+  // 12-in-12 is deliberately absent, and not because it is inconvenient: at that pitch the
+  // ROOFING ITSELF stops 1.9 in short of the ridge (each course is offset perpendicular from the
+  // plane and still cut at `slopeLengthFt`, so its top edge pulls back), and the 2x8 ridge board
+  // out-reaches it whatever the cap does. That is a separate defect, measured and recorded in
+  // docs/VISUAL_FIDELITY_SWEEP.md, not something this assertion can paper over.
+  for (const kind of ['gable', 'hip'] as const) {
+    for (const risePer12 of [2, 4, 6]) {
+      const model = roofModel(kind, risePer12);
+      const ridge = model.members.find((m) => m.role === 'ridge');
+      const caps = model.members.filter((m) => m.role === 'ridgeCap');
+      assert.ok(ridge, `${kind} ${risePer12}: no ridge board`);
+      assert.ok(caps.length > 0, `${kind} ${risePer12}: no cap`);
+      // The cap over the RIDGE is the one that runs along it.
+      const cap = caps.reduce((best, c) =>
+        Math.abs(c.position[2]! - ridge!.position[2]!) < Math.abs(best.position[2]! - ridge!.position[2]!) ? c : best);
+      const ridgeTop = ridge!.position[1]! + ridge!.actual!.d / 12 / 2;
+      const capTop = cap.position[1]! + cap.actual!.w / 12 / 2;
+      assert.ok(capTop > ridgeTop,
+        `${kind} at ${risePer12}-in-12: cap top ${capTop.toFixed(4)} is ${((capTop - ridgeTop) * 12).toFixed(2)} in `
+        + `relative to the ridge board's ${ridgeTop.toFixed(4)} — the ridge board pierces its own cap`);
+    }
+  }
+});
+
+test('a cap LANDS ON the roofing, at every pitch — not under it and not floating over it', () => {
+  // Two ways to get this wrong, and the fix has to miss both. Under: the cap took the deck's
+  // offset, so the courses stacked on top of it. Over: lifting to the apex where the two roofing
+  // PLANES would meet if extended puts the cap 3.8 in above the sheets at 12-in-12, because the
+  // sheets pull back from the ridge and never reach that apex.
+  //
+  // The sheets are the thing the cap is nailed to, so they are what it is measured against here.
+  for (const risePer12 of [2, 4, 6, 12]) {
+    const model = roofModel('hip', risePer12);
+    const rafter = model.members.find((m) => m.role === 'rafter')!;
+    const deck = model.members.find((m) => m.role === 'roofPanel')!;
+    const ridge = model.members.find((m) => m.role === 'ridge')!;
+    const caps = model.members.filter((m) => m.role === 'ridgeCap');
+    const cap = caps.reduce((best, c) =>
+      Math.abs(c.position[2]! - ridge.position[2]!) < Math.abs(best.position[2]! - ridge.position[2]!) ? c : best);
+    // The ridge board's centre lies on the rafter plane at the ridge, so it is the datum here.
+    // `roofPlanes(spec, 0)` puts the plane at plate height ZERO — usable for its normal and its
+    // pitch, useless as a position, and using it as one makes any assertion pass.
+    const p = roofPlanes(model.spec as BuildingSpec, 0).find((x) => x.id === 'roof-S')!;
+    const cos = Math.sqrt(1 - p.upSlope[1]! * p.upSlope[1]!);
+    // How high the roofing surface stands over the plane at the ridge, and where the cap's
+    // underside is. Both measured from the same datum.
+    const deckOnly = (rafter.actual!.d / 2 + deck.actual!.w) / 12;
+    const capUnder = cap.position[1]! - cap.actual!.w / 24 - ridge.position[1]!;
+    const sheetTop = Math.max(...model.members.filter((m) => m.role === 'roofingCourse')
+      .map((m) => m.position[1]! + (m.actual!.d / 12 / 2) * p.upSlope[1]!)) - ridge.position[1]!;
+    assert.ok(capUnder > deckOnly * cos,
+      `${risePer12}-in-12: the cap's underside is ${(capUnder * 12).toFixed(2)} in over the plane, `
+      + `inside a deck that alone reaches ${(deckOnly * cos * 12).toFixed(2)} in — the roofing is on top of the cap`);
+    // LANDS ON, so bounded both ways: half an inch of slack either side of the sheet it rests on.
+    // Buried reads negative here (-0.79 in before the fix, the courses lying over the cap) and
+    // floating reads positive (+3.8 in if the cap is lifted to the planes' unreachable apex).
+    assert.ok(Math.abs(capUnder - sheetTop) < 0.5 / 12,
+      `${risePer12}-in-12: the cap's underside sits ${((capUnder - sheetTop) * 12).toFixed(2)} in from the `
+      + `highest sheet — a cap is nailed to the roofing, not buried in it or hovering over it`);
+  }
 });

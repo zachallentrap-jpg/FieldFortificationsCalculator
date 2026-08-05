@@ -613,6 +613,8 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
     const cite = isRoll
       ? (roofing === 'rollDouble' ? citeOf(ROOFING.rollDoubleMinSlopePer12) : citeOf(ROOFING.rollMinSlopePer12))
       : citeOf(ROOFING.corrugatedWidthIn);
+    // Hoisted: the cap over the ridge has to know how thick the roofing under it got.
+    const coveringThick = (ROOFING.coveringThickIn.value as number) / IN_PER_FT;
 
     for (const plane of planes) {
       const courses = Math.max(1, Math.ceil(plane.slopeLengthFt / exposureFt));
@@ -669,7 +671,6 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
           // already under this one, and finally half of this course's own thickness. Leaving
           // that last half out sank each course an eighth of an inch INTO the deck, and the
           // deck striped through — the same class of mistake as the sign above, seen twice.
-          const coveringThick = (ROOFING.coveringThickIn.value as number) / IN_PER_FT;
           const p = roofTilePlacement(
             plane,
             { u0, u1, v0: vb0, v1: vb1 },
@@ -688,8 +689,18 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
         }
       }
     }
+    // A CAP SITS ON THE ROOFING, NOT ON THE DECK. This passed the deck's own offset, so the cap
+    // was laid at deck level and every course of roofing was stacked on top of it — the piece
+    // whose whole job is to be the outermost thing at the joint was the innermost. On a hip the
+    // 2x8 ridge board then showed through it as a tan line along the peak. The courses build up
+    // toward the ridge (each rides on the ones below), so the cap has to clear ALL of them:
+    // `courses` layers of roofing, then half the cap's own thickness to reach its centre.
+    // `courses` layers of roofing. This is the roofing's OUTER SURFACE, perpendicular to the roof;
+    // the cap adds half of its own thickness on top, vertically, inside `generateRidgeCaps`.
+    const capCourses = planes.reduce(
+      (n, plane) => Math.max(n, Math.max(1, Math.ceil(plane.slopeLengthFt / exposureFt))), 1);
     emit.members.push(...generateRidgeCaps(planes, nominal, cite, stageRoofing,
-      rafterHalfFt + deckThick + paperThick + TOLERANCE.surfaceLiftFt,
+      rafterHalfFt + deckThick + paperThick + TOLERANCE.surfaceLiftFt + capCourses * coveringThick,
       // A cap is nailed on BOTH sides of the joint it straddles, in the same fastener as the
       // courses under it. Both phrasings below are ones `fasteners.ts` already reads, and that
       // is not a coincidence to preserve by luck: its unparsed-schedule gate failed this file
@@ -743,22 +754,25 @@ export function generateRidgeCaps(
 ): Member[] {
   const emit = makeEmitter('CP');
   const capW = (ROOFING.capWidthIn.value as number) / IN_PER_FT;
+  const capThickFt = (ROOFING.coveringThickIn.value as number) / IN_PER_FT;
   const seen = new Set<string>();
 
-  const lines: { a: V3; b: V3; hip: boolean }[] = [];
+  const lines: { a: V3; b: V3; hip: boolean; cos: number }[] = [];
   for (const p of planes) {
     const top = planeSpanAt(p, p.slopeLengthFt);
     const foot = planeSpanAt(p, 0);
+    // `upSlope` is a unit vector, so its Y component is sin(pitch) and this is cos(pitch).
+    const cos = Math.max(1e-9, Math.sqrt(Math.max(0, 1 - p.upSlope[1] * p.upSlope[1])));
     // The top edge: a ridge wherever the plane still has width up there. A hip end tapers to a
     // point and has none, which is why a pyramid has four hips and no ridge at all.
     if (top.hi - top.lo > EPS) {
-      lines.push({ a: atUV(p, top.lo, p.slopeLengthFt), b: atUV(p, top.hi, p.slopeLengthFt), hip: false });
+      lines.push({ a: atUV(p, top.lo, p.slopeLengthFt), b: atUV(p, top.hi, p.slopeLengthFt), hip: false, cos });
     }
     // The side edges, but only where the plane actually tapers — otherwise they are the rake of
     // a gable, which is trimmed with a barge board and not capped.
     if (p.topLengthFt !== undefined) {
-      lines.push({ a: atUV(p, foot.lo, 0), b: atUV(p, top.lo, p.slopeLengthFt), hip: true });
-      lines.push({ a: atUV(p, foot.hi, 0), b: atUV(p, top.hi, p.slopeLengthFt), hip: true });
+      lines.push({ a: atUV(p, foot.lo, 0), b: atUV(p, top.lo, p.slopeLengthFt), hip: true, cos });
+      lines.push({ a: atUV(p, foot.hi, 0), b: atUV(p, top.hi, p.slopeLengthFt), hip: true, cos });
     }
   }
 
@@ -778,9 +792,24 @@ export function generateRidgeCaps(
     // across the two slopes and its thickness stands off them.
     const rx = Math.acos(Math.max(-1, Math.min(1, u[1])));
     const ry = Math.atan2(u[0], u[2]);
+    // `liftFt` is the roofing's outer surface measured PERPENDICULAR to the roof, the way every
+    // other covering offset in this file is, and `mid` is on the roof plane — so the sheet edge
+    // the cap lands on is `liftFt * cos(pitch)` above it, and the cap's own half-thickness goes on
+    // top of that. Both were previously skipped: the cap took the DECK's offset added straight to
+    // Y, so every course of roofing was stacked on the one piece whose whole job is to be
+    // outermost, and on a hip the 2x8 ridge board showed through it.
+    //
+    // `* cos`, not `/ cos`. Dividing would put the cap at the apex where the two roofing PLANES
+    // would meet if extended — but the sheets do not reach that apex: each course is offset
+    // perpendicular from the plane and still cut at `slopeLengthFt`, so its top edge pulls back
+    // from the ridge by `lift * sin(pitch)` and sits `lift * cos(pitch)` up instead. A cap at the
+    // apex therefore floats above the material it is nailed to, by 3.8 in at 12-in-12 — which is
+    // what the plausibility check means by "touches nothing at all". The cap goes where the
+    // sheets actually are. (That the sheets stop short at all is a separate defect; see
+    // docs/VISUAL_FIDELITY_SWEEP.md.)
     emit('ridgeCap', nominal, {
       cutLengthFt: l,
-      position: [mid[0], mid[1] + liftFt, mid[2]],
+      position: [mid[0], mid[1] + liftFt * line.cos + capThickFt / 2, mid[2]],
       rotation: [rx, ry, Math.PI / 2],
       stage,
       actual: { w: ROOFING.coveringThickIn.value as number, d: capW * IN_PER_FT },
