@@ -8,6 +8,8 @@ import { joistNominalFor, SMALL_PLAN_WIDTH_FT } from '../src/timber/subsystems/f
 import type { BuildingSpec, FoundationSpec } from '../src/timber/spec';
 import { shippedFamilies, familyById } from '../src/timber/catalog';
 import { maxOpeningTopFt } from '../src/timber/normalize';
+import { FAMILY_TABLE } from '../src/timber/catalog';
+import type { Member } from '../src/timber/types';
 
 function bldg(over: Partial<BuildingSpec> = {}): BuildingSpec {
   const base = specFromBuildingInput({
@@ -337,5 +339,107 @@ test('coverings compose with every foundation and roof without id collisions', (
       assert.ok(model.members.some((m) => m.role === 'siding' || m.role === 'sidingBoard'), 'siding present');
       assert.ok(model.members.some((m) => m.role === 'roofingCourse'), 'roofing present');
     }
+  }
+});
+
+// ── Skids: the runners a building is dragged on ──────────────────────────────
+
+/**
+ * A member's axis-aligned box, in feet.
+ *
+ * Spelled out because getting it wrong is how a sweep invents defects that are not there. Length
+ * runs along LOCAL X; `actual.d` is the face width (local Y) and `actual.w` the thickness (local
+ * Z). Then: ry = ±90° swings the length onto world Z; rz = ±90° stands the member up, so its
+ * LENGTH becomes its vertical extent; rx = −90° lays it flat, so its thickness is vertical.
+ */
+function memberBox(m: Member): { lo: [number, number, number]; hi: [number, number, number] } {
+  const [rx, ry, rz] = m.rotation;
+  const len = m.cutLength / 12;
+  const face = m.actual.d / 12;
+  const thick = m.actual.w / 12;
+  const alongZ = Math.abs(Math.sin(ry)) > 0.5;
+  const vertical = Math.abs(Math.abs(rz) - Math.PI / 2) < 1e-6;
+  const flat = Math.abs(Math.abs(rx) - Math.PI / 2) < 1e-6;
+  const ext = vertical
+    ? { x: alongZ ? thick : face, y: len, z: alongZ ? face : thick }
+    : flat
+      ? { x: alongZ ? thick : len, y: thick, z: alongZ ? len : face }
+      : { x: alongZ ? thick : len, y: face, z: alongZ ? len : thick };
+  return {
+    lo: [m.position[0] - ext.x / 2, m.position[1] - ext.y / 2, m.position[2] - ext.z / 2],
+    hi: [m.position[0] + ext.x / 2, m.position[1] + ext.y / 2, m.position[2] + ext.z / 2],
+  };
+}
+
+const overlapFt = (a: ReturnType<typeof memberBox>, b: ReturnType<typeof memberBox>): number[] =>
+  [0, 1, 2].map((k) => Math.min(a.hi[k]!, b.hi[k]!) - Math.max(a.lo[k]!, b.lo[k]!));
+
+/** Every shipped configuration that puts a building on runners, plus the picker-only one. */
+function skidCases(): { label: string; model: ReturnType<typeof generateStructure> }[] {
+  const out: { label: string; model: ReturnType<typeof generateStructure> }[] = [];
+  for (const fam of FAMILY_TABLE) {
+    const model = generateStructure(fam.preset);
+    if (model.members.some((m) => m.role === 'skid')) out.push({ label: fam.id, model });
+  }
+  const platform = FAMILY_TABLE.find((f) => f.id === 'platform');
+  if (platform) {
+    const onSkids = { ...(platform.preset as object), base: 'skids' } as unknown as Parameters<typeof generateStructure>[0];
+    out.push({ label: 'platform/skids', model: generateStructure(onSkids) });
+  }
+  return out;
+}
+
+test('a skid lies ON the ground — it is a runner, not something buried under one', () => {
+  // `generateSkids` assumed grade was y = 0 and hung the skid BELOW it, while the building branch
+  // computed grade as `joistTop − joistDepth − skidDepth` — more than a foot lower — and the
+  // scene drew the ground there. Two ideas of where the earth is, in one function. The skids came
+  // out floating 8 in clear of it with the floor they carry buried underneath.
+  const cases = skidCases();
+  assert.ok(cases.length >= 4, `only ${cases.length} skid configurations found`);
+  for (const { label, model } of cases) {
+    const grade = model.levels?.gradeY ?? 0;
+    for (const s of model.members.filter((m) => m.role === 'skid')) {
+      const box = memberBox(s);
+      assert.ok(
+        Math.abs(box.lo[1]! - grade) < 1e-9,
+        `${label} ${s.id}: underside at ${box.lo[1]}, grade at ${grade} — ${((box.lo[1]! - grade) * 12).toFixed(2)} in off the ground`,
+      );
+    }
+  }
+});
+
+test('nothing runs through a skid, and something bears on every one of them', () => {
+  for (const { label, model } of skidCases()) {
+    const skids = model.members.filter((m) => m.role === 'skid');
+    assert.ok(skids.length > 0);
+    for (const s of skids) {
+      const a = memberBox(s);
+      for (const o of model.members) {
+        if (o.role === 'skid' || o.id === s.id) continue;
+        const ov = overlapFt(a, memberBox(o));
+        assert.ok(
+          !ov.every((v) => v > 1e-6),
+          `${label}: ${o.role} ${o.id} runs through ${s.id} by ${ov.map((v) => (v * 12).toFixed(2) + ' in').join(' x ')}`,
+        );
+      }
+      // A runner that carries nothing is not a foundation. Whatever the family puts on it —
+      // joists on a hut, posts on a platform — must land exactly on its top.
+      const carried = model.members.filter((o) => o.role !== 'skid' && Math.abs(memberBox(o).lo[1]! - a.hi[1]!) < 1e-9);
+      assert.ok(carried.length > 0, `${label} ${s.id}: nothing bears on this runner`);
+    }
+  }
+});
+
+test('a building on skids stands above the earth, not in a trench dug for it', () => {
+  // The whole floor — every joist, rim joist and bridging piece — was below y = 0 with the
+  // subfloor's top exactly at ground level.
+  for (const { label, model } of skidCases()) {
+    const grade = model.levels?.gradeY ?? 0;
+    const buried = model.members.filter((m) => memberBox(m).hi[1]! < grade - 1e-6);
+    assert.deepEqual(
+      buried.map((m) => `${m.role} ${m.id}`),
+      [],
+      `${label}: ${buried.length} members are underground`,
+    );
   }
 });

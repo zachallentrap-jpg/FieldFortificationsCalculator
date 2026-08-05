@@ -71,7 +71,11 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
   // mid-air over three timbers lying on the ground. The two bases differ in what is UNDER the
   // post — a concrete pad you pour, or a timber runner you can drag the whole thing on — not
   // in whether the deck is held up.
-  if (spec.base === 'skids') emit.members.push(...generateSkids(L, W, sBase));
+  // Grade is y = 0 for a platform, so the runners lie on it and the posts bear on their TOPS.
+  // Standing the posts at 0 alongside a buried skid is what the pier base does, and on skids it
+  // left the runners underground with the platform resting on the earth between them.
+  const skidTop = spec.base === 'skids' ? DRESSED[LUMBER.skidNominal.value as string]!.d / IN_PER_FT : 0;
+  if (spec.base === 'skids') emit.members.push(...generateSkids(L, W, sBase, 0));
 
   const bays = Math.max(1, Math.round(L / (PLATFORM.pierSpacingFt.value as number)));
   for (let i = 0; i <= bays; i++) {
@@ -92,12 +96,12 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
           doctrineRef: 'FM 5-426 post footers (PH page)',
         });
       }
-      const postLen = deckY - joistDepth - sillDepth;
+      const postLen = deckY - joistDepth - sillDepth - skidTop;
       // Below this a 'post' is a shim, not a member — the same guard floor.ts uses.
       if (postLen > (PLATFORM.minPostFt.value as number)) {
         emit('post', postNominal, {
           cutLengthFt: postLen,
-          position: [x, postLen / 2, z],
+          position: [x, skidTop + postLen / 2, z],
           rotation: [0, 0, Math.PI / 2],
           stage: sBase,
           nailing: spec.base === 'skids'
@@ -347,16 +351,21 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
   const joistNominal = LUMBER.joistNominal.value as string;
   const joistDepth = DRESSED[joistNominal]!.d / IN_PER_FT;
   const deckThick = DRESSED[deckNominal]!.w / IN_PER_FT;
-  const deckY = joistDepth + deckThick;
+  // ON THE RUNNERS. The joists used to start at y = 0 — flat on the earth — with the skids
+  // buried in the ground underneath them carrying nothing at all. A tent floor on skids is off
+  // the ground; that is the entire point of putting it on skids. Everything above reads `deckY`,
+  // so lifting the floor by the runner's depth carries the bents, the eave and the ridge with it.
+  const skidTop = DRESSED[LUMBER.skidNominal.value as string]!.d / IN_PER_FT;
+  const deckY = skidTop + joistDepth + deckThick;
 
-  emit.members.push(...generateSkids(L, W, sBase));
+  emit.members.push(...generateSkids(L, W, sBase, 0));
 
   const spacing = spec.spacing.joistSpacingIn / IN_PER_FT;
   const joists = Math.max(2, Math.floor(L / spacing) + 1);
   for (let i = 0; i < joists; i++) {
     emit('joist', joistNominal, {
       cutLengthFt: W,
-      position: [(L * i) / (joists - 1), joistDepth / 2, W / 2],
+      position: [(L * i) / (joists - 1), skidTop + joistDepth / 2, W / 2],
       rotation: [0, Math.PI / 2, 0],
       stage: sFloor,
       nailing: '3-16d toenail ea bearing (PH)',
@@ -367,7 +376,7 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
   for (let z = boardW / 2; z < W; z += boardW) {
     emit('deckPlank', deckNominal, {
       cutLengthFt: L,
-      position: [L / 2, joistDepth + deckThick / 2, Math.min(z, W - boardW / 2)],
+      position: [L / 2, skidTop + joistDepth + deckThick / 2, Math.min(z, W - boardW / 2)],
       rotation: [-Math.PI / 2, 0, 0], // flat — see the platform deck above
 
       stage: sDeck,

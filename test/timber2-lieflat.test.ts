@@ -189,7 +189,16 @@ test('a skid base holds the deck up, exactly like a pier base does', () => {
     assert.ok(posts.length > 0, `${base}: the deck stands on posts`);
     const top = Math.max(...posts.map((m) => yRange(m)[1]));
     const bottom = Math.min(...posts.map((m) => yRange(m)[0]));
-    assert.ok(bottom < 0.3, `${base}: the posts come down to the base`);
+    // The posts come down to WHAT THEY BEAR ON, which is not the same height in the two cases:
+    // a pier post stands on a pad at grade, a skid post stands on the runner's TOP. Asserting a
+    // bare "below 0.3 ft" quietly encoded the old bug, where the runners were buried below grade
+    // and the posts stood on the earth beside them carrying the load past them.
+    const skids = model.members.filter((m) => m.role === 'skid');
+    const bearing = base === 'skids' ? Math.max(...skids.map((m) => yRange(m)[1])) : 0;
+    assert.ok(
+      Math.abs(bottom - bearing) < 1e-9,
+      `${base}: the posts start at ${bottom}, but they bear at ${bearing}`,
+    );
     assert.ok(top > spec.deckHeightFt * 0.6, `${base}: the posts come up to the framing`);
   }
 });

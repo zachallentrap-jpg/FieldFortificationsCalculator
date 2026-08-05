@@ -41,6 +41,7 @@ screenshots get read.
 | **Board-and-batten at the rake** | **Fixed** — every batten stopped dead in a straight line at the cap plate; the gable triangle was bare boards. |
 | **Pyramid roof on a building** | **Fixed** — no generator framed it, so a shared link produced a plank of roofing hanging in mid-air over an open building. |
 | **Dead stops on the stage scrubber** | **Fixed** — five plans advertised stages nothing would ever build; and the issues panel had never spoken on load at all. |
+| **Skid foundation** | **Fixed** — the runners floated 8 in above the ground with the floor buried beneath them, and ran through every joist they crossed. |
 
 ## The shed that had no walls above the plate
 
@@ -457,8 +458,46 @@ appeared *after* you changed a control. Every warning the engine had was correct
 invisible: a forwarded link carrying a roof this engine cannot frame, an opening moved back inside
 its wall, a second story dropped. One line, at the point where the build opens.
 
+## The runners that floated, and the floor buried under them
+
+A skid building is meant to lie on the ground and be dragged. `generateSkids` assumed grade was
+y = 0 and hung the runner BELOW it — while the caller computed grade as
+`joistTop − joistDepth − skidDepth`, more than a foot lower, and the scene drew the ground there.
+**Two ideas of where the earth is, inside one function.** What came out:
+
+- the runners **floating 8 in clear** of the ground they are supposed to lie on,
+- every joist, rim joist and bridging piece **underground**, with the finished floor at ground level,
+- and the two ranges overlapping, so the skids **ran straight through every joist they crossed** —
+  **50 interpenetrating pairs** on the storage shed, the worst a rim joist buried 4¾ in into a skid
+  over its whole 20-ft length.
+
+The fix is one parameter. Told where grade is, the runner's bottom lands on it and its top lands
+exactly on the joist underside — because `gradeY + skidDepth` IS `joistTop − joistDepth` by the
+caller's own definition. The interpenetration and the floating go away together, which is the tell
+that they were one defect and not two.
+
+**Then the same defect turned up in two more families.** The tent floor and the strongback put
+their joists at y = 0 — flat on the earth — with the skids buried underneath carrying nothing at
+all. A platform on skids stood its posts on the ground *beside* the runners, so the load went past
+them into the soil. Everything above reads a single `deckY`, so lifting each floor by the runner's
+depth carried the bents, the eave and the ridge with it.
+
+One more, found in the same call and the same family of mistake as several before it: the outer
+runners were inset by the skid's DEPTH where the inset is along Z and wants its THICKNESS. An inch
+out, and the rim joist overhung the runner it bears on.
+
+**Two things I found and did not report, because they were my own sweep lying.** The first pass
+reported three surviving overlaps on the storage shed and "nothing bears on the platform's skids".
+Both were the box-extent helper mishandling members laid flat (rx = −90°) and stood up (rz = ±90°)
+— the same frame convention that has bitten this log twice before. The model was right and the
+measurement was wrong. The helper in the regression test spells the convention out for that reason.
+
+**And a test was pinning the bug.** `timber2-lieflat` asserted a platform's posts come down below
+0.3 ft — true when they stand on the earth beside a buried runner, false when they bear on its
+top. It asserts the physical claim now: the post's underside is exactly the bearing surface,
+whichever base it is.
+
 ## Next targets, unchecked
 
 - **The portrait painter's residual errors** — the real fix is a depth buffer (rasterise per pixel), or drawing only the outermost skin for a finished building.
-- Skid foundation (rendered incidentally with the storage shed, not examined on its own).
 - Weather barrier BEHIND THE SIDING — the `buildingPaper` role's own label promises it and nothing emits it.

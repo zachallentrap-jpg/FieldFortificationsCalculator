@@ -852,15 +852,32 @@ export function generateSlabOnGrade(lengthFt: number, widthFt: number, stageEdge
   return emit.members;
 }
 
-export function generateSkids(lengthFt: number, widthFt: number, stage: number, count = 3): Member[] {
+/**
+ * The runners a skid building sits on and is dragged by.
+ *
+ * `gradeY` IS REQUIRED, and it is the whole story. This used to assume grade was y = 0 and hang
+ * the skid BELOW it — while the caller computed grade as `joistTop − joistDepth − skidDepth`,
+ * more than a foot lower, and the scene drew the ground there. Two ideas of where the ground is,
+ * in one branch. What came out: the skids floating 8 in clear of the ground they are supposed to
+ * lie on, the joists 8 in UNDERGROUND, and the two ranges overlapping so the skids ran straight
+ * through every joist they crossed — 50 interpenetrating pairs on the storage shed, the worst a
+ * rim joist buried 4¾ in into a skid over its whole 20-ft length.
+ *
+ * Told where grade is, the skid's bottom lands on it and its top lands exactly on the joist
+ * underside, because `gradeY + skidDepth` is `joistTop − joistDepth` by that same definition.
+ */
+export function generateSkids(lengthFt: number, widthFt: number, stage: number, gradeY: number, count = 3): Member[] {
   const emit = makeEmitter('FL');
   const nominal = LUMBER.skidNominal.value as string;
-  const d = DRESSED[nominal]!.d / IN_PER_FT;
+  const depth = DRESSED[nominal]!.d / IN_PER_FT; // on edge: the face width stands vertical
+  const halfWide = DRESSED[nominal]!.w / IN_PER_FT / 2; // across Z — its THICKNESS, not its depth
   for (let i = 0; i < count; i++) {
     const z = (widthFt / (count - 1 || 1)) * i;
     emit('skid', nominal, {
       cutLengthFt: lengthFt,
-      position: [lengthFt / 2, -d / 2, Math.min(Math.max(z, d / 2), widthFt - d / 2)],
+      // Inset by the half-extent along Z, which is the thickness. Using the depth here held the
+      // outer runners an inch inboard of the wall line they carry, so the rim joist overhung them.
+      position: [lengthFt / 2, gradeY + depth / 2, Math.min(Math.max(z, halfWide), widthFt - halfWide)],
       rotation: [0, 0, 0],
       stage,
       nailing: 'drift-pinned; chamfer both ends for dragging (PH)',

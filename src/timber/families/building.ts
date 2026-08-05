@@ -141,7 +141,12 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
     const deckThick = PANEL.subfloorThickIn.value as number;
     const skidD = DRESSED[LUMBER.skidNominal.value as string]!.d / IN_PER_FT;
     const deckTopY = 0;
-    members.push(...generateSkids(L, W, requireOrdinal(stagePlan, 'foundation')));
+    // The runners bear on the ground, and the ground is where this branch says it is — see
+    // `levels.gradeY` below, which is the same expression. Passing it is what stops the skids
+    // floating clear of the earth while the floor they carry is buried in it.
+    const joistDepth = DRESSED[joistNominalFor(W)]!.d / IN_PER_FT;
+    const gradeY = deckTopY - deckThick / IN_PER_FT - joistDepth - skidD;
+    members.push(...generateSkids(L, W, requireOrdinal(stagePlan, 'foundation'), gradeY));
     members.push(
       ...generateFloorOnBearings({
         lengthFt: L,
@@ -155,13 +160,12 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
         prefix: 'FL',
       }),
     );
-    const joistD = DRESSED[joistNominalFor(W)]!.d / IN_PER_FT;
     const joistTop = deckTopY - deckThick / IN_PER_FT;
     levels = {
       subfloorTop: 0,
       joistTop,
-      sillTop: joistTop - joistD,
-      gradeY: joistTop - joistD - skidD, // the runners are what this floor stands on
+      sillTop: joistTop - joistDepth,
+      gradeY, // the runners are what this floor stands on — and they are placed on it, above
     };
   } else {
     const floorInput = legacyFloorInput(spec);
