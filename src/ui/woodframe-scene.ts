@@ -235,6 +235,12 @@ function finishWorkbench(build: StoredBuild, family: ReturnType<typeof familyByI
   model = generateStructure(build.spec);
 
   app.innerHTML = workbenchHtml(build, family, false);
+  // THE PANEL HAD NEVER SPOKEN ON LOAD. `regenerate` is what renders normalize's report, and it
+  // runs only after the operator changes a control — so a build that arrived already needing
+  // repair opened silently. Every warning was there and none of it was on screen: a forwarded
+  // link carrying a roof this engine cannot frame, an opening moved back inside its wall, a
+  // second story dropped. It is said here, when the build opens, which is when it matters.
+  renderIssues(normalizeSpec(build.spec).issues.map((i) => i.message));
 
   studio = createStudio(
     {

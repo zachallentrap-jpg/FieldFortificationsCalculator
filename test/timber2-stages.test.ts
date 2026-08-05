@@ -11,6 +11,8 @@ import { generateStructure } from '../src/timber/families/index';
 import { bomSummary, boardFeet } from '../src/timber/bom';
 import { STAGES } from '../src/timber/types';
 import { stagePlanForBuilding, stagePlanForLegacyBuilding, STAGE_KEYS, ordinalOf } from '../src/timber/stagePlan';
+import { FAMILY_TABLE } from '../src/timber/catalog';
+import { normalizeSpec } from '../src/timber/normalize';
 
 const demo: BuildingInput = {
   lengthFt: 20, widthFt: 16, wallHeightFt: 8,
@@ -125,4 +127,80 @@ test('the defaulted (no-plan) call still matches the plan-passed call for legacy
   assert.deepEqual(bomSummary(model.members), bomSummary(model.members, model.stagePlan));
   // And that is what the TIMBER-1 caller has always gotten.
   assert.deepEqual(bomSummary(generateFrame(demo).members), bomSummary(model.members));
+});
+
+test('no stage in any plan is a dead stop — every row either builds something or says it will not', () => {
+  // THE GUARD THAT WOULD HAVE CAUGHT THE PYRAMID. A "pyramid" building — reachable only through
+  // a shared link, because `decodeSpec` takes any JSON with a `family` key — listed Ceiling
+  // joists and Rafters & ridge and framed NEITHER, then hung a single plank of roofing in the
+  // air over an open building. Nothing complained, because nothing was checking that a stage the
+  // plan advertises is a stage something lands in.
+  //
+  // A row may be deliberately memberless — a slab has to cure, a skid building's bearing line is
+  // cleared and strung before a skid is dropped on it — and those say so with `noMembers`. What
+  // is not allowed is a row that is empty because no generator was ever written for it.
+  const failures: string[] = [];
+  for (const fam of FAMILY_TABLE) {
+    const variants: { label: string; spec: Parameters<typeof generateStructure>[0] }[] = [
+      { label: fam.id, spec: fam.preset },
+    ];
+    // Every roof the picker offers this family, not just the one its preset ships with — the
+    // pyramid was only ever reachable off-preset, and so is every other roof in `fam.roofs`.
+    if (fam.specBranch === 'building') {
+      const prev = (fam.preset as { roof?: { risePer12?: number; overhangFt?: number } }).roof ?? {};
+      const rise = prev.risePer12 ?? 4;
+      const oh = prev.overhangFt ?? 1;
+      for (const kind of fam.roofs) {
+        const roof =
+          kind === 'flat' ? { kind, overhangFt: oh, drainPer12: 1 }
+          : kind === 'none' ? { kind }
+          : kind === 'shed' ? { kind, risePer12: rise, overhangFt: oh, highSide: 'N' as const }
+          : { kind, risePer12: rise, overhangFt: oh };
+        variants.push({ label: `${fam.id}/${kind}`, spec: { ...(fam.preset as object), roof } as unknown as Parameters<typeof generateStructure>[0] });
+      }
+    }
+    for (const v of variants) {
+      const model = generateStructure(v.spec);
+      const occupied = new Set<number>(model.members.map((m) => m.stage as number));
+      for (const row of model.stagePlan) {
+        if (occupied.has(row.ordinal) || row.noMembers) continue;
+        failures.push(`${v.label}: stage ${row.ordinal} "${row.label}" (${row.key}) is empty`);
+      }
+    }
+  }
+  assert.deepEqual(failures, [], `dead stops on the scrubber:\n  ${failures.join('\n  ')}`);
+});
+
+test('a building has no pyramid roof — it is framed as a hip, and said so', () => {
+  // `pyramid` is the guard tower cab's roof and the tower generator owns it. The building path
+  // frames gable, hip, shed and flat; for a pyramid it framed nothing at all and the covering
+  // pass skinned a roof that had no rafters under it. Downgraded now, loudly.
+  const base = FAMILY_TABLE.find((f) => f.id === 'gp-frame')!.preset as object;
+  const spec = { ...base, dims: { lengthFt: 16, widthFt: 16 }, roof: { kind: 'pyramid', risePer12: 5, overhangFt: 1 } };
+  const { spec: normalized, issues } = normalizeSpec(spec as Parameters<typeof normalizeSpec>[0]);
+  assert.equal((normalized as { roof: { kind: string } }).roof.kind, 'hip', 'a building kept a roof kind it cannot frame');
+  const said = issues.find((i) => i.path === 'roof.kind');
+  assert.ok(said, 'the roof was changed under the operator with nothing said about it');
+  assert.equal(said.severity, 'warn');
+
+  // And the model that comes out is framed, not a floating skin.
+  const model = generateStructure(spec as Parameters<typeof generateStructure>[0]);
+  const framing = model.members.filter((m) => m.role === 'rafter' || m.role === 'hipRafter' || m.role === 'jackRafter');
+  const skin = model.members.filter((m) => m.role === 'roofPanel' || m.role === 'roofingCourse');
+  assert.ok(skin.length > 0, 'no roof skin at all');
+  assert.ok(framing.length > 0, `${skin.length} pieces of roof skin over ${framing.length} rafters`);
+});
+
+test('the plan does not advertise a skin the spec has turned off', () => {
+  const base = FAMILY_TABLE.find((f) => f.id === 'gp-frame')!.preset as unknown as { coverings: Record<string, string> };
+  const keys = (spec: unknown): string[] =>
+    generateStructure(spec as Parameters<typeof generateStructure>[0]).stagePlan.map((s) => s.key);
+  assert.ok(keys(base).includes('roofing'), 'a roofed building should have a roofing stage');
+  assert.ok(keys(base).includes('siding'), 'a clad building should have a siding stage');
+  const bare = { ...base, coverings: { ...base.coverings, roofing: 'none', siding: 'none', wallSheathing: 'none' } };
+  assert.ok(!keys(bare).includes('roofing'), 'a roofing stop with no roofing to lay');
+  assert.ok(!keys(bare).includes('siding'), 'a siding stop with no siding to hang');
+  // Sheathing alone still earns the close-in stage — it is what lands there.
+  const sheathed = { ...base, coverings: { ...base.coverings, roofing: 'none', siding: 'none', wallSheathing: 'plywood' } };
+  assert.ok(keys(sheathed).includes('siding'), 'sheathing has nowhere to land');
 });

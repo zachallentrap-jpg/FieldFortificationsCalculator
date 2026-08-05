@@ -18,7 +18,7 @@ import { DRESSED } from '../types';
 import type { BuildingSpec, RoofSpec } from '../spec';
 import { WALL_ORDER, toLegacySpacing } from '../spec';
 import type { StagePlanEntry } from '../stagePlan';
-import { stagePlanForBuilding, requireOrdinal } from '../stagePlan';
+import { stagePlanForBuilding, requireOrdinal, ordinalOf } from '../stagePlan';
 import { generateFloor, floorLevels, type FloorInput, type FloorLevels } from '../floor';
 import { generateWalls, type Opening } from '../walls';
 import { generateRoof } from '../roof';
@@ -115,7 +115,12 @@ function gableOf(roof: RoofSpec): { risePer12: number; overhangFt: number } {
 export function generateBuilding(spec: BuildingSpec): BuildingResult {
   const story = spec.stories[0]!;
   const { lengthFt: L, widthFt: W } = spec.dims;
-  const stagePlan = stagePlanForBuilding(spec.roof.kind, spec.foundation.kind);
+  // The plan is told which skins are ON, so it does not advertise a Roofing or a Siding stop
+  // for work the spec says is not being done — a scrubber stop that can never contain anything.
+  const stagePlan = stagePlanForBuilding(spec.roof.kind, spec.foundation.kind, {
+    roofing: spec.coverings.roofing !== 'none',
+    walls: spec.coverings.siding !== 'none' || spec.coverings.wallSheathing !== 'none',
+  });
   const walls = wallContract(L, W, story.wallHeightFt, story.openings, 0, spec.wallBands ?? []);
   const members: Member[] = [];
   let levels: FloorLevels;
@@ -249,7 +254,9 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
         roofing: spec.coverings.roofing,
         buildingPaper: spec.coverings.buildingPaper,
         stageDeck: requireOrdinal(stagePlan, 'roof-deck'),
-        stageRoofing: requireOrdinal(stagePlan, 'roofing'),
+        // No roofing means no roofing row — and nothing reads this, because the covering module
+        // emits no course for `roofing: 'none'`. The deck's ordinal keeps it a real number.
+        stageRoofing: ordinalOf(stagePlan, 'roofing') ?? requireOrdinal(stagePlan, 'roof-deck'),
         rafterHalfFt: rafterHalf,
       }),
     );

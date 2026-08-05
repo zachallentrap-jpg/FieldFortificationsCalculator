@@ -242,30 +242,38 @@ export function generateHut(spec: HutSpec): HutResult {
   // the building plan has no finish stage — so the hut plan is the building's plus one. APPEND,
   // never renumber: `Member.stage` is an ordinal into this array, so inserting a stage would
   // silently move every member emitted before it into the wrong row of the cut list.
-  const stagePlan: StagePlanEntry[] = [
-    ...base.stagePlan,
-    {
-      ordinal: base.stagePlan.length + 1,
-      key: 'finish',
-      label: 'Screens, doors and fittings',
-      detail: 'The band is screened, the doors are hung, and anything built in goes in last.',
-    },
-  ];
+  // ONLY IF THERE IS FINISH WORK. The row went on unconditionally, and only the sea hut and the
+  // latrine have any: a screen band, and the latrine's riser box. The SWA hut, the B-hut, the
+  // squad hut and the guard shack each carried a "Screens, doors and fittings" stop on the
+  // scrubber that could never contain anything. It is the LAST row, so leaving it off moves no
+  // ordinal — which is the only reason this is safe to do at all.
+  const band = bandFor(spec);
+  const screened = band !== null && band.sillFt + band.heightFt <= wallHeightFt;
+  const hasRiser = spec.variant === 'latrine';
+  const stagePlan: StagePlanEntry[] = screened || hasRiser
+    ? [
+      ...base.stagePlan,
+      {
+        ordinal: base.stagePlan.length + 1,
+        key: 'finish',
+        label: 'Screens, doors and fittings',
+        detail: 'The band is screened, the doors are hung, and anything built in goes in last.',
+      },
+    ]
+    : base.stagePlan;
   const wallStage = requireOrdinal(stagePlan, 'walls');
-  const finishStage = requireOrdinal(stagePlan, 'finish');
   members.push(...generateGirts(base.walls, wallStage, wallHeightFt));
 
-  const band = bandFor(spec);
-  if (band && band.sillFt + band.heightFt <= wallHeightFt) {
-    members.push(...generateScreenBand(base.walls, band, finishStage));
+  if (screened || hasRiser) {
+    const finishStage = requireOrdinal(stagePlan, 'finish');
+    if (screened) members.push(...generateScreenBand(base.walls, band!, finishStage));
+    if (hasRiser) {
+      const seats = spec.latrine?.seats ?? 4;
+      members.push(...generateRiserBox(buildingSpec.dims.lengthFt, buildingSpec.dims.widthFt, seats, finishStage));
+    }
   }
 
-  if (spec.variant === 'latrine') {
-    const seats = spec.latrine?.seats ?? 4;
-    members.push(...generateRiserBox(buildingSpec.dims.lengthFt, buildingSpec.dims.widthFt, seats, finishStage));
-  }
-
-  return { ...base, members, stagePlan, screenBand: band && band.sillFt + band.heightFt <= wallHeightFt ? band : null };
+  return { ...base, members, stagePlan, screenBand: screened ? band : null };
 }
 
 /** Walls a variant screens, for the catalog's lock rows. Exported for the catalog test. */

@@ -53,8 +53,11 @@ export interface BunkerResult {
 }
 
 export function bunkerStagePlan(wallType: BunkerSpec['wallType'], showSoil: boolean): StagePlanEntry[] {
-  const rows: { key: Parameters<typeof stagePlan>[0][number]['key']; label: string; detail: string }[] = [
-    { key: 'layout', label: 'Layout & excavation lines', detail: 'The hole is a survivability task; what is staked here is the wood that goes in it.' },
+  const rows: Parameters<typeof stagePlan>[0] = [
+    // The hole itself is not modelled — staking its lines is real work that puts no member in
+    // the model, which is what `noMembers` declares. Without it this row is indistinguishable
+    // from a stage nothing was ever written for.
+    { key: 'layout', label: 'Layout & excavation lines', detail: 'The hole is a survivability task; what is staked here is the wood that goes in it.', noMembers: true },
     wallType === 'crib'
       ? { key: 'cribwork', label: 'Cribwork', detail: 'Courses laid at right angles to each other so every log bears across the two below it. The corner is the whole idea.' }
       : { key: 'walls', label: 'Posts & lagging', detail: 'Posts on the spacing, lagging behind them holding the face.' },

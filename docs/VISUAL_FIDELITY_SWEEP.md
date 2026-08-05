@@ -39,6 +39,8 @@ screenshots get read.
 | **Rafter-to-plate seat (bird's mouth)** | **Fixed** — the notch is cut, and the roof plane it needed was 1¾ in low on every roof in the catalog. |
 | **Shed roof — the high (pony) wall** | **Fixed** — the pony wall had no plate at all: its studs stood free and the rafters ran 1.4 in into their bare ends. |
 | **Board-and-batten at the rake** | **Fixed** — every batten stopped dead in a straight line at the cap plate; the gable triangle was bare boards. |
+| **Pyramid roof on a building** | **Fixed** — no generator framed it, so a shared link produced a plank of roofing hanging in mid-air over an open building. |
+| **Dead stops on the stage scrubber** | **Fixed** — five plans advertised stages nothing would ever build; and the issues panel had never spoken on load at all. |
 
 ## The shed that had no walls above the plate
 
@@ -412,9 +414,51 @@ Checked at the same time and NOT a defect: the rake boards themselves already li
 wall's boards, because the raked tiler's outer loop steps by the board width and only ever
 subdivides WITHIN a module. Plain board siding correctly gets no battens.
 
+## A roof with nothing under it, and four more stages that promised nothing
+
+`pyramid` is the guard tower cab's roof and the tower generator owns it. The BUILDING path frames
+gable, hip, shed and flat — and for a pyramid it framed nothing at all, while the covering pass
+went ahead and skinned a roof plane that had no rafters under it. What came out was **a single
+tilted plank of roofing hanging in the air over a building open to the sky**, with the Ceiling
+joists and Rafters & ridge stages both empty and not one word said about any of it.
+
+The picker never offers pyramid for a building, which is why this survived: it is reachable only
+through a **shared link**, and `decodeSpec` accepts any JSON carrying a `family` key. That is the
+second time in three iterations that the defect lived outside the presets — first the shed roof
+through the picker, now a roof kind through a forwarded link.
+
+Normalize downgrades it to a hip and says so. Hip is the honest nearest thing rather than a
+refusal: a pyramid IS a hip whose ridge has shrunk to a point, which is what a hip already does on
+a square plan, and on a rectangular plan a pyramid is not definable at one pitch at all.
+
+**The guard is the interesting part.** The general invariant is that *the stage plan must not
+promise work nothing does*, and asserting it turned up four more violations that nobody had looked
+for:
+
+- **`custom` listed Roofing and Siding** while shipping neither. The plan was built from the roof
+  and foundation kinds alone, so it could not know the skins were off. It is told now — and both
+  are the LAST rows, so dropping them moves no ordinal and the frozen rows 1–6 are untouched.
+- **Four huts listed "Screens, doors and fittings"** and only the sea hut and the latrine have any:
+  a screen band, and the latrine's riser box. The SWA hut, the B-hut, the squad hut and the guard
+  shack each carried a stop that could never contain anything.
+- **A skid building's layout row** said "posts and footers set to the building lines" for a
+  building that has neither, and showed nothing.
+- **The crib bunker's excavation-lines row** is real work with no material.
+
+The last two are not the same defect as the first two, and the difference matters enough to be in
+the type. A row may be deliberately memberless — a slab has to cure, a bearing line is cleared and
+strung before a skid drops on it — and those now say `noMembers` out loud. What is not allowed is a
+row that is empty because no generator was ever written for it. Only the second kind fails the test.
+
+**And the panel had never spoken on load.** Chasing whether the pyramid downgrade actually reached
+the operator: it did not. `regenerate()` is what renders normalize's report, and the workbench's
+own mount path built the model directly and never called it — so the issues panel only ever
+appeared *after* you changed a control. Every warning the engine had was correct, recorded, and
+invisible: a forwarded link carrying a roof this engine cannot frame, an opening moved back inside
+its wall, a second story dropped. One line, at the point where the build opens.
+
 ## Next targets, unchecked
 
 - **The portrait painter's residual errors** — the real fix is a depth buffer (rasterise per pixel), or drawing only the outermost skin for a finished building.
 - Skid foundation (rendered incidentally with the storage shed, not examined on its own).
 - Weather barrier BEHIND THE SIDING — the `buildingPaper` role's own label promises it and nothing emits it.
-- Pyramid roof on a building (the tower cab uses it; a building never has been rendered with one).

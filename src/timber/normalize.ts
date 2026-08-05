@@ -227,7 +227,27 @@ function normalizeBuilding(spec: BuildingSpec, issues: SpecIssue[]): BuildingSpe
   }
 
   let roof = spec.roof;
-  if (roof.kind === 'gable' || roof.kind === 'shed' || roof.kind === 'hip' || roof.kind === 'pyramid') {
+  // A BUILDING HAS NO PYRAMID. `pyramid` is the guard tower's cab roof and the tower generator
+  // owns it; the building path frames gable, hip, shed and flat and silently framed NOTHING for
+  // a pyramid. The picker never offers it, so this only arrived through a shared link — and
+  // `decodeSpec` takes any JSON with a `family` key — but what came back was a building open to
+  // the sky under a single tilted plank of roofing, with the ceiling and rafter stages both
+  // empty and not one word said about it.
+  //
+  // Hip is the honest nearest thing rather than a refusal: a pyramid IS a hip whose ridge has
+  // shrunk to a point, which is what a hip already does on a square plan, and on a rectangular
+  // plan a pyramid is not definable at one pitch at all. Said out loud, the way every other
+  // downgrade in this file is.
+  if (roof.kind === 'pyramid') {
+    issues.push({
+      path: 'roof.kind',
+      kind: 'clamped',
+      message: 'A pyramid roof belongs to the guard tower cab — this building was framed as a hip, which is the same roof with the ridge shrunk to a point.',
+      severity: 'warn',
+    });
+    roof = { ...roof, kind: 'hip' };
+  }
+  if (roof.kind === 'gable' || roof.kind === 'shed' || roof.kind === 'hip') {
     roof = {
       ...roof,
       risePer12: clampPath(roof.risePer12, 'roof.risePer12', issues),
