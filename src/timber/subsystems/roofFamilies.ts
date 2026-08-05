@@ -180,6 +180,18 @@ export function roofPlanes(spec: BuildingSpec, plateTopYRaw: number): RoofPlane[
   // W-wide eave up to a single point at the ridge end. Every one of the four rises
   // (W/2 + overhang) of run, so all four share the pitch — which is what makes it a hip
   // rather than four unrelated planes.
+  //
+  // EVERY EAVE IS `2 * oh` LONGER THAN ITS WALL. A hip has no rake — all four sides are eaves,
+  // and each one overhangs its neighbours' overhang as well as its own. This read `L` and `W`,
+  // the bare wall lengths, so each plane stopped exactly above its wall corner while the four
+  // hip rafters ran on to the true eave corner at (-oh, -oh). The result was a square notch at
+  // all four corners of the roof, one overhang on a side, with the hip rafter tail standing bare
+  // in the middle of it — plainly visible from above, and the fascia (which takes its cut length
+  // from `eaveLengthFt`) was short by the same amount on all four sides.
+  //
+  // The taper is the check: with the eave `L + 2*oh` and the ridge `L - W`, each end draws in by
+  // (W + 2*oh)/2 over the climb — exactly the W/2 + oh of horizontal run a 45-degree hip covers,
+  // so the plane's edge IS the hip line rather than something parallel to it.
   if (roof.kind === 'hip') {
     const run = W / 2 + oh;
     const yEave = plateTopY - oh * slope;
@@ -191,28 +203,28 @@ export function roofPlanes(spec: BuildingSpec, plateTopYRaw: number): RoofPlane[
       const zEave = side === -1 ? -oh : W + oh;
       planes.push({
         id: side === -1 ? 'roof-S' : 'roof-N',
-        origin: [side === -1 ? 0 : L, yEave, zEave],
+        origin: [side === -1 ? -oh : L + oh, yEave, zEave],
         alongEave: side === -1 ? [1, 0, 0] : [-1, 0, 0],
         upSlope: [0, slope / lenPerFtRun, (side === -1 ? 1 : -1) / lenPerFtRun],
         normal: cross([0, slope / lenPerFtRun, (side === -1 ? 1 : -1) / lenPerFtRun],
           side === -1 ? [1, 0, 0] : [-1, 0, 0]),
-        eaveLengthFt: L,
+        eaveLengthFt: L + 2 * oh,
         slopeLengthFt,
         topLengthFt: Math.max(0, L - W),
       });
     }
-    // Hip ends. At x = 0 uphill is +X and u runs -Z; at x = L it is mirrored. Both taper to a
-    // point, so `topLengthFt` is 0 and the tiler cuts every course to the triangle.
+    // Hip ends. At x = -oh uphill is +X and u runs -Z; at x = L + oh it is mirrored. Both taper
+    // to a point, so `topLengthFt` is 0 and the tiler cuts every course to the triangle.
     for (const end of [-1, 1] as const) {
       const upSlope: [number, number, number] = [end === -1 ? 1 / lenPerFtRun : -1 / lenPerFtRun, slope / lenPerFtRun, 0];
       const alongEave: [number, number, number] = end === -1 ? [0, 0, -1] : [0, 0, 1];
       planes.push({
         id: end === -1 ? 'roof-W' : 'roof-E',
-        origin: [end === -1 ? -oh : L + oh, yEave, end === -1 ? W : 0],
+        origin: [end === -1 ? -oh : L + oh, yEave, end === -1 ? W + oh : -oh],
         alongEave,
         upSlope,
         normal: cross(upSlope, alongEave),
-        eaveLengthFt: W,
+        eaveLengthFt: W + 2 * oh,
         slopeLengthFt,
         topLengthFt: 0,
       });

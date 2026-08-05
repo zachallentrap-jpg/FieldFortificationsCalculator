@@ -142,14 +142,32 @@ test('the two layers are clipped differently, and the pairing is the point', () 
   assert.ok(coverageOf(end, 4, 8, 'average') < 0.999, 'averaging genuinely leaves gaps — that is the trade');
 });
 
+/** Framing-square length per foot of run at 6-in-12, the pitch every test here uses. */
+const K6 = Math.sqrt(12 * 12 + 6 * 6) / 12;
+const presetDims = (): { L: number; W: number } => {
+  const d = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset)).dims;
+  return { L: d.lengthFt as number, W: d.widthFt as number };
+};
+
 test('the deck bills its true area — a hip\'s offcuts are reusable', () => {
   // A hip's four corners are mirror pairs, so the diagonal triangle cut off at one is the piece
   // needed at another. That is why the DECK is counted at its true area rather than at the
-  // rectangle each sheet is cut from, and why it comes out equal to the gable's.
+  // rectangle each sheet is cut from — and the true area is the roof's own PLAN times the
+  // framing-square length per foot of run, for a hip exactly as for a gable.
+  //
+  // This used to assert "the hip equals the gable", which holds only if the two cover the same
+  // plan. They do not: a gable is flush at its rakes and overhangs only its two eaves, while a
+  // hip is all eave and overhangs on four sides. The equality passed only because the hip's
+  // planes were short by exactly those two rake overhangs — the notch at the four corners.
+  const { L, W } = presetDims();
+  const oh = 1;
   const hip = areaOf(hipModel(), 'roofPanel');
   const gable = areaOf(gableModel(), 'roofPanel');
   assert.ok(hip > 0, 'a hip with no deck is the bug all of this exists for');
-  assert.ok(Math.abs(hip - gable) < 1, `deck: hip ${hip.toFixed(1)} sf vs gable ${gable.toFixed(1)} sf`);
+  assert.ok(Math.abs(hip - (L + 2 * oh) * (W + 2 * oh) * K6) < 1,
+    `hip deck ${hip.toFixed(1)} sf, plan says ${((L + 2 * oh) * (W + 2 * oh) * K6).toFixed(1)}`);
+  assert.ok(Math.abs(gable - L * (W + 2 * oh) * K6) < 1,
+    `gable deck ${gable.toFixed(1)} sf, plan says ${(L * (W + 2 * oh) * K6).toFixed(1)}`);
 });
 
 test('the roofing bills MORE than the deck, because it has to reach the hip', () => {
@@ -160,17 +178,26 @@ test('the roofing bills MORE than the deck, because it has to reach the hip', ()
   assert.ok(hipRoofing < gableRoofing * 1.25, `${(100 * (hipRoofing / gableRoofing - 1)).toFixed(0)}% is too much to be trim`);
 });
 
-test('the two roofs cover the same PLAN — the surfaces themselves are equal', () => {
+test('every equal-pitch roof covers ITS OWN plan — the surfaces say so', () => {
   // The geometric identity the material figure above sits on top of, checked without the tiler
-  // in the way: an equal-pitch hip and gable on one plan have the same roof area.
+  // in the way: an equal-pitch roof's surface is its plan footprint times the framing-square
+  // length per foot of run, whatever shape the roof is. A hip and a gable on the same BUILDING
+  // do not have the same roof area, because they do not cover the same plan — the gable is
+  // flush at its two rakes and the hip overhangs there too.
   const spec = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset));
+  const { L, W } = presetDims();
+  const oh = 1;
   const planeArea = (kind: 'hip' | 'gable') => {
-    spec.roof = { kind, risePer12: 6, overhangFt: 1 };
+    spec.roof = { kind, risePer12: 6, overhangFt: oh };
     return roofPlanes(spec, 0).reduce(
       (a, p) => a + ((p.eaveLengthFt + (p.topLengthFt ?? p.eaveLengthFt)) / 2) * p.slopeLengthFt, 0);
   };
-  assert.ok(Math.abs(planeArea('hip') - planeArea('gable')) < 0.01,
-    `hip ${planeArea('hip').toFixed(2)} vs gable ${planeArea('gable').toFixed(2)}`);
+  assert.ok(Math.abs(planeArea('hip') - (L + 2 * oh) * (W + 2 * oh) * K6) < 0.01,
+    `hip ${planeArea('hip').toFixed(2)} vs its plan ${((L + 2 * oh) * (W + 2 * oh) * K6).toFixed(2)}`);
+  assert.ok(Math.abs(planeArea('gable') - L * (W + 2 * oh) * K6) < 0.01,
+    `gable ${planeArea('gable').toFixed(2)} vs its plan ${(L * (W + 2 * oh) * K6).toFixed(2)}`);
+  // And the whole difference between them is the two rake overhangs, nothing else.
+  assert.ok(Math.abs((planeArea('hip') - planeArea('gable')) - 2 * oh * (W + 2 * oh) * K6) < 0.01);
 });
 
 test('nothing the hip lays hangs off the roof', () => {
@@ -215,4 +242,75 @@ test('a square-plan hip is a pyramid — the ridge vanishes and all four faces a
   for (const p of planes) assert.equal(p.topLengthFt, 0, `${p.id} should come to a point`);
   const model = generateStructure(spec);
   assert.ok(areaOf(model, 'roofPanel') > 0, 'a pyramid roof still gets a deck');
+});
+
+// ── The corners: where the four planes have to meet ──────────────────────────
+
+/** A point on a plane, in world feet. */
+function worldPoint(p: ReturnType<typeof roofPlanes>[number], u: number, v: number): [number, number, number] {
+  return [0, 1, 2].map((i) => p.origin[i]! + p.alongEave[i]! * u + p.upSlope[i]! * v) as [number, number, number];
+}
+
+/** A plane's outline in world feet: both eave ends, then the top edge (or its single apex). */
+function outlineOf(p: ReturnType<typeof roofPlanes>[number]): [number, number, number][] {
+  const S = p.slopeLengthFt;
+  const e = planeSpanAt(p, 0);
+  const t = planeSpanAt(p, S);
+  const pts: [number, number, number][] = [worldPoint(p, e.lo, 0), worldPoint(p, e.hi, 0)];
+  if (t.hi - t.lo > 1e-9) pts.push(worldPoint(p, t.hi, S), worldPoint(p, t.lo, S));
+  else pts.push(worldPoint(p, (t.lo + t.hi) / 2, S));
+  return pts;
+}
+
+const plan = (q: [number, number, number]) => `${q[0].toFixed(4)},${q[2].toFixed(4)}`;
+
+test('THE CORNERS: a hip has no rake, so every eave is 2 overhangs longer than its wall', () => {
+  // A hip's four sides are all eaves, and each overhangs its neighbours' overhang as well as its
+  // own. The planes read the BARE WALL lengths (L and W), so each one stopped over its wall
+  // corner while the hip rafters ran on to the true corner at (-oh, -oh) — a square notch of
+  // missing roof at all four corners with the bare hip tail standing in the middle of it. Asserted
+  // as "the four corners each belong to exactly two planes", which is the property that failed.
+  const oh = 1;
+  const spec = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset));
+  spec.dims = { lengthFt: 16, widthFt: 12 };
+  spec.roof = { kind: 'hip', risePer12: 6, overhangFt: oh };
+  const { lengthFt: L, widthFt: W } = spec.dims;
+  const planes = roofPlanes(spec, 0);
+
+  for (const p of planes) {
+    assert.equal(p.eaveLengthFt, p.topLengthFt === 0 ? W + 2 * oh : L + 2 * oh, `${p.id} eave length`);
+  }
+
+  // Every eave corner of the overhang rectangle is an eave END of exactly two planes.
+  const eaveEnds = planes.flatMap((p) => outlineOf(p).slice(0, 2)).map(plan);
+  for (const [cx, cz] of [[-oh, -oh], [L + oh, -oh], [L + oh, W + oh], [-oh, W + oh]] as const) {
+    const key = plan([cx, 0, cz]);
+    assert.equal(eaveEnds.filter((k) => k === key).length, 2,
+      `corner (${cx}, ${cz}) is not shared by two planes — that is a notch in the roof`);
+  }
+  // And every eave sits at the eave height, not part-way up the slope.
+  for (const p of planes) for (const q of outlineOf(p).slice(0, 2)) {
+    assert.ok(Math.abs(q[1] - p.origin[1]!) < 1e-9, `${p.id}: an eave end left the eave line`);
+  }
+
+  // The taper is right only if each end's apex lands on the ridge end the long slopes reach.
+  const ridgeEnds = new Set(planes.filter((p) => p.topLengthFt === 0).map((p) => plan(outlineOf(p)[2]!)));
+  assert.deepEqual([...ridgeEnds].sort(), [plan([L - W / 2, 0, W / 2]), plan([W / 2, 0, W / 2])].sort());
+  for (const p of planes.filter((x) => x.topLengthFt !== 0)) {
+    const top = outlineOf(p).slice(2).map(plan).sort();
+    assert.deepEqual(top, [...ridgeEnds].sort(), `${p.id}: the ridge edge missed the hip apexes`);
+  }
+});
+
+test('THE CORNERS: the fascia runs the whole overhang perimeter', () => {
+  // Fascia takes its cut length straight from `eaveLengthFt`, so the short planes billed four
+  // short boards and left the corners of the eave open over the tails they exist to cover.
+  const oh = 1;
+  const spec = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset));
+  spec.dims = { lengthFt: 16, widthFt: 12 };
+  spec.roof = { kind: 'hip', risePer12: 6, overhangFt: oh };
+  const model = generateStructure(spec);
+  const total = model.members.filter((m) => m.role === 'fascia').reduce((a, m) => a + m.cutLength / 12, 0);
+  assert.ok(Math.abs(total - (2 * (16 + 2 * oh) + 2 * (12 + 2 * oh))) < 1e-6,
+    `fascia totals ${total.toFixed(3)} ft, not the eave perimeter`);
 });

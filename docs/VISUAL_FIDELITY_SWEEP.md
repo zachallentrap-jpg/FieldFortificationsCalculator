@@ -47,6 +47,8 @@ screenshots get read.
 | **Crib bunker — the entrance baffle** | **Fixed** — it started at the doorway's CENTRE, leaving two feet of a five-foot opening with a clear straight line in. |
 | Guard shack (8×8, four openings) | **Checked, clean.** Nothing wrong. Its unbraced walls are a documented rule, now pinned by a test. |
 | Squad hut (50 ft — the longest building) | **Checked, clean.** Nothing wrong. Its fifty-foot runs are already handled, by a module I had not read. |
+| Weather barrier / building paper | **Already covered** — an earlier pass fixed it (row above). All that is left is a stale help string; see below. |
+| **Hip roof — the four corners** | **Fixed** — every plane stopped over its wall corner while the hip rafters ran on to the true eave corner, so the roof had a square notch at all four corners with a bare hip tail standing in each. |
 
 ## The shed that had no walls above the plate
 
@@ -677,3 +679,48 @@ not that the evidence was weaker; it was that the evidence was about a surface I
 
 - **The portrait painter's residual errors** — the real fix is a depth buffer (rasterise per pixel), or drawing only the outermost skin for a finished building.
 - Weather barrier BEHIND THE SIDING — the `buildingPaper` role's own label promises it and nothing emits it.
+
+## The hip roof with a notch at every corner
+
+A hip has no rake. All four of its sides are eaves, and each one overhangs past its neighbours'
+overhang as well as its own — so on an L × W plan with a 1-ft overhang, the roof's outline in plan
+is (L + 2) × (W + 2), and every plane's eave is two overhangs longer than the wall beneath it.
+
+`roofPlanes` gave each hip plane the bare WALL length: `eaveLengthFt: L` for the long slopes and
+`W` for the triangular ends, with the long slopes starting at x = 0. Meanwhile `generateHip` runs
+its four hip rafters from `(-oh, -oh)` and the other three true eave corners up to the ridge ends.
+Frame and skin disagreed about where the roof's corner was, and the frame was right.
+
+What that looked like from above: a square notch of missing roof at each of the four corners, one
+overhang on a side, with the bare hip rafter tail standing in the middle of it — plus a stepped
+jog in the roof outline where the two short planes failed to meet. The fascia was short by the
+same amount on all four sides, because it takes its cut length straight from `eaveLengthFt`.
+
+The taper is the check that the fix is geometry and not a fudge. With the eave at `L + 2*oh` and
+the ridge at `L - W`, each end of a long slope draws in by `(W + 2*oh)/2` over the climb — exactly
+the `W/2 + oh` of horizontal run a 45-degree hip covers, so the plane's edge *is* the hip line
+rather than something parallel to it. Both hip ends' apexes now land on the same two ridge-end
+points the long slopes reach, and the test asserts that as well as the corners.
+
+**Two existing tests had been pinning the bug.** Both asserted that an equal-pitch hip and gable on
+one building have the same roof area. That is true only if the two cover the same plan, and they do
+not: a gable is flush at its two rakes, a hip overhangs there too. The equality held only because
+the hip's planes were short by precisely those two rake overhangs. Both now assert the real
+identity — a roof's surface is *its own* plan footprint times the framing-square length per foot of
+run — which is a stronger statement and one the old geometry fails.
+
+Recovered on a 48 × 20 hip: 12 deck pieces and 26 roofing pieces that were never emitted.
+
+## What is still open
+
+- **The eave ticks.** Seen from directly above, a row of short tan marks runs along both long
+  eaves — rafter tails showing between the fascia and the roofing edge. Present in the before and
+  after shots alike, so it is not from this change and is not diagnosed yet. Next target.
+- **`buildingPaper` the ROLE.** The felt under the roofing was fixed in an earlier pass and is
+  emitted under the `felt` role. `buildingPaper` remains in the role union, the thumbnail paint
+  order, the handout list and `portrait.ts`, and nothing emits it. Its help string reads "Weather
+  barrier behind the siding" — a wall product — while the only control that sets the flag is
+  labelled "Felt under the roofing" and gated on the roof deck. Nothing is missing from the model;
+  the text is just describing a product this toolkit does not place. Text, not geometry.
+- **The portrait painter's residual errors** — needs a per-pixel depth test, or drawing only the
+  outermost skin for a finished building.
