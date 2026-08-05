@@ -1040,11 +1040,32 @@ function lumberPiece(group: THREE.Group, size: LumberSize, length: number, width
  * the wrong way. `LUMBER_FACE_U` reproduces the atlas share the GLB props give a board's face, so
  * a cut rafter and an uncut one carry the same grain at the same scale.
  */
-function cutLumberPiece(group: THREE.Group, profile: readonly (readonly [number, number])[], thickFt: number): THREE.Group {
+function cutLumberPiece(
+  group: THREE.Group,
+  profile: readonly (readonly [number, number])[],
+  thickFt: number,
+  holes: readonly (readonly (readonly [number, number])[])[] = [],
+): THREE.Group {
   const shape = new THREE.Shape();
   shape.moveTo(profile[0]![0], profile[0]![1]);
   for (const [x, y] of profile.slice(1)) shape.lineTo(x, y);
   shape.closePath();
+  // Holes go straight through — a latrine's seat openings, punched in the lid it is cut from.
+  // THREE.Shape wants each hole wound OPPOSITE the outer contour, and `Path` does not care which
+  // way the caller listed the corners, so the winding is fixed here rather than trusted.
+  for (const h of holes) {
+    if (h.length < 3) continue;
+    const area = h.reduce((s2, [x, y], i) => {
+      const [nx, ny] = h[(i + 1) % h.length]!;
+      return s2 + x * ny - nx * y;
+    }, 0);
+    const pts = area > 0 ? [...h].reverse() : [...h];
+    const path = new THREE.Path();
+    path.moveTo(pts[0]![0], pts[0]![1]);
+    for (const [x, y] of pts.slice(1)) path.lineTo(x, y);
+    path.closePath();
+    shape.holes.push(path);
+  }
   const t = Math.max(0.02, thickFt);
   const geo = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false, curveSegments: 1 });
   geo.translate(0, 0, -t / 2); // extrusion runs 0..depth; the member frame is centred

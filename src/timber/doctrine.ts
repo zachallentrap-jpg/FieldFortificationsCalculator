@@ -244,6 +244,13 @@ export const LATRINE = {
   // person can fall into is exactly the failure mode the gate exists for.
   pitDepthFt: doc(6, 'TM 5-302 latrine pit depth (PH)', { unit: 'ft', lifeSafety: true }),
   aisleWidthFt: doc(3, 'TM 5-302 latrine aisle (PH)', { unit: 'ft' }),
+  // THE SEAT ITSELF. The riser box generator's own docstring promised "a seat opening per seat"
+  // and cut none — `seats` sized the divider count and nothing else, so a four-seat latrine came
+  // out as an unbroken bench. These are the hole, and they are what makes it a latrine.
+  seatOpeningWidthIn: doc(11, 'TM 5-302 latrine seat opening (PH)', { unit: 'in' }),
+  seatOpeningLengthIn: doc(14, 'TM 5-302 latrine seat opening (PH)', { unit: 'in' }),
+  /** Clear board left in front of the opening, measured from the riser box's front face. */
+  seatFrontMarginIn: doc(4, 'TM 5-302 latrine seat set back from the front board (PH)', { unit: 'in' }),
 } as const;
 
 // ── Guard tower (TM 5-302 (PH); EM 385-1-1 for everything that can drop you) ──

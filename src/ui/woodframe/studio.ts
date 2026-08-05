@@ -29,6 +29,7 @@ import {
 } from './cutaway';
 import { cameraRigsFor, memberAabb, type CameraRig } from './camera';
 import { seatCutsFor, seatProfile, type SeatCut } from '../../timber/birdsMouth';
+import { riserLidOf, seatOpeningsFor, seatOpeningPath } from '../../timber/riserSeats';
 import { fmtFtIn } from '../../timber/units';
 
 export interface StudioHandles {
@@ -192,6 +193,13 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
    * the viewer draws it and no golden moves when it changes.
    */
   let seats = new Map<string, SeatCut[]>();
+  /**
+   * The latrine lid's seat openings, and the id of the lid they belong to. Derived with the
+   * model for the same reason the notch is: the holes are a consequence of where the engine put
+   * the lid and its dividers, so nothing upstream has to know the viewer punches them.
+   */
+  let riserLidId: string | null = null;
+  let riserHoles: [number, number][][] = [];
 
   function buildMemberMesh(m: Member): THREE.Group {
     let p: THREE.Group;
@@ -229,6 +237,18 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     } else if (m.nominal.includes('panel')) {
       p = plywoodSheet(group);
       p.scale.set(m.cutLength / 12, m.actual.d / 12, Math.max(0.02, m.actual.w / 12));
+    } else if (m.id === riserLidId && riserHoles.length) {
+      // THE SEAT OPENINGS. `generateRiserBox` promised "a seat opening per seat" and cut none, so
+      // a four-seat latrine was an unbroken ten-foot bench — the one feature that makes the
+      // building a latrine, missing. The lid is a flat board; the holes go through it.
+      const hx = m.cutLength / 24;
+      const hy = m.actual.d / 24;
+      p = cutLumberPiece(
+        group,
+        [[-hx, -hy], [hx, -hy], [hx, hy], [-hx, hy]],
+        m.actual.w / 12,
+        riserHoles,
+      );
     } else if (seat?.length) {
       // A NOTCHED rafter. The plain prop is a box, and a box laid at pitch across a cap plate
       // intersects it — 3 inches of rafter buried in the plate at every bearing, on every roof.
@@ -346,6 +366,9 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     group.clear();
     byId.clear();
     seats = seatCutsFor(model.members);
+    const lid = riserLidOf(model.members);
+    riserLidId = lid?.id ?? null;
+    riserHoles = lid ? seatOpeningsFor(model.members).map(seatOpeningPath) : [];
     for (const m of model.members) {
       const mesh = buildMemberMesh(m);
       byId.set(m.id, mesh);

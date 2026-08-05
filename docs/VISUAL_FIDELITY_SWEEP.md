@@ -43,6 +43,7 @@ screenshots get read.
 | **Dead stops on the stage scrubber** | **Fixed** — five plans advertised stages nothing would ever build; and the issues panel had never spoken on load at all. |
 | **Skid foundation** | **Fixed** — the runners floated 8 in above the ground with the floor buried beneath them, and ran through every joist they crossed. |
 | **Members emitted twice in the same place** | **Fixed** — 12 duplicate posts across three families. **Invisible in the render**; 96.5 board feet of phantom stock on the cut list. |
+| **Latrine — the riser box** | **Fixed** — the one feature that makes the building a latrine was a solid bench. `seats` sized the dividers and cut no seats. |
 
 ## The shed that had no walls above the plate
 
@@ -530,6 +531,37 @@ split a railing edge around a gate or a ladder, so "is this the end of an edge" 
 The regression test is deliberately blunt — same role, stock, length, position and rotation means
 one member counted twice, with no tolerance and no bounding boxes, so it cannot report a false
 positive. That is what lets it run over the whole catalog unattended.
+
+## A latrine with no seats
+
+The latrine had never been rendered in this sweep, and it is the only family with a riser box —
+a boxed bench down one side over the pit. Cutting the roof off and looking straight down showed a
+**solid, unbroken ten-foot slab**. Four seats specified, four bays framed, five dividers, and not
+one hole.
+
+The generator says so itself, in its own opening line:
+
+> The latrine's riser box: a boxed bench down one side over the pit, **with a seat opening per
+> seat**.
+
+`seats` sized the divider count and nothing else. This is the same defect as the bird's mouth,
+almost word for word — a value the spec carries, consumed for one purpose, and the shape it
+describes never cut — and it is worth noticing that both were found the same way: by reading what
+the code says it does and then looking at whether it did.
+
+The fix follows the same pattern too. `riserSeats.ts` is pure and adds nothing to the model: the
+openings are DERIVED from members the engine already emitted, so the cut list and every golden are
+untouched. The bays come from the DIVIDERS rather than from the seat count, so an opening lands
+between the boards that are actually there rather than where arithmetic says they should be.
+
+`cutLumberPiece` — written for the bird's mouth — grew hole support to draw them, which is the
+first time that machinery has paid for itself twice. `THREE.Shape` wants each hole wound opposite
+the outer contour, and it will not tell you when one is not; the winding is computed from the
+signed area rather than trusted.
+
+Checked at the same time and NOT defects: the box closes properly (lid on the front board, front
+board and dividers to the floor, no gaps), the seat height is 16.8 in, the bays are even, and the
+other five huts share the generator and correctly get no box at all.
 
 ## Next targets, unchecked
 
