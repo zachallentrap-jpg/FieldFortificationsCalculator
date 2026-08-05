@@ -45,6 +45,7 @@ screenshots get read.
 | **Members emitted twice in the same place** | **Fixed** — 12 duplicate posts across three families. **Invisible in the render**; 96.5 board feet of phantom stock on the cut list. |
 | **Latrine — the riser box** | **Fixed** — the one feature that makes the building a latrine was a solid bench. `seats` sized the dividers and cut no seats. |
 | **Crib bunker — the entrance baffle** | **Fixed** — it started at the doorway's CENTRE, leaving two feet of a five-foot opening with a clear straight line in. |
+| Guard shack (8×8, four openings) | **Checked, clean.** Nothing wrong. Its unbraced walls are a documented rule, now pinned by a test. |
 
 ## The shed that had no walls above the plate
 
@@ -598,6 +599,38 @@ the first run.)
 view as a slab floating off to one side — is exactly right: 2 ft thick, the full footprint, its
 underside on the roof deck, translucent and unlit so it can never be mistaken for something built.
 The cribwork walls, the cap beams, the overhead stringers and the deck all close properly.
+
+## The guard shack, which was fine
+
+Twenty iterations in, the first one that found nothing to fix.
+
+The guard shack is 8 ft square with an opening in every wall — a door and three windows — which
+is the shape that stresses opening placement hardest, and it holds up. One door on the south (no
+sill, no cripples below), three windows with sills and cripples, doubled 2x6 headers whose tops
+land exactly on the top plate's underside at y = 7.250, and 2.4 ft of clear wall at each end of
+every opening. The skids lie on the ground where iteration 17 put them, the fascia is on both
+eaves, the framing around every opening is complete.
+
+**Two things I chased and had to put down.**
+
+The gable-end siding looked, at 4× magnification, like it was standing proud of the rake. It is —
+by up to 1.6 in, and that is the design: `tileRakedInfill` cuts each strip to the MIDDLE of the
+range it spans, "half a step proud at one edge, half shy at the other, which is what a ripped
+piece against a sloped line looks like". My sweep compared each strip against the LOWEST rake
+across its own width and duly reported every strip in six families as a defect. It was measuring
+the documented behaviour and calling it a bug.
+
+Then: **the guard shack has no let-in bracing at all**, where every other shipped building has
+eight. That looks alarming until you measure it. The rule in the frozen wall generator places a
+brace in the clear wall at each corner, steepens it from 45° up to about 62° as the openings
+crowd it, and drops it below a 3 ft run. An 8 ft wall with a 3 ft opening centred leaves 2.0 ft
+at each corner, and a brace over a 2 ft run against a 7.1 ft rise stands at **74°** — that is a
+stud, not a brace. The wall is braced by its plywood siding instead.
+
+So: not a defect I can substantiate, and I am not going to invent a fix for it. What I did instead
+is make the rule VISIBLE — a test that pins the brace count for every shipped family and the angle
+range for every brace placed. The guard shack's zero is now a fact somebody chose rather than one
+nobody noticed, and a family that has bracing today cannot lose it to an opening someone moves.
 
 ## Next targets, unchecked
 

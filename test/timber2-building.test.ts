@@ -443,3 +443,41 @@ test('a building on skids stands above the earth, not in a trench dug for it', (
     );
   }
 });
+
+test('let-in bracing: steepened where the openings crowd it, and absent where it cannot fit', () => {
+  // NOT A DEFECT — a STATED behaviour, written down because it was neither.
+  //
+  // The guard shack comes out of the engine with all four walls unbraced, and every other
+  // shipped building gets eight braces. That looks alarming until you measure it: an 8 ft wall
+  // with a 3 ft opening roughly centred leaves 2.0 ft of clear wall at each corner, and a brace
+  // over a 2 ft run against a 7.1 ft rise stands at 74° — that is a stud, not a brace. The
+  // generator drops it below a 3 ft run, steepens it from 45° up to about 62° above that, and
+  // says nothing either way.
+  //
+  // This test does not decide whether the rule is right. It makes the rule VISIBLE, so that a
+  // family which today has bracing cannot lose it to an opening someone moves, and so that the
+  // guard shack's zero is a fact somebody chose rather than one nobody noticed.
+  const MIN_RUN_FT = 3;
+  const expectation: Record<string, number> = {
+    'gp-frame': 6, // long walls take one each: the openings crowd the other corner
+    'sea-hut': 8, 'swa-hut': 8, 'b-hut': 8, 'squad-hut': 8, 'latrine': 8, 'storage-shed': 8,
+    'guard-shack': 0, // 2.0 ft of clear wall at every corner — below the rule's floor
+  };
+  for (const [id, want] of Object.entries(expectation)) {
+    const fam = FAMILY_TABLE.find((f) => f.id === id);
+    assert.ok(fam, `${id} is not in the catalog`);
+    const model = generateStructure(fam.preset);
+    const braces = model.members.filter((m) => m.role === 'brace');
+    assert.equal(braces.length, want, `${id}: ${braces.length} let-in braces, expected ${want}`);
+    // Every brace that IS placed leans within the range the rule allows: 45° at best, and never
+    // steeper than the shortest run the rule permits would make it.
+    const capTop = Math.max(...model.members.filter((m) => m.role === 'capPlate').map((m) => m.position[1] + m.actual.w / 24));
+    const studLen = capTop - 3 * (1.5 / 12);
+    const steepest = (Math.atan2(studLen, MIN_RUN_FT) * 180) / Math.PI;
+    for (const b of braces) {
+      const deg = (Math.abs(b.rotation[2]) * 180) / Math.PI;
+      assert.ok(deg >= 44.9, `${id} ${b.id}: ${deg.toFixed(0)}° is shallower than 45°`);
+      assert.ok(deg <= steepest + 0.1, `${id} ${b.id}: ${deg.toFixed(0)}° is steeper than the ${MIN_RUN_FT} ft run the rule floors at`);
+    }
+  }
+});
