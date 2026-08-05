@@ -36,6 +36,7 @@ screenshots get read.
 | Let-in bracing | **Checked, clean.** Proper diagonals let into the studs at every corner. |
 | **Eave / rafter tails** | **Fixed** — no fascia existed, so every roof ended in a row of raw square-cut rafter ends. |
 | **Picker & flashcard portraits** | **Improved, not solved** — the painter sorted polygons by their CENTRE; long members painted over the sheets covering them. |
+| **Rafter-to-plate seat (bird's mouth)** | **FOUND AND MEASURED, NOT YET FIXED** — every rafter passes ~3 in through the cap plate it is supposed to bear on. |
 
 ## The shed that had no walls above the plate
 
@@ -287,8 +288,33 @@ sort independently of their neighbours — many small errors instead of a few bi
 times the file size. That measurement is recorded in the code so the next person to have the idea
 can see the result rather than re-derive it.
 
+## The bird's mouth: measured, not yet cut
+
+Every rafter in the toolkit passes straight THROUGH the cap plate it bears on. Measured on the GP
+building's south slope: the cap plate's top is at y = 8.000, and the rafter's underside where it
+crosses the wall line is at y = 7.76 — the stick is **2.9 in inside the plate**. Zoom the framing
+stage and you can watch the rafters cross the plates as though the plates were not there.
+
+The cause is stated in the design doc, and was a deliberate simplification rather than an
+oversight: *"bird's-mouth seat geometry is carried as angles on the member but not notched in
+scene geometry."* Every rafter does carry `angles: { plumbCut, seatCut }` — 71.6° and 18.4° on
+this roof, correct for a 4:12 — and the member card prints them. The declaration is there; the
+shape is not, so a rafter is drawn as a plain stick and a plain stick cannot sit on a plate.
+
+**The fix is the notch, and it does not need the engine.** The seat is derivable from members
+that already exist — the rafter, and the plate it crosses — so it can be a pure function feeding
+an extruded profile in the viewer, with no generator change, no golden movement and nothing done
+to the frozen branch. The profile is the triangle a framing square gives: the SEAT horizontal on
+the plate's top, the HEEL plumb against its outer face, and the rafter's own underside closing it.
+
+Not shipped this pass. A first cut of the local-frame math was written and thrown away rather
+than committed unverified — mapping the notch into a pitched member's own frame is exactly the
+kind of sign-convention work this log exists to record going wrong, and half-checked geometry is
+worse than none.
+
 ## Next targets, unchecked
 
+- **Cut the bird's mouth** (above) — the measured, diagnosed, unfixed one; do this first.
 - **The portrait painter's residual errors** — the real fix is a depth buffer (rasterise per pixel), or drawing only the outermost skin for a finished building.
 - Skid foundation (rendered incidentally with the storage shed, not examined on its own).
 - Weather barrier BEHIND THE SIDING — the `buildingPaper` role's own label promises it and nothing emits it.
