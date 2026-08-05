@@ -407,6 +407,7 @@ function renderConfigPanel(): void {
       <summary>${esc(g.title)}</summary>
       ${g.rows.map((r) => rowHtml(r,
         r.path === '__family' ? current!.familyId
+        : r.path === 'openFront' ? (getPath(current!.spec, r.path) ?? 'none')
         : r.path === 'site.soil' ? (getPath(current!.spec, r.path) ?? 'unknown')
         : getPath(current!.spec, r.path))).join('')}
     </details>`)
@@ -435,7 +436,12 @@ function renderConfigPanel(): void {
         }
         return;
       }
-      if (path === 'site.soil') {
+      if (path === 'openFront') {
+        // 'none' clears it: an absent field means the building is closed in, and storing the
+        // string 'none' would read as a wall named none everywhere downstream.
+        const w = (el as HTMLSelectElement).value;
+        (spec as unknown as { openFront?: string }).openFront = w === 'none' ? undefined : w;
+      } else if (path === 'site.soil') {
         const soil = (el as HTMLSelectElement).value;
         // 'unknown' clears the record rather than storing a value that claims an observation.
         (spec as unknown as { site?: { soil?: string } }).site = soil === 'unknown' ? undefined : { soil };

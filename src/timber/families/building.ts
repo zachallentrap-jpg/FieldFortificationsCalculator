@@ -27,6 +27,7 @@ import { roofPlanes, generateShed, generatePurlins, generateHip, wallInfillProfi
 import { generateRoofCovering, generateWallCovering, generateInfillCovering, generateSkids, generateSlabOnGrade, wallLayerThicknessFt, type InfillSurface } from '../subsystems/coverings';
 import { generateFloorOnBearings, joistNominalFor } from '../subsystems/floorSystem';
 import { generatePartitions } from '../subsystems/partitions';
+import { generateOpenFront, removeClosedWall } from '../subsystems/openFront';
 import { LUMBER, PANEL, FOUNDATION, IN_PER_FT } from '../doctrine';
 import { headerForSpan } from '../normalize';
 
@@ -175,6 +176,17 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
     }),
   );
 
+  // ── The open front, if this building has one: drop what the frozen generator framed into
+  // that wall and stand posts and a beam in its place. The plates stay — they are what the
+  // rafters bear on, and the beam under them is what now carries them.
+  if (spec.openFront) {
+    const kept = removeClosedWall(members, spec.openFront);
+    members.length = 0;
+    members.push(...kept, ...generateOpenFront({
+      spec, walls, stageWalls: requireOrdinal(stagePlan, 'walls'),
+    }));
+  }
+
   // ── Interior partitions. They go up with the walls and carry nothing, so they are framed
   // AFTER the exterior walls (which the frozen generator emits) and before the roof.
   members.push(...generatePartitions({
@@ -242,6 +254,14 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
       }),
     );
   }
+  // The open front is not a wall to be skinned. Dropping its STUDS is only half the job —
+  // sheathing and siding tile `walls.surfaces`, so the wall came back clad from the outside and
+  // the opening was invisible from every angle that mattered. The raked infill ABOVE the plates
+  // is not affected: a gable end over an open bay is still closed in.
+  const skinSurfaces = spec.openFront
+    ? walls.surfaces.filter((s) => s.wall !== spec.openFront)
+    : walls.surfaces;
+
   // What each wall must close in above its cap plate — a gable end's triangle, a shed's pony
   // wall and rakes. Resolved once here and skinned by whichever coverings are on, so the
   // sheathing and the siding agree about where the building stops.
@@ -263,7 +283,7 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
     const kind = spec.coverings.wallSheathing === 'boards' ? 'boards' : 'plywood';
     members.push(
       ...generateWallCovering({
-        surfaces: walls.surfaces,
+        surfaces: skinSurfaces,
         kind,
         role: 'sheathingPanel',
         stage: requireOrdinal(stagePlan, 'siding'),
@@ -286,7 +306,7 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
       : spec.coverings.siding === 'boards' ? 'boards' : 'plywood';
     members.push(
       ...generateWallCovering({
-        surfaces: walls.surfaces,
+        surfaces: skinSurfaces,
         kind,
         role: 'siding',
         stage: requireOrdinal(stagePlan, 'siding'),

@@ -18,6 +18,58 @@ function bldg(over: Partial<BuildingSpec> = {}): BuildingSpec {
   return { ...base, ...over };
 }
 
+test('an open front is posts and a beam — not a wall, and not skinned', () => {
+  // The storage-shed card offers this in so many words: "a wide door bay — or leave the whole
+  // front open". spec.ts documented it as "posts + header", normalizeSpec dropped that wall's
+  // openings with a warning, isLegacyBuilding excluded it from the frozen path — and no
+  // generator read the field. A spec with openFront produced a model BYTE-IDENTICAL to one
+  // without: same member count, same studs on the wall the card promises to leave open.
+  const vert = (m: { cutLength: number; actual: { w: number; d: number }; rotation: readonly number[]; position: readonly number[] }): [number, number] => {
+    const hx = m.cutLength / 12 / 2, hy = m.actual.d / 12 / 2, hz = m.actual.w / 12 / 2;
+    const [rx, , rz] = m.rotation as [number, number, number];
+    const h = Math.abs(hx * Math.sin(rz)) + Math.abs(hy * Math.cos(rz) * Math.cos(rx)) + Math.abs(hz * Math.sin(rx));
+    return [m.position[1]! - h, m.position[1]! + h];
+  };
+  const closed = generateStructure(bldg({ coverings: { wallSheathing: 'none', siding: 'plywood', roofDeck: 'plywood', roofing: 'none' } }));
+  const open = generateStructure(bldg({
+    openFront: 'S',
+    coverings: { wallSheathing: 'none', siding: 'plywood', roofDeck: 'plywood', roofing: 'none' },
+  }));
+  const onS = (model: typeof open, role: string) => model.members.filter((m) => m.wall === 'S' && m.role === role);
+
+  // The fixture must actually have a wall there, or "it is gone" proves nothing.
+  for (const role of ['stud', 'solePlate', 'siding'] as const) {
+    assert.ok(onS(closed, role).length > 0, `fixture check: a closed wall has ${role}`);
+  }
+  // And it is gone: nothing that fills a wall between its plates survives on that side.
+  for (const role of ['stud', 'solePlate', 'brace', 'siding', 'sheathingPanel', 'header', 'cripple'] as const) {
+    if (role === 'header') continue; // the open front has its OWN header — the beam, checked below
+    assert.equal(onS(open, role).length, 0, `an open front has no ${role}`);
+  }
+  // The plates stay — they are what the rafters bear on.
+  assert.equal(onS(open, 'topPlate').length, 1);
+  assert.equal(onS(open, 'capPlate').length, 1);
+
+  // And the load path under them is real: floor → post → beam → top plate, meeting at each joint.
+  const posts = onS(open, 'post');
+  const beams = onS(open, 'header');
+  assert.ok(posts.length >= 2, 'an open bay needs a post at each end at least');
+  assert.equal(beams.length, posts.length - 1, 'one beam per bay');
+  const [postLo, postHi] = vert(posts[0]!);
+  const [beamLo, beamHi] = vert(beams[0]!);
+  const [plateLo] = vert(onS(open, 'topPlate')[0]!);
+  assert.ok(Math.abs(postLo) < 1e-9, 'posts stand on the floor');
+  assert.ok(Math.abs(beamLo - postHi) < 1e-9, 'the beam bears on the posts');
+  assert.ok(Math.abs(plateLo - beamHi) < 1e-9, 'and the plates bear on the beam');
+
+  // The other three walls are untouched.
+  for (const wall of ['N', 'E', 'W'] as const) {
+    const before = closed.members.filter((m) => m.wall === wall).length;
+    const after = open.members.filter((m) => m.wall === wall).length;
+    assert.equal(after, before, `wall ${wall} must not change because the front opened`);
+  }
+});
+
 test('the B-hut has its bays: partitions are framed, and the framing stack meets exactly', () => {
   // `bHutPartitions()` computed three dividing walls, `buildingSpecForHut` put them on the spec,
   // `isLegacyBuilding` checked for them — and `generateBuilding` never read the field. Nothing

@@ -376,6 +376,19 @@ export function configSchemaFor(familyId: FamilyId): PanelSchema {
       applies: (spec) => ((spec as { coverings?: { roofDeck?: string } }).coverings?.roofDeck ?? 'none') !== 'none',
     });
   }
+  // The open front. The storage-shed card has always offered it — "a wide door bay, or leave the
+  // whole front open" — while nothing in the engine read the field and no control set it.
+  if (family.specBranch === 'building') {
+    skin.push({
+      path: 'openFront',
+      label: 'Open front (whole wall)',
+      control: 'select',
+      options: ['none', 'S', 'N', 'E', 'W'],
+      optionLabels: ['Closed in', 'Front (S)', 'Back (N)', 'Right (E)', 'Left (W)'],
+      help: 'That wall becomes posts and a beam instead of studs, and can carry no doors or windows.',
+      cite: 'TM 5-302 storage (PH)',
+    });
+  }
   if (family.specBranch === 'hut') {
     skin.push({
       path: 'screenBand',

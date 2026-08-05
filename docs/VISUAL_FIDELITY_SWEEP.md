@@ -32,6 +32,7 @@ screenshots get read.
 | **Sheathing under siding** — the two-layer standoff | **Fixed** — over board sheathing the siding sat a quarter inch inside it, on every wall. |
 | **Building paper / felt under the roofing** | **Fixed** — the option was accepted and ignored; no felt was ever emitted, and no way to ask for it. |
 | **B-hut partitions** — the bays that define it | **Fixed** — the partitions were computed, put on the spec, and never framed. |
+| **The open front** (`openFront`) | **Fixed** — the card offers it, the spec documents it, normalize honours it, and the wall was framed shut. |
 
 ## The shed that had no walls above the plate
 
@@ -229,10 +230,37 @@ The test checks the stack meets at every joint — floor→sole→studs→plate 
 cripples→plate — and that the squad hut, whose card promises "one long open bay, no partitions",
 has none.
 
+## The wall the card promised to leave open
+
+The storage-shed card says it plainly: *"Covered storage with a wide door bay — or leave the
+whole front open."* `spec.ts` documented `openFront` as "posts + header". `normalizeSpec`
+honoured it, dropping that wall's openings with the warning "the whole wall is the opening".
+`isLegacyBuilding` excluded it from the frozen path. And no generator read the field: a spec with
+`openFront` produced a model **byte-identical** to one without — same 288 members, same 18 studs
+on the wall that was supposed to be a hole.
+
+That is the fifth instance of the same shape, and the worst of them, because here the model was
+not merely missing something — it asserted the opposite of what the card said.
+
+An open front is now posts on the wall line and a beam across them, tight under the plates. The
+plates stay: they are what the rafters bear on, and the beam is what carries them now. Bay width
+follows `LAYOUT.postSpacingMaxFt` — the same rule the foundation posts use — and each bay's beam
+is sized by the header table for its span, so an open front cannot quietly carry a longer span on
+the same stick than a doorway would.
+
+**Removing the studs was only half of it.** The first cut left the wall clad: sheathing and siding
+tile `walls.surfaces`, so the open bay came back skinned from the outside and the opening was
+invisible from every angle that mattered. Both passes now skip the open wall, while the RAKED
+INFILL above the plates is deliberately kept — a gable end over an open bay is still closed in.
+
+C-10 was never in the way. `generateWalls` is frozen and still frames four walls; the building
+family drops what the open wall does not have and adds what it does, the same composition the
+shed and flat roofs already use. The compat goldens cannot move, because `isLegacyBuilding` has
+always refused a spec with an open front.
+
 ## Next targets, unchecked
 
 - Skid foundation (rendered incidentally with the storage shed, not examined on its own).
-- The `openFront` storage-shed variant — posts and a header instead of a wall.
 - Weather barrier BEHIND THE SIDING — the `buildingPaper` role's own label promises it and nothing emits it.
 - Pyramid roof on a building (the tower cab uses it; a building never has been rendered with one).
 - Board-and-batten and board siding at the rake (the infill path renders them, unphotographed).
