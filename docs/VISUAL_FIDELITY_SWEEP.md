@@ -25,6 +25,7 @@ screenshots get read.
 | Tent frame — strongback and tent-floor | **Checked, clean.** Nothing wrong. Bent posts stand exactly on the deck top, rafters meet the ridge, collars tie the bents, deck on joists on skids. |
 | Two-story building | **Not a render defect** — a parked feature (T6b). It was being accepted silently, which is fixed; see below. |
 | Storage shed — open front, skids, board-and-batten | **Fixed** — board-and-batten rendered as horizontal clapboard. The geometry was right; the wood grain ran across every board instead of along it. |
+| Building — **slab on grade** | **Fixed** — the option emitted no slab at all: a suspended wood floor over clear air, and no concrete in the model or on the bill. |
 
 ## The shed that had no walls above the plate
 
@@ -118,9 +119,31 @@ This dresses every stick of lumber in the app, so framing was re-checked at the 
 with a different unwrap, it fails and names `lumberTexture()` — rather than the siding quietly
 going back to looking like lap.
 
+## Slab on grade, which poured no concrete
+
+Chosen because the underside is newly visible, and it showed a full wood floor — joists,
+bridging, subfloor — with nothing whatever beneath it. The `grounded` branch handled skids and
+slabs together and only the skid case emitted anything below the floor, so "Slab on grade"
+framed a suspended floor and left out the slab it is named after. Nothing in the cut list said
+concrete either.
+
+A slab is now what it is: one pour whose top IS the floor at y = 0, its edge thickened under
+every wall line to carry them, no joists and no deck. Putting a wood floor on a slab is not a
+foundation choice, it is two floors.
+
+**One thing this got wrong first, and the sweep caught it.** The slab plan initially DROPPED the
+"Floor joists" and "Subfloor" rows, on the reasoning that a stage with nothing in it is a dead
+stop on the scrubber. That broke the frozen branch: `walls.ts` stamps a sole plate as stage 5 and
+a cap plate as stage 6 as LITERALS, so removing a row above them landed every wall member a stage
+late or past the end of the plan — which the seeded sweep caught immediately, and which the
+stage-plan file's own comment had already warned about ("rows 1–6 never move"). The rows keep
+their positions now and change their MEANING instead: thickened edge poured, slab poured, slab
+cures. A curing slab really is a step a crew plans around, and it is honest that no member
+appears during it.
+
 ## Next targets, unchecked
 
-- Continuous-wall foundation; slab and skid foundations.
+- Continuous-wall foundation; skid foundation (rendered incidentally with the storage shed, not examined).
 - Storage shed's wide door header and its jack/king framing at that span (the shed was rendered for its siding; the header was not examined).
 - Flat roof at its 1:12 drain slope — the covering path at near-zero pitch.
 - Pyramid roof on a building (the tower cab uses it; a building never has been rendered with one).

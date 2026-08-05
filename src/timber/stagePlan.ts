@@ -69,12 +69,31 @@ export function stagePlan(rows: { key: StageKey; label: string; detail: string }
  */
 export function stagePlanForBuilding(
   roofKind: 'gable' | 'hip' | 'pyramid' | 'shed' | 'flat' | 'none',
+  foundationKind: 'piers' | 'wall' | 'basement' | 'slab' | 'skids' | 'embedded' = 'piers',
 ): StagePlanEntry[] {
+  // A SLAB IS THE FLOOR, so its first four stages are a different job — but they are still FOUR
+  // stages, and that is not a style choice. `walls.ts` and `floor.ts` are the frozen branch and
+  // they stamp their ordinals as LITERALS: a sole plate is stage 5 and a cap plate is stage 6,
+  // written into code the compat goldens pin byte for byte. Drop a row above them and every wall
+  // member lands one stage late, or past the end of the plan entirely — which is exactly what
+  // happened the first time this was written, and the seeded sweep caught it.
+  //
+  // So the rows keep their positions and change their MEANING. A slab pour really is a sequence:
+  // dig and pour the thickened edge, pour the slab over it, and then wait — nothing bears on a
+  // slab until it has cured, which is a real step a crew plans around even though it puts no
+  // member in the model.
+  const slabFloor = foundationKind === 'slab';
   const base: { key: StageKey; label: string; detail: string }[] = [
     { key: 'layout', label: STAGES[0]!.name, detail: 'Batter boards, posts and footers set to the building lines.' },
-    { key: 'foundation', label: STAGES[1]!.name, detail: 'Sills bedded and the built-up girder set — everything above bears on this.' },
-    { key: 'floor', label: STAGES[2]!.name, detail: 'Joists over the girder, bridging rows to share the load between them.' },
-    { key: 'subfloor', label: STAGES[3]!.name, detail: 'Deck panels tie the joists into one stiff floor to build the walls on.' },
+    slabFloor
+      ? { key: 'foundation', label: 'Thickened edge poured', detail: 'The edge is dug and poured under every wall line — the slab bears the walls there, so that is where it is deepest.' }
+      : { key: 'foundation', label: STAGES[1]!.name, detail: 'Sills bedded and the built-up girder set — everything above bears on this.' },
+    slabFloor
+      ? { key: 'floor', label: 'Slab poured', detail: 'One pour over the edge, screeded flat: its top IS the finished floor, and the walls stand on it.' }
+      : { key: 'floor', label: STAGES[2]!.name, detail: 'Joists over the girder, bridging rows to share the load between them.' },
+    slabFloor
+      ? { key: 'subfloor', label: 'Slab cures', detail: 'Nothing is built on a green slab. The wall lines are snapped and the plates anchored once it has cured.' }
+      : { key: 'subfloor', label: STAGES[3]!.name, detail: 'Deck panels tie the joists into one stiff floor to build the walls on.' },
     { key: 'walls', label: STAGES[4]!.name, detail: 'Walls framed flat and raised: plates, studs, and the framing around every opening.' },
     { key: 'plates', label: STAGES[5]!.name, detail: 'Cap plates lap the corners and the let-in braces square the walls.' },
   ];

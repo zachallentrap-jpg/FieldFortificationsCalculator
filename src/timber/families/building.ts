@@ -24,9 +24,9 @@ import { generateWalls, type Opening } from '../walls';
 import { generateRoof } from '../roof';
 import { wallContract, type WallsContract } from '../subsystems/wallSystem';
 import { roofPlanes, generateShed, generatePurlins, generateHip, wallInfillProfiles } from '../subsystems/roofFamilies';
-import { generateRoofCovering, generateWallCovering, generateInfillCovering, generateSkids, type InfillSurface } from '../subsystems/coverings';
+import { generateRoofCovering, generateWallCovering, generateInfillCovering, generateSkids, generateSlabOnGrade, type InfillSurface } from '../subsystems/coverings';
 import { generateFloorOnBearings, joistNominalFor } from '../subsystems/floorSystem';
-import { LUMBER, PANEL, IN_PER_FT } from '../doctrine';
+import { LUMBER, PANEL, FOUNDATION, IN_PER_FT } from '../doctrine';
 import { headerForSpan } from '../normalize';
 
 export interface BuildingResult {
@@ -113,7 +113,7 @@ function gableOf(roof: RoofSpec): { risePer12: number; overhangFt: number } {
 export function generateBuilding(spec: BuildingSpec): BuildingResult {
   const story = spec.stories[0]!;
   const { lengthFt: L, widthFt: W } = spec.dims;
-  const stagePlan = stagePlanForBuilding(spec.roof.kind);
+  const stagePlan = stagePlanForBuilding(spec.roof.kind, spec.foundation.kind);
   const walls = wallContract(L, W, story.wallHeightFt, story.openings, 0, spec.wallBands ?? []);
   const members: Member[] = [];
   let levels: FloorLevels;
@@ -121,13 +121,20 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
   const grounded = spec.foundation.kind === 'skids' || spec.foundation.kind === 'slab';
 
   // ── Substructure + floor
-  if (grounded) {
+  if (spec.foundation.kind === 'slab') {
+    // The slab IS the floor: one pour, its top at y = 0 where the sole plates land. No joists
+    // and no deck — this branch used to fall through to the framed floor below and emit a
+    // suspended wood floor with nothing under it, and no concrete anywhere in the model.
+    members.push(...generateSlabOnGrade(
+      L, W, requireOrdinal(stagePlan, 'foundation'), requireOrdinal(stagePlan, 'floor'),
+    ));
+    const slabT = (FOUNDATION.slabThickIn.value as number) / IN_PER_FT;
+    levels = { subfloorTop: 0, joistTop: 0, sillTop: 0, gradeY: -slabT };
+  } else if (grounded) {
     const deckThick = PANEL.subfloorThickIn.value as number;
     const skidD = DRESSED[LUMBER.skidNominal.value as string]!.d / IN_PER_FT;
     const deckTopY = 0;
-    if (spec.foundation.kind === 'skids') {
-      members.push(...generateSkids(L, W, requireOrdinal(stagePlan, 'foundation')));
-    }
+    members.push(...generateSkids(L, W, requireOrdinal(stagePlan, 'foundation')));
     members.push(
       ...generateFloorOnBearings({
         lengthFt: L,
@@ -147,7 +154,7 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
       subfloorTop: 0,
       joistTop,
       sillTop: joistTop - joistD,
-      gradeY: spec.foundation.kind === 'skids' ? joistTop - joistD - skidD : joistTop - joistD,
+      gradeY: joistTop - joistD - skidD, // the runners are what this floor stands on
     };
   } else {
     const floorInput = legacyFloorInput(spec);

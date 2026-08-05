@@ -17,7 +17,7 @@
 import type { Member, WallId } from '../types';
 import { DRESSED } from '../types';
 import { makeEmitter } from '../emit';
-import { PANEL, ROOFING, SIDING, LUMBER, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
+import { PANEL, ROOFING, SIDING, LUMBER, FOUNDATION, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
 import { planeSpanAt, type RoofPlane } from './roofFamilies';
 import type { WallSurface } from './wallSystem';
 
@@ -661,6 +661,66 @@ export function generateRidgeCaps(
 }
 
 /** Skid runners under a building on grade (foundation 'skids'). */
+/**
+ * Slab on grade — where the floor and the foundation are the SAME POUR.
+ *
+ * "Slab on grade" used to emit no slab. The option built a suspended wood floor — joists,
+ * bridging, subfloor — resting on nothing at all, which is what it looked like from underneath
+ * once the ground stopped being an opaque plane: a framed floor and clear air below it. The
+ * concrete the option is named after was never generated, so the picture showed a building with
+ * no foundation and the bill listed no concrete to pour.
+ *
+ * What a slab actually is here: one pour whose TOP IS THE FLOOR (y = 0, where the wall sole
+ * plates land), with its edge thickened under every wall line to carry them. No joists and no
+ * subfloor — putting a wood floor on a slab is not a foundation choice, it is two floors.
+ */
+export function generateSlabOnGrade(lengthFt: number, widthFt: number, stageEdge: number, stageSlab: number): Member[] {
+  const emit = makeEmitter('FL');
+  const slabT = (FOUNDATION.slabThickIn.value as number) / IN_PER_FT;
+  const edgeW = (FOUNDATION.stripFootingWidthIn.value as number) / IN_PER_FT;
+  const edgeD = (FOUNDATION.stripFootingDepthIn.value as number) / IN_PER_FT;
+  const edgeCite = `${citeOf(FOUNDATION.stripFootingWidthIn)} — thickened edge under the wall lines`;
+
+  // Thickened edge first: it is dug and poured before the slab goes over it. The two long runs
+  // go through and the two cross runs butt between them, the same convention the foundation
+  // walls use, so no two pours claim the same cubic foot.
+  for (const z of [edgeW / 2, widthFt - edgeW / 2]) {
+    emit('footing', `conc edge ${FOUNDATION.stripFootingWidthIn.value}x${FOUNDATION.stripFootingDepthIn.value}`, {
+      cutLengthFt: lengthFt,
+      position: [lengthFt / 2, -slabT - edgeD / 2, z],
+      rotation: [0, 0, 0],
+      stage: stageEdge,
+      actual: { w: FOUNDATION.stripFootingWidthIn.value as number, d: FOUNDATION.stripFootingDepthIn.value as number },
+      nailing: 'no fasteners — concrete (PH)',
+      doctrineRef: edgeCite,
+    });
+  }
+  for (const x of [edgeW / 2, lengthFt - edgeW / 2]) {
+    emit('footing', `conc edge ${FOUNDATION.stripFootingWidthIn.value}x${FOUNDATION.stripFootingDepthIn.value}`, {
+      cutLengthFt: Math.max(0.5, widthFt - 2 * edgeW),
+      position: [x, -slabT - edgeD / 2, widthFt / 2],
+      rotation: [0, -Math.PI / 2, 0],
+      stage: stageEdge,
+      actual: { w: FOUNDATION.stripFootingWidthIn.value as number, d: FOUNDATION.stripFootingDepthIn.value as number },
+      nailing: 'no fasteners — concrete (PH)',
+      doctrineRef: edgeCite,
+    });
+  }
+
+  emit('slab', `conc slab ${FOUNDATION.slabThickIn.value}in`, {
+    cutLengthFt: lengthFt,
+    position: [lengthFt / 2, -slabT / 2, widthFt / 2],
+    rotation: [0, 0, 0],
+    // Length along X, thickness UP (actual.d), width across Z — the same convention the
+    // basement slab is emitted with, so one reader serves both.
+    actual: { w: widthFt * IN_PER_FT, d: FOUNDATION.slabThickIn.value as number },
+    stage: stageSlab,
+    nailing: 'no fasteners — concrete; sole plates anchored to the slab (PH)',
+    doctrineRef: citeOf(FOUNDATION.slabThickIn),
+  });
+  return emit.members;
+}
+
 export function generateSkids(lengthFt: number, widthFt: number, stage: number, count = 3): Member[] {
   const emit = makeEmitter('FL');
   const nominal = LUMBER.skidNominal.value as string;

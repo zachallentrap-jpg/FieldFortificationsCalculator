@@ -16,6 +16,63 @@ function bldg(over: Partial<BuildingSpec> = {}): BuildingSpec {
   return { ...base, ...over };
 }
 
+test('slab on grade: the slab IS the floor — concrete, an edge under the walls, no wood floor', () => {
+  // What this replaces: "Slab on grade" emitted NO slab. It fell through to the framed-floor
+  // branch and produced joists, bridging and a subfloor resting on nothing at all — a wood
+  // floor with clear air under it, and no concrete anywhere in the model or on the bill.
+  const model = generateStructure(bldg({ foundation: { kind: 'slab' } }));
+
+  const slabs = model.members.filter((m) => m.role === 'slab');
+  assert.equal(slabs.length, 1, 'one pour');
+  const slab = slabs[0]!;
+  const slabTop = slab.position[1] + slab.actual.d / 12 / 2;
+  assert.ok(Math.abs(slabTop) < 1e-9, `the slab top IS the floor; it is at ${slabTop.toFixed(3)}`);
+  assert.ok(Math.abs(slab.cutLength / 12 - 20) < 1e-9, 'the pour covers the plan length');
+  assert.ok(Math.abs(slab.actual.w / 12 - 16) < 1e-9, 'and its width');
+
+  // NOTHING IS FRAMED UNDER A SLAB. Stated as "what is below the floor" rather than a list of
+  // banned roles, because 'joist' is not by itself a floor member — a gable roof's ceiling
+  // joists carry the same role, up at the plates, and a ban on the word would have failed for
+  // the wrong reason.
+  for (const m of model.members.filter((x) => x.position[1] < -1e-6)) {
+    assert.ok(
+      m.role === 'slab' || m.role === 'footing',
+      `${m.id} (${m.role}) is under a slab — only the pour and its edge belong there`,
+    );
+  }
+
+  // The thickened edge runs under every wall line, carrying the slab.
+  const edge = model.members.filter((m) => m.role === 'footing');
+  assert.equal(edge.length, 4, 'one run per wall line');
+  const slabBottom = slab.position[1] - slab.actual.d / 12 / 2;
+  for (const f of edge) {
+    const top = f.position[1] + f.actual.d / 12 / 2;
+    assert.ok(Math.abs(top - slabBottom) < 1e-9, `${f.id}: its top must be the slab's underside`);
+  }
+
+  // And the walls stand ON it: a sole plate's underside is the slab's top face.
+  const sole = model.members.filter((m) => m.role === 'solePlate');
+  assert.ok(sole.length > 0);
+  for (const p of sole) {
+    // A plate is laid FLAT (rx = -90°), so its thickness — `actual.w` — is the vertical
+    // dimension, not its face width. Getting that backwards reads a plate as 2 in low.
+    // Only the FLATNESS matters here; the yaw differs per wall (the N plate faces about-face).
+    assert.ok(Math.abs(Math.abs(p.rotation[0]) - Math.PI / 2) < 1e-6, `${p.id}: a plate lies flat`);
+    const bottom = p.position[1] - p.actual.w / 12 / 2;
+    assert.ok(Math.abs(bottom - slabTop) < 1e-6, `${p.id}: sits at ${bottom.toFixed(3)}, slab top ${slabTop.toFixed(3)}`);
+  }
+
+  // The stages a crew actually works through, in the plan's own words.
+  assert.deepEqual(
+    model.stagePlan.slice(1, 4).map((e) => e.label),
+    ['Thickened edge poured', 'Slab poured', 'Slab cures'],
+  );
+  // Those rows keep their POSITIONS: the frozen wall generator stamps 5 and 6 as literals, so
+  // dropping a row above them lands every wall member a stage late or past the plan entirely.
+  assert.equal(model.stagePlan[4]!.key, 'walls');
+  assert.equal(model.stagePlan[5]!.key, 'plates');
+});
+
 test('skids: runners under the floor, no posts, no pads', () => {
   const model = generateStructure(bldg({ foundation: { kind: 'skids' } }));
   const skids = model.members.filter((m) => m.role === 'skid');
