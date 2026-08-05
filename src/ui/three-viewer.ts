@@ -158,6 +158,20 @@ function corrugatedTexture(): THREE.Texture {
 // Sawn dimensional lumber — warm SPF tone with fine, faintly wavy grain lines. Distinct from
 // the pale plywood face below (lumber is warmer and more densely grained), and dresses every
 // dimensional-lumber prop: stringers, the plywood-revetment frame, and platform/step decking.
+//
+// GRAIN RUNS ALONG THE STICK, and for a long time it did not. The lumber props are unit cubes
+// carrying a box-atlas UV, and on a board's broad face that atlas puts **V across the full
+// length** while U is a sliver a few percent wide — measured off the GLBs, corner (-0.5,-0.46)
+// maps to (0.076, 0.998) and (+0.5,+0.43) to (0.041, 0.002). Grain drawn as lines of constant
+// canvas-Y is therefore a line of constant V: it crosses the board and repeats ALONG it. Nine
+// lines over an eight-foot board is a band every eleven inches, which is why board-and-batten
+// siding — vertical boards, correct geometry, asserted by its own test — rendered as horizontal
+// clapboard. The material was lying about which way the wood ran.
+//
+// So the grain is drawn as VERTICAL lines (constant canvas-X, spanning canvas-Y), which the
+// atlas maps to lines running the length of the piece. `repeat.x` then compensates for that
+// sliver: the broad face samples about 3.5% of the canvas across its width, so the pattern has
+// to tile hard to put more than one line on a board.
 let lumberTexCache: THREE.Texture | null = null;
 function lumberTexture(): THREE.Texture {
   if (lumberTexCache) return lumberTexCache;
@@ -171,20 +185,25 @@ function lumberTexture(): THREE.Texture {
   for (let i = 0; i < 9; i++) {
     ctx.strokeStyle = i % 3 === 0 ? '#a97f4e' : i % 3 === 1 ? '#b98d59' : '#c29a66';
     ctx.beginPath();
-    const gy = 3 + i * 7;
-    ctx.moveTo(0, gy);
-    for (let x = 0; x <= 64; x += 4) {
-      ctx.lineTo(x, gy + Math.sin((x / 64) * Math.PI * 2 + i * 1.7) * 1.6);
+    const gx = 3 + i * 7;
+    ctx.moveTo(gx, 0);
+    for (let y = 0; y <= 64; y += 4) {
+      ctx.lineTo(gx + Math.sin((y / 64) * Math.PI * 2 + i * 1.7) * 1.6, y);
     }
     ctx.stroke();
   }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace; // see dirtTexture — all canvas color maps are sRGB
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  // ~4 grain lines across a board's width, given the atlas hands the face only 0.035 of U.
+  tex.repeat.set(LUMBER_GRAIN_REPEAT, 1);
   lumberTexCache = tex;
   sharedTextures.add(tex);
   return tex;
 }
+
+/** How hard the grain tiles across a piece — see `lumberTexture` for why it is not 1. */
+const LUMBER_GRAIN_REPEAT = 14;
 
 // Plywood FACE — the sanded veneer of one whole sheet, mapped 1:1 onto it (the caller scales a
 // unit box, so this canvas IS the sheet, corner to corner). Warm CDX tan, clearly not the

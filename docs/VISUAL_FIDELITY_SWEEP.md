@@ -24,6 +24,7 @@ screenshots get read.
 | Building — **basement foundation + stair** | **Fixed** — the stair stringers ran 6.6 in below the basement slab, through the floor and into the earth. Walls, footings, slab, opening framing, riser count and tread geometry were all correct. |
 | Tent frame — strongback and tent-floor | **Checked, clean.** Nothing wrong. Bent posts stand exactly on the deck top, rafters meet the ridge, collars tie the bents, deck on joists on skids. |
 | Two-story building | **Not a render defect** — a parked feature (T6b). It was being accepted silently, which is fixed; see below. |
+| Storage shed — open front, skids, board-and-batten | **Fixed** — board-and-batten rendered as horizontal clapboard. The geometry was right; the wood grain ran across every board instead of along it. |
 
 ## The shed that had no walls above the plate
 
@@ -93,10 +94,34 @@ a different building than the one asked for, and nothing anywhere said so. The c
 only caught THREE or more stories, so the one case that could actually be requested passed
 straight through. It now clamps at one and warns, exactly like every other out-of-scope input.
 
+## Wood grain that ran the wrong way
+
+The storage shed is the board-and-batten card, and it rendered as horizontal lap siding —
+clapboard, unmistakably. The geometry was not the problem and it is worth saying why that took a
+minute to establish: `timber2-coverings` already asserts board siding and battens run vertically,
+and it passes. Probing the members confirmed it — 28 boards side by side across the south wall,
+each 8 ft long with its length axis at `[0, 1, 0]`.
+
+The material was the liar. Measured straight off the GLB props, a lumber piece is a unit cube
+with a box-atlas unwrap, and on the broad face that atlas puts **V across the full length** while
+U is a sliver about 3.5% wide — corner `(-0.5, -0.46)` maps to `(0.076, 0.998)` and `(+0.5, +0.43)`
+to `(0.041, 0.002)`. The grain was drawn as lines of constant canvas-Y, which is constant V: every
+line crossed the board and the set of them repeated ALONG it. Nine lines over an eight-foot board
+is a band every eleven inches, and a wall of vertical boards banded every eleven inches is a wall
+of clapboard.
+
+The grain is now drawn as vertical canvas lines, which that atlas maps along the length, with
+`repeat.x` compensating for the sliver so a board carries a few lines rather than part of one.
+This dresses every stick of lumber in the app, so framing was re-checked at the rafter stage too.
+
+`timber2-lumber-grain` pins the fact the texture depends on: if the props are ever re-exported
+with a different unwrap, it fails and names `lumberTexture()` — rather than the siding quietly
+going back to looking like lap.
+
 ## Next targets, unchecked
 
 - Continuous-wall foundation; slab and skid foundations.
-- Storage shed's wide door header and its jack/king framing at that span.
+- Storage shed's wide door header and its jack/king framing at that span (the shed was rendered for its siding; the header was not examined).
 - Flat roof at its 1:12 drain slope — the covering path at near-zero pitch.
 - Pyramid roof on a building (the tower cab uses it; a building never has been rendered with one).
 - Board-and-batten and board siding at the rake (the infill path renders them, unphotographed).
