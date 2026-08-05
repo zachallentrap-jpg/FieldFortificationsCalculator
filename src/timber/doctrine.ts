@@ -107,6 +107,16 @@ export const TOLERANCE = {
   hipCapFt: 4 / IN_PER_FT,
   /** Ceiling on that subdivision, so a degenerate plane cannot emit a thousand offcuts. */
   maxTaperBands: 8,
+  /**
+   * How far a piece of wall covering may step away from a RAKE — the sloped top edge of a
+   * gable end or a shed's rake wall — before it is ripped narrower. Siding is cut to the rake
+   * on site; a rectangle cannot be, so a wide sheet against a shallow gable either overshoots
+   * the roof or leaves a wedge of daylight. Stepping at 3 in is close enough that the rake
+   * reads as a straight line, and the cut pieces are what a crew would actually rip.
+   */
+  rakeStepFt: 3 / IN_PER_FT,
+  /** Ceiling on THAT subdivision — same reasoning as `maxTaperBands`, in the other axis. */
+  maxRakeStrips: 64,
 } as const;
 
 // ── Foundations ──────────────────────────────────────────────────────────────

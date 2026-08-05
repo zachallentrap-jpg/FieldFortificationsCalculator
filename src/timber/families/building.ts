@@ -23,8 +23,8 @@ import { generateFloor, floorLevels, type FloorInput, type FloorLevels } from '.
 import { generateWalls, type Opening } from '../walls';
 import { generateRoof } from '../roof';
 import { wallContract, type WallsContract } from '../subsystems/wallSystem';
-import { roofPlanes, generateShed, generatePurlins, generateHip } from '../subsystems/roofFamilies';
-import { generateRoofCovering, generateWallCovering, generateSkids } from '../subsystems/coverings';
+import { roofPlanes, generateShed, generatePurlins, generateHip, wallInfillProfiles } from '../subsystems/roofFamilies';
+import { generateRoofCovering, generateWallCovering, generateInfillCovering, generateSkids, type InfillSurface } from '../subsystems/coverings';
 import { generateFloorOnBearings, joistNominalFor } from '../subsystems/floorSystem';
 import { LUMBER, PANEL, IN_PER_FT } from '../doctrine';
 import { headerForSpan } from '../normalize';
@@ -228,14 +228,36 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
       }),
     );
   }
+  // What each wall must close in above its cap plate — a gable end's triangle, a shed's pony
+  // wall and rakes. Resolved once here and skinned by whichever coverings are on, so the
+  // sheathing and the siding agree about where the building stops.
+  const infill: InfillSurface[] = wallInfillProfiles(spec, walls).flatMap((p) => {
+    const s = walls.surfaces.find((q) => q.wall === p.wall);
+    return s ? [{
+      wall: s.wall,
+      runFt: s.runFt,
+      baseYFt: walls.plateTopY,
+      topAt: p.topAt,
+      normal: s.normal,
+      origin: s.origin,
+      along: s.along,
+      faceOffsetFt: s.faceOffsetFt,
+    }] : [];
+  });
+
   if (spec.coverings.wallSheathing !== 'none') {
+    const kind = spec.coverings.wallSheathing === 'boards' ? 'boards' : 'plywood';
     members.push(
       ...generateWallCovering({
         surfaces: walls.surfaces,
-        kind: spec.coverings.wallSheathing === 'boards' ? 'boards' : 'plywood',
+        kind,
         role: 'sheathingPanel',
         stage: requireOrdinal(stagePlan, 'siding'),
         standoffFt: 0,
+      }),
+      ...generateInfillCovering({
+        surfaces: infill, kind, role: 'sheathingPanel',
+        stage: requireOrdinal(stagePlan, 'siding'), standoffFt: 0,
       }),
     );
   }
@@ -243,14 +265,19 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
     const sheathingThick = spec.coverings.wallSheathing !== 'none'
       ? (PANEL.sidingThickIn.value as number) / IN_PER_FT
       : 0;
+    const kind = spec.coverings.siding === 'boardAndBatten' ? 'boardAndBatten'
+      : spec.coverings.siding === 'boards' ? 'boards' : 'plywood';
     members.push(
       ...generateWallCovering({
         surfaces: walls.surfaces,
-        kind: spec.coverings.siding === 'boardAndBatten' ? 'boardAndBatten'
-          : spec.coverings.siding === 'boards' ? 'boards' : 'plywood',
+        kind,
         role: 'siding',
         stage: requireOrdinal(stagePlan, 'siding'),
         standoffFt: sheathingThick,
+      }),
+      ...generateInfillCovering({
+        surfaces: infill, kind, role: 'siding',
+        stage: requireOrdinal(stagePlan, 'siding'), standoffFt: sheathingThick,
       }),
     );
   }

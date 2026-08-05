@@ -14,7 +14,7 @@
 // the compat goldens and stays in the frozen `roof.ts`. This module's generalized tiler serves
 // new roof kinds and any surface with cutouts.
 
-import type { Member } from '../types';
+import type { Member, WallId } from '../types';
 import { DRESSED } from '../types';
 import { makeEmitter } from '../emit';
 import { PANEL, ROOFING, SIDING, LUMBER, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
@@ -141,6 +141,135 @@ export function tileSurface(
     }
   }
   return tiles;
+}
+
+// ── Raked infill: closing in above the cap plate ─────────────────────────────
+//
+// A wall does not stop at its cap plate. A gable roof leaves a triangle at each end, a shed
+// leaves a full-height pony wall on its high side and a raked triangle on each side wall, and
+// every one of them is framed (`roof.ts` gable studs, `generateShed`'s pony and rake studs) and
+// then CLOSED IN. The covering pass only ever tiled `walls.surfaces` — rectangles ending at the
+// plate — so every one of those areas came out as bare framing you could see straight through,
+// and the take-off was short by their whole area.
+//
+// WHY VERTICAL STRIPS AND NOT THE ROW TILER. `tileSurface` bands a taper in v, which is right
+// for a roof plane: those taper gently over a long slope. A gable end is the opposite shape —
+// twenty feet wide and three feet tall — so horizontal bands step sideways by a foot or more
+// each, and the rake comes out as a staircase either overhanging the roof or gapping under it.
+// Cutting the same triangle into vertical strips puts the step in the direction the edge is
+// actually cut, and a strip narrow enough to hold `rakeStepFt` reads as a straight rake.
+
+/** One wall's infill: what sits above the cap plate, and how tall it is at each station. */
+export interface InfillSurface {
+  wall: WallId;
+  runFt: number;
+  /** World Y of the infill's bottom — the cap-plate top. */
+  baseYFt: number;
+  /** Height above `baseYFt` at station u along the run. Zero means nothing to close in. */
+  topAt: (u: number) => number;
+  normal: [x: number, z: number];
+  origin: [x: number, z: number];
+  along: [x: number, z: number];
+  faceOffsetFt: number;
+}
+
+/**
+ * Vertical strips covering `topAt`, each no wider than `moduleFt` and each narrow enough that
+ * its top edge is within `TOLERANCE.rakeStepFt` of the true rake. A flat top (a shed's pony
+ * wall) never subdivides and comes out as plain full-width strips.
+ */
+export function tileRakedInfill(runFt: number, topAt: (u: number) => number, moduleFt: number): Rect[] {
+  const out: Rect[] = [];
+  for (let u0 = 0; u0 < runFt - EPS; u0 += moduleFt) {
+    const uEnd = Math.min(u0 + moduleFt, runFt);
+    // Walk the module in fine cells and MERGE while the top edge stays inside one step, rather
+    // than cutting it into equal strips. Two reasons, and the second is the one a screenshot
+    // found: equal strips waste cuts where the edge is flat, and — worse — sizing them from
+    // the module's two ENDS is blind to a peak in the middle. A gable's ridge lands inside a
+    // module, both of whose ends are then the same height, so the module read as flat and came
+    // out as one 4-ft slab standing at ridge height in the middle of the gable end.
+    const cells = TOLERANCE.maxRakeStrips;
+    const res = (uEnd - u0) / cells;
+    let u = u0;
+    while (u < uEnd - EPS) {
+      let end = Math.min(u + res, uEnd);
+      let lo = topAt((u + end) / 2);
+      let hi = lo;
+      while (end < uEnd - EPS) {
+        const next = Math.min(end + res, uEnd);
+        const h = topAt((end + next) / 2);
+        if (Math.max(hi, h) - Math.min(lo, h) > TOLERANCE.rakeStepFt) break;
+        hi = Math.max(hi, h);
+        lo = Math.min(lo, h);
+        end = next;
+      }
+      // Cut to the middle of the range this piece spans — half a step proud at one edge, half
+      // shy at the other, which is what a ripped piece against a sloped line looks like.
+      const h = (hi + lo) / 2;
+      if (h > TOLERANCE.minSliverFt && end - u > EPS) out.push({ u0: u, u1: end, v0: 0, v1: h });
+      u = end;
+    }
+  }
+  return out;
+}
+
+export interface InfillCoveringInput {
+  surfaces: InfillSurface[];
+  kind: 'plywood' | 'boards' | 'boardAndBatten';
+  role: 'sheathingPanel' | 'siding';
+  stage: number;
+  standoffFt: number;
+}
+
+/** Close in every raked area above the plates, in the same material as the walls below. */
+export function generateInfillCovering(input: InfillCoveringInput): Member[] {
+  // Its OWN prefix. The wall pass and this one emit the same roles ('siding', 'sidingBoard',
+  // 'sheathingPanel'), and `makeEmitter` numbers per role from one — so sharing 'CV' handed
+  // two different pieces the same id, which the id-collision test caught immediately.
+  const emit = makeEmitter('RK');
+  const { surfaces, kind, role, stage, standoffFt } = input;
+  for (const s of surfaces) {
+    const plywood = kind === 'plywood';
+    const boardNominal = SIDING.boardNominal.value as string;
+    const moduleFt = plywood ? (PANEL.widthFt.value as number) : DRESSED[boardNominal]!.d / IN_PER_FT;
+    const thick = plywood
+      ? (PANEL.sidingThickIn.value as number) / IN_PER_FT
+      : DRESSED[boardNominal]!.w / IN_PER_FT;
+    for (const t of tileRakedInfill(s.runFt, s.topAt, moduleFt)) {
+      const uMid = (t.u0 + t.u1) / 2;
+      const out = s.faceOffsetFt + standoffFt + thick / 2;
+      const x = s.origin[0] + s.along[0] * uMid + s.normal[0] * out;
+      const z = s.origin[1] + s.along[1] * uMid + s.normal[1] * out;
+      const yaw = Math.atan2(-s.along[1], s.along[0]);
+      const widthFt = t.u1 - t.u0;
+      const heightFt = t.v1 - t.v0;
+      const y = s.baseYFt + heightFt / 2;
+      if (plywood) {
+        emit(role, `${PANEL.widthFt.value}x${PANEL.lengthFt.value} panel`, {
+          cutLengthFt: widthFt,
+          position: [x, y, z],
+          rotation: [0, yaw, 0],
+          stage,
+          wall: s.wall,
+          actual: { w: PANEL.sidingThickIn.value as number, d: heightFt * IN_PER_FT },
+          nailing: '8d @ 6" edges / 12" field (PH)',
+          doctrineRef: `${citeOf(PANEL.sidingThickIn)} — cut to the rake above the plate`,
+        });
+      } else {
+        emit(kind === 'boardAndBatten' ? 'sidingBoard' : role, boardNominal, {
+          cutLengthFt: heightFt,
+          position: [x, y, z],
+          rotation: [0, yaw, Math.PI / 2],
+          stage,
+          wall: s.wall,
+          actual: { w: DRESSED[boardNominal]!.w, d: widthFt * IN_PER_FT },
+          nailing: '8d @ 12" (PH)',
+          doctrineRef: `${citeOf(SIDING.boardNominal)} — cut to the rake above the plate`,
+        });
+      }
+    }
+  }
+  return emit.members;
 }
 
 // ── Wall surfaces ────────────────────────────────────────────────────────────

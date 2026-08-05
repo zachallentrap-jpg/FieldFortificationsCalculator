@@ -54,7 +54,10 @@ test('solid art is deterministic, self-contained, and inside its size budget', (
     assert.ok(!/<image|xlink:href|url\(/i.test(a), `${f.id}: external reference`);
     // A solid drawing is polygons, not strokes, so it is legitimately bigger than the line art —
     // but a card that ships a quarter-megabyte of SVG is a card that janks a phone.
-    assert.ok(a.length < 260_000, `${f.id}: solid art is ${a.length} bytes`);
+    // 300 KB, raised from 260 KB when the gable ends started being closed in: the raked
+    // infill is real geometry the drawing was previously missing, not bloat. The budget's
+    // job is catching a renderer that starts emitting a polygon per nail, and it still does.
+    assert.ok(a.length < 300_000, `${f.id}: solid art is ${a.length} bytes`);
   }
 });
 

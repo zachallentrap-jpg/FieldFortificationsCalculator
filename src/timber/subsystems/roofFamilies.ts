@@ -259,6 +259,67 @@ export function roofPlanes(spec: BuildingSpec, plateTopY: number): RoofPlane[] {
   }];
 }
 
+/**
+ * What each wall has to close in ABOVE its cap plate, as a height at every station along the
+ * run. This is the outline the framing already follows — gable studs, a shed's pony wall and
+ * its rake studs — stated once so the covering pass can skin it instead of leaving it open.
+ *
+ * Which walls get one is the roof's own geometry, and a hip is the proof that "always" would
+ * be wrong: all four of its slopes come down to the plate, so a hip has no infill anywhere,
+ * which is exactly why its walls looked right while every gable end did not.
+ */
+export function wallInfillProfiles(
+  spec: BuildingSpec,
+  walls: WallsContract,
+): { wall: WallId; topAt: (u: number) => number }[] {
+  const roof = spec.roof;
+  if (roof.kind === 'none' || roof.kind === 'hip' || roof.kind === 'pyramid') return [];
+  const { lengthFt: L, widthFt: W } = spec.dims;
+  const { slope } = slopeOf(roof);
+  const out: { wall: WallId; topAt: (u: number) => number }[] = [];
+
+  if (roof.kind === 'gable') {
+    // The ridge runs along X over z = W/2, so the two walls that run along Z — E and W — carry
+    // a triangle rising to the ridge over the middle of the span. N and S bear the rafters and
+    // stop at the plate.
+    for (const wall of ['E', 'W'] as const) {
+      const s = walls.surfaces.find((q) => q.wall === wall);
+      if (!s) continue;
+      out.push({
+        wall,
+        topAt: (u) => {
+          const z = s.origin[1] + s.along[1] * u;
+          return Math.max(0, (W / 2 - Math.abs(z - W / 2)) * slope);
+        },
+      });
+    }
+    return out;
+  }
+
+  // Shed and flat: one slope. The high wall carries a full-height pony wall, the two walls
+  // parallel to the slope carry a rake rising from the low side, and the low wall stops at
+  // the plate.
+  const highSide: WallId = roof.kind === 'shed' ? roof.highSide : 'N';
+  const alongZ = slopeAlongZ(highSide);
+  const span = alongZ ? W : L;
+  const up = highSide === 'N' || highSide === 'E' ? 1 : -1;
+  const high = walls.surfaces.find((q) => q.wall === highSide);
+  if (high) out.push({ wall: highSide, topAt: () => span * slope });
+  for (const wall of (alongZ ? ['E', 'W'] : ['S', 'N']) as WallId[]) {
+    const s = walls.surfaces.find((q) => q.wall === wall);
+    if (!s) continue;
+    out.push({
+      wall,
+      topAt: (u) => {
+        const across = alongZ ? s.origin[1] + s.along[1] * u : s.origin[0] + s.along[0] * u;
+        const fromLow = up === 1 ? across : span - across;
+        return Math.max(0, fromLow * slope);
+      },
+    });
+  }
+  return out;
+}
+
 export interface ShedInput {
   spec: BuildingSpec;
   walls: WallsContract;

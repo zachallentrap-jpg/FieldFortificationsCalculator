@@ -90,8 +90,10 @@ test('C-5 on real walls: siding + openings = wall area, to 1e-6 sf', () => {
   const model = generateStructure(spec);
   const walls = wallContract(spec.dims.lengthFt, spec.dims.widthFt, spec.stories[0]!.wallHeightFt, spec.stories[0]!.openings);
   for (const s of walls.surfaces) {
+    // The wall PROPER — pieces from the wall pass ('CV'), not the raked infill above the
+    // plate ('RK'), which closes in a different region and is conserved by its own test.
     const covered = model.members
-      .filter((m) => m.role === 'siding' && m.wall === s.wall)
+      .filter((m) => m.role === 'siding' && m.wall === s.wall && m.id.startsWith('CV-'))
       .reduce((a, m) => a + (m.cutLength / 12) * (m.actual.d / 12), 0);
     const cut = s.cutouts.reduce((a, c) => a + (c.u1 - c.u0) * (c.v1 - c.v0), 0);
     const surface = s.runFt * s.heightFt;
@@ -108,7 +110,7 @@ test('board-and-batten covers the same area and adds battens over the joints', (
   const walls = wallContract(20, 16, 8, spec.stories[0]!.openings);
   for (const s of walls.surfaces) {
     const covered = model.members
-      .filter((m) => m.role === 'sidingBoard' && m.wall === s.wall)
+      .filter((m) => m.role === 'sidingBoard' && m.wall === s.wall && m.id.startsWith('CV-'))
       .reduce((a, m) => a + (m.cutLength / 12) * (m.actual.d / 12), 0);
     const cut = s.cutouts.reduce((a, c) => a + (c.u1 - c.u0) * (c.v1 - c.v0), 0);
     assert.ok(Math.abs(covered + cut - s.runFt * s.heightFt) < 1e-6, `${s.wall}: board coverage`);
@@ -256,6 +258,72 @@ test('a frozen-decked gable resolves purlins to its own solid deck — one deck 
   assert.equal(model.members.filter((m) => m.role === 'purlin').length, 0, 'no purlins over a frozen deck');
   assert.ok(model.members.filter((m) => m.role === 'roofPanel').length > 0, 'the frozen stage-9 deck IS the deck');
   assert.ok(model.members.some((m) => m.role === 'roofingCourse'), 'and the metal still goes on');
+});
+
+// ── Raked infill: closing in above the plates ────────────────────────────────
+
+/** Total area of every infill piece ('RK') on one wall, in square feet. */
+const infillArea = (model: { members: readonly { id: string; wall?: string; cutLength: number; actual: { d: number } }[] }, wall: string): number =>
+  model.members
+    .filter((m) => m.id.startsWith('RK-') && m.wall === wall)
+    .reduce((a, m) => a + (m.cutLength / 12) * (m.actual.d / 12), 0);
+
+test('a gable end is CLOSED IN — the triangle above the plate is not left open framing', () => {
+  // What the screenshot showed: siding stopped dead at the cap plate and the whole gable
+  // triangle was bare studs you could see straight through.
+  const model = generateStructure(withCoverings({ siding: 'plywood' }));
+  const W = 16, slope = 4 / 12;
+  // The gable ends are the walls that BUTT BETWEEN the through walls, so the triangle is cut
+  // off a wall thickness at each end: ∫ slope·z dz over the clear run, doubled about the ridge.
+  const t = DRESSED['2x4']!.d / 12;
+  const trueTriangle = slope * ((W / 2) ** 2 - t ** 2);
+  for (const wall of ['E', 'W'] as const) {
+    const got = infillArea(model, wall);
+    assert.ok(
+      Math.abs(got - trueTriangle) / trueTriangle < 0.01,
+      `${wall}: gable infill ${got.toFixed(3)} sf vs triangle ${trueTriangle.toFixed(3)} sf`,
+    );
+  }
+  // The walls the rafters BEAR on have nothing above the plate.
+  for (const wall of ['N', 'S'] as const) {
+    assert.ok(infillArea(model, wall) < 1e-9, `${wall}: a bearing wall has no gable to close in`);
+  }
+});
+
+test('a shed closes in its pony wall and both rakes; a hip has nothing to close in', () => {
+  const base = withCoverings({ siding: 'plywood' });
+  const L = 20, W = 16, slope = 4 / 12;
+
+  const shed = generateStructure({ ...base, roof: { kind: 'shed', risePer12: 4, overhangFt: 1, highSide: 'N' } });
+  // High wall: a pony wall of constant height over a wall that runs the full length.
+  assert.ok(Math.abs(infillArea(shed, 'N') - L * W * slope) < 1e-6, 'pony wall over the high plate');
+  // The two walls parallel to the slope: a right triangle rising to the high side, over the
+  // clear run between the through walls. The profile is linear, so the strips are EXACT.
+  const t = DRESSED['2x4']!.d / 12;
+  const rake = (slope * ((W - t) ** 2 - t ** 2)) / 2;
+  for (const wall of ['E', 'W'] as const) {
+    assert.ok(Math.abs(infillArea(shed, wall) - rake) < 1e-6, `${wall}: rake infill ${infillArea(shed, wall)} vs ${rake}`);
+  }
+  assert.ok(infillArea(shed, 'S') < 1e-9, 'the low wall stops at its plate');
+
+  // A hip brings all four slopes down to the plate — nothing above it anywhere. This is the
+  // case that proves the profiles are the roof's geometry and not a blanket rule.
+  const hip = generateStructure({ ...base, roof: { kind: 'hip', risePer12: 4, overhangFt: 1 } });
+  assert.equal(hip.members.filter((m) => m.id.startsWith('RK-')).length, 0, 'a hip has no infill');
+});
+
+test('infill is cut to the rake, never above it, and carries the wall’s own material', () => {
+  for (const [siding, role] of [['plywood', 'siding'], ['boardAndBatten', 'sidingBoard'], ['boards', 'siding']] as const) {
+    const model = generateStructure(withCoverings({ siding }));
+    const pieces = model.members.filter((m) => m.id.startsWith('RK-'));
+    assert.ok(pieces.length > 0, `${siding}: nothing closed in`);
+    for (const m of pieces) {
+      assert.equal(m.role, role, `${siding}: ${m.id} is not the wall's own material`);
+      // Nothing pokes above the ridge: plate top (8 ft) + the gable rise.
+      const top = m.position[1] + (role === 'siding' && siding === 'plywood' ? m.actual.d / 12 : m.cutLength / 12) / 2;
+      assert.ok(top <= 8 + (16 / 2) * (4 / 12) + 1e-6, `${m.id} stands ${top.toFixed(2)} ft — above the ridge`);
+    }
+  }
 });
 
 test('coverings default to none, so the compat path never sees them', () => {
