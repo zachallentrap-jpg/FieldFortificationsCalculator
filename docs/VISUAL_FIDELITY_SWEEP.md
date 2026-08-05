@@ -44,6 +44,7 @@ screenshots get read.
 | **Skid foundation** | **Fixed** — the runners floated 8 in above the ground with the floor buried beneath them, and ran through every joist they crossed. |
 | **Members emitted twice in the same place** | **Fixed** — 12 duplicate posts across three families. **Invisible in the render**; 96.5 board feet of phantom stock on the cut list. |
 | **Latrine — the riser box** | **Fixed** — the one feature that makes the building a latrine was a solid bench. `seats` sized the dividers and cut no seats. |
+| **Crib bunker — the entrance baffle** | **Fixed** — it started at the doorway's CENTRE, leaving two feet of a five-foot opening with a clear straight line in. |
 
 ## The shed that had no walls above the plate
 
@@ -562,6 +563,41 @@ signed area rather than trusted.
 Checked at the same time and NOT defects: the box closes properly (lid on the front board, front
 board and dividers to the floor, no gaps), the seat height is 16.8 in, the bays are even, and the
 other five huts share the generator and correctly get no box at all.
+
+## A baffle you could see straight past
+
+The crib bunker had never been rendered in this sweep. Most of it holds up — but the entrance
+baffle, the one piece of that structure with a single job, was not doing it.
+
+    const baffleZ0 = outerW / 2 - jambT;
+
+`outerW / 2` is the MIDDLE of the doorway, not its edge. The baffle covered the outer half and
+left the inner half open: **two feet of a five-foot opening with a clear straight line in from
+outside**, on a survivability structure. And the generator has said this since the day it was
+written, four lines above the bug:
+
+> A short wall standing off the doorway, **overlapping it far enough that you cannot see or shoot
+> straight in**.
+
+That is the third defect in three iterations found by reading what the code says it does and then
+checking whether it did — the bird's mouth, the latrine's seats, and now this. The comments in
+this repo are unusually good, and that turns out to cut both ways: a comment describing the
+intended behaviour is a test nobody ran.
+
+The rule is now stated so it can be tested: cover the doorway **jamb to jamb**, and run past the
+far jamb by the standoff distance so the 45° sightline round that end is shut too. The near end
+stays open, and that is not a gap — it is the way in. You come down the slot between the baffle
+and the wall and turn through the door.
+
+The regression test asserts the sightline rather than the arithmetic, and it measures the standoff
+off the POSTS: the lagging hangs on their outer face, half a post further out, and measuring there
+would demand the baffle be longer than its own rule asks for. (It caught me doing exactly that on
+the first run.)
+
+**Checked at the same time and NOT defects.** The soil ghost — which I first misread in an iso
+view as a slab floating off to one side — is exactly right: 2 ft thick, the full footprint, its
+underside on the roof deck, translucent and unlit so it can never be mistaken for something built.
+The cribwork walls, the cap beams, the overhead stringers and the deck all close properly.
 
 ## Next targets, unchecked
 

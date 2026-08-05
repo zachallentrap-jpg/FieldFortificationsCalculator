@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateStructure } from '../src/timber/families/index';
-import { familyById } from '../src/timber/catalog';
+import { familyById, FAMILY_TABLE } from '../src/timber/catalog';
 import { stringerFor } from '../src/timber/families/bunker';
 import { generateCribWall, cribCourseCount } from '../src/timber/subsystems/cribwork';
 import { BUNKER } from '../src/timber/doctrine';
@@ -91,5 +91,47 @@ test('both wall types build, and both carry an overhead', () => {
     assert.ok(roles.has('ohcStringer'), `${wallType}: no stringers`);
     assert.ok(roles.has('capBeam'), `${wallType}: no caps`);
     assert.ok(roles.has(wallType === 'crib' ? 'cribLog' : 'post'), `${wallType}: no wall`);
+  }
+});
+
+test('the entrance baffle actually blocks the entrance', () => {
+  // The generator has always said "overlapping it far enough that you cannot see or shoot
+  // straight in", and it started the baffle at `outerW / 2` — the MIDDLE of the doorway, not its
+  // edge. The outer half was covered and the inner half was a clear straight line in: two feet
+  // of a five-foot opening, on a survivability structure whose baffle has exactly one job.
+  //
+  // Asserted as the sightline, not as the arithmetic: a ray straight out through any point of
+  // the opening has to hit the baffle.
+  const spec = { ...(FAMILY_TABLE.find((f) => f.id === 'crib-bunker')!.preset as object), entrance: 'baffle' };
+  const model = generateStructure(spec as Parameters<typeof generateStructure>[0]);
+  const baffle = model.members.filter((m) => m.role === 'baffleWall');
+  assert.ok(baffle.length > 0, 'no baffle at all');
+
+  const header = model.members.find((m) => m.role === 'header');
+  assert.ok(header, 'no header — where is the doorway?');
+  const doorZ0 = header.position[2] - header.cutLength / 24;
+  const doorZ1 = header.position[2] + header.cutLength / 24;
+
+  // The baffle's own extent, from the lagging that spans it.
+  const lag = baffle.filter((m) => Math.abs(Math.abs(m.rotation[1]) - Math.PI / 2) < 1e-6);
+  assert.ok(lag.length > 0, 'the baffle has posts but nothing across them');
+  const bz0 = Math.min(...lag.map((m) => m.position[2] - m.cutLength / 24));
+  const bz1 = Math.max(...lag.map((m) => m.position[2] + m.cutLength / 24));
+
+  assert.ok(bz0 <= doorZ0 + 1e-9, `baffle starts at ${bz0}, doorway opens at ${doorZ0} — ${((bz0 - doorZ0) * 12).toFixed(1)} in of it is in the open`);
+  assert.ok(bz1 >= doorZ1 - 1e-9, `baffle ends at ${bz1}, doorway runs to ${doorZ1}`);
+  // And past the far jamb by the standoff, so the diagonal round that end is shut as well. The
+  // standoff is measured off the POSTS — the lagging hangs on their outer face, half a post
+  // further out, and using that would demand the baffle be longer than its own rule asks for.
+  const posts = baffle.filter((m) => Math.abs(Math.abs(m.rotation[2]) - Math.PI / 2) < 1e-6);
+  assert.ok(posts.length >= 2, 'a free-standing baffle needs posts');
+  const stand = Math.abs(posts[0]!.position[0]);
+  assert.ok(bz1 - doorZ1 >= stand - 1e-9, `only ${(bz1 - doorZ1).toFixed(2)} ft past the far jamb for a ${stand} ft standoff`);
+
+  // It stands OFF the wall — a baffle flat against the doorway is a door, not a baffle — and it
+  // reaches the ground and the full clear height.
+  assert.ok(stand > 1, `the baffle is only ${stand} ft off the wall`);
+  for (const p of posts) {
+    assert.ok(Math.abs(p.position[1] - p.cutLength / 24) < 1e-9, `${p.id} does not reach the ground`);
   }
 });

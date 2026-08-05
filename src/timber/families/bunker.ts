@@ -273,8 +273,18 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
     // A short wall standing off the doorway, overlapping it far enough that you cannot see or
     // shoot straight in. Posts to the ground, lagging across them — the same two pieces the
     // bunker's own walls are made of, so it reads as part of the same structure.
-    const baffleZ0 = outerW / 2 - jambT;
-    const baffleZ1 = Math.min(outerW, baffleZ0 + offset * 1.5);
+    //
+    // IT STARTED AT THE DOORWAY'S CENTRE. `outerW / 2` is the middle of the opening, not its
+    // edge, so the baffle covered the outer half and left the inner half — two feet of a
+    // five-foot doorway — with a clear straight line in from outside. The comment above has said
+    // "you cannot see or shoot straight in" since the day it was written, and you could.
+    //
+    // The rule now, stated so it can be tested: cover the doorway from JAMB to JAMB, and run
+    // past the far jamb by the standoff distance so the 45° sightline round the far end is shut
+    // too. The near end stays open — that is not a gap, that is the way in: you come down the
+    // slot between the baffle and the wall and turn through the door.
+    const baffleZ0 = outerW / 2 - doorWidth / 2 - jambT;
+    const baffleZ1 = outerW / 2 + doorWidth / 2 + jambT + offset;
     const run = baffleZ1 - baffleZ0;
     const posts = Math.max(2, Math.round(run / postSpacing) + 1);
     for (let i = 0; i < posts; i++) {
