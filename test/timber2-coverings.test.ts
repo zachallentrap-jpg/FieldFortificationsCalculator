@@ -326,6 +326,35 @@ test('infill is cut to the rake, never above it, and carries the wall’s own ma
   }
 });
 
+test('siding stands off sheathing by the SHEATHING’s thickness, in every combination', () => {
+  // The standoff came from `PANEL.sidingThickIn` whatever the sheathing was. That is right for
+  // plywood (½ in) and wrong for boards (¾), so board sheathing held the siding out by half an
+  // inch and the siding sat a QUARTER INCH INSIDE it — two skins in the same quarter inch, on
+  // every wall, from a constant that happened to be correct for one of the two choices.
+  for (const wallSheathing of ['plywood', 'boards'] as const) {
+    for (const siding of ['plywood', 'boards', 'boardAndBatten'] as const) {
+      const model = generateStructure(withCoverings({ wallSheathing, siding }));
+      for (const wall of ['S', 'N', 'E', 'W'] as const) {
+        const sheath = model.members.find((m) => m.role === 'sheathingPanel' && m.wall === wall);
+        const skin = model.members.find((m) => (m.role === 'siding' || m.role === 'sidingBoard') && m.wall === wall);
+        assert.ok(sheath && skin, `${wallSheathing}/${siding} on ${wall}: both layers must exist`);
+        // Along the wall's outward normal: how far each layer's faces are from the wall plane.
+        // Both layers carry their thickness in `actual.w`, so the inner face of the outer layer
+        // must land exactly on the outer face of the inner one.
+        const axis = wall === 'S' || wall === 'N' ? 2 : 0;
+        const dir = Math.sign(skin!.position[axis]! - sheath!.position[axis]!) || 1;
+        const sheathOuter = sheath!.position[axis]! + dir * (sheath!.actual.w / 12 / 2);
+        const skinInner = skin!.position[axis]! - dir * (skin!.actual.w / 12 / 2);
+        assert.ok(
+          Math.abs(skinInner - sheathOuter) < 1e-9,
+          `${wallSheathing} + ${siding} on ${wall}: layers overlap/gap by `
+          + `${((skinInner - sheathOuter) * dir * 12).toFixed(3)} in`,
+        );
+      }
+    }
+  }
+});
+
 test('coverings default to none, so the compat path never sees them', () => {
   const model = generateStructure(specFromBuildingInput(demo));
   for (const role of ['siding', 'sheathingPanel', 'roofingCourse', 'batten', 'sidingBoard', 'purlin'] as const) {

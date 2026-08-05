@@ -232,9 +232,7 @@ export function generateInfillCovering(input: InfillCoveringInput): Member[] {
     const plywood = kind === 'plywood';
     const boardNominal = SIDING.boardNominal.value as string;
     const moduleFt = plywood ? (PANEL.widthFt.value as number) : DRESSED[boardNominal]!.d / IN_PER_FT;
-    const thick = plywood
-      ? (PANEL.sidingThickIn.value as number) / IN_PER_FT
-      : DRESSED[boardNominal]!.w / IN_PER_FT;
+    const thick = wallLayerThicknessFt(kind);
     for (const t of tileRakedInfill(s.runFt, s.topAt, moduleFt)) {
       const uMid = (t.u0 + t.u1) / 2;
       const out = s.faceOffsetFt + standoffFt + thick / 2;
@@ -307,6 +305,24 @@ function wallTilePlacement(
   };
 }
 
+/**
+ * How thick ONE layer of wall covering is — which is also the standoff the next layer out has
+ * to clear.
+ *
+ * It exists because that second sentence was not true. `generateBuilding` computed the siding's
+ * standoff over sheathing as `PANEL.sidingThickIn` no matter what the sheathing WAS, so board
+ * sheathing — ¾ in, not ½ — held the siding out by only half an inch and the siding sat a
+ * quarter-inch INSIDE it. Two skins occupying the same quarter inch, on every wall of the
+ * building, from a constant that happened to be right for one of the two choices.
+ *
+ * One function answers it now, and every layer asks the same one.
+ */
+export function wallLayerThicknessFt(kind: 'plywood' | 'boards' | 'boardAndBatten'): number {
+  return kind === 'plywood'
+    ? (PANEL.sidingThickIn.value as number) / IN_PER_FT
+    : DRESSED[SIDING.boardNominal.value as string]!.w / IN_PER_FT;
+}
+
 export function generateWallCovering(input: WallCoveringInput): Member[] {
   const emit = makeEmitter('CV');
   const { surfaces, kind, role, stage, standoffFt } = input;
@@ -315,7 +331,7 @@ export function generateWallCovering(input: WallCoveringInput): Member[] {
     const cutouts: Rect[] = s.cutouts.map((c) => ({ u0: c.u0, u1: c.u1, v0: c.v0, v1: c.v1 }));
 
     if (kind === 'plywood') {
-      const thick = (PANEL.sidingThickIn.value as number) / IN_PER_FT;
+      const thick = wallLayerThicknessFt('plywood');
       const sheetW = PANEL.widthFt.value as number;
       const sheetH = PANEL.lengthFt.value as number;
       // Sheets stand on end (4 ft wide, 8 ft tall) so joints land on studs.
@@ -344,7 +360,7 @@ export function generateWallCovering(input: WallCoveringInput): Member[] {
     // check catches exactly that: a third of a square foot per wall, invisible by eye.)
     const boardNominal = SIDING.boardNominal.value as string;
     const boardW = DRESSED[boardNominal]!.d / IN_PER_FT;
-    const boardT = DRESSED[boardNominal]!.w / IN_PER_FT;
+    const boardT = wallLayerThicknessFt('boards');
     const seams: number[] = [];
     for (let u = 0; u < s.runFt - EPS; u += boardW) {
       const u1 = Math.min(u + boardW, s.runFt);

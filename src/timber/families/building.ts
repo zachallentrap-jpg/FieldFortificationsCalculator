@@ -24,7 +24,7 @@ import { generateWalls, type Opening } from '../walls';
 import { generateRoof } from '../roof';
 import { wallContract, type WallsContract } from '../subsystems/wallSystem';
 import { roofPlanes, generateShed, generatePurlins, generateHip, wallInfillProfiles } from '../subsystems/roofFamilies';
-import { generateRoofCovering, generateWallCovering, generateInfillCovering, generateSkids, generateSlabOnGrade, type InfillSurface } from '../subsystems/coverings';
+import { generateRoofCovering, generateWallCovering, generateInfillCovering, generateSkids, generateSlabOnGrade, wallLayerThicknessFt, type InfillSurface } from '../subsystems/coverings';
 import { generateFloorOnBearings, joistNominalFor } from '../subsystems/floorSystem';
 import { LUMBER, PANEL, FOUNDATION, IN_PER_FT } from '../doctrine';
 import { headerForSpan } from '../normalize';
@@ -269,8 +269,11 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
     );
   }
   if (spec.coverings.siding !== 'none') {
+    // The standoff is the SHEATHING's own thickness, not the siding's. Board sheathing is ¾ in
+    // where plywood is ½, and holding the siding out by the wrong one buried it a quarter inch
+    // inside the layer it is nailed to.
     const sheathingThick = spec.coverings.wallSheathing !== 'none'
-      ? (PANEL.sidingThickIn.value as number) / IN_PER_FT
+      ? wallLayerThicknessFt(spec.coverings.wallSheathing === 'boards' ? 'boards' : 'plywood')
       : 0;
     const kind = spec.coverings.siding === 'boardAndBatten' ? 'boardAndBatten'
       : spec.coverings.siding === 'boards' ? 'boards' : 'plywood';

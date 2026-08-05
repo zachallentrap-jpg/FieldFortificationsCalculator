@@ -29,6 +29,7 @@ screenshots get read.
 | Building — flat roof at 1:12 | **Checked, clean.** Nothing wrong. Pony studs exactly span×slope, rafters at atan(1/12) and the right length, deck above the rafters, walls closed in. |
 | Building — continuous-wall foundation | **Checked, clean.** Nothing wrong. Every bearing exact to 0.0000: posts on pads, walls on strip footings, sills on walls, girder on posts. |
 | **Openings vs. the plates they sit under** | **Fixed** — the storage shed's door header ran 1¾ in through the top plate, and the guard shack had three more. |
+| **Sheathing under siding** — the two-layer standoff | **Fixed** — over board sheathing the siding sat a quarter inch inside it, on every wall. |
 
 ## The shed that had no walls above the plate
 
@@ -170,11 +171,26 @@ shack's door past its wall. And `defaultOpenings` now places a window sill that 
 is going into: the window's SIZE is doctrine and does not move, but where the default sill sits is
 the generator's choice, and a default that cannot be built is not a default.
 
+## Two skins in the same quarter inch
+
+Sheathing and siding had never been rendered together. Measured across all four combinations,
+plywood-under-anything was exact and **board sheathing was a quarter inch out**: the siding sat
+INSIDE the layer it is nailed to, on every wall of the building.
+
+The cause is worth naming because it is not a geometry mistake. `generateBuilding` computed the
+siding's standoff as `PANEL.sidingThickIn` — a constant that is correct for plywood sheathing
+(½ in) and wrong for boards (¾). Nothing was miscalculated; the wrong quantity was consulted, and
+it agreed with the right one in the case anyone had looked at.
+
+`wallLayerThicknessFt` now answers "how thick is one layer of this" once, and the sheet tiler,
+the board tiler, the raked infill and the standoff all ask it. That is the actual fix — a single
+constant two call sites can disagree about is the bug, not the quarter inch it produced.
+
 ## Next targets, unchecked
 
 - Skid foundation (rendered incidentally with the storage shed, not examined on its own).
 - The `openFront` storage-shed variant — posts and a header instead of a wall.
 - Partitions (`spec.partitions`) and the B-hut's interior division.
-- Wall sheathing UNDER siding — the two-layer standoff, never rendered together.
+- Building paper between deck and roofing — the same layering question on the roof.
 - Pyramid roof on a building (the tower cab uses it; a building never has been rendered with one).
 - Board-and-batten and board siding at the rake (the infill path renders them, unphotographed).
