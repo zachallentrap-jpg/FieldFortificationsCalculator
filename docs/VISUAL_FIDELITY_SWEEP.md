@@ -30,6 +30,7 @@ screenshots get read.
 | Building — continuous-wall foundation | **Checked, clean.** Nothing wrong. Every bearing exact to 0.0000: posts on pads, walls on strip footings, sills on walls, girder on posts. |
 | **Openings vs. the plates they sit under** | **Fixed** — the storage shed's door header ran 1¾ in through the top plate, and the guard shack had three more. |
 | **Sheathing under siding** — the two-layer standoff | **Fixed** — over board sheathing the siding sat a quarter inch inside it, on every wall. |
+| **Building paper / felt under the roofing** | **Fixed** — the option was accepted and ignored; no felt was ever emitted, and no way to ask for it. |
 
 ## The shed that had no walls above the plate
 
@@ -186,11 +187,31 @@ it agreed with the right one in the case anyone had looked at.
 the board tiler, the raked infill and the standoff all ask it. That is the actual fix — a single
 constant two call sites can disagree about is the bug, not the quarter inch it produced.
 
+## An option that was accepted and ignored
+
+`spec.coverings.buildingPaper` reached `generateRoofCovering` as a declared input field, was
+never destructured, and emitted nothing. Around that hole, every other part of the feature was
+already in place: `ROOFING.feltWidthIn` and `feltLapIn` in doctrine (unused), the `felt` role in
+the type union (never emitted) with the label *"Underlayment between deck and roofing"*, the
+portrait renderer and the worksheet omit-set both handling it — and this module's own header
+claiming felt was among the things it generates. Everything existed except the part that makes
+it exist. There was also no control anywhere to turn it on.
+
+Felt is now laid: 36-in courses lapping 2 in, from the eave up, banded across a hip's taper the
+same way the roofing is, with the roofing and the ridge caps lifted onto it. The panel offers it
+wherever there is a deck to lay it on.
+
+Two details worth keeping. The lap is real material, so the felt bills about 6% MORE than the
+roof's area — which is the point of modelling the lap rather than the coverage. And the roofing's
+lift is measured **square to the slope**, so its vertical rise is the felt's thickness times
+cos(pitch); the test asserts that rather than the plain thickness, which would pass on a flat
+roof and would not tell a layer stacked along the normal from one nudged straight up.
+
 ## Next targets, unchecked
 
 - Skid foundation (rendered incidentally with the storage shed, not examined on its own).
 - The `openFront` storage-shed variant — posts and a header instead of a wall.
 - Partitions (`spec.partitions`) and the B-hut's interior division.
-- Building paper between deck and roofing — the same layering question on the roof.
+- Weather barrier BEHIND THE SIDING — the `buildingPaper` role's own label promises it and nothing emits it.
 - Pyramid roof on a building (the tower cab uses it; a building never has been rendered with one).
 - Board-and-batten and board siding at the rake (the infill path renders them, unphotographed).

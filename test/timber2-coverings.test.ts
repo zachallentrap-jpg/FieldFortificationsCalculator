@@ -355,6 +355,44 @@ test('siding stands off sheathing by the SHEATHING’s thickness, in every combi
   }
 });
 
+test('building paper lays felt between the deck and the roofing, and lifts the roofing onto it', () => {
+  // `buildingPaper` was accepted by generateRoofCovering's input type, never destructured, and
+  // never emitted. ROOFING.feltWidthIn and feltLapIn sat unused in doctrine, the `felt` role sat
+  // unused in the union with the label "Underlayment between deck and roofing", and this
+  // module's header claimed felt was among the things it generates. Every part existed except
+  // the part that makes it exist.
+  const off = generateStructure(withCoverings({ roofDeck: 'plywood', roofing: 'roll' }));
+  assert.equal(off.members.filter((m) => m.role === 'felt').length, 0, 'felt is opt-in');
+
+  const on = generateStructure(withCoverings({ roofDeck: 'plywood', roofing: 'roll', buildingPaper: true }));
+  const felt = on.members.filter((m) => m.role === 'felt');
+  assert.ok(felt.length > 0, 'asking for building paper must put felt on the roof');
+
+  // The roofing rides ON the felt: every course moves up by the felt's thickness measured
+  // SQUARE TO THE ROOF, so the vertical rise is that times cos(pitch). Asserting the plain
+  // thickness would pass only on a flat roof, and would not distinguish a layer stacked along
+  // the slope normal from one nudged straight up.
+  const feltThick = 0.05 / 12; // ROOFING.feltThickIn, in feet
+  const rise = feltThick * Math.cos(Math.atan(4 / 12)); // the demo roof's pitch
+  const courseOff = off.members.filter((m) => m.role === 'roofingCourse');
+  const courseOn = on.members.filter((m) => m.role === 'roofingCourse');
+  assert.equal(courseOn.length, courseOff.length, 'felt must not change how the roofing is cut');
+  for (let i = 0; i < courseOff.length; i++) {
+    const got = courseOn[i]!.position[1] - courseOff[i]!.position[1];
+    assert.ok(Math.abs(got - rise) < 1e-9, `course ${i} rose ${got}, not the felt's ${rise} square to the slope`);
+  }
+
+  // Laps are real material: felt covers MORE than the roof's area, by roughly the lap fraction
+  // (36-in courses lapping 2 in ⇒ about 6% more), and nowhere near double.
+  const roofArea = on.members
+    .filter((m) => m.role === 'roofPanel')
+    .reduce((a, m) => a + (m.cutLength / 12) * (m.actual.d / 12), 0);
+  const feltArea = felt.reduce((a, m) => a + (m.cutLength / 12) * (m.actual.d / 12), 0);
+  assert.ok(feltArea > roofArea * 0.98, `felt ${feltArea.toFixed(1)} sf does not cover the roof's ${roofArea.toFixed(1)} sf`);
+  assert.ok(feltArea < roofArea * 1.2, `felt ${feltArea.toFixed(1)} sf is far past the roof's ${roofArea.toFixed(1)} sf`);
+  for (const f of felt) assert.ok(Math.abs(f.actual.w - 0.05) < 1e-9, `${f.id}: felt is a sheet, not a board`);
+});
+
 test('coverings default to none, so the compat path never sees them', () => {
   const model = generateStructure(specFromBuildingInput(demo));
   for (const role of ['siding', 'sheathingPanel', 'roofingCourse', 'batten', 'sidingBoard', 'purlin'] as const) {

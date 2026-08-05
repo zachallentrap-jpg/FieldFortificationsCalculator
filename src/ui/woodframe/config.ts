@@ -363,6 +363,19 @@ export function configSchemaFor(familyId: FamilyId): PanelSchema {
       optionLabels: labelsFor(options, key === 'coverings.roofing' ? ROOFING_LABELS : COVERING_LABELS),
     });
   }
+  // Felt under the roofing. A real choice with a real line on the bill, and until now no way to
+  // make it: the spec carried the field, the engine ignored it, and the panel never offered it.
+  // Only worth asking about once there is a deck to lay it on.
+  if (family.coverings.roofDeck && family.coverings.roofDeck.length > 0) {
+    skin.push({
+      path: 'coverings.buildingPaper',
+      label: 'Felt under the roofing',
+      control: 'toggle',
+      help: 'Underlayment between the deck and the roofing, lapped from the eave up.',
+      cite: 'FM 5-426 felt underlayment (PH)',
+      applies: (spec) => ((spec as { coverings?: { roofDeck?: string } }).coverings?.roofDeck ?? 'none') !== 'none',
+    });
+  }
   if (family.specBranch === 'hut') {
     skin.push({
       path: 'screenBand',

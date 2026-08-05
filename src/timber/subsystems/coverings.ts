@@ -451,7 +451,7 @@ export interface RoofCoveringInput {
 
 export function generateRoofCovering(input: RoofCoveringInput): Member[] {
   const emit = makeEmitter('CV');
-  const { planes, deck, roofing, stageDeck, stageRoofing, rafterHalfFt, deckLaidElsewhere } = input;
+  const { planes, deck, roofing, stageDeck, stageRoofing, rafterHalfFt, deckLaidElsewhere, buildingPaper } = input;
   // What is UNDER the roofing, regardless of who put it there. Purlins are emitted by
   // `generatePurlins`, not here — but they are still a deck, and their flat thickness is what
   // holds the roofing off the rafters. Ignoring it left the corrugated sheets at rafter
@@ -479,6 +479,57 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
           nailing: '8d @ 6" edges / 12" field (PH)',
           doctrineRef: citeOf(PANEL.roofDeckThickIn),
         });
+      }
+    }
+  }
+
+  // ── Building paper: felt underlayment between the deck and the roofing.
+  //
+  // THIS WAS ACCEPTED AND IGNORED. `buildingPaper` arrived in this function's input type, was
+  // never destructured, and nothing was ever emitted for it — while `ROOFING.feltWidthIn` and
+  // `feltLapIn` sat unused in doctrine, the `felt` role sat unused in the type union with a
+  // label reading "Underlayment between deck and roofing", and this module's own header claimed
+  // felt was among the things it generates. Every part of the feature existed except the part
+  // that makes it exist.
+  //
+  // Courses run the eave, 36 in wide and lapping 2, laid from the bottom up so each sheds onto
+  // the one below — the same rule as the roofing over it, and the reason the bill wants more
+  // felt than the roof has area.
+  const feltThick = (ROOFING.feltThickIn.value as number) / IN_PER_FT;
+  const paperThick = buildingPaper ? feltThick : 0;
+  if (buildingPaper && (deckThick > 0 || deckLaidElsewhere)) {
+    const feltW = (ROOFING.feltWidthIn.value as number) / IN_PER_FT;
+    const exposure = feltW - (ROOFING.feltLapIn.value as number) / IN_PER_FT;
+    for (const plane of planes) {
+      const courses = Math.max(1, Math.ceil(plane.slopeLengthFt / exposure));
+      for (let c = 0; c < courses; c++) {
+        const v0 = c * exposure;
+        const v1 = Math.min(v0 + feltW, plane.slopeLengthFt);
+        // Banded up the slope on a tapered plane, exactly as the roofing is: a rectangle cannot
+        // be cut on a hip's diagonal, so the course becomes as many pieces as it takes.
+        const taper = Math.abs((planeSpanAt(plane, v0).hi - planeSpanAt(plane, v0).lo)
+          - (planeSpanAt(plane, v1).hi - planeSpanAt(plane, v1).lo));
+        const bands = Math.min(TOLERANCE.maxTaperBands, Math.max(1, Math.ceil(taper / TOLERANCE.hipCapFt)));
+        for (let k = 0; k < bands; k++) {
+          const vb0 = v0 + ((v1 - v0) * k) / bands;
+          const vb1 = v0 + ((v1 - v0) * (k + 1)) / bands;
+          const a = planeSpanAt(plane, vb0);
+          const b = planeSpanAt(plane, vb1);
+          const lo = Math.min(a.lo, b.lo);
+          const hi = Math.max(a.hi, b.hi);
+          if (hi - lo <= TOLERANCE.epsFt) continue;
+          const p = roofTilePlacement(plane, { u0: lo, u1: hi, v0: vb0, v1: vb1 },
+            rafterHalfFt + deckThick + TOLERANCE.surfaceLiftFt + feltThick / 2);
+          emit('felt', `${ROOFING.feltWidthIn.value}-in felt`, {
+            cutLengthFt: hi - lo,
+            position: p.position,
+            rotation: [Math.PI / 2 - p.pitch, p.yaw, 0],
+            stage: stageRoofing,
+            actual: { w: ROOFING.feltThickIn.value as number, d: (vb1 - vb0) * IN_PER_FT },
+            nailing: 'staples or 1-in roofing nails @ 12" (PH)',
+            doctrineRef: `${citeOf(ROOFING.feltWidthIn)} — ${ROOFING.feltLapIn.value}-in lap, laid from the eave up`,
+          });
+        }
       }
     }
   }
@@ -558,7 +609,7 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
           const p = roofTilePlacement(
             plane,
             { u0, u1, v0: vb0, v1: vb1 },
-            rafterHalfFt + deckThick + TOLERANCE.surfaceLiftFt + c * coveringThick + coveringThick / 2,
+            rafterHalfFt + deckThick + paperThick + TOLERANCE.surfaceLiftFt + c * coveringThick + coveringThick / 2,
           );
           emit('roofingCourse', nominal, {
             cutLengthFt: u1 - u0,
@@ -574,7 +625,7 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
       }
     }
     emit.members.push(...generateRidgeCaps(planes, nominal, cite, stageRoofing,
-      rafterHalfFt + deckThick + TOLERANCE.surfaceLiftFt,
+      rafterHalfFt + deckThick + paperThick + TOLERANCE.surfaceLiftFt,
       // A cap is nailed on BOTH sides of the joint it straddles, in the same fastener as the
       // courses under it. Both phrasings below are ones `fasteners.ts` already reads, and that
       // is not a coincidence to preserve by luck: its unparsed-schedule gate failed this file

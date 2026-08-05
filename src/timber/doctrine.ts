@@ -302,6 +302,7 @@ export const ROOFING = {
   capWidthIn: doc(12, 'FM 5-426 ridge and hip cap (PH)', { unit: 'in' }),
   feltWidthIn: doc(36, 'FM 5-426 felt underlayment', { unit: 'in' }),
   feltLapIn: doc(2, 'FM 5-426 felt lap', { unit: 'in' }),
+  feltThickIn: doc(0.05, 'felt underlayment thickness as modeled (15-lb felt lies flat)', { unit: 'in' }),
   squareSf: doc(100, 'roofing square = 100 sf', { unit: 'sf', ph: false }),
 } as const;
 
