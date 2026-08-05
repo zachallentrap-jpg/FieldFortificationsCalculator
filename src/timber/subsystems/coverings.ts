@@ -266,6 +266,38 @@ export function generateInfillCovering(input: InfillCoveringInput): Member[] {
         });
       }
     }
+
+    // THE BATTENS DID NOT COME UP HERE. The wall pass lays a batten over every board joint and
+    // this one laid none, so on a board-and-batten gable every batten stopped dead in a straight
+    // horizontal line at the cap plate and the triangle above it was bare boards — a ribbed wall
+    // under a flat one, and the joint line reads as a seam across the whole end of the building.
+    //
+    // The seams are the module boundaries, the same grid the wall's boards use, so a batten
+    // above the plate lands on the continuation of the board joint below it. Each runs from the
+    // plate up to the true rake AT THE SEAM — between the heights of the two boards it covers.
+    if (kind === 'boardAndBatten') {
+      const battenNominal = SIDING.battenNominal.value as string;
+      const battenT = DRESSED[battenNominal]!.w / IN_PER_FT;
+      const boardT = wallLayerThicknessFt(kind);
+      for (let seam = moduleFt; seam < s.runFt - EPS; seam += moduleFt) {
+        const h = s.topAt(seam);
+        if (h <= TOLERANCE.minSliverFt) continue;
+        const out = s.faceOffsetFt + standoffFt + boardT + battenT / 2;
+        emit('batten', battenNominal, {
+          cutLengthFt: h,
+          position: [
+            s.origin[0] + s.along[0] * seam + s.normal[0] * out,
+            s.baseYFt + h / 2,
+            s.origin[1] + s.along[1] * seam + s.normal[1] * out,
+          ],
+          rotation: [0, Math.atan2(-s.along[1], s.along[0]), Math.PI / 2],
+          stage,
+          wall: s.wall,
+          nailing: '8d @ 12" into the joint (PH)',
+          doctrineRef: `${citeOf(SIDING.battenNominal)} — carried up over the plate to the rake`,
+        });
+      }
+    }
   }
   return emit.members;
 }

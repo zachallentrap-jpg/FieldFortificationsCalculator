@@ -324,7 +324,10 @@ test('infill is cut to the rake, never above it, and carries the wall’s own ma
     const pieces = model.members.filter((m) => m.id.startsWith('RK-'));
     assert.ok(pieces.length > 0, `${siding}: nothing closed in`);
     for (const m of pieces) {
-      assert.equal(m.role, role, `${siding}: ${m.id} is not the wall's own material`);
+      // A batten IS the wall's own material when the wall is board-and-batten — it is the other
+      // half of the pair, and it belongs above the plate for the same reason the boards do.
+      const allowed = siding === 'boardAndBatten' ? [role, 'batten'] : [role];
+      assert.ok(allowed.includes(m.role), `${siding}: ${m.id} is ${m.role}, not the wall's own material`);
       // Nothing pokes above the ridge: plate top (8 ft), the seat lift, and the gable rise.
       const top = m.position[1] + (role === 'siding' && siding === 'plywood' ? m.actual.d / 12 : m.cutLength / 12) / 2;
       const ridge = 8 + rafterSeatLiftFt(DRESSED['2x6']!.d, DRESSED['2x4']!.d, 4 / 12) + (16 / 2) * (4 / 12);
@@ -405,4 +408,45 @@ test('coverings default to none, so the compat path never sees them', () => {
   for (const role of ['siding', 'sheathingPanel', 'roofingCourse', 'batten', 'sidingBoard', 'purlin'] as const) {
     assert.equal(model.members.filter((m) => m.role === role).length, 0, `${role} must be opt-in`);
   }
+});
+
+test('board-and-batten carries its BATTENS above the plate, on the wall’s own joint grid', () => {
+  // WHAT THE SCREENSHOT SHOWED. The wall pass lays a batten over every board joint and the
+  // infill pass laid none, so on a gable end every batten stopped in one straight horizontal
+  // line at the cap plate: a ribbed wall under a flat triangle, with the joint reading as a seam
+  // across the whole end of the building.
+  //
+  // A batten above the plate is only right if it continues the one below it — same joint, same
+  // plane, no gap at the plate — so all three are asserted rather than just the count.
+  const model = generateStructure(withCoverings({ siding: 'boardAndBatten' }));
+  const battens = model.members.filter((m) => m.role === 'batten');
+  const wall = battens.filter((m) => m.id.startsWith('CV-'));
+  const rake = battens.filter((m) => m.id.startsWith('RK-'));
+  assert.ok(wall.length > 0, 'no battens on the walls at all');
+  assert.ok(rake.length > 0, 'the gable triangle has boards but no battens');
+
+  for (const w of ['E', 'W'] as const) {
+    const wb = wall.filter((m) => m.wall === w);
+    const rb = rake.filter((m) => m.wall === w);
+    assert.ok(rb.length > 0, `${w}: no battens above the plate on a gable end`);
+    // Same joint: every rake batten sits on a wall batten's line, to the micron.
+    const lines = new Set(wb.map((m) => m.position[2].toFixed(9)));
+    for (const m of rb) {
+      assert.ok(lines.has(m.position[2].toFixed(9)), `${m.id} is not on a board joint below it`);
+    }
+    // Same plane: over the boards, not floating off them or sunk into them.
+    const planes = new Set([...wb, ...rb].map((m) => m.position[0].toFixed(9)));
+    assert.equal(planes.size, 1, `${w}: the rake battens are not in the wall's batten plane`);
+    // No gap at the plate: the rake batten starts exactly where the wall batten stops.
+    const wallTop = Math.max(...wb.map((m) => m.position[1] + m.cutLength / 24));
+    const rakeBase = Math.min(...rb.map((m) => m.position[1] - m.cutLength / 24));
+    assert.ok(Math.abs(wallTop - rakeBase) < 1e-9, `${w}: ${(rakeBase - wallTop) * 12} in of gap at the plate`);
+  }
+  // The walls the rafters BEAR on have no triangle, so no battens above them either.
+  for (const w of ['N', 'S'] as const) {
+    assert.equal(rake.filter((m) => m.wall === w).length, 0, `${w}: a bearing wall has no rake to batten`);
+  }
+  // And plain board siding gets none — a batten is half of a PAIR, not a decoration.
+  const plain = generateStructure(withCoverings({ siding: 'boards' }));
+  assert.equal(plain.members.filter((m) => m.role === 'batten').length, 0, 'plain boards grew battens');
 });

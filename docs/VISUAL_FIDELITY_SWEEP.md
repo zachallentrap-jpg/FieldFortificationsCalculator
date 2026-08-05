@@ -38,6 +38,7 @@ screenshots get read.
 | **Picker & flashcard portraits** | **Improved, not solved** — the painter sorted polygons by their CENTRE; long members painted over the sheets covering them. |
 | **Rafter-to-plate seat (bird's mouth)** | **Fixed** — the notch is cut, and the roof plane it needed was 1¾ in low on every roof in the catalog. |
 | **Shed roof — the high (pony) wall** | **Fixed** — the pony wall had no plate at all: its studs stood free and the rafters ran 1.4 in into their bare ends. |
+| **Board-and-batten at the rake** | **Fixed** — every batten stopped dead in a straight line at the cap plate; the gable triangle was bare boards. |
 
 ## The shed that had no walls above the plate
 
@@ -382,10 +383,38 @@ Checked after the fix across four shed orientations (N/S/E/W high), a flat roof,
 every rafter notched at every plate it bears on, zero corners left inside a plate, no profile that
 doubles back.
 
+## Every batten stopped at the plate
+
+Board-and-batten is a PAIR: vertical boards, and a batten over each joint. The wall pass lays
+both. The infill pass — everything above the cap plate — laid only the boards. So on a gable end
+the wall below the plate was ribbed and the triangle above it was flat, with **every batten in the
+building ending on the same horizontal line**. On a 20-ft end that line reads as a seam across the
+whole building, and it was there in the shipped storage-shed preset, which is the one family that
+ships board-and-batten.
+
+The fix is a batten pass in the infill generator, and the thing worth getting right is that a
+batten above the plate is only correct if it CONTINUES the one below it. Three claims, all tested
+rather than assumed:
+
+- **Same joint.** The seams are the module boundaries, which is the same grid the wall's boards
+  use, so every rake batten lands on the continuation of a board joint below it — 25 of 25 on
+  each gable end, to the micron.
+- **Same plane.** Standoff is `faceOffset + standoff + boardThickness + battenThickness/2`, so
+  the batten's inner face lands exactly on the boards' outer face rather than floating off them
+  or sinking into them.
+- **No gap at the plate.** The wall batten's top and the rake batten's base are both 8.00000.
+
+Each runs from the plate up to the true rake AT ITS SEAM — between the heights of the two boards
+it covers — and seams whose rake height is under a sliver (the last few at each corner, where the
+triangle closes) get none, which is what happens on site.
+
+Checked at the same time and NOT a defect: the rake boards themselves already line up with the
+wall's boards, because the raked tiler's outer loop steps by the board width and only ever
+subdivides WITHIN a module. Plain board siding correctly gets no battens.
+
 ## Next targets, unchecked
 
 - **The portrait painter's residual errors** — the real fix is a depth buffer (rasterise per pixel), or drawing only the outermost skin for a finished building.
 - Skid foundation (rendered incidentally with the storage shed, not examined on its own).
 - Weather barrier BEHIND THE SIDING — the `buildingPaper` role's own label promises it and nothing emits it.
 - Pyramid roof on a building (the tower cab uses it; a building never has been rendered with one).
-- Board-and-batten and board siding at the rake (the infill path renders them, unphotographed).
