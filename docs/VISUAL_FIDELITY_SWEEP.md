@@ -42,6 +42,7 @@ screenshots get read.
 | **Pyramid roof on a building** | **Fixed** — no generator framed it, so a shared link produced a plank of roofing hanging in mid-air over an open building. |
 | **Dead stops on the stage scrubber** | **Fixed** — five plans advertised stages nothing would ever build; and the issues panel had never spoken on load at all. |
 | **Skid foundation** | **Fixed** — the runners floated 8 in above the ground with the floor buried beneath them, and ran through every joist they crossed. |
+| **Members emitted twice in the same place** | **Fixed** — 12 duplicate posts across three families. **Invisible in the render**; 96.5 board feet of phantom stock on the cut list. |
 
 ## The shed that had no walls above the plate
 
@@ -496,6 +497,39 @@ measurement was wrong. The helper in the regression test spells the convention o
 0.3 ft — true when they stand on the earth beside a buried runner, false when they bear on its
 top. It asserts the physical claim now: the post's underside is exactly the bearing surface,
 whichever base it is.
+
+## Twelve posts that were never there — and a finding the render could not show
+
+The skid work left behind a general check — solid overlap between members — so this pass ran it
+across the whole catalog rather than picking a target by eye. Most of what it reported was
+carpentry doing what carpentry does (a let-in brace is LET IN; battered legs and diagonal braces
+have huge axis-aligned boxes that overlap when the members do not), but underneath that noise sat
+something that cannot be argued with: **members emitted twice at exactly the same coordinates**.
+
+Four in the tower, four in the platform, four in the crib bunker — **every one of them at a
+corner**, and all from one cause. A perimeter run places its posts inclusive of both ends, which
+is right for a single edge and wrong for a closed loop: each corner gets one post from the side
+arriving and another from the side leaving. On the bunker those are 6x6 timbers, 6½ ft each.
+
+**96.5 board feet of stock on the cut list that nobody would ever cut**, 65.5 of it heavy timber.
+
+### It does not show in the picture, and that is the point worth recording
+
+Two identical meshes at identical coordinates look exactly like one. I cropped a doubled corner
+post against a single intermediate post at 4× and the outline weight is the same; I went looking
+for a selection artefact — the tint applies per member id, so only one of the two would take it —
+and could not produce one either. **The render is clean. The bill is not.**
+
+Every finding in this log so far arrived through a screenshot. This one could not have. A crew
+orders from the cut list, and the list said four more 6x6 posts than the bunker has holes for.
+
+The fix de-duplicates by POSITION rather than by reasoning about topology: `coveredSpans` can
+split a railing edge around a gate or a ladder, so "is this the end of an edge" does not answer
+"is a post already standing here". Where two posts land on the same spot, there is one post.
+
+The regression test is deliberately blunt — same role, stock, length, position and rotation means
+one member counted twice, with no tolerance and no bounding boxes, so it cannot report a false
+positive. That is what lets it run over the whole catalog unattended.
 
 ## Next targets, unchecked
 

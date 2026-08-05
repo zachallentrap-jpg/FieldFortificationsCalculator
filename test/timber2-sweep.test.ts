@@ -15,6 +15,8 @@ import { thumbnailFor } from '../src/timber/thumbnails';
 import { specToJson } from '../src/timber/normalize';
 import type { BuildingSpec, FoundationSpec, RoofSpec, WallOpenings } from '../src/timber/spec';
 import type { WallId } from '../src/timber/types';
+import type { Member } from '../src/timber/types';
+import { FAMILY_TABLE } from '../src/timber/catalog';
 
 /** mulberry32 — small, fast, and deterministic across runs and platforms. */
 function mulberry32(seed: number): () => number {
@@ -185,4 +187,40 @@ test('the whole sweep runs inside its wall-clock budget', () => {
   for (let i = 0; i < 60; i++) generateStructure(randomSpec(rng));
   const ms = performance.now() - t0;
   assert.ok(ms < 10_000, `60 models took ${ms.toFixed(0)} ms`);
+});
+
+test('no member is emitted twice in the same place — one post per hole', () => {
+  // FOUND BY SWEEP, NOT BY EYE. Coincident duplicates are invisible in a render: two identical
+  // meshes at the same coordinates look exactly like one. They are not invisible on the CUT
+  // LIST, which is what a crew orders and builds from — 96.5 board feet of stock that does not
+  // exist, 65.5 of it 6x6 timber on the crib bunker.
+  //
+  // The cause was the same in all three families: a perimeter run places its posts inclusive of
+  // both ends, which is right for one edge and wrong for a closed loop, so every corner got one
+  // post from the side arriving and another from the side leaving.
+  //
+  // Two members of the same stock, the same length, at the same place and the same angle are one
+  // member counted twice. No tolerance, no bounding boxes — this test cannot report a false
+  // positive, which is why it can be this blunt.
+  const signature = (m: Member): string =>
+    [m.role, m.nominal, m.cutLength.toFixed(6),
+     ...m.position.map((v) => v.toFixed(6)), ...m.rotation.map((v) => v.toFixed(6))].join('|');
+
+  const offenders: string[] = [];
+  for (const fam of FAMILY_TABLE) {
+    const model = generateStructure(fam.preset);
+    const seen = new Map<string, Member[]>();
+    for (const m of model.members) {
+      const k = signature(m);
+      seen.set(k, [...(seen.get(k) ?? []), m]);
+    }
+    for (const group of seen.values()) {
+      if (group.length < 2) continue;
+      const m = group[0]!;
+      offenders.push(
+        `${fam.id}: ${group.length}x ${m.role} ${m.nominal} at (${m.position.map((v) => v.toFixed(2)).join(', ')}) — ${group.map((g) => g.id).join(', ')}`,
+      );
+    }
+  }
+  assert.deepEqual(offenders, [], `members emitted more than once in the same place:\n  ${offenders.join('\n  ')}`);
 });

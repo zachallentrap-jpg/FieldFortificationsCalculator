@@ -124,6 +124,10 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
     [0, 0], [outerL, 0], [outerL, outerW], [0, outerW],
   ];
   if (spec.wallType === 'crib') {
+    // ONE POST PER CORNER. Each side runs its posts inclusive of both ends, so every corner of
+    // the crib got a 6x6 from the side arriving and another from the side leaving — four doubled
+    // posts, 65 board feet of heavy timber on the cut list that does not exist.
+    const setPosts = new Set<string>();
     for (let i = 0; i < 4; i++) {
       const a = corners[i]!;
       const b = corners[(i + 1) % 4]!;
@@ -138,6 +142,10 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       }));
     }
   } else {
+    // ONE POST PER CORNER. Each side runs its posts inclusive of both ends, so every corner of
+    // the crib got a 6x6 from the side arriving and another from the side leaving — four doubled
+    // posts, 65 board feet of heavy timber on the cut list that does not exist.
+    const setPosts = new Set<string>();
     for (let i = 0; i < 4; i++) {
       const a = corners[i]!;
       const b = corners[(i + 1) % 4]!;
@@ -147,9 +155,14 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       const n = Math.max(2, Math.round(run / postSpacing) + 1);
       for (let k = 0; k < n; k++) {
         const d = (run * k) / (n - 1);
+        const px = a[0] + ux * d;
+        const pz = a[1] + uz * d;
+        const spot = `${px.toFixed(6)}|${pz.toFixed(6)}`;
+        if (setPosts.has(spot)) continue;
+        setPosts.add(spot);
         emit('post', postNominal, {
           cutLengthFt: H,
-          position: [a[0] + ux * d, H / 2, a[1] + uz * d],
+          position: [px, H / 2, pz],
           rotation: [0, 0, Math.PI / 2],
           stage: sWall,
           nailing: 'set against the cut face; capped and drift-pinned (PH)',

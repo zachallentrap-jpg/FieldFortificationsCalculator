@@ -60,6 +60,21 @@ export function coveredSpans(edge: RailEdge): [number, number][] {
 
 export function generateRailing(input: RailingInput): Member[] {
   const emit = makeEmitter('RL');
+  // ONE POST PER HOLE. Every edge runs its posts inclusive of both ends, which is right for the
+  // edge and wrong for the perimeter: at each corner the two edges meeting there each set a post,
+  // and the model carried two 4x4s in the same place. Four of them on the platform and four on
+  // the tower — 31 board feet of stock on the cut list that nobody would ever cut.
+  //
+  // De-duplicated by POSITION rather than by clever topology: `coveredSpans` can split an edge
+  // around a gate or a ladder, so "is this the end of an edge" does not answer "is a post
+  // already standing here". Where two posts land on the same spot, there is one post.
+  const placed = new Set<string>();
+  const spotTaken = (x: number, z: number): boolean => {
+    const k = `${x.toFixed(6)}|${z.toFixed(6)}`;
+    if (placed.has(k)) return true;
+    placed.add(k);
+    return false;
+  };
   const { edges, deckY, stage } = input;
   const postNominal = RAIL.postNominal.value as string;
   const memberNominal = RAIL.memberNominal.value as string;
@@ -85,6 +100,7 @@ export function generateRailing(input: RailingInput): Member[] {
       const bays = Math.max(1, Math.ceil(span / maxSpacing));
       for (let i = 0; i <= bays; i++) {
         const [x, z] = at(a + (span * i) / bays);
+        if (spotTaken(x, z)) continue;
         emit('railPost', postNominal, {
           cutLengthFt: topH + DRESSED[postNominal]!.d / IN_PER_FT,
           position: [x, deckY + topH / 2, z],
