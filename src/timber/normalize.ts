@@ -140,9 +140,21 @@ function normalizeBuilding(spec: BuildingSpec, issues: SpecIssue[]): BuildingSpe
     issues.push({ path: 'stories', kind: 'clamped', message: 'A building needs at least one story; added one.', severity: 'warn' });
     stories = [{ wallHeightFt: 8, openings: {} }];
   }
-  if (stories.length > 2) {
-    issues.push({ path: 'stories', kind: 'clamped', message: 'Three or more stories are out of scope; kept the first two.', severity: 'warn' });
-    stories = stories.slice(0, 2);
+  // A SECOND STORY IS NOT BUILT, AND SAYING SO IS THE POINT. `generateBuilding` frames
+  // `stories[0]` and nothing else — the story loop, the second floor bearing on the cap plates
+  // and the interior stairwell are T6b, which the plan parks on its own descope ladder. What
+  // was wrong was not the parking, it was the silence: a two-story spec normalized with ZERO
+  // issues and then generated a model byte-identical to the one-story it was not. The picture,
+  // the cut list and the packet all quietly described a different building than the one asked
+  // for, and nothing anywhere said so. Clamped and warned, like every other out-of-scope input.
+  if (stories.length > 1) {
+    issues.push({
+      path: 'stories',
+      kind: 'clamped',
+      message: 'This engine frames one story; the upper stories were dropped.',
+      severity: 'warn',
+    });
+    stories = stories.slice(0, 1);
   }
 
   const runFor = (w: WallId): number => (w === 'S' || w === 'N' ? lengthFt : widthFt);

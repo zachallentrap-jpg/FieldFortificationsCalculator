@@ -22,6 +22,8 @@ screenshots get read.
 | Building — gable end, closing in | **Fixed** with the same change; the apex needed a second pass (below). |
 | Grade / underside of every structure | **Fixed** — a solid ground slab and a camera floor made undersides unreachable. |
 | Building — **basement foundation + stair** | **Fixed** — the stair stringers ran 6.6 in below the basement slab, through the floor and into the earth. Walls, footings, slab, opening framing, riser count and tread geometry were all correct. |
+| Tent frame — strongback and tent-floor | **Checked, clean.** Nothing wrong. Bent posts stand exactly on the deck top, rafters meet the ridge, collars tie the bents, deck on joists on skids. |
+| Two-story building | **Not a render defect** — a parked feature (T6b). It was being accepted silently, which is fixed; see below. |
 
 ## The shed that had no walls above the plate
 
@@ -65,11 +67,36 @@ blast radius was exactly three members in two cases, because no other foundation
 The existing test had been asserting the length equalled `hypot(runFt, totalRiseFt)` — pinning
 the bug rather than the claim — and now asserts the physical endpoints instead.
 
+## The strongback, which was fine
+
+Rendered from iso and end-on, and the first read of the iso shot looked wrong — the deck seemed
+to sit offset from the bents. It does not. Measured as true AABBs rather than eyeballed:
+deck `x 0..32, y 0.60..0.73, z 0..20`, posts `y 0.73..7.23` standing exactly on the deck top and
+`z 0.19..19.81` inside its edges, rafters closing on the ridge at `y 11.08..11.38`. The apparent
+offset was perspective — an eleven-foot frame over a knee-high deck projects up and away from it.
+The end-on view settles it. Recorded as checked and clean; no change made.
+
+That is worth writing down precisely because the loop's failure mode is inventing a defect to
+justify a commit. A screenshot is where a defect gets NOTICED; the numbers are where it gets
+CONFIRMED, and this one did not survive them.
+
+## The second story nobody was told about
+
+Two stories was never a render defect, because a second story is not built at all: the engine
+frames `stories[0]` and stops. That parking is deliberate — TIMBER2_PLAN scopes the story loop,
+the second-floor bearing and the interior stairwell as T6b, first on its own descope ladder.
+
+The defect was the silence. `normalizeSpec` accepted `stories: [a, b]` with **zero issues**, and
+the model that came out was byte-identical to the one-story it was not — same 321 members, same
+overall height. Every downstream artifact, the render and the cut list and the packet, described
+a different building than the one asked for, and nothing anywhere said so. The clamp that existed
+only caught THREE or more stories, so the one case that could actually be requested passed
+straight through. It now clamps at one and warns, exactly like every other out-of-scope input.
+
 ## Next targets, unchecked
 
-- Two-story building (`walls-l2`) — the second floor's bearing and the stair between them.
-- Continuous-wall foundation.
+- Continuous-wall foundation; slab and skid foundations.
 - Storage shed's wide door header and its jack/king framing at that span.
-- Tent floor and strongback families.
 - Flat roof at its 1:12 drain slope — the covering path at near-zero pitch.
+- Pyramid roof on a building (the tower cab uses it; a building never has been rendered with one).
 - Board-and-batten and board siding at the rake (the infill path renders them, unphotographed).
