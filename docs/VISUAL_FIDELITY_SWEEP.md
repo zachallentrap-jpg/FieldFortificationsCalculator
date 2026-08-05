@@ -46,6 +46,7 @@ screenshots get read.
 | **Latrine — the riser box** | **Fixed** — the one feature that makes the building a latrine was a solid bench. `seats` sized the dividers and cut no seats. |
 | **Crib bunker — the entrance baffle** | **Fixed** — it started at the doorway's CENTRE, leaving two feet of a five-foot opening with a clear straight line in. |
 | Guard shack (8×8, four openings) | **Checked, clean.** Nothing wrong. Its unbraced walls are a documented rule, now pinned by a test. |
+| Squad hut (50 ft — the longest building) | **Checked, clean.** Nothing wrong. Its fifty-foot runs are already handled, by a module I had not read. |
 
 ## The shed that had no walls above the plate
 
@@ -631,6 +632,46 @@ So: not a defect I can substantiate, and I am not going to invent a fix for it. 
 is make the rule VISIBLE — a test that pins the brace count for every shipped family and the angle
 range for every brace placed. The guard shack's zero is now a fact somebody chose rather than one
 nobody noticed, and a family that has bracing today cannot lose it to an opening someone moves.
+
+## The squad hut, and a fix I had to throw away
+
+Second empty iteration in a row, and this one is worth writing up for the mistake rather than the
+result.
+
+The squad hut is 50 ft long — the biggest thing in the catalog — and it renders correctly. Then I
+listed the longest single members in every family and found this:
+
+    squad-hut   sill 2x6 @50ft · girder 2x10 x3 @50ft · solePlate 2x4 @50ft ·
+                topPlate 2x4 @50ft · capPlate 2x4 @49.4ft · ridge 2x8 @50ft · fascia 1x6 @50ft
+
+The cut list duly said **"3 × 2x10 @ 50'-0""**. No yard on earth stocks a fifty-foot 2x10, and
+every shipped building over 20 ft had lines like it. It looked like the biggest bill defect in the
+repo, and the render agreed: 50 ft of unbroken plate with no joint anywhere, where a real wall is
+three or four pieces with staggered joints.
+
+So I added a `maxStockLengthFt` to doctrine, taught `cutList` to report ⌈length / stock⌉ pieces
+per member, surfaced it in the workbench table, and wrote the tests. All of it worked.
+
+**All of it was wrong.** `purchase.ts` — which I had not read — already does this, and does it
+better. It carries real stock lengths `[8, 10, 12, 14, 16]`, packs every cut onto them, and
+separates the over-length runs into their own list with their lineal feet AND their roles. Ten
+long runs on the squad hut, zero on the guard shack. Its comment says exactly why it stops short
+of what I had just built:
+
+> Packing it into bins would print "buy four 16-ft sticks", which happens to be **right for a
+> plate and badly wrong for a girder**, and the tool cannot tell which without a splice rule it
+> does not have.
+
+A built-up girder is three plies with staggered joints and every splice has to land over a post.
+⌈50/16⌉ = 4 is a number, and printing it would have been a confident lie in exactly the case where
+being wrong costs the most. Two tests already pin the behaviour — *"a run longer than any stock is
+surfaced, never silently spliced"* and *"a long run names its roles, so a plate can be told from a
+girder"*.
+
+Reverted, all of it. **The lesson for this log: check whether the thing is already solved
+somewhere you have not looked, BEFORE building the fix — not after.** Nineteen iterations of
+finding real defects makes the twentieth candidate look real too. What made this one different was
+not that the evidence was weaker; it was that the evidence was about a surface I had never opened.
 
 ## Next targets, unchecked
 
