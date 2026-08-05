@@ -49,6 +49,7 @@ screenshots get read.
 | Squad hut (50 ft — the longest building) | **Checked, clean.** Nothing wrong. Its fifty-foot runs are already handled, by a module I had not read. |
 | Weather barrier / building paper | **Already covered** — an earlier pass fixed it (row above). All that is left is a stale help string; see below. |
 | **Hip roof — the four corners** | **Fixed** — every plane stopped over its wall corner while the hip rafters ran on to the true eave corner, so the roof had a square notch at all four corners with a bare hip tail standing in each. |
+| **Hip roof — the common rafters' pitch** | **Fixed** — rotated to a rise measured from the plate over a run measured from the eave, so every common sat 1.84 in proud of the roof at the eave and 1.84 in below the ridge. The jacks and hips were right; only the commons dissented. |
 
 ## The shed that had no walls above the plate
 
@@ -711,11 +712,35 @@ run — which is a stronger statement and one the old geometry fails.
 
 Recovered on a 48 × 20 hip: 12 deck pieces and 26 roofing pieces that were never emitted.
 
+## The hip's common rafters were the wrong pitch
+
+The tan bars recorded as open in the previous pass — short marks lying on both long slopes of a
+finished hip, seen from overhead — were the **common rafters**, standing proud of the roof and
+showing through the roofing. The app's own raycaster named one: from a camera directly above a
+roof with deck and corrugated on it, a `rafter` was still the nearest thing under the cursor.
+
+`generateHip` rotated its commons to `atan2(halfSpan * slope, halfSpan + oh)`. That measures the
+RISE from the wall plate and the RUN from the eave, and the numerator forgets that the eave is
+`oh` further out and therefore `oh * slope` further down. On a 12-ft-wide 4-in-12 hip it gives
+15.945 degrees where the roof is 18.435 — a rise/run of 0.2857 on a 0.3333 roof.
+
+Length and midpoint were always right, so a too-flat rafter pivots about its middle and misses at
+both ends: measured off the model, the eave end sat **1.84 in above** where the jacks and hips land
+on the same eave line, and the ridge end **1.84 in below** the ridge board it is nailed to, with
+0.57 in of horizontal overshoot at each end. Above the plane at the eave is what showed through the
+roofing; below the ridge is a gap nobody would see.
+
+Two things make this a clean catch rather than a judgement call. The **jacks and the hips were
+always right** — jacks use `Math.atan(slope)` and hips correctly use the diagonal — so three member
+families framing one plane disagreed, and only the commons dissented. And the rafter's own
+`angles` block, two lines below the rotation, was already derived from `atan(slope)`: the model and
+the cut list described two different pieces. Both are now asserted.
+
 ## What is still open
 
-- **The eave ticks.** Seen from directly above, a row of short tan marks runs along both long
-  eaves — rafter tails showing between the fascia and the roofing edge. Present in the before and
-  after shots alike, so it is not from this change and is not diagnosed yet. Next target.
+- **The ridge line on a finished hip.** A thin tan line shows along the ridge from overhead even
+  with `ridgeCap` members emitted. Present before and after this change, so not from it, and not
+  diagnosed. Next target.
 - **`buildingPaper` the ROLE.** The felt under the roofing was fixed in an earlier pass and is
   emitted under the `felt` role. `buildingPaper` remains in the role union, the thumbnail paint
   order, the handout list and `portrait.ts`, and nothing emits it. Its help string reads "Weather

@@ -314,3 +314,82 @@ test('THE CORNERS: the fascia runs the whole overhang perimeter', () => {
   assert.ok(Math.abs(total - (2 * (16 + 2 * oh) + 2 * (12 + 2 * oh))) < 1e-6,
     `fascia totals ${total.toFixed(3)} ft, not the eave perimeter`);
 });
+
+// ── The pitch: a rafter's slope is the roof's slope ──────────────────────────
+
+/** A member's two ends in world feet, from its own frame: length is local X, rotation YXZ. */
+function endsOf(mm: { position: readonly number[]; rotation: readonly number[]; cutLength: number }): [number[], number[]] {
+  const ry = mm.rotation[1]!, rz = mm.rotation[2]!;
+  const ax = [Math.cos(rz) * Math.cos(ry), Math.sin(rz), -Math.cos(rz) * Math.sin(ry)];
+  const h = mm.cutLength / 12 / 2;
+  return [
+    mm.position.map((v, i) => v - h * ax[i]!),
+    mm.position.map((v, i) => v + h * ax[i]!),
+  ];
+}
+const riseOverRun = (a: number[], b: number[]) => (b[1]! - a[1]!) / Math.hypot(b[0]! - a[0]!, b[2]! - a[2]!);
+
+test('THE PITCH: a hip\'s commons, jacks and hips all land on ONE eave line', () => {
+  // The commons were rotated to `atan2(halfSpan * slope, halfSpan + oh)` — rise measured from the
+  // wall plate, run measured from the eave. The numerator forgets that the eave is `oh` further
+  // out and so `oh * slope` further down, giving 15.945 degrees on a 4-in-12 roof instead of
+  // 18.435. Length and midpoint were right, so each rafter pivoted about its middle: proud of the
+  // deck at the eave by 1.84 in (visible through the roofing from overhead) and hanging that far
+  // below the ridge board at the top. The jacks and hips were always right, which is the tell —
+  // three members framing one plane must agree, and only the commons dissented.
+  const risePer12 = 4;
+  const slope = risePer12 / 12;
+  const oh = 1;
+  const spec = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset));
+  spec.dims = { lengthFt: 16, widthFt: 12 };
+  spec.roof = { kind: 'hip', risePer12, overhangFt: oh };
+  const model = generateStructure(spec);
+  const pick = (role: string) => model.members.filter((m) => m.role === role);
+
+  const commons = pick('rafter');
+  const jacks = pick('jackRafter');
+  const hips = pick('hipRafter');
+  assert.ok(commons.length > 0 && jacks.length > 0 && hips.length === 4);
+
+  // Every common runs at the roof's own slope, and every jack with it.
+  for (const m of [...commons, ...jacks]) {
+    const [a, b] = endsOf(m);
+    assert.ok(Math.abs(riseOverRun(a, b) - slope) < 1e-9,
+      `${m.id}: rise/run ${riseOverRun(a, b).toFixed(4)}, roof is ${slope.toFixed(4)}`);
+  }
+  // A hip runs the DIAGONAL, so its rise/run is the roof's over root two.
+  for (const m of hips) {
+    const [a, b] = endsOf(m);
+    assert.ok(Math.abs(riseOverRun(a, b) - slope / Math.SQRT2) < 1e-9, `${m.id}: hip pitch`);
+  }
+  // All three land on ONE eave line. That is the property the bug broke.
+  const eaveY = endsOf(hips[0]!)[0]![1]!;
+  for (const m of [...commons, ...jacks, ...hips]) {
+    const low = endsOf(m)[0]!;
+    assert.ok(Math.abs(low[1]! - eaveY) < 1e-9,
+      `${m.id}: its eave end sits ${((low[1]! - eaveY) * 12).toFixed(2)} in off the eave line`);
+  }
+  // And the commons meet the hips at the ridge, at the same point.
+  const ridgeY = endsOf(hips[0]!)[1]![1]!;
+  for (const m of commons) {
+    const high = endsOf(m)[1]!;
+    assert.ok(Math.abs(high[1]! - ridgeY) < 1e-9,
+      `${m.id}: its ridge end sits ${((high[1]! - ridgeY) * 12).toFixed(2)} in off the ridge`);
+    assert.ok(Math.abs(high[2]! - spec.dims.widthFt / 2) < 1e-9, `${m.id}: ridge end missed z = W/2`);
+  }
+});
+
+test('THE PITCH: the rotation and the cut list agree about the same rafter', () => {
+  // Each rafter carries its own plumb and seat cut angles, and those were already derived from
+  // `atan(slope)` while the rotation was not — the model and the cut list described two different
+  // pieces. Whatever else changes, these two must be read off the same number.
+  const spec = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset));
+  spec.roof = { kind: 'hip', risePer12: 6, overhangFt: 1 };
+  for (const m of generateStructure(spec).members.filter((x) => x.role === 'rafter')) {
+    assert.ok(m.angles, `${m.id} has no cut angles`);
+    const fromRotation = (m.rotation[2]! * 180) / Math.PI;
+    assert.ok(Math.abs(fromRotation - m.angles!.seatCut!) < 1e-9,
+      `${m.id}: rotated ${fromRotation.toFixed(3)} deg, cut list says seat ${m.angles!.seatCut}`);
+    assert.ok(Math.abs(fromRotation + m.angles!.plumbCut! - 90) < 1e-9, `${m.id}: plumb + seat != 90`);
+  }
+});

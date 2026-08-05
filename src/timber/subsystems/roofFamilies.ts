@@ -650,6 +650,20 @@ export function generateHip(input: HipInput): Member[] {
   });
 
   // Common rafters along the ridge's length, both slopes.
+  //
+  // A RAFTER'S PITCH IS THE ROOF'S PITCH — `atan(slope)`, the same figure the jacks below use and
+  // the same one the frozen gable path uses. This read `atan2(halfSpan * slope, halfSpan + oh)`,
+  // which measures the RISE from the wall plate and the RUN from the eave: the numerator forgets
+  // that the eave is `oh` further out and therefore `oh * slope` further down. On a 12-ft-wide
+  // 4-in-12 hip that is 15.945 degrees against a true 18.435, and the piece's own `angles` block
+  // two lines below was already reporting the right number — the rotation and the cut list
+  // disagreed about the same rafter.
+  //
+  // Length and midpoint were always right, so a too-flat rafter pivots about its middle: at the
+  // eave it rides 1.84 in ABOVE the roof plane, standing proud of the deck and showing through
+  // the roofing (the tan bars along both long slopes, seen from overhead), and at the ridge it
+  // hangs 1.84 in BELOW the ridge board it is supposed to be nailed to. The jacks and the hips
+  // land on the eave exactly; only the commons floated between them.
   const commonLen = (halfSpan + oh) * lenPerFtRun;
   for (let x = L / 2 - ridgeLen / 2; x <= L / 2 + ridgeLen / 2 + 1e-6; x += spacingFt) {
     for (const side of [-1, 1] as const) {
@@ -657,7 +671,7 @@ export function generateHip(input: HipInput): Member[] {
       emit('rafter', rafterNominal, {
         cutLengthFt: commonLen,
         position: [x, (roofY - oh * slope + ridgeY) / 2, (zEave + W / 2) / 2],
-        rotation: [0, side === -1 ? -Math.PI / 2 : Math.PI / 2, Math.atan2(halfSpan * slope, halfSpan + oh)],
+        rotation: [0, side === -1 ? -Math.PI / 2 : Math.PI / 2, Math.atan(slope)],
         stage,
         angles: { plumbCut: 90 - (Math.atan(slope) * 180) / Math.PI, seatCut: (Math.atan(slope) * 180) / Math.PI },
         nailing: '3-16d at ridge, bird’s-mouth toenail 3-8d (PH)',
