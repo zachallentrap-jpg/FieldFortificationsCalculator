@@ -37,6 +37,7 @@ screenshots get read.
 | **Eave / rafter tails** | **Fixed** — no fascia existed, so every roof ended in a row of raw square-cut rafter ends. |
 | **Picker & flashcard portraits** | **Improved, not solved** — the painter sorted polygons by their CENTRE; long members painted over the sheets covering them. |
 | **Rafter-to-plate seat (bird's mouth)** | **Fixed** — the notch is cut, and the roof plane it needed was 1¾ in low on every roof in the catalog. |
+| **Shed roof — the high (pony) wall** | **Fixed** — the pony wall had no plate at all: its studs stood free and the rafters ran 1.4 in into their bare ends. |
 
 ## The shed that had no walls above the plate
 
@@ -338,9 +339,51 @@ The actual defect was that no rafter in the toolkit had ever had a height above 
 notch could not be cut correctly without finding that, because a notch is the shape of the gap
 between where a rafter is and where it should bear.
 
+## The pony wall that was never a wall
+
+A shed roof's high side is framed as a pony wall — studs above the cap plate making up the height
+difference, so `generateWalls` is never asked for an unequal wall. It had **no plate**. Thirty-seven
+studs stood free at the top, nothing tying them together, and the rafters ran straight over their
+bare ends — **1.4 in INTO them**. The same defect the bird's mouth had just fixed at the low wall,
+except here there was no plate for the notch machinery to find, so nothing could detect it: the
+sweep reported the shed as fully notched because its ONE notch, at the low wall, was fine.
+
+No shipped family uses a shed roof — every one of the fourteen is a gable — so this only ever
+appeared through the Planning UI's roof picker, which offers `shed` on five of them. That is the
+lesson worth keeping: **sweeping the catalog is not sweeping the app.** A preset is one point in a
+configuration space the picker lets an operator move around in.
+
+Three defects at that one joint, and the second two only became visible once the first was fixed:
+
+**The plate, and the height it goes at.** The pony wall's height was `span · slope`. It is
+`(span − plateWidth) · slope`: the seat at the LOW wall lands at its plate's INNER face and the
+seat at the HIGH wall at its OUTER face, so the rise between the two plate tops is one plate short
+of the full span. The old height stood the wall 7/8 in proud of where the rafters wanted to sit.
+Studs are now cut to leave room for the plate, and the plate's top lands exactly on the seat.
+
+**A rafter bears on two plates, and only one was being cut.** `seatCutsFor` kept the DEEPEST
+notch per rafter, which is the right answer for a gable (one bearing, then the ridge) and wrong
+for a shed (low plate and pony plate, identical notches). It returns every notch now, and
+`seatProfile` lays them into the underside in x order, dropping any that would overlap rather
+than folding the outline back on itself — a self-intersecting `THREE.Shape` triangulates into
+stray garbage rather than failing.
+
+**The minimum-notch guard was a full inch.** A plate-wide seat at 3/12 is 7/8 in deep and at 2/12
+is 9/16 in, so the guard meant to reject a rafter merely grazing a plate was throwing away the real
+bird's mouth on every shallow roof — every shed, and any gable under 4/12 — which then went back to
+running through its plate. The floor is a saw kerf, 1/8 in.
+
+And one found on the way, unrelated to bearing: the shed generator placed each rafter's centre by
+subtracting a PERPENDICULAR half-depth and adding back a VERTICAL one. That corrects nothing. It
+left every shed rafter **0.085 in below the roof plane the deck is placed off**, so the sheathing
+floated a sixteenth of an inch clear of the rafters carrying it.
+
+Checked after the fix across four shed orientations (N/S/E/W high), a flat roof, and a 2/12 gable:
+every rafter notched at every plate it bears on, zero corners left inside a plate, no profile that
+doubles back.
+
 ## Next targets, unchecked
 
-- **A shed's pony wall has no cap plate.** The rafters at the high side bear on bare stud ends, so the bird's mouth finds no plate there and leaves them unnotched. Found while sweeping the notch; not chased, because it is a framing change and not a drawing one.
 - **The portrait painter's residual errors** — the real fix is a depth buffer (rasterise per pixel), or drawing only the outermost skin for a finished building.
 - Skid foundation (rendered incidentally with the storage shed, not examined on its own).
 - Weather barrier BEHIND THE SIDING — the `buildingPaper` role's own label promises it and nothing emits it.

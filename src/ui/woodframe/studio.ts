@@ -191,7 +191,7 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
    * consequence of where the engine put the rafter and the plate, so nothing upstream has to know
    * the viewer draws it and no golden moves when it changes.
    */
-  let seats = new Map<string, SeatCut>();
+  let seats = new Map<string, SeatCut[]>();
 
   function buildMemberMesh(m: Member): THREE.Group {
     let p: THREE.Group;
@@ -229,7 +229,7 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     } else if (m.nominal.includes('panel')) {
       p = plywoodSheet(group);
       p.scale.set(m.cutLength / 12, m.actual.d / 12, Math.max(0.02, m.actual.w / 12));
-    } else if (seat) {
+    } else if (seat?.length) {
       // A NOTCHED rafter. The plain prop is a box, and a box laid at pitch across a cap plate
       // intersects it — 3 inches of rafter buried in the plate at every bearing, on every roof.
       // Cut the seat instead: the piece now lands ON the plate, and the notch reads as the

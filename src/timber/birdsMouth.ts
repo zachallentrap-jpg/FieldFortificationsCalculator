@@ -32,6 +32,9 @@ import type { Member } from './types';
 
 const IN_PER_FT = 12;
 
+/** Below a saw kerf there is nothing to cut — the rafter is grazing the plate, not bearing on it. */
+const MIN_NOTCH_FT = 0.125 / IN_PER_FT;
+
 /**
  * How high a rafter's TOP edge sits above the plate at the building line — HAP, the number a
  * framer sets before cutting anything.
@@ -142,7 +145,12 @@ export function seatCutFor(m: Member, plateTopY: number, outerRun: number): Seat
   const apexY = a * cz - b * sz;
   const depth = apexY + halfFace;
   // A notch deeper than the board is not a notch, and one thinner than a saw kerf is noise.
-  if (depth <= 1 / IN_PER_FT || depth >= 2 * halfFace) return null;
+  //
+  // THE KERF, NOT AN INCH. This guard was set at a full inch, which is larger than the notch a
+  // shallow roof actually has: a plate-wide seat at 3/12 is 7/8 in deep, so every shed and every
+  // 2-in-12 or 3-in-12 gable had its bird's mouth thrown away as "noise" and went back to
+  // running through its plate. The real floor is what a saw can cut.
+  if (depth <= MIN_NOTCH_FT || depth >= 2 * halfFace) return null;
   return { heelXFt: heelX, toeXFt: toeX, apexXFt: apexX, depthFt: depth };
 }
 
@@ -150,30 +158,58 @@ export function seatCutFor(m: Member, plateTopY: number, outerRun: number): Seat
  * The notch profile as a closed polygon in the member's local (x, y), ready to extrude across
  * its thickness. Corners run anticlockwise from the low-x end of the underside.
  *
- * Walking the underside from −x to +x, the notch is three vertices: the first cut reached, the
+ * Walking the underside from −x to +x, each notch is three vertices: the first cut reached, the
  * apex, and the second cut. Which of those is the heel depends on the slope's sign, and the apex
  * always sits over the heel — that is the plumb cut.
+ *
+ * A rafter may bear on MORE THAN ONE plate. A shed rafter spans from the low wall to the pony
+ * wall and has a bird's mouth at each; taking only the deepest left it running through the other.
+ * Notches are laid into the underside in x order, and any that would overlap is dropped rather
+ * than allowed to fold the polygon back on itself.
  */
-export function seatProfile(m: Member, seat: SeatCut): [number, number][] {
+export function seatProfile(m: Member, seat: SeatCut | readonly SeatCut[]): [number, number][] {
   const hx = m.cutLength / IN_PER_FT / 2;
   const hy = m.actual.d / IN_PER_FT / 2;
-  const apex: [number, number] = [seat.apexXFt, -hy + seat.depthFt];
-  const notch: [number, number][] =
-    seat.heelXFt < seat.toeXFt
-      ? [[seat.heelXFt, -hy], apex, [seat.toeXFt, -hy]] //  heel first: plumb up, then down the seat
-      : [[seat.toeXFt, -hy], apex, [seat.heelXFt, -hy]]; // seat first: up the slope, then plumb down
-  return [[-hx, -hy], ...notch, [hx, -hy], [hx, hy], [-hx, hy]];
+  const seats = (Array.isArray(seat) ? seat : [seat]) as readonly SeatCut[];
+  const spans = seats
+    .map((s) => ({
+      lo: Math.min(s.heelXFt, s.toeXFt),
+      hi: Math.max(s.heelXFt, s.toeXFt),
+      apex: [s.apexXFt, -hy + s.depthFt] as [number, number],
+      heelIsLow: s.heelXFt < s.toeXFt,
+      s,
+    }))
+    .sort((a, b) => a.lo - b.lo);
+  const underside: [number, number][] = [[-hx, -hy]];
+  let cursor = -hx;
+  for (const n of spans) {
+    if (n.lo < cursor || n.hi > hx) continue; // overlaps a notch already cut, or runs off the end
+    underside.push(
+      n.heelIsLow
+        ? [n.s.heelXFt, -hy]
+        : [n.s.toeXFt, -hy],
+      n.apex,
+      n.heelIsLow ? [n.s.toeXFt, -hy] : [n.s.heelXFt, -hy],
+    );
+    cursor = n.hi;
+  }
+  underside.push([hx, -hy]);
+  return [...underside, [hx, hy], [-hx, hy]];
 }
 
 /**
- * Every rafter's notch in a model, keyed by member id.
+ * Every notch on every rafter in a model, keyed by member id.
  *
- * A rafter is matched to the cap plate it actually crosses — the one whose run its footprint
- * passes over — and rafters that cross none simply get no entry, which is the honest answer
- * rather than a guessed notch.
+ * A rafter is matched to the cap plates it actually crosses — those whose run its footprint
+ * passes over, running SQUARE to it — and rafters that cross none simply get no entry, which is
+ * the honest answer rather than a guessed notch. A tower's cab rafters bear on a beam, not a
+ * wall plate.
+ *
+ * ALL of them, not the deepest. A shed rafter runs from the low wall up to the pony wall and
+ * bears on a plate at each end; keeping only one left it running through the other.
  */
-export function seatCutsFor(members: readonly Member[]): Map<string, SeatCut> {
-  const out = new Map<string, SeatCut>();
+export function seatCutsFor(members: readonly Member[]): Map<string, SeatCut[]> {
+  const out = new Map<string, SeatCut[]>();
   const plates = members.filter((m) => m.role === 'capPlate');
   if (plates.length === 0) return out;
   for (const m of members) {
@@ -181,10 +217,15 @@ export function seatCutsFor(members: readonly Member[]): Map<string, SeatCut> {
     const run = runAxisOf(m);
     if (!run) continue;
     const halfLen = m.cutLength / IN_PER_FT / 2;
-    const lowRun = m.position[run.axis]! - Math.abs(halfLen * Math.cos(m.rotation[2]!)) * 1.05;
-    const highRun = m.position[run.axis]! + Math.abs(halfLen * Math.cos(m.rotation[2]!)) * 1.05;
-    let best: SeatCut | null = null;
+    const reach = Math.abs(halfLen * Math.cos(m.rotation[2]!)) * 1.05;
+    const lowRun = m.position[run.axis]! - reach;
+    const highRun = m.position[run.axis]! + reach;
+    const cuts: SeatCut[] = [];
     for (const p of plates) {
+      // A plate running the SAME axis as the rafter lies alongside it and cannot be what it
+      // bears on. Reading its half-width off `actual.d` would be reading its length instead.
+      const pAxis = runAxisOf(p);
+      if (!pAxis || pAxis.axis === run.axis) continue;
       const half = p.actual.d / IN_PER_FT / 2;
       const at = p.position[run.axis]!;
       if (at < lowRun || at > highRun) continue;
@@ -193,9 +234,9 @@ export function seatCutsFor(members: readonly Member[]): Map<string, SeatCut> {
       // (the pitch is +rz), so downhill is whichever face the rafter reaches first going down.
       const outer = run.k * Math.sign(Math.sin(m.rotation[2]!)) > 0 ? at - half : at + half;
       const cut = seatCutFor(m, top, outer);
-      if (cut && (!best || cut.depthFt > best.depthFt)) best = cut;
+      if (cut) cuts.push(cut);
     }
-    if (best) out.set(m.id, best);
+    if (cuts.length) out.set(m.id, cuts);
   }
   return out;
 }

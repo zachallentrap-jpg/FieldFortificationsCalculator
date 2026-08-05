@@ -11,6 +11,7 @@ import { generateStructure } from '../src/timber/families/index';
 import { roofPlanes, slopeOf, generateShed } from '../src/timber/subsystems/roofFamilies';
 import { wallContract } from '../src/timber/subsystems/wallSystem';
 import type { BuildingSpec, RoofSpec } from '../src/timber/spec';
+import { DRESSED } from '../src/timber/types';
 import type { WallId } from '../src/timber/types';
 
 function bldg(roof: RoofSpec, over: Partial<BuildingSpec> = {}): BuildingSpec {
@@ -100,16 +101,30 @@ test('TD6: the shed pony wall closes the triangle above the high wall', () => {
   const model = generateStructure(spec);
   const pony = model.members.filter((m) => m.role === 'ponyStud');
   assert.ok(pony.length >= 10, `expected a pony wall of studs, got ${pony.length}`);
-  const expectedHeight = spec.dims.widthFt * (4 / 12);
+  // The wall's height is (span − plateWidth)·slope, NOT span·slope: the seat at the low wall
+  // lands at its plate's inner face and the seat here at the outer face, so the rise between the
+  // two plate tops is one plate short of the span. Then the studs are cut to leave room for the
+  // pony wall's own plate — which it did not used to have at all.
+  const plateD = DRESSED['2x4']!.d / 12;
+  const plateT = DRESSED['2x4']!.w / 12;
+  const wallHeight = (spec.dims.widthFt - plateD) * (4 / 12);
+  const studLen = wallHeight - plateT;
   for (const p of pony) {
     assert.equal(p.wall, 'N', 'the pony wall stands on the HIGH wall');
-    assert.ok(Math.abs(p.cutLength / 12 - expectedHeight) < 1e-9, `${p.id}: pony stud height`);
+    assert.ok(Math.abs(p.cutLength / 12 - studLen) < 1e-9, `${p.id}: pony stud height`);
     // It stands ON the wall below, not through it.
-    assert.ok(Math.abs(p.position[1] - (8 + expectedHeight / 2)) < 1e-9, `${p.id}: sits on the cap plate`);
+    assert.ok(Math.abs(p.position[1] - (8 + studLen / 2)) < 1e-9, `${p.id}: sits on the cap plate`);
   }
-  // And the frozen wall generator was never asked for an unequal wall.
-  const capPlates = model.members.filter((m) => m.role === 'capPlate');
-  const heights = new Set(capPlates.map((m) => m.position[1].toFixed(9)));
+  // The pony wall carries a plate for the rafters to bear on, right on the stud tops.
+  const ponyPlate = model.members.find((m) => m.role === 'capPlate' && m.position[1] > 8.5);
+  assert.ok(ponyPlate, 'the pony wall has no plate — the rafters bear on bare stud ends');
+  assert.ok(Math.abs(ponyPlate.position[1] - ponyPlate.actual.w / 24 - (8 + studLen)) < 1e-9, 'the plate is not on the studs');
+  assert.ok(Math.abs(ponyPlate.position[1] + ponyPlate.actual.w / 24 - (8 + wallHeight)) < 1e-9, 'the plate top is not where the rafters seat');
+  // And the frozen wall generator was never asked for an unequal wall — the four WALL plates are
+  // all at one height, whatever the pony wall does above them.
+  const wallPlates = model.members.filter((m) => m.role === 'capPlate' && m.id !== ponyPlate.id);
+  assert.equal(wallPlates.length, 4, 'four walls, four cap plates');
+  const heights = new Set(wallPlates.map((m) => m.position[1].toFixed(9)));
   assert.equal(heights.size, 1, 'all four walls are still the same rectangular height');
 });
 

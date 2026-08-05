@@ -389,12 +389,15 @@ export function generateShed(input: ShedInput): Member[] {
   const yMid = yLowEave + ((span + 2 * oh) / 2) * slope;
 
   for (const c of centers) {
-    // Rafter centerline midpoint, lifted half its depth so its TOP is the roof plane.
+    // ON the plane, full stop. `roofPlanes` returns the rafter CENTRE plane — the deck is placed
+    // off it by rafterHalf + panelHalf along the normal — so a rafter's centre line IS yMid.
+    // This used to subtract a PERPENDICULAR half-depth and add back a VERTICAL one, which is not
+    // a correction of anything: it left every shed rafter 0.085 in below its own roof plane, so
+    // the deck floated a sixteenth of an inch off the rafters carrying it.
     const midAcross = (up === 1 ? -oh : span + oh) + up * ((span + 2 * oh) / 2);
-    const lift = (rafterD / 2) / Math.cos(pitchRad);
     const pos: [number, number, number] = alongZ
-      ? [c, yMid - lift + rafterD / 2, midAcross]
-      : [midAcross, yMid - lift + rafterD / 2, c];
+      ? [c, yMid, midAcross]
+      : [midAcross, yMid, c];
     emit('rafter', LUMBER.rafterNominal.value as string, {
       cutLengthFt: rafterLen,
       position: pos,
@@ -414,9 +417,23 @@ export function generateShed(input: ShedInput): Member[] {
   // ── TD6: the pony wall. The high wall is a normal rectangular wall; the height difference
   // is framed HERE as studs above its cap plate, so `generateWalls` is never asked for an
   // unequal wall.
-  const ponyHeight = span * slope;
-  if (ponyHeight > TOLERANCE.minSliverFt) {
-    const studLen = ponyHeight;
+  //
+  // IT HAD NO PLATE, and its studs were the wrong length. Thirty-seven studs stood free at the
+  // top with the rafters running straight over their bare ends and 1.4 in INTO them — the same
+  // defect the bird's mouth fixed at the low wall, except here there was no plate for the notch
+  // to find, so nothing could even detect it. A pony wall is a wall: it gets a plate, the
+  // rafters bear on that plate, and the studs are cut to leave room for it.
+  //
+  // The height is (span − plateWidth)·slope, NOT span·slope. The seat at the LOW wall lands at
+  // the plate's inner face and the seat at the HIGH wall at its outer face, so the rise between
+  // the two plate tops is one plate short of the full span. Using span·slope stands the pony
+  // wall 7/8 in proud of where the rafters actually want to sit.
+  const ponyPlateNominal = LUMBER.plateNominal.value as string;
+  const ponyPlateThick = DRESSED[ponyPlateNominal]!.w / IN_PER_FT;
+  const plateWidthFt = DRESSED[ponyPlateNominal]!.d / IN_PER_FT;
+  const ponyHeight = (span - plateWidthFt) * slope;
+  if (ponyHeight > TOLERANCE.minSliverFt + ponyPlateThick) {
+    const studLen = ponyHeight - ponyPlateThick;
     const studNominal = LUMBER.studNominal.value as string;
     const highSurface = walls.surfaces.find((s) => s.wall === highSide)!;
     const ocStud = spec.spacing.studSpacingIn / IN_PER_FT;
@@ -437,6 +454,21 @@ export function generateShed(input: ShedInput): Member[] {
         doctrineRef: `${citeOf(LUMBER.studNominal)} — shed pony wall carrying the high plate`,
       });
     }
+    // The plate itself: flat on the stud tops, running the wall, and the surface the rafters'
+    // upper bird's mouth is cut against.
+    emit('capPlate', ponyPlateNominal, {
+      cutLengthFt: highSurface.runFt,
+      position: [
+        highSurface.origin[0] + (highSurface.along[0] * highSurface.runFt) / 2,
+        H + studLen + ponyPlateThick / 2,
+        highSurface.origin[1] + (highSurface.along[1] * highSurface.runFt) / 2,
+      ],
+      rotation: alongZ ? [-Math.PI / 2, 0, 0] : [-Math.PI / 2, Math.PI / 2, 0],
+      stage: stageRoofFrame,
+      wall: highSide,
+      nailing: '16d @ 16" to the studs; rafters bird’s-mouth toenail 3-8d (PH)',
+      doctrineRef: `${citeOf(LUMBER.plateNominal)} — the pony wall's bearing plate for the rafters`,
+    });
   }
 
   // ── Rake infill: the two walls parallel to the slope get studs stepping up to the rafter
