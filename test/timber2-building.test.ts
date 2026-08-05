@@ -6,6 +6,8 @@ import { generateStructure } from '../src/timber/families/index';
 import { specFromBuildingInput } from '../src/timber/frame';
 import { joistNominalFor, SMALL_PLAN_WIDTH_FT } from '../src/timber/subsystems/floorSystem';
 import type { BuildingSpec, FoundationSpec } from '../src/timber/spec';
+import { shippedFamilies } from '../src/timber/catalog';
+import { maxOpeningTopFt } from '../src/timber/normalize';
 
 function bldg(over: Partial<BuildingSpec> = {}): BuildingSpec {
   const base = specFromBuildingInput({
@@ -15,6 +17,42 @@ function bldg(over: Partial<BuildingSpec> = {}): BuildingSpec {
   });
   return { ...base, ...over };
 }
+
+test('no header is driven through a top plate — on any shipped preset, at any wall height', () => {
+  // The storage shed shipped one. Its 8-ft door needs a 2x10 by the span table, a 2x10 is 9¼ in
+  // deep, and an 8-ft wall has 91½ in between plates — so a 7-ft door wanted 93¼. The header
+  // was drawn running 1¾ in INTO the top plate: two solid members in the same space, on a
+  // standard card, hidden under siding and only visible with the framing stage scrubbed up.
+  // The guard shack had three more of them, from a 3½-ft window sill on a 7.5-ft wall.
+  const vert = (m: { cutLength: number; actual: { w: number; d: number }; rotation: readonly number[]; position: readonly number[] }): [number, number] => {
+    const hx = m.cutLength / 12 / 2, hy = m.actual.d / 12 / 2, hz = m.actual.w / 12 / 2;
+    const [rx, , rz] = m.rotation as [number, number, number];
+    const h = Math.abs(hx * Math.sin(rz)) + Math.abs(hy * Math.cos(rz) * Math.cos(rx)) + Math.abs(hz * Math.sin(rx));
+    return [m.position[1]! - h, m.position[1]! + h];
+  };
+  for (const f of shippedFamilies()) {
+    const model = generateStructure(f.preset);
+    const plates = model.members.filter((m) => m.role === 'topPlate');
+    for (const h of model.members.filter((m) => m.role === 'header')) {
+      const plate = plates.find((p) => p.wall === h.wall);
+      if (!plate) continue;
+      const clearance = vert(plate)[0] - vert(h)[1];
+      assert.ok(
+        clearance > -1e-6,
+        `${f.id}/${h.id} (${h.nominal}) is driven ${(-clearance * 12).toFixed(2)} in into ${plate.id}`,
+      );
+    }
+  }
+});
+
+test('maxOpeningTopFt: an opening plus its header must clear the plates', () => {
+  // 8-ft wall, 3-ft window: plates take 4½ in, a 2x6 header 5½, leaving 86 in = 7.167 ft.
+  assert.ok(Math.abs(maxOpeningTopFt(8, 3) - (8 - 0.375 - 5.5 / 12)) < 1e-9);
+  // The same wall with an 8-ft door needs a 2x10, which costs another 3¾ in of headroom.
+  assert.ok(maxOpeningTopFt(8, 8) < maxOpeningTopFt(8, 3), 'a wider opening leaves less headroom');
+  // A taller wall buys headroom foot for foot.
+  assert.ok(Math.abs((maxOpeningTopFt(9, 3) - maxOpeningTopFt(8, 3)) - 1) < 1e-9);
+});
 
 test('slab on grade: the slab IS the floor — concrete, an edge under the walls, no wood floor', () => {
   // What this replaces: "Slab on grade" emitted NO slab. It fell through to the framed-floor
@@ -89,13 +127,21 @@ test('skids: runners under the floor, no posts, no pads', () => {
   assert.ok(model.members.some((m) => m.role === 'stud'));
 });
 
-test('slab: the floor frames on grade with no crawl space below it', () => {
+test('slab: grade sits at the underside of the pour, with no crawl space below it', () => {
   const model = generateStructure(bldg({ foundation: { kind: 'slab' } }));
   assert.equal(model.members.filter((m) => m.role === 'post').length, 0);
   assert.equal(model.members.filter((m) => m.role === 'skid').length, 0);
-  assert.ok(model.levels.gradeY < 0, 'grade sits just under the deck');
+  assert.ok(model.levels.gradeY < 0, 'grade sits just under the floor');
   assert.ok(model.levels.gradeY > -2, 'and not a crawl space away');
-  assert.ok(model.members.some((m) => m.role === 'joist'));
+  // This used to end `assert.ok(members.some(m => m.role === 'joist'))` under the title "the
+  // floor frames on grade" — which was the behaviour being asserted back when a slab emitted a
+  // suspended wood floor and no concrete. It kept passing after that was fixed, for the wrong
+  // reason: a gable roof's CEILING joists carry role 'joist' too. Grade is what this checks now.
+  const slab = model.members.find((m) => m.role === 'slab')!;
+  assert.ok(
+    Math.abs(model.levels.gradeY - (slab.position[1] - slab.actual.d / 12 / 2)) < 1e-9,
+    'the ground meets the slab where the slab ends',
+  );
 });
 
 test('§3.2.2 small-plan rule: below 8 ft of width there is NO girder', () => {

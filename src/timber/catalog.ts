@@ -144,7 +144,12 @@ const STORAGE_SHED: FamilyDef = {
       // found on this very preset the day it was written, and the card's "per span table" lock was
       // describing an intention rather than the code. Auto-sizing belongs in the engine and lands
       // with the compat-lock work; until then the standard design carries the header it needs.
-      openings: { S: [{ kind: 'door', offsetFt: 6, widthFt: 8, heightFt: 7, sillHeightFt: 0, fill: 'rough', headerNominal: '2x10' }] },
+      // ...and the header it needs does not leave 7 ft of door under an 8-ft wall. A 2x10 is
+      // 9¼ in deep and the plates take 4½, so 91½ in of wall carries at most 82¼ in of opening.
+      // The door was drawn 7 ft tall anyway, with its header running 1¾ in THROUGH the top
+      // plate — two solid members in the same space on a shipped card. 6'-9" is what fits, and
+      // `maxOpeningTopFt` now catches the general case for anything the operator types.
+      openings: { S: [{ kind: 'door', offsetFt: 6, widthFt: 8, heightFt: 6.75, sillHeightFt: 0, fill: 'rough', headerNominal: '2x10' }] },
     }],
     roof: { kind: 'gable', risePer12: 4, overhangFt: 1 },
     foundation: { kind: 'skids' },

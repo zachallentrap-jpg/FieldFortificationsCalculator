@@ -26,6 +26,9 @@ screenshots get read.
 | Two-story building | **Not a render defect** — a parked feature (T6b). It was being accepted silently, which is fixed; see below. |
 | Storage shed — open front, skids, board-and-batten | **Fixed** — board-and-batten rendered as horizontal clapboard. The geometry was right; the wood grain ran across every board instead of along it. |
 | Building — **slab on grade** | **Fixed** — the option emitted no slab at all: a suspended wood floor over clear air, and no concrete in the model or on the bill. |
+| Building — flat roof at 1:12 | **Checked, clean.** Nothing wrong. Pony studs exactly span×slope, rafters at atan(1/12) and the right length, deck above the rafters, walls closed in. |
+| Building — continuous-wall foundation | **Checked, clean.** Nothing wrong. Every bearing exact to 0.0000: posts on pads, walls on strip footings, sills on walls, girder on posts. |
+| **Openings vs. the plates they sit under** | **Fixed** — the storage shed's door header ran 1¾ in through the top plate, and the guard shack had three more. |
 
 ## The shed that had no walls above the plate
 
@@ -141,10 +144,37 @@ their positions now and change their MEANING instead: thickened edge poured, sla
 cures. A curing slab really is a step a crew plans around, and it is honest that no member
 appears during it.
 
+## Two that were fine, and one that was not
+
+The flat roof and the continuous-wall foundation were both rendered and both **correct** — no
+change made. Flat: pony studs exactly `span × slope`, rafters rotated to `atan(1/12)` and cut to
+22.08 ft, the deck riding above them, every wall closed in. Wall foundation: posts land on their
+pads, walls on their strip footings, sills on the walls and the girder on the posts, every
+bearing exact to four decimal places.
+
+The third — the storage shed's wide-door framing — was not. Its 8-ft door needs a **2x10** by the
+span table (that was itself a fix, recorded in `DECISIONS.md`), a 2x10 is 9¼ in deep, and an 8-ft
+wall leaves 91½ in between plates. A 7-ft door plus that header wants 93¼. The header was drawn
+anyway, running **1¾ in through the top plate** — two solid members in the same space, on a
+shipped card, hidden by siding and visible only with the framing stage scrubbed up. Fixing the
+header's DEPTH had created a HEADROOM conflict, and nothing checked the second thing.
+
+Generalised rather than patched: `maxOpeningTopFt` states what a wall can carry — sole plate,
+sill, opening and header all have to fit under the doubled top plate — and `normalizeSpec` clamps
+anything over it with the usual visible warning. That immediately found three more on the guard
+shack, whose 7.5-ft walls carried windows at the standard 3½-ft sill.
+
+Two smaller things fell out of it. `OPENING.doorHeightFt` was **6.7 ft while its own citation
+said "6 ft 8 in"** — 6.667 — and those four tenths of an inch were exactly what pushed the guard
+shack's door past its wall. And `defaultOpenings` now places a window sill that fits the wall it
+is going into: the window's SIZE is doctrine and does not move, but where the default sill sits is
+the generator's choice, and a default that cannot be built is not a default.
+
 ## Next targets, unchecked
 
-- Continuous-wall foundation; skid foundation (rendered incidentally with the storage shed, not examined).
-- Storage shed's wide door header and its jack/king framing at that span (the shed was rendered for its siding; the header was not examined).
-- Flat roof at its 1:12 drain slope — the covering path at near-zero pitch.
+- Skid foundation (rendered incidentally with the storage shed, not examined on its own).
+- The `openFront` storage-shed variant — posts and a header instead of a wall.
+- Partitions (`spec.partitions`) and the B-hut's interior division.
+- Wall sheathing UNDER siding — the two-layer standoff, never rendered together.
 - Pyramid roof on a building (the tower cab uses it; a building never has been rendered with one).
 - Board-and-batten and board siding at the rake (the infill path renders them, unphotographed).

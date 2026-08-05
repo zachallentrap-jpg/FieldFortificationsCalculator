@@ -20,8 +20,10 @@ import type {
 } from './spec';
 import { SPEC_PATH_DEFS, WALL_ORDER, specPath } from './spec';
 import type { WallId } from './types';
-import { SPAN, LUMBER } from './doctrine';
+import { DRESSED } from './types';
+import { SPAN, LUMBER, IN_PER_FT } from './doctrine';
 import { defaultOpenings } from './openings';
+import { hutDims } from './families/hut';
 
 export interface SpecIssue {
   path: string; // dotted spec path
@@ -83,11 +85,33 @@ export function headerForSpan(widthFt: number): string {
   return rows[pick]![0];
 }
 
+/**
+ * The tallest rough opening this wall can carry, given the header its width demands.
+ *
+ * A wall is not `wallHeightFt` of clear space. The sole plate eats the bottom, the doubled top
+ * plate eats the top, and the header — sized by SPAN, not by what is left over — eats whatever
+ * it needs above the opening. Everything left is available for sill + opening:
+ *
+ *   sole (1½") + sill + opening + header ≤ wallHeight − top plate (1½") − cap plate (1½")
+ *
+ * The storage shed is what this was written for. Its 8-ft door needs a 2x10 by the span table
+ * (see DECISIONS on header sizing), a 2x10 is 9¼ in deep, and an 8-ft wall leaves 91½ in
+ * between plates — so a 7-ft door needs 93¼ in of a wall that has 91½. The header was drawn
+ * running 1¾ in THROUGH the top plate: two solid members in the same space, on a shipped card,
+ * hidden by siding and visible the moment the framing stage was rendered.
+ */
+export function maxOpeningTopFt(wallHeightFt: number, widthFt: number, headerNominal?: string): number {
+  const plate = DRESSED[LUMBER.plateNominal.value as string]!.w / IN_PER_FT;
+  const headerD = DRESSED[headerNominal ?? headerForSpan(widthFt)]!.d / IN_PER_FT;
+  return wallHeightFt - 3 * plate - headerD;
+}
+
 function normalizeOpenings(
   openings: WallOpenings | undefined,
   runFor: (w: WallId) => number,
   basePath: string,
   issues: SpecIssue[],
+  wallHeightFt: number,
 ): WallOpenings {
   const out: WallOpenings = {};
   if (!openings) return out;
@@ -123,7 +147,25 @@ function normalizeOpenings(
         });
         offset = fixed;
       }
-      kept.push({ ...o, offsetFt: offset, widthFt: width, heightFt: height, sillHeightFt: sill });
+      // The opening plus its header has to fit under the plates. Clamped rather than dropped:
+      // a door an inch too tall is a door that wants trimming, not a door nobody asked for.
+      let openHeight = height;
+      // Compared at the SAME precision the clamps round to. `clampPath` snaps every value to
+      // 1e-6, so an opening sized exactly to the limit comes back a third of a millionth over
+      // it and a raw `>` fires, reporting a cut to the number it already was.
+      const maxTop = maxOpeningTopFt(wallHeightFt, width, o.headerNominal);
+      if (round(sill + openHeight) > round(maxTop)) {
+        const fixed = round(Math.max(0.5, maxTop - sill));
+        issues.push({
+          path: p,
+          kind: 'clamped',
+          message: `A ${round(width)} ft opening needs a ${o.headerNominal ?? headerForSpan(width)} header, `
+            + `which does not leave ${round(openHeight)} ft under an ${round(wallHeightFt)} ft wall — cut to ${fixed} ft.`,
+          severity: 'warn',
+        });
+        openHeight = fixed;
+      }
+      kept.push({ ...o, offsetFt: offset, widthFt: width, heightFt: openHeight, sillHeightFt: sill });
     });
     // Order is PRESERVED exactly as supplied (TD5).
     if (kept.length > 0) out[wall] = kept;
@@ -158,11 +200,16 @@ function normalizeBuilding(spec: BuildingSpec, issues: SpecIssue[]): BuildingSpe
   }
 
   const runFor = (w: WallId): number => (w === 'S' || w === 'N' ? lengthFt : widthFt);
-  const normStories = stories.map((s, i) => ({
-    ...s,
-    wallHeightFt: clampPath(s.wallHeightFt, `stories.${Math.min(i, 1)}.wallHeightFt`, issues),
-    openings: normalizeOpenings(s.openings, runFor, `stories.${i}.openings`, issues),
-  }));
+  const normStories = stories.map((s, i) => {
+    // Clamp the wall height FIRST: an opening's headroom is measured against the wall the
+    // model will actually build, not the one that was asked for.
+    const wallHeightFt = clampPath(s.wallHeightFt, `stories.${Math.min(i, 1)}.wallHeightFt`, issues);
+    return {
+      ...s,
+      wallHeightFt,
+      openings: normalizeOpenings(s.openings, runFor, `stories.${i}.openings`, issues, wallHeightFt),
+    };
+  });
 
   // openFront (storage shed): that wall is posts + header, so it can carry no openings.
   if (spec.openFront) {
@@ -235,11 +282,12 @@ function normalizeHut(spec: HutSpec, issues: SpecIssue[]): HutSpec {
   // normalize also means the openings editor has something real to show and the operator can
   // move or delete them; an empty record now honestly means "none", because it can only have
   // got that way by somebody saying so.
-  const named = spec.openings ?? defaultOpenings(spec.variant, lengthFt, widthFt);
+  const hutWallHeightFt = spec.wallHeightFt ?? hutDims(spec.variant).wallHeightFt;
+  const named = spec.openings ?? defaultOpenings(spec.variant, lengthFt, widthFt, hutWallHeightFt);
   const out: HutSpec = {
     ...spec,
     dims: { lengthFt, widthFt },
-    openings: normalizeOpenings(named, runFor, 'openings', issues),
+    openings: normalizeOpenings(named, runFor, 'openings', issues, hutWallHeightFt),
   };
   if (spec.variant === 'latrine') {
     const seats = spec.latrine?.seats === 2 ? 2 : 4;

@@ -190,7 +190,10 @@ export const RAMP = {
 // catalog presets. Three copies of "a door is 3 by 6 foot 8" is three chances to disagree.
 export const OPENING = {
   doorWidthFt: doc(3, 'FM 5-426 door rough opening (PH)', { unit: 'ft' }),
-  doorHeightFt: doc(6.7, 'FM 5-426 door rough opening — 6 ft 8 in (PH)', { unit: 'ft' }),
+  // 6 ft 8 in is 6.667 ft, not 6.7 — the value disagreed with its own citation by four tenths
+  // of an inch, and that was the difference between the guard shack's door fitting under its
+  // 7.5-ft wall and its header running through the top plate.
+  doorHeightFt: doc(6 + 8 / 12, 'FM 5-426 door rough opening — 6 ft 8 in (PH)', { unit: 'ft' }),
   windowWidthFt: doc(3, 'FM 5-426 window rough opening (PH)', { unit: 'ft' }),
   windowHeightFt: doc(3.5, 'FM 5-426 window rough opening (PH)', { unit: 'ft' }),
   windowSillFt: doc(3.5, 'FM 5-426 window sill height (PH)', { unit: 'ft' }),

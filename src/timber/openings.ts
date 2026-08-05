@@ -16,6 +16,7 @@
 
 import type { HutSpec, OpeningSpec, WallOpenings } from './spec';
 import { OPENING } from './doctrine';
+import { maxOpeningTopFt } from './normalize';
 
 /**
  * Doors and windows a variant ships with, when the operator has not named their own.
@@ -29,19 +30,29 @@ export function defaultOpenings(
   variant: HutSpec['variant'],
   lengthFt: number,
   widthFt: number,
+  wallHeightFt = 8,
 ): WallOpenings {
   const dw = OPENING.doorWidthFt.value as number;
   const ww = OPENING.windowWidthFt.value as number;
   const setback = OPENING.cornerSetbackFt.value as number;
   const pitch = OPENING.windowPitchFt.value as number;
+  // A DEFAULT HAS TO FIT THE WALL IT IS PUT IN. The window's SIZE is doctrine and does not
+  // move; where its sill sits is this function's choice, and on a short wall the standard
+  // 3½-ft sill puts the head above what a 2x6 header can clear — the guard shack's 7.5-ft
+  // walls carried three windows whose headers ran through the top plate. Dropping the sill is
+  // a default choosing a buildable position, not an override of anything the operator asked
+  // for; a sill THEY type that does not fit is clamped by `normalizeSpec`, loudly.
+  const winTop = maxOpeningTopFt(wallHeightFt, ww);
+  const winSill = Math.max(0, Math.min(OPENING.windowSillFt.value as number, winTop - (OPENING.windowHeightFt.value as number)));
   const door = (offsetFt: number): OpeningSpec => ({
     kind: 'door', offsetFt, widthFt: dw,
-    heightFt: OPENING.doorHeightFt.value as number, sillHeightFt: 0, fill: 'door-ledged',
+    heightFt: Math.min(OPENING.doorHeightFt.value as number, maxOpeningTopFt(wallHeightFt, dw)),
+    sillHeightFt: 0, fill: 'door-ledged',
   });
   const win = (offsetFt: number): OpeningSpec => ({
     kind: 'window', offsetFt, widthFt: ww,
     heightFt: OPENING.windowHeightFt.value as number,
-    sillHeightFt: OPENING.windowSillFt.value as number, fill: 'window-shutter',
+    sillHeightFt: winSill, fill: 'window-shutter',
   });
   /** A door centred on a wall of this run. */
   const centred = (runFt: number): OpeningSpec => door(runFt / 2 - dw / 2);
