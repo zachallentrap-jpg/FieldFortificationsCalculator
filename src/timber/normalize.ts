@@ -362,6 +362,20 @@ function normalizeBuilding(spec: BuildingSpec, issues: SpecIssue[]): BuildingSpe
     });
     foundation = structuredClone(SPEC_SECTION_FALLBACK.foundation);
   }
+  // A BUILDING HAS NO EMBEDDED POSTS. `'embedded'` is the tower's and the bunker's — their posts
+  // are set in the ground — and the building path has no branch for it, so it fell through to a
+  // pier foundation, 926 members byte-identical to `{kind:'piers'}`, and said nothing. Exactly
+  // the pyramid-roof case a hundred lines up, and it gets the same treatment: piers is still the
+  // answer, said out loud instead of arrived at by accident.
+  if (foundation.kind === 'embedded') {
+    issues.push({
+      path: 'foundation.kind',
+      kind: 'clamped',
+      message: 'Embedded posts belong to the guard tower and the bunker, whose posts are set in the ground — this building was stood on piers.',
+      severity: 'warn',
+    });
+    foundation = structuredClone(SPEC_SECTION_FALLBACK.foundation);
+  }
   if (foundation.kind === 'piers' || foundation.kind === 'wall') {
     foundation = { ...foundation, crawlFt: clampPath(foundation.crawlFt, 'foundation.crawlFt', issues) };
   } else if (foundation.kind === 'basement') {
@@ -569,6 +583,58 @@ function repairShutters(spec: StructureSpec, issues: SpecIssue[]): void {
   s.shutters = 'side';
 }
 
+/**
+ * THE LAST OF THE UNGUARDED ENUMS.
+ *
+ * `decodeSpec` takes any JSON with a `family` key, so every one of these is reachable from a
+ * pasted link — and a link is exactly where a typo, or a value from a later version of this tool,
+ * comes from. Ten fields took any string and said nothing; nine of them fell through to whatever
+ * their generator's `else` happened to be, and the tenth — the tent size — indexed a table with
+ * it and THREW, which is the failure this file's own header calls the worst of the three: the
+ * shell renders, the spinner never stops, and the page looks like it is working.
+ *
+ * The roof kind, the foundation kind, the shutter mode and the four coverings were already
+ * guarded above. This is the same shape, table-driven because there is nothing to say about any
+ * one of them that is not true of all ten.
+ */
+const FAMILY_CHOICES: { family: string; path: string; ok: string[]; fallback: string; what: string }[] = [
+  { family: 'bunker', path: 'entrance', ok: ['open', 'baffle'], fallback: 'baffle', what: 'a way in' },
+  { family: 'bunker', path: 'wallType', ok: ['post-plank', 'crib'], fallback: 'post-plank', what: 'a bunker wall' },
+  { family: 'tower', path: 'access', ok: ['ladder', 'stair'], fallback: 'ladder', what: 'a way up' },
+  { family: 'tower', path: 'footing', ok: ['timber-mudsill', 'concrete-pad'], fallback: 'concrete-pad', what: 'a footing' },
+  { family: 'tower', path: 'cab.walls', ok: ['open-rail', 'half-wall', 'half-wall-screen'], fallback: 'half-wall-screen', what: 'a cab wall' },
+  { family: 'tower', path: 'cab.roof', ok: ['pyramid', 'shed'], fallback: 'pyramid', what: 'a cab roof' },
+  { family: 'platform', path: 'base', ok: ['piers', 'skids'], fallback: 'piers', what: 'a base' },
+  { family: 'platform', path: 'deck', ok: ['plank', 'panel'], fallback: 'plank', what: 'a decking' },
+  { family: 'tentFrame', path: 'tent', ok: ['gpSmall', 'gpMedium', 'temper'], fallback: 'gpMedium', what: 'a tent size' },
+  { family: 'building', path: 'bridging', ok: ['cross', 'solid'], fallback: 'cross', what: 'a bridging' },
+];
+
+function repairFamilyChoices(spec: StructureSpec, issues: SpecIssue[]): void {
+  for (const c of FAMILY_CHOICES) {
+    if (spec.family !== c.family) continue;
+    const parts = c.path.split('.');
+    let holder = spec as unknown as Record<string, unknown>;
+    for (const k of parts.slice(0, -1)) {
+      const next = holder[k];
+      if (!next || typeof next !== 'object') { holder = null as never; break; }
+      holder = next as Record<string, unknown>;
+    }
+    if (!holder) continue;
+    const leaf = parts[parts.length - 1]!;
+    const was = holder[leaf];
+    if (was === undefined || (typeof was === 'string' && c.ok.includes(was))) continue;
+    issues.push({
+      path: c.path,
+      kind: 'clamped',
+      message: `"${String(was)}" is not ${c.what} this tool builds — took ${c.fallback}. `
+        + `The choices are ${c.ok.join(', ')}.`,
+      severity: 'warn',
+    });
+    holder[leaf] = c.fallback;
+  }
+}
+
 function normalizeSpec2(raw: StructureSpec, issues: SpecIssue[]): NormalizeResult {
   // Every family extends `SpecCommon`, so dims/spacing/coverings are repaired for all of them.
   // The three that only a BuildingSpec declares are repaired only for a building: a hut carries
@@ -582,6 +648,7 @@ function normalizeSpec2(raw: StructureSpec, issues: SpecIssue[]): NormalizeResul
   );
   repairShutters(spec, issues);
   repairCoverings(spec, issues);
+  repairFamilyChoices(spec, issues);
   switch (spec.family) {
     case 'building':
       return { spec: normalizeBuilding(spec, issues), issues };

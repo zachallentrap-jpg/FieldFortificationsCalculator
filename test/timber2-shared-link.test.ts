@@ -199,11 +199,17 @@ test('a foundation this tool does not pour becomes piers AND says so', () => {
   assert.match(m.issues.find((i) => i.path === 'foundation.kind')!.message, /"raft"/, 'and names what was asked for');
 });
 
-test('every foundation the union really has survives untouched', () => {
+test('every foundation a BUILDING really has survives untouched', () => {
+  // `'embedded'` is in the union and is NOT in this list, and the difference is the point. It
+  // belongs to the guard tower and the bunker, whose posts are set in the ground; `generateBuilding`
+  // has no branch for it and fell through to a pier foundation — 926 members byte-identical to
+  // `{kind:'piers'}` — while normalization left the kind saying "embedded". This test used to
+  // pin that: it asserted the union member survived, which was true, and said nothing about the
+  // building being something else. It is now told, the same way a pyramid roof on a building is.
   const good: unknown[] = [
     { kind: 'piers', crawlFt: 1.5 }, { kind: 'wall', crawlFt: 1.5 },
     { kind: 'basement', depthFt: 7, stairs: true }, { kind: 'slab' },
-    { kind: 'skids' }, { kind: 'embedded', embedFt: 3 },
+    { kind: 'skids' },
   ];
   for (const foundation of good) {
     const spec = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset)) as Record<string, unknown>;

@@ -2163,3 +2163,45 @@ the shutter mode already were — a share link is the only way to reach any of i
 is exactly where a typo comes from.
 
 Five regression tests, all five failing on the old code.
+
+## The last of the unguarded enums
+
+A sweep rather than a single target: every remaining string enum a share link can reach, generated
+with each legal value and with one nobody wrote, and the signatures compared.
+
+**Ten fields took any string and said nothing.** Nine fell through to whatever their generator's
+`else` happened to be — a bunker with an unreadable `entrance` came back with a baffle, a tower
+with an unreadable `footing` came back on concrete pads — and the tenth, the tent size, indexed a
+doctrine table with it and **threw**: `Cannot read properties of undefined (reading 'value')`. That
+is the failure `normalize.ts`'s own header calls the worst of the three — the shell renders, the
+spinner never stops, and the page looks like it is working. All ten are repaired and spoken now,
+table-driven, because there is nothing to say about any one of them that is not true of all ten.
+
+Two dead fields fell out of the same sweep:
+
+- **`TowerSpec.cab.roofing`** was declared on the spec, written by the preset, and read by nothing.
+  Set it to `'roll'` through a link and the cab still came out corrugated, byte for byte. The cab
+  is the tower's only roof, so what covers it is `coverings.roofing` — which is what the panel
+  writes and what `tower.ts` reads. The second name is gone.
+- **`foundation.kind: 'embedded'` on a BUILDING** fell through to a pier foundation, 926 members
+  byte-identical to `{kind:'piers'}`, and said nothing. It belongs to the tower and the bunker,
+  whose posts are set in the ground. Told now, exactly as a pyramid roof on a building already was.
+
+### A near-miss worth writing down
+
+The first pass of the sweep reported `cab.walls: 'solid'` and `'open'` as producing identical
+geometry — a finding, if the union had those values. It does not: it is
+`'open-rail' | 'half-wall' | 'half-wall-screen'`, and I had guessed. Both my "values" were unknown
+strings falling through to the same default, which is a different fault and the one this pass
+actually fixed. **Read the type before reporting what two of its values do.**
+
+### One existing test moved, and why
+
+`every foundation the union really has survives untouched` fed a BUILDING preset every member of
+the foundation union including `'embedded'`, and asserted the kind came through unrepaired. That
+was true and said nothing about the building being something else. Narrowed to the foundations a
+building really has, with the reason written in it.
+
+Five regression tests, four failing on the old code — the fifth is the guard that must pass both
+ways: **every shipped card still normalizes with nothing to repair.** A table-driven repair pass is
+one typo away from "fixing" a preset.

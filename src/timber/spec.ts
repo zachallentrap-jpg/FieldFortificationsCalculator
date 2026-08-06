@@ -168,7 +168,10 @@ export interface TowerSpec extends SpecCommon {
   cab: {
     walls: 'open-rail' | 'half-wall' | 'half-wall-screen';
     roof: 'pyramid' | 'shed';
-    roofing: 'corrugated' | 'roll';
+    // NO `roofing` HERE. The cab is the tower's only roof, so what covers it is
+    // `coverings.roofing` — which is what the panel writes and what `tower.ts` reads. A second
+    // field saying the same thing was declared, written by the preset and read by nothing: set
+    // it to 'roll' through a link and the cab still came out corrugated, byte for byte.
   };
   footing: 'timber-mudsill' | 'concrete-pad';
 }

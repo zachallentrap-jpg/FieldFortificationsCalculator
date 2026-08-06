@@ -363,7 +363,7 @@ const TOWER_CARD: FamilyDef = {
     platformHeightFt: 16,
     cabPlanFt: 8,
     access: 'ladder',
-    cab: { walls: 'half-wall-screen', roof: 'pyramid', roofing: 'corrugated' },
+    cab: { walls: 'half-wall-screen', roof: 'pyramid' },
     footing: 'timber-mudsill',
   } as StructureSpec,
   locks: [
