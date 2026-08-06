@@ -1792,3 +1792,58 @@ with timber the table never asked for.
   ends when the next board's centre would fall outside, so the last board's far edge lands at
   10.875 ft of a 10.917 ft building — a ½-in strip of the overhead with earth straight onto the
   stringers. The `Math.min` clamp in the position was meant to catch this and does not fire.
+
+## The treads that were not on the steps
+
+Moved off the bunker to a family/member combination not yet looked at: the **entry steps and stair
+treads** on `gp-frame`. A side elevation of a hut's entry flight shows three loose boards floating
+beside the stringer, the lowest one detached in mid-air past the end of it.
+
+Two defects, one line apart.
+
+**`base` is documented as "the nose of the lowest riser", and the generator centred tread i on the
+nose line.** So every tread sat half its own depth (4⅝ in of a 9¼-in 2x10) downhill of the step it
+belongs to. Measured through the stringers' cut profiles:
+
+```
+                     underside over stringer material
+                     before        after
+gp-frame  tread 1     0%            38%      ← the whole bottom tread was in the air,
+          tread 2    15%            65%        and half of it stood past the foot of
+          tread 3    43%            93%        the stringers entirely
+platform  tread 1     0%            28%
+          tread 2     0%            48%
+```
+
+**A flight of N risers has N−1 treads**, and every flight in the toolkit built N. The N-th surface
+is the landing — the deck, the platform between flights, the threshold — and whoever built that
+built it already. An `omitTopTread` flag had been added for the entry steps when that tread turned
+up buried in a sole plate; it was the general rule wearing a local name, and on the loading
+platform the same tread sat inside the deck planks it arrived at, 14 in³ of one solid inside
+another. The flag is gone.
+
+Three regression tests, all failing on the old generator: the tread count against the riser count;
+*"ES1-tread-01 runs 50.1563..50.9271 along a flight that runs −2.5417..50.5417 — 4.62 in of it is
+off the end"*; and *"ES1-tread-01 has 0 of 205 points of its underside over stringer material — it
+is standing in the air."* The bearing test is asked EXACTLY, against the cut profile polygon; the
+first version sampled the stringer instead and failed on the FIXED model, reporting no stringer
+under a tread that had 28% bearing — a 1½-in board leaves a thin band for a sample to land in.
+
+### The real one, measured and not yet fixed
+
+**The stringer has no sawtooth.** Its top edge is a straight rake from the flight's base to the
+landing, and you cannot lay flat treads on a straight raked edge: each tread meets it along a
+line, so the stringer now stands *through* 20–93% of each tread's own thickness (it did before as
+well — 0–43% — with the treads in the wrong place). The three lines involved:
+
+- the **nosing line** through the nose points, slope `R/T`, from `(0, R)` to `((N−1)T, N·R)`;
+- the **stringer's line as built**, from `(0, 0)` to `((N−1)T, N·R)` — slope `N·R/((N−1)T)`, a
+  third steeper, one riser low at the foot and level with the nosing line only at the head;
+- the **sawtooth**, which is what actually carries treads: a horizontal seat at `i·R − t` from
+  `(i−1)T` to `iT`, and a plumb riser face between each pair.
+
+The profile machinery already exists — `stringerEndProfile` feeds `cutLumberPiece`, the same route
+the bird's-mouth travels — and the local-frame mapping is
+`localX = −hx + Δd·cos p + Δh·sin p`, `localY = hy − Δd·sin p + Δh·cos p` from the flight's base.
+What it needs beyond that is the stringer repositioned onto the nosing line (so there is material
+above the seats to cut away) and the foot drop that goes with it. **Next target.**

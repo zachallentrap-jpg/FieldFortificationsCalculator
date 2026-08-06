@@ -176,16 +176,6 @@ export interface StairInput {
    */
   arriveAt?: { at: [x: number, z: number]; dir: [x: number, z: number] };
   /**
-   * Leave the topmost tread off, because the landing IS that tread.
-   *
-   * A flight normally puts a tread at every riser top including the last, flush with the landing
-   * — right for a deck, where you step off sideways onto planks at the same level. An ENTRY
-   * stair does not arrive at a deck; it arrives at a threshold with a wall in it. Keeping that
-   * last tread buried it in the sole plate and the siding, 189 cubic inches of one solid inside
-   * another, on every door of every raised card. What you step onto there is the floor.
-   */
-  omitTopTread?: boolean;
-  /**
    * Member-id prefix. Defaults to 'AC', which is right while a structure has ONE stair — the
    * tower's, the basement's. A building with two doors has two, and both came out numbering
    * their own pieces from one: `AC-stringer-01` twice in the same model. Ids are what the
@@ -312,9 +302,21 @@ export function generateStair(input: StairInput): StairResult {
     // edge, and a stair rendered as a comb of 9 1/4-in fins with nothing to walk on.
     const treadYaw = Math.atan2(-across[1], across[0]);
     const treadT = DRESSED[treadNominal]!.w / IN_PER_FT;
-    const lastTread = input.omitTopTread && f === flightCount - 1 ? sol.risers - 1 : sol.risers;
-    for (let i = 1; i <= lastTread; i++) {
-      const d = ((i - 1) * sol.treadIn) / IN_PER_FT;
+    // A FLIGHT OF N RISERS HAS N−1 TREADS. The N-th surface is the landing — the deck, the
+    // platform between flights, the threshold — and it is built by whoever built that. Every
+    // flight in the toolkit put a tread there too: on the loading platform the top tread sat
+    // inside the deck planks it arrived at, 14 in³ of one solid inside another. An `omitTopTread`
+    // flag was added for the entry steps when the same tread turned up buried in a sole plate;
+    // it was the general rule wearing a local name, and it is gone.
+    //
+    // AND EACH TREAD GOES ON ITS OWN STEP. `base` is documented as "the nose of the lowest
+    // riser", and tread i was CENTRED on the nose line (i−1) runs along from it — so every tread
+    // sat half its own depth downhill of the step it belongs to, and the bottom one hung clear
+    // off the end of the stringers with nothing under any part of it. A tread starts at its
+    // nose and runs UPHILL from there.
+    const treadDepth = DRESSED[treadNominal]!.d / IN_PER_FT;
+    for (let i = 1; i < sol.risers; i++) {
+      const d = ((i - 1) * sol.treadIn) / IN_PER_FT + treadDepth / 2;
       emit('tread', treadNominal, {
         cutLengthFt: widthFt,
         position: [at[0] + dir[0] * d, y + (risePerFlight * i) / sol.risers - treadT / 2, at[1] + dir[1] * d],

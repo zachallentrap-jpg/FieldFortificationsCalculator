@@ -330,8 +330,8 @@ export function generateEntrySteps(input: EntryStepsInput): Member[] {
         widthFt: cut.u1 - cut.u0,
         stage,
         arriveAt: { at, dir: [-s.normal[0], -s.normal[1]] },
-        // The threshold is the top tread. See `omitTopTread`.
-        omitTopTread: true,
+        // The threshold is the top landing, and `generateStair` leaves the landing to whoever
+        // builds it — here, the floor. This used to need an `omitTopTread` flag of its own.
         // One prefix per door: a building with two of them had two flights both numbering their
         // pieces from `AC-stringer-01`, and an id is what selection and the packet key on.
         idPrefix: `ES${++flight}`,

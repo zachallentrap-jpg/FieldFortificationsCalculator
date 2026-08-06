@@ -428,20 +428,133 @@ test('entrySteps: false takes them away again', () => {
   assert.ok(m.members.filter((x) => x.role === 'doorBoard').length > 0, 'the door is still hung');
 });
 
-test('omitTopTread is opt-in — the tower and platform stairs are untouched', () => {
-  // The option went into the SHARED stair generator, so the two callers that were already right
-  // must not move. Same input, same flight, one more tread than the entry stair asks for.
-  const base = {
-    base: [0, 0] as [number, number], up: [1, 0] as [number, number],
-    baseY: 0, topY: 6, widthFt: 3, stage: 1,
-  };
-  const withTop = generateStair(base).members.filter((x) => x.role === 'tread').length;
-  const without = generateStair({ ...base, omitTopTread: true }).members.filter((x) => x.role === 'tread').length;
-  assert.equal(without, withTop - 1, 'exactly one tread is dropped, and only when asked');
-  assert.ok(withTop > 1);
+test('A FLIGHT OF N RISERS HAS N−1 TREADS — the last surface is the landing', () => {
+  // This started as an `omitTopTread` flag, opt-in, added when the entry stair's top tread turned
+  // up buried in a sole plate. It was the general rule wearing a local name: every OTHER caller
+  // put a tread at the landing too, and on the loading platform that tread sat inside the deck
+  // planks it arrived at — 14 in³ of one solid inside another. Nobody steps on it; you step onto
+  // the deck. The flag is gone and the rule is here.
+  //
+  // Checked on a plain flight — where the arithmetic is visible — and then on every family that
+  // actually builds one.
+  const flight = generateStair({
+    base: [0, 0], up: [1, 0], baseY: 0, topY: 6, widthFt: 3, stage: 1,
+  });
+  const treads = flight.members.filter((x) => x.role === 'tread').length;
+  const risers = flight.flights.reduce((n, f) => n + f.risers, 0);
+  assert.equal(treads, risers - flight.flights.length,
+    `${treads} treads for ${risers} risers over ${flight.flights.length} flight(s)`);
+  assert.ok(treads > 1);
   for (const id of ['tower', 'platform']) {
     const m = modelOf(id);
     assert.ok(m.members.some((x) => x.role === 'tread' || x.role === 'ladderRung'), `${id} still has a way up`);
+  }
+});
+
+test('EVERY TREAD SITS ON ITS OWN STEP — none of them hangs off the end of the flight', () => {
+  // `base` is documented as "the nose of the lowest riser", and the generator CENTRED tread i on
+  // the nose line (i−1) runs along from it. So every tread sat half its own depth downhill of the
+  // step it belongs to, and the bottom one hung entirely clear of the stringers: measured on the
+  // loading platform, the lowest two treads had 0% of their underside over stringer material, and
+  // in a side elevation of a hut's entry steps the treads read as loose boards floating beside
+  // the stringer with the lowest one detached in mid-air.
+  //
+  // Measured ALONG THE FLIGHT rather than in world x/z, because a stair can run any direction and
+  // a switchback runs two.
+  for (const id of ['gp-frame', 'platform', 'sea-hut']) {
+    const m = modelOf(id);
+    const treads = m.members.filter((x) => x.role === 'tread');
+    assert.ok(treads.length > 0, `${id} has no treads`);
+    const stringers = m.members.filter((x) => x.role === 'stringer');
+    assert.ok(stringers.length > 0, `${id} has no stringers`);
+    for (const t of treads) {
+      // The flight this tread belongs to: the stringers at its own height band and heading.
+      const dir = axis(t); // a tread's length runs ACROSS the stair
+      const up: V3 = [-dir[2]!, 0, dir[0]!]; // so the direction of travel is square to it, in plan
+      const mine = stringers.filter((s) => Math.abs(axis(s)[0]! * up[0]! + axis(s)[2]! * up[2]!) > 0.5);
+      assert.ok(mine.length > 0, `${id}: no stringer runs the way ${t.id} is laid across`);
+      // Project both onto the direction of travel and demand the tread lie within the run the
+      // stringers cover. The stringers are sampled AS CUT — their raw boxes span the whole lean.
+      const proj = (p: V3): number => p[0]! * up[0]! + p[2]! * up[2]!;
+      const sPts = mine.flatMap((s) => cutSamples(s).map(proj));
+      const lo = Math.min(...sPts);
+      const hi = Math.max(...sPts);
+      const th: V3 = [t.cutLength / 24, t.actual.d / 24, t.actual.w / 24];
+      const tPts: number[] = [];
+      for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+        const r = rotate(t, [sx * th[0], sy * th[1], sz * th[2]]);
+        tPts.push(proj([t.position[0] + r[0], t.position[1] + r[1], t.position[2] + r[2]]));
+      }
+      assert.ok(Math.min(...tPts) >= lo - 1e-6 && Math.max(...tPts) <= hi + 1e-6,
+        `${id}: ${t.id} runs ${Math.min(...tPts).toFixed(4)}..${Math.max(...tPts).toFixed(4)} along a flight `
+        + `that runs ${lo.toFixed(4)}..${hi.toFixed(4)} — ${(Math.max(lo - Math.min(...tPts), Math.max(...tPts) - hi) * IN_PER_FT).toFixed(2)} in of it is off the end`);
+    }
+  }
+});
+
+/** Undo a member's YXZ euler — world offset back into the board's own frame. */
+function unrotate(m: Member, v: V3): V3 {
+  const [rx, ry, rz] = m.rotation;
+  let [x, y, z] = v;
+  let a = x * Math.cos(-ry) + z * Math.sin(-ry);
+  let b = -x * Math.sin(-ry) + z * Math.cos(-ry);
+  x = a; z = b;
+  a = y * Math.cos(-rx) - z * Math.sin(-rx);
+  b = y * Math.sin(-rx) + z * Math.cos(-rx);
+  y = a; z = b;
+  a = x * Math.cos(-rz) - y * Math.sin(-rz);
+  b = x * Math.sin(-rz) + y * Math.cos(-rz);
+  return [a, b, z];
+}
+
+/** Is a world point inside the stringer AS CUT? Exact, against the profile polygon itself. */
+function insideStringer(s: Member, p: V3): boolean {
+  const l = unrotate(s, [p[0] - s.position[0], p[1] - s.position[1], p[2] - s.position[2]]);
+  if (Math.abs(l[2]) > s.actual.w / 24) return false;
+  const prof = stringerEndProfile(s);
+  let hit = false;
+  for (let i = 0, j = prof.length - 1; i < prof.length; j = i++) {
+    const [xi, yi] = prof[i]!; const [xj, yj] = prof[j]!;
+    if ((yi > l[1]) !== (yj > l[1]) && l[0] < ((xj - xi) * (l[1] - yi)) / (yj - yi) + xi) hit = !hit;
+  }
+  return hit;
+}
+
+test('and every tread has stringer under it, not merely beside it', () => {
+  // The other half of the same defect, and the one the render showed first: the bottom treads
+  // were not short of bearing, they had NONE. Measured on the loading platform before the fix,
+  // treads 1 and 2 had 0% of their underside over stringer material and tread 3 had 15%; on a
+  // hut's entry steps the bottom tread was 0% and half of it stood past the end of the stringers.
+  //
+  // Asked exactly — a point either is or is not inside the cut profile — rather than by sampling
+  // the stringer and hoping a sample lands in the thin band under a 1½-in board. The first
+  // version of this test did the latter and failed on the FIXED model, reporting "no stringer
+  // under any part of it" for a tread with 28% bearing.
+  for (const id of ['gp-frame', 'platform', 'sea-hut']) {
+    const m = modelOf(id);
+    const treads = m.members.filter((x) => x.role === 'tread');
+    const stringers = m.members.filter((x) => x.role === 'stringer');
+    assert.ok(treads.length > 0 && stringers.length > 0, `${id} has no stair`);
+    for (const t of treads) {
+      const tb = box(t);
+      const run = tb.x[1]! - tb.x[0]! < tb.z[1]! - tb.z[0]! ? 0 : 2;
+      const [u0, u1] = run === 0 ? tb.x : tb.z;
+      let on = 0;
+      let total = 0;
+      for (const s of stringers) {
+        const across = s.position[run === 0 ? 2 : 0];
+        if (across < (run === 0 ? tb.z[0]! : tb.x[0]!) || across > (run === 0 ? tb.z[1]! : tb.x[1]!)) continue;
+        for (let k = 0; k <= 40; k++) {
+          const u = u0! + ((u1! - u0!) * k) / 40;
+          total++;
+          const p: V3 = run === 0 ? [u, tb.y[0]! - 0.004, across] : [across, tb.y[0]! - 0.004, u];
+          if (insideStringer(s, p)) on++;
+        }
+      }
+      assert.ok(total > 0, `${id}: ${t.id} has no stringer across it at all`);
+      assert.ok(on > 0,
+        `${id}: ${t.id} has 0 of ${total} points of its underside over stringer material — it is standing in the air`);
+    }
   }
 });
 
