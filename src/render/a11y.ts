@@ -31,7 +31,9 @@ export function describe(result: Result, view: DrawView): A11y {
   const geo = result.geometry as GeometryModel;
   // A through-route with no firing aperture (connecting_trench) has no enemy-facing side —
   // the plan draws no ENEMY arrow or FRONT/REAR labels for it either (drawPlan.ts isOpenCorridor).
-  const isOpenCorridor = !geo.plan.sectors.present && geo.shape !== 'circular' && geo.shape !== 'vehicle_ramp';
+  // bunker_op_cp shares sectorsOfFire: false but is NOT a through-corridor (it has a real
+  // front/rear and parapet) — excluded by its own distinct shape, matching drawPlan.ts exactly.
+  const isOpenCorridor = !geo.plan.sectors.present && geo.shape !== 'circular' && geo.shape !== 'vehicle_ramp' && geo.shape !== 'rect_roofed';
 
   const features: string[] = [];
   if (result.cover.roofPath === 'earth_on_stringers') features.push('earth-on-stringers overhead cover');
