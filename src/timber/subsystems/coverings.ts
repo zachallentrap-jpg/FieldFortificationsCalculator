@@ -475,7 +475,7 @@ function roofTilePlacement(
 
 export interface RoofCoveringInput {
   planes: RoofPlane[];
-  deck: 'none' | 'plywood' | 'boards' | 'skip' | 'purlins';
+  deck: 'none' | 'plywood' | 'boards' | 'purlins';
   roofing: 'none' | 'roll' | 'rollDouble' | 'corrugated';
   buildingPaper?: boolean;
   stageDeck: number;
@@ -513,15 +513,52 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
   // `Math.max`, so this can only ever ADD lift: every case that was already right is untouched,
   // including purlins under a non-frozen roof, where nothing is laid elsewhere.
   const laidElsewhereThick = deckLaidElsewhere ? (PANEL.roofDeckThickIn.value as number) / IN_PER_FT : 0;
+  // A BOARD DECK IS AS THICK AS THE BOARD, not as thick as a sheet of plywood. Sharing the
+  // panel's ½ in here would have lifted the roofing by the wrong amount over a ¾-in deck.
+  const deckBoardNominal = LUMBER.deckBoardNominal.value as string;
+  const deckBoardT = DRESSED[deckBoardNominal]!.w / IN_PER_FT;
+  const deckBoardW = DRESSED[deckBoardNominal]!.d / IN_PER_FT;
   const deckThick = Math.max(
     laidElsewhereThick,
-    deck === 'plywood' || deck === 'boards' ? (PANEL.roofDeckThickIn.value as number) / IN_PER_FT
+    deck === 'plywood' ? (PANEL.roofDeckThickIn.value as number) / IN_PER_FT
+    : deck === 'boards' ? deckBoardT
     : deck === 'purlins' ? DRESSED[LUMBER.purlinNominal.value as string]!.w / IN_PER_FT
     : 0,
   );
 
   // ── Deck
-  if (!deckLaidElsewhere && (deck === 'plywood' || deck === 'boards')) {
+  //
+  // BOARDS ARE BOARDS. `roofDeck: 'boards'` came out of here as 4x8 plywood sheets — the same
+  // members, the same nominal, the same smooth panel on screen and the same line on the cut
+  // list as `'plywood'`, byte for byte. The wall pass next door has always laid its board
+  // siding as real boards at their true dressed width with the last one ripped; this is that,
+  // running ACROSS the rafters and stepping up the slope.
+  if (!deckLaidElsewhere && deck === 'boards') {
+    // Its OWN course loop, not `tileSurface`. That tiler splits a course into bands up the slope
+    // when a hip tapers faster than a sheet's height can follow — right for a 4-ft sheet, and on
+    // a board it sliced every 7¼-in course into four 1⅞-in strips. A board is one piece: it is
+    // laid whole and cut on the diagonal at the hip, which is what clipping to the span at its
+    // own mid-height describes.
+    for (const plane of planes) {
+      for (let v = 0; v < plane.slopeLengthFt - EPS; v += deckBoardW) {
+        const v1 = Math.min(v + deckBoardW, plane.slopeLengthFt);
+        const at = planeSpanAt(plane, (v + v1) / 2);
+        if (at.hi - at.lo <= EPS) continue; // the point at the top of a hip end
+        const t: Tile = { u0: at.lo, u1: at.hi, v0: v, v1, full: v1 - v >= deckBoardW - EPS };
+        const p = roofTilePlacement(plane, t, rafterHalfFt + deckBoardT / 2);
+        emit('roofPanel', deckBoardNominal, {
+          cutLengthFt: t.u1 - t.u0,
+          position: p.position,
+          rotation: [Math.PI / 2 - p.pitch, p.yaw, 0],
+          stage: stageDeck,
+          actual: { w: DRESSED[deckBoardNominal]!.w, d: (v1 - v) * IN_PER_FT },
+          nailing: '2-8d ea rafter (PH)',
+          doctrineRef: citeOf(LUMBER.deckBoardNominal),
+        });
+      }
+    }
+  }
+  if (!deckLaidElsewhere && deck === 'plywood') {
     const thick = (PANEL.roofDeckThickIn.value as number) / IN_PER_FT;
     const sheetW = PANEL.lengthFt.value as number; // 8 ft along the eave
     const sheetH = PANEL.widthFt.value as number; // 4 ft up the slope

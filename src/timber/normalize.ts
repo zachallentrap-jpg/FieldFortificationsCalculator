@@ -517,6 +517,44 @@ export function normalizeSpec(spec: StructureSpec): NormalizeResult {
  */
 const SHUTTER_MODES = new Set(['none', 'side', 'propped']);
 
+/**
+ * THE COVERINGS SECTION TOOK ANY STRING, and two of its four fields then behaved like a real
+ * choice: `siding: "nonsense"` and `roofing: "nonsense"` came back with the same member count as
+ * a real answer, and `wallSheathing` and `roofDeck` came back with none and nothing said. A
+ * share link is the only way to reach any of it — `decodeSpec` takes any JSON with a `family`
+ * key — and a share link is exactly where a typo, or a value from a later version of this tool,
+ * comes from.
+ *
+ * `roofDeck` also carried a fifth value, `'skip'`, that no card offered and no generator told
+ * apart from `'none'`. It is gone from the type; a link still carrying it lands here and is
+ * repaired to the thing it always meant, out loud.
+ */
+const COVERING_CHOICES: Record<string, { ok: string[]; fallback: string }> = {
+  wallSheathing: { ok: ['none', 'plywood', 'boards'], fallback: 'none' },
+  siding: { ok: ['none', 'plywood', 'boards', 'boardAndBatten'], fallback: 'none' },
+  roofDeck: { ok: ['none', 'plywood', 'boards', 'purlins'], fallback: 'plywood' },
+  roofing: { ok: ['none', 'roll', 'rollDouble', 'corrugated'], fallback: 'none' },
+};
+
+function repairCoverings(spec: StructureSpec, issues: SpecIssue[]): void {
+  const cov = (spec as unknown as { coverings?: Record<string, unknown> }).coverings;
+  if (!cov || typeof cov !== 'object') return;
+  for (const [field, { ok, fallback }] of Object.entries(COVERING_CHOICES)) {
+    const was = cov[field];
+    if (was === undefined || (typeof was === 'string' && ok.includes(was))) continue;
+    issues.push({
+      path: `coverings.${field}`,
+      kind: 'clamped',
+      message: was === 'skip'
+        ? 'A roof deck of "skip" was the same as none — took none, which is what it meant.'
+        : `"${String(was)}" is not a ${field === 'roofDeck' ? 'roof deck' : field} this tool lays — took ${fallback === 'none' ? 'none' : fallback}. `
+          + `The choices are ${ok.join(', ')}.`,
+      severity: 'warn',
+    });
+    cov[field] = was === 'skip' ? 'none' : fallback;
+  }
+}
+
 function repairShutters(spec: StructureSpec, issues: SpecIssue[]): void {
   const s = spec as { shutters?: unknown };
   if (s.shutters === undefined) return;
@@ -543,6 +581,7 @@ function normalizeSpec2(raw: StructureSpec, issues: SpecIssue[]): NormalizeResul
     raw.family === 'building' ? SPEC_SECTIONS_BUILDING : SPEC_SECTIONS_COMMON,
   );
   repairShutters(spec, issues);
+  repairCoverings(spec, issues);
   switch (spec.family) {
     case 'building':
       return { spec: normalizeBuilding(spec, issues), issues };

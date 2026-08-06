@@ -94,7 +94,7 @@ export interface StorySpec {
 export interface CoveringSpec {
   wallSheathing: 'none' | 'plywood' | 'boards';
   siding: 'none' | 'plywood' | 'boards' | 'boardAndBatten';
-  roofDeck: 'none' | 'plywood' | 'boards' | 'skip' | 'purlins';
+  roofDeck: 'none' | 'plywood' | 'boards' | 'purlins';
   roofing: 'none' | 'roll' | 'rollDouble' | 'corrugated';
   buildingPaper?: boolean;
 }

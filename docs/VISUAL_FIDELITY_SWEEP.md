@@ -2106,3 +2106,60 @@ that matter more than they look:
 
 It fails on the old generator at the first of the three: *"the wall: the last board ends at 6.6458
 against a limit of 6.5000 — 1.75 in past it."*
+
+## Floor cross-bridging — measured, wrong, and OUT OF BOUNDS
+
+A member type nothing in this sweep had looked at, and it is wrong. The ends are cut square to the
+board instead of plumb against the joists they bear on, so on the shipped `gp-frame`:
+
+```
+144 bridging pieces, 1x3 at 25.4°, between 2x8 joists
+  every corner    0.780 in above the joist tops and 0.780 in below their soffit
+  288 of 1152     corners inside the SUBFLOOR — two per piece, through the floor deck
+  576 of 1152     corners inside a JOIST — the square end drives into the joist beside it
+```
+
+**It cannot be fixed.** `FL-bridging-*` comes from `floor.ts`, and `timber2-compat.test.ts` opens
+with *"Red here past 1e-12 is a stop-the-line event — never 'update the golden' to make it pass;
+the goldens ARE the contract."*
+
+And a viewer-side cut — the `birdsMouth`/`riserSeats` pattern, pure, no golden moves — only gets
+half of it. Cutting each end plumb removes the 576 corners driving into the joists, but the piece's
+world-height extent is set by the board's own width and its pitch, and the plumb cut passes exactly
+through the two corners that were already extreme. The 288 corners through the subfloor survive it
+untouched. A half-fix that leaves the visible half is not worth the machinery.
+
+**What it would take:** the centreline ends moved in by half the end face's height
+(`boardWidth / 2 / cos(pitch)` = 1.38 in here) so the bevelled end sits inside the joist depth —
+which is the generator, which is frozen. Recorded here so the next person to unfreeze `floor.ts`
+has the number.
+
+## The roof deck option, which had three faults
+
+`coverings.roofDeck` is a five-value enum and only two of the five meant anything.
+
+**A board deck was plywood.** `'boards'` and `'plywood'` came out of the covering pass byte for
+byte the same — the same `4x8 panel` members, the same nominal on the cut list, the same smooth tan
+sheet on screen. The wall pass next door has always laid its board siding as real boards at their
+true dressed width with the last one ripped; this side never did. Now `LUMBER.deckBoardNominal`
+(1x8) laid across the rafters, stepping up the slope, ripped at the ridge.
+
+It needed its **own course loop** rather than `tileSurface`. That tiler splits a course into bands
+up the slope when a hip tapers faster than a sheet's height can follow — right for a 4-ft sheet,
+and on a 7¼-in board it sliced every course into four 1⅞-in strips. A board is one piece.
+
+And **the deck's thickness now follows its material**: the roofing's lift came off
+`PANEL.roofDeckThickIn` for both, so a ¾-in board deck lifted the courses by ½ in and they sank
+into it. (The test for this had to be corrected once: the lift is perpendicular to the roof plane,
+so a ¼-in difference raises a course by ¼ in × cos(pitch), not by ¼ in.)
+
+**`'skip'` was a synonym for `'none'`** that no card offered and no generator told apart. Gone from
+the type; a link still carrying it is repaired to the thing it always meant, out loud.
+
+**And the whole section took any string.** `siding: "nonsense"` and `roofing: "nonsense"` came back
+with the same member count as a real answer; `wallSheathing` and `roofDeck` came back with none.
+Nothing said a word. All four are guarded now, the same way the roof kind, the foundation kind and
+the shutter mode already were — a share link is the only way to reach any of it, and a share link
+is exactly where a typo comes from.
+
+Five regression tests, all five failing on the old code.
