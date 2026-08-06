@@ -71,6 +71,7 @@ screenshots get read.
 | **What fills a rough opening** | **Fixed** — every door and window on all fourteen cards was a HOLE you could see the cripples through. `OpeningSpec.fill` was written by every preset and read by nothing; the roles existed; the plan named the module by filename and it did not exist. |
 | **Getting to the door** | **Fixed** — every door on a piered card opened onto a 2 ft 3½ in drop to clear air. `BuildingSpec.entrySteps` was set to `true` by every hut and read by nothing, one field along from `fill`, in the same file. |
 | **The ends of a stair stringer** | **Fixed** — every flight in the toolkit ended in two sharp wedges: the foot stabbing 4 in below the ground it stands on, the head the same distance above the landing, and half the board standing proud of the treads it carries. |
+| **The loading ramp's toe** | **Fixed** — the ramp's walking surface started AT grade, so everything holding it up was underground: the toe plank entirely, and the stringers 12.34 in deep for the last six feet of a twenty-four-foot run. |
 
 ## The shed that had no walls above the plate
 
@@ -1536,6 +1537,63 @@ reported the foot as floating.
   not editable here. It has the same 4.44-in wedges.
 - **The platform's ramp** (`PF-stringer-*`) is its own emitter in `families/platform.ts`, not
   `generateStair`, and its stringers dip 5.55 in. Same shape of fix, different file.
+  *(Taken up in the next pass — and the dip was 12.34 in, not 5.55: the earlier figure came from
+  a sign error in the throwaway probe, not from the model. See below.)*
 - **The thumbnail painter draws boxes**, so the picker cards still show the uncut stringer. At
   220x150 over a forty-foot building that is well under a pixel; the 3D view and the solid card are
   what this change is for.
+
+## A ramp with its last six feet underground
+
+`platform.ts` parameterises its ramp better than anything else in the toolkit. One function places
+every piece —
+
+```
+surface(s) = (x, deckY·s, -run·(1-s))    s = 0 at grade, s = 1 at the platform edge
+```
+
+— and each piece says how far square BELOW the walking surface it sits, which is how a carpenter
+would describe it. The comment above it explains why: an earlier version gave every piece its own
+trigonometry and they disagreed about signs.
+
+The parameterisation is right and the datum was wrong. `s = 0` puts the **walking surface** at
+grade, so everything holding it up is under the ground: the toe plank lay entirely below it, and
+the stringers ran **12.34 in deep for the last six feet** of a twenty-four-foot run. Their own
+nailing note reads *"bolted at the deck; bedded at grade"* — buried a foot under it is not bedded.
+
+Two independent changes:
+
+**The datum.** The toe board lies ON the earth, so the surface starts one deck thickness up and
+the rise the slope is measured over is what is left. The slope itself — the life-safety figure — is
+untouched; a test measures it off the stringers' own pitch and pins it exactly at every value the
+doctrine offers.
+
+**The toe cut.** `stringerEndProfile`, written for the stair last pass, already cuts a level foot —
+but it cut the wrong end. The toolkit contains **both handednesses**: a stair climbs out of its +X
+end and its foot is at −hx, while the ramp is written the other way round ("walking out the +X end
+of the stringer goes DOWNHILL") and its foot is at +hx. Cutting the level face onto the wrong end
+would have left the buried end square and hung the long wedge in the air at the deck — worse than
+not cutting at all. The function reads the SIGN of the pitch now, not just its magnitude.
+
+At 1:6 the level cut is 5.6 ft long, which is a proper feathered ramp toe rather than the stair's
+few inches — the same expression, a very different-looking piece, and `MAX_BITE` was already there
+to stop it eating a piece that is too short to carry one.
+
+### Three things this iteration got wrong before getting them right
+
+**The iso view said the ramp stopped in mid-air.** It does not; it runs to the ground. In an
+isometric projection something receding from the camera moves UP the screen, so a descending ramp
+that recedes can end higher on screen than the deck it came from. An elevation settled it in one
+shot. That is the same trap as the orthographic-elevation note earlier in this file, from the other
+direction: **a projection is not a measurement**, whichever projection it is.
+
+**The 5.55-in figure recorded last pass was wrong** — the real dip is 12.34 in. The earlier number
+came from a throwaway probe that assumed the length axis points uphill, which is true of a stair and
+false of this ramp; it measured from the wrong end. The model was never 5.55 in out. Recorded here
+because a wrong number carried forward is worse than no number.
+
+**Three of the six new tests failed on their first run for being wrong themselves**: one flagged the
+platform's own FOOTINGS as "underground", which is where footings go; one demanded the toe board's
+underside sit exactly on grade when the boards are laid across the ramp from the toe up, so the
+first board's underside is legitimately half a board's rise above it; and one measured the slope
+from a bounding box round those boards and read 3% shallow.

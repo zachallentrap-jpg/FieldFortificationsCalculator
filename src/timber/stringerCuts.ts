@@ -34,7 +34,8 @@ export function stringerEndProfile(m: Pick<Member, 'cutLength' | 'actual' | 'rot
   const hx = m.cutLength / IN_PER_FT / 2;
   const hy = m.actual.d / IN_PER_FT / 2;
   const rect: [number, number][] = [[-hx, -hy], [hx, -hy], [hx, hy], [-hx, hy]];
-  const pitch = Math.abs(m.rotation[2] ?? 0);
+  const signed = m.rotation[2] ?? 0;
+  const pitch = Math.abs(signed);
   if (pitch < 1e-6 || pitch > Math.PI / 2 - 1e-6) return rect;
   const tan = Math.tan(pitch);
   // The level cut at the foot runs from the top corner down to the underside, reaching forward by
@@ -42,12 +43,15 @@ export function stringerEndProfile(m: Pick<Member, 'cutLength' | 'actual' | 'rot
   // it. They are reciprocals because one is measured against the horizontal and one the vertical.
   const foot = Math.min((2 * hy) / tan, 2 * hx * MAX_BITE);
   const head = Math.min(2 * hy * tan, 2 * hx * MAX_BITE);
-  return [
-    [-hx + foot, -hy],
-    [hx - head, -hy],
-    [hx, hy],
-    [-hx, hy],
-  ];
+  // WHICH END IS THE FOOT DEPENDS ON THE SIGN, and the toolkit contains both handednesses. A
+  // stair climbs out of its +X end (`+pitch`), so its foot is at -hx; the platform's RAMP is
+  // written the other way round — "walking out the +X end of the stringer goes DOWNHILL" — so
+  // its foot is at +hx. Cutting the level face onto the wrong end would put the long wedge in
+  // the air at the top and leave the buried end square, which is worse than not cutting at all.
+  const downhillIsPlusX = signed < 0;
+  return downhillIsPlusX
+    ? [[-hx + head, -hy], [hx - foot, -hy], [hx, hy], [-hx, hy]]
+    : [[-hx + foot, -hy], [hx - head, -hy], [hx, hy], [-hx, hy]];
 }
 
 /**

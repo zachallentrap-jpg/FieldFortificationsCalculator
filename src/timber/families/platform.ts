@@ -216,23 +216,31 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
   // carpenter would describe them: planks a half-thickness down, stringers under the planks.
   if (spec.ramp) {
     const sRamp = requireOrdinal(plan, 'stairs-access');
-    const run = deckY * spec.ramp.slope;
     const nominal = RAMP.stringerNominal.value as string;
-    const slopeLen = Math.hypot(run, deckY);
-    const pitch = Math.atan2(deckY, Math.max(1e-6, run));
     const rampW = spec.ramp.widthFt;
     const rampX0 = L / 2 - rampW / 2;
-    const downY = -Math.cos(pitch);
-    const downZ = Math.sin(pitch);
-    /** Center of a piece sitting `drop` feet square below the walking surface at station `s`. */
-    const seat = (x: number, s: number, drop: number): [number, number, number] =>
-      [x, deckY * s + downY * drop, -run * (1 - s) + downZ * drop];
-
     const deckIsPlank = spec.deck === 'plank';
     const rampDeckNominal = TENT.deckNominal.value as string;
     const deckThick = (deckIsPlank
       ? DRESSED[rampDeckNominal]!.w
       : (PANEL.subfloorThickIn.value as number)) / IN_PER_FT;
+
+    // THE RAMP SITS ON THE GROUND, IT IS NOT SUNK INTO IT. `s = 0` used to put the walking
+    // SURFACE at grade, which buried everything holding it up: the toe plank lay entirely under
+    // the ground and the stringers ran a foot deep for the last six feet of the run. The toe
+    // board lies ON the earth, so the surface starts one deck thickness up, and the rise the
+    // slope is measured over is what is left. The slope itself — the life-safety figure — is
+    // unchanged; only the datum it starts from is.
+    const toeY = deckThick;
+    const rise = Math.max(1e-6, deckY - toeY);
+    const run = rise * spec.ramp.slope;
+    const slopeLen = Math.hypot(run, rise);
+    const pitch = Math.atan2(rise, Math.max(1e-6, run));
+    const downY = -Math.cos(pitch);
+    const downZ = Math.sin(pitch);
+    /** Center of a piece sitting `drop` feet square below the walking surface at station `s`. */
+    const seat = (x: number, s: number, drop: number): [number, number, number] =>
+      [x, toeY + rise * s + downY * drop, -run * (1 - s) + downZ * drop];
 
     // Ry(PI/2)·Rz(-pitch) sends the length axis to (0, -sin pitch, -cos pitch): walking out the
     // +X end of the stringer goes DOWNHILL and away, so the piece is high at z = 0 against the
