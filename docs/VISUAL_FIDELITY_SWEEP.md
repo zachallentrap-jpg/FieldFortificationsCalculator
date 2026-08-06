@@ -55,6 +55,8 @@ screenshots get read.
 | **Corrugated banding on a hip** | **Fixed** — the band count was the whole PLANE's taper, so every strip on a hip was cut into the maximum 8 bands: 176 pieces of 26 x 11 in where a gable gave one sheet per strip. |
 | **Corrugated sheet layout** | **Fixed** — sheets were laid 8 ft along the eave x 26 in up the slope (on their side) with their joints butted; they now run their length up the slope and side-lap. |
 | **Hip + roof deck "none" + roofing** | **Partly fixed.** The hip was UNBACKED and is now dropped — real, measured, pinned. But that was NOT what the specks were; see the correction below. |
+| Guard tower — the guardrail gap vs. where the ladder arrives | **Checked, correct.** Nothing wrong. The opening is centred exactly on the ladder; the read that said otherwise is below. |
+| Custom card (`custom`) — bare frame, no siding, no roofing | **Checked, clean.** Nothing wrong. Piers on footings, floor frame, framed openings, gable rafters and deck, rake studs stepping up. |
 | **Guard tower — the ladder** | **Fixed** — set plumb inside a BATTERED frame, it crossed the leg plane about 9.6 ft up and ran through two brace diagonals with 8.9 in of overlap. |
 | Double-coverage roll roofing (`rollDouble`) | **Checked, clean.** Nothing wrong. Five courses where single coverage lays three — the 50% lap — laid along the eave from the eave up, which is how roll goods go on. |
 | **Roll roofing below its minimum slope** | **Fixed** — the two minimum-slope figures were cited on every course and checked nowhere, so a 1-in-12 roof under single-coverage roll came out clean. |
@@ -1004,3 +1006,31 @@ the sample points. Same mistake as the sweep made in its very first pass, caught
 The rake also has to be paid for in the rail: 36 in above the landing is a HEIGHT, so a raked rail
 is longer than a plumb one by its own hypotenuse — 19.083 ft, not 19. The wall ladder the two-story
 building uses takes `leanPerFt` 0 by default and comes out exactly as before.
+
+## Two clean checks, and a finding that wasn't
+
+Nothing was wrong this pass. Both targets are recorded above; what is worth writing down is how
+close the first came to being reported as a defect on the strength of a code read alone.
+
+**The tower's guardrail gap.** Having just moved the ladder, the obvious next question was whether
+the rail still opens where the ladder arrives. `tower.ts` computes it as
+
+    accessEdgeGap = [cabPlanFt/2 - accessWidth/2, cabPlanFt/2 + accessWidth/2]
+
+centred on `cabPlanFt/2` = 4.0 — while the deck's centre, and the ladder, are at `cx` = 5.5. A
+1.5-ft offset, exactly the batter, on a life-safety rail: it reads like the same `cx`-vs-half
+mix-up that has turned up elsewhere in this sweep, and the sentence describing it was half written.
+
+Measured, the front rail's gap runs **x 4.25 .. 6.75, centred at 5.50, 2.50 ft wide** — precisely
+the ladder's arrival and precisely the access width. `accessEdgeGap` is expressed in the rail RUN's
+own 0-based coordinates, not world X, and the railing subsystem adds the deck origin. `cabPlanFt/2`
+is the midpoint of an 8-ft run, and it is right.
+
+The rule that saved it is the one this log keeps relearning: a plausible reading of the code is not
+a finding. Measure the model.
+
+**The custom card.** Never rendered before, and it is the card a user lands on to start from
+scratch — `NO_COVERINGS`, so nothing is hidden behind siding or roofing and every member is on
+show. Piers on footings, floor frame and subfloor, stud walls with header, trimmers and sill at
+both openings, gable rafters, plywood deck, and the gable-end studs stepping up under the rake.
+Clean.
