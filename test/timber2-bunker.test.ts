@@ -445,10 +445,14 @@ import { IN_PER_FT } from '../src/timber/doctrine';
 /** Roles that make up a wall — the roof deck is `lagging` too, and is filtered off by height. */
 const WALL_ROLES = new Set(['post', 'cribLog', 'lagging']);
 
-function bunkerGeom(wallType: string) {
-  const spec = preset();
-  spec.wallType = wallType;
-  const model = generateStructure(spec);
+function bunkerGeom(wallType: string, over: Record<string, unknown> = {}) {
+  const asked = preset();
+  asked.wallType = wallType;
+  Object.assign(asked, over);
+  const model = generateStructure(asked);
+  // Read the dimensions BACK from the model: the envelope clamps, and a test that sizes the
+  // building off what it asked for measures a bunker that was never built.
+  const spec = model.spec as unknown as Record<string, number>;
   const wallThick = wallType === 'crib'
     ? (DRESSED[BUNKER.cribLogNominal.value as string]!.w / IN_PER_FT) * 3
     : DRESSED[BUNKER.postNominal.value as string]!.w / IN_PER_FT;
@@ -457,6 +461,7 @@ function bunkerGeom(wallType: string) {
   const wall = model.members.filter((k) => WALL_ROLES.has(k.role) && boxB(k).y[1]! <= capBottom + 1e-9);
   return {
     model, caps, wall, wallThick,
+    stringers: model.members.filter((k) => k.role === 'ohcStringer'),
     interiorL: spec.interiorLengthFt as number,
     interiorW: spec.interiorWidthFt as number,
     outerL: (spec.interiorLengthFt as number) + 2 * wallThick,
@@ -622,4 +627,85 @@ test('the crib bunker\'s other three walls are unbroken', () => {
   assert.ok(cut.length > 0, 'the entrance wall has cut courses');
   for (const c of cut) assert.ok(boxB(c).x[0]! < 1, `${c.id} was cut on a wall that has no doorway`);
   void hb;
+});
+
+// ── The overhead stringers ───────────────────────────────────────────────────
+//
+// Same mistake as the wall, one loop further down. The stringers were placed at
+// `outerL · i / (n − 1)`, so the first and last were CENTRED ON the end faces of the building:
+// half of each 8x8 hung 3⅝ in past the end wall, past the end of the cap it bears on, and out
+// from under both the roof lagging and the earth cover. In a front elevation of the stringer
+// stage the end one plainly sticks out beyond the wall below it, cantilevered over air.
+//
+// The count went with it. `floor(outerL / spacing) + 1` is the number that fit at LEAST the
+// doctrine spacing apart, which is the wrong side of a maximum: the shipped card came out at
+// 25⅜ in on centre against a 2 ft figure the stringer table flags life-safety.
+
+test('THE OVERHEAD STRINGERS ARE LAID INSIDE THE BUILDING, flush with both ends', () => {
+  for (const wallType of ['post-plank', 'crib']) {
+    for (const lengthFt of [10, 13, 16, 20, 24]) {
+      const { stringers, outerL, outerW } = bunkerGeom(wallType, { interiorLengthFt: lengthFt });
+      const tag = `${wallType} ${lengthFt} ft`;
+      assert.ok(stringers.length >= 2, `${tag}: no overhead`);
+      const bands = stringers.map((k) => boxB(k).x as [number, number]).sort((a, b) => a[0] - b[0]);
+      const first = bands[0]!;
+      const last = bands[bands.length - 1]!;
+      assert.ok(Math.abs(first[0]) < 1e-9,
+        `${tag}: the first stringer's outer face is at ${first[0].toFixed(4)} against an end wall at 0 `
+        + `— ${(-first[0] * IN_PER_FT).toFixed(2)} in of it is outside the building`);
+      assert.ok(Math.abs(last[1] - outerL) < 1e-9,
+        `${tag}: the last stringer's outer face is at ${last[1].toFixed(4)} against an end wall at ${outerL.toFixed(4)}`);
+      // And each of them still crosses the whole building the short way, which is what it is for.
+      for (const k of stringers) {
+        const b = boxB(k);
+        assert.ok(Math.abs(b.z[0]!) < 1e-9 && Math.abs(b.z[1]! - outerW) < 1e-9,
+          `${tag}: ${k.id} spans z ${b.z[0]!.toFixed(4)}..${b.z[1]!.toFixed(4)} of a ${outerW.toFixed(4)} ft building`);
+      }
+    }
+  }
+});
+
+test('at no more than the spacing the stringer table asks for, and no more of them than that needs', () => {
+  // A maximum, not a target: the spacing carries the stated depth of soil and the doctrine entry
+  // is flagged life-safety. Bounded from above as well, so a future change cannot quietly buy
+  // its way out of this test with more timber than the table asks for.
+  const spacing = BUNKER.stringerSpacingFt.value as number;
+  for (const wallType of ['post-plank', 'crib']) {
+    for (const lengthFt of [10, 13, 16, 20, 24]) {
+      const { stringers, outerL } = bunkerGeom(wallType, { interiorLengthFt: lengthFt });
+      const tag = `${wallType} ${lengthFt} ft`;
+      const centres = stringers.map((k) => k.position[0]!).sort((a, b) => a - b);
+      const gaps = centres.slice(1).map((c, i) => c - centres[i]!);
+      const widest = Math.max(...gaps);
+      assert.ok(widest <= spacing + 1e-9,
+        `${tag}: ${(widest * IN_PER_FT).toFixed(2)} in on centre against a ${spacing * IN_PER_FT} in maximum`);
+      const run = outerL - stringers[0]!.actual.w / IN_PER_FT;
+      if (stringers.length > 2) {
+        assert.ok(run / (stringers.length - 2) > spacing + 1e-9,
+          `${tag}: ${stringers.length} stringers where ${stringers.length - 1} would still make the spacing`);
+      }
+    }
+  }
+});
+
+test('and every stringer bears on both caps across its whole thickness', () => {
+  for (const wallType of ['post-plank', 'crib']) {
+    const { model, caps, stringers } = bunkerGeom(wallType);
+    assert.equal(caps.length, 2);
+    for (const cap of caps) {
+      const cb = boxB(cap);
+      for (const s of stringers) {
+        const sb = boxB(s);
+        assert.ok(sb.x[0]! >= cb.x[0]! - 1e-9 && sb.x[1]! <= cb.x[1]! + 1e-9,
+          `${wallType}: ${s.id} runs x ${sb.x[0]!.toFixed(4)}..${sb.x[1]!.toFixed(4)} over a cap running `
+          + `${cb.x[0]!.toFixed(4)}..${cb.x[1]!.toFixed(4)} — ${((Math.max(0, cb.x[0]! - sb.x[0]!) + Math.max(0, sb.x[1]! - cb.x[1]!)) * IN_PER_FT).toFixed(2)} in of it is past the end of what carries it`);
+        assert.ok(Math.abs(sb.y[0]! - cb.y[1]!) < 1e-9,
+          `${wallType}: ${s.id} sits at ${sb.y[0]!.toFixed(4)} on a cap topping out at ${cb.y[1]!.toFixed(4)}`);
+      }
+    }
+    // Nothing of the overhead may stand outside the walls it lands on, in plan.
+    const outer = model.members.filter((k) => k.role === 'capBeam');
+    const xMax = Math.max(...outer.map((k) => boxB(k).x[1]!));
+    for (const s of stringers) assert.ok(boxB(s).x[1]! <= xMax + 1e-9);
+  }
 });

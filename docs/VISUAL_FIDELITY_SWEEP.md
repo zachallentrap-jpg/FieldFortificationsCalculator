@@ -1752,3 +1752,43 @@ from inside or outside it simply looked like a wall.
 - **The wall lagging is centred on the post line**, so at every post station the plank passes
   through the post. Physically the lagging retains the earth and belongs on the *outer* face of the
   posts. Pre-existing and unchanged by this pass.
+
+## The two beams cantilevered over the ends of the bunker
+
+The recorded next target, and it went the same way as the wall: the visible defect was one of two,
+and the second one was in the number rather than the geometry.
+
+The overhead stringers were placed at `x = outerL · i / (n − 1)` — the first and last **centred on**
+the end faces of the building. Half of each 8×8 hung 3⅝ in past the end wall, past the end of the
+cap it bears on, and out from under both the roof lagging and the earth cover. A front elevation of
+the stringer stage shows it plainly: the end stringer's outer face sits clear of the wall below it,
+with air under the overhanging half.
+
+```
+post-plank, shipped card (outer 16.917 ft long, 8x8 stringers 7¼ in thick)
+  before   x −0.3021 .. 17.2188   n = 9    25⅜ in on centre
+  after    x  0.0000 .. 16.9167   n = 10   21¾ in on centre
+```
+
+**The count was wrong too.** `floor(outerL / spacing) + 1` is the number of stringers that fit at
+*least* the doctrine spacing apart — the wrong side of a maximum. `BUNKER.stringerSpacingFt` is
+`doc(2, …, { lifeSafety: true })`, and the shipped card came out at 25⅜ in on centre against 24.
+The run that has to be divided is the building less one stringer, and it has to be divided into
+**enough** bays: `ceil(run / spacing)`.
+
+Three regression tests, all failing on the old generator across five interior lengths and both
+wall types: *"the first stringer's outer face is at −0.3021 against an end wall at 0 — 3.63 in of
+it is outside the building"*, *"26.20 in on centre against a 24 in maximum"*, and *"3.63 in of it
+is past the end of what carries it."* The spacing test is bounded from **above** as well — one
+fewer stringer would have to break the spacing — so a later change cannot buy its way out of it
+with timber the table never asked for.
+
+### Seen while measuring, not changed
+
+- **The post spacing has the same bug.** `Math.round(run / postSpacing) + 1` gives 4 ft 1⅜ in on
+  centre against a `postSpacingFt` of 4 ft, also flagged life-safety and also named on the card's
+  own lock list. Same wrong side of a maximum, different loop. **Next target.**
+- **The roof deck stops ½ in short of the far long wall.** `for (let z = lagW/2; z < outerW; z += lagW)`
+  ends when the next board's centre would fall outside, so the last board's far edge lands at
+  10.875 ft of a 10.917 ft building — a ½-in strip of the overhead with earth straight onto the
+  stringers. The `Math.min` clamp in the position was meant to catch this and does not fire.

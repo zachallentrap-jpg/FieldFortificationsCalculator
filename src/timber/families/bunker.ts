@@ -268,11 +268,27 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
   const stringerD = DRESSED[stringer.nominal]!.d / IN_PER_FT;
   const stringerY = capY + capD / 2 + stringerD / 2;
   const stringerSpacing = BUNKER.stringerSpacingFt.value as number;
-  const nStringers = Math.max(2, Math.floor(outerL / stringerSpacing) + 1);
+  // THE STRINGERS ARE LAID INSIDE THE BUILDING, on a run that is the building less one stringer.
+  //
+  // They were placed at `outerL · i / (n − 1)` — the first and last CENTRED ON the end faces, so
+  // half of each 8x8 hung 3⅝ in out past the end wall, past the end of the cap it bears on, and
+  // out from under both the roof lagging and the earth cover. Two beams cantilevered over open
+  // air at the two ends of the overhead, and in a front elevation the end one plainly sticks out
+  // beyond the wall below it. Same mistake as the wall itself: a member placed ON a face instead
+  // of INSIDE it.
+  //
+  // And the count went with it. `floor(outerL / spacing) + 1` gives the number of stringers that
+  // fit at LEAST the doctrine spacing apart, which is the wrong side of a maximum: the shipped
+  // card came out at 25⅜ in on centre against a 2 ft figure the doctrine table flags life-safety.
+  // The run is what has to be divided, and it has to be divided into ENOUGH bays.
+  const stringerW = DRESSED[stringer.nominal]!.w / IN_PER_FT;
+  const stringerRun = Math.max(0, outerL - stringerW);
+  const stringerBays = Math.max(1, Math.ceil(stringerRun / stringerSpacing - 1e-9));
+  const nStringers = stringerBays + 1;
   for (let i = 0; i < nStringers; i++) {
     emit('ohcStringer', stringer.nominal, {
       cutLengthFt: outerW,
-      position: [(outerL * i) / (nStringers - 1), stringerY, outerW / 2],
+      position: [stringerW / 2 + (stringerRun * i) / stringerBays, stringerY, outerW / 2],
       rotation: [0, Math.PI / 2, 0],
       stage: sStringer,
       nailing: 'bearing on the caps both ends; drift-pinned (PH)',
