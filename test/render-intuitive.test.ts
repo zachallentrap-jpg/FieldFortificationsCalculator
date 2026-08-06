@@ -239,6 +239,30 @@ test('engineered roof is drawn honestly (hazard block, no fabricated earth cover
   assert.ok(!section.includes('url(#pat-cover)'), 'no earth-cover slab for an engineered roof');
 });
 
+test('a vehicle defilade never draws a roof or engineered-hazard block, matching the 3D model', () => {
+  // scene3d.ts has always excluded vehicle_ramp from both the earth-roof and engineered-hazard
+  // branches (nobody ever designed a "roof over a vehicle pit" geometry — there's no parapet for
+  // it to span between). drawSection.ts had no such exclusion: for a threat resolving to
+  // engineered_required, it drew the same "ENGINEERED ROOF — SEE ENGINEER" hazard block for a
+  // vehicle position that the 3D model correctly omitted for the identical position/threat. The
+  // underlying calc.roofPath/coverOn are deliberately left untouched (they still feed the specs
+  // panel and ROOF_SPAN_EXCEEDED correctly) — only the schematic's attempt to draw an undesigned
+  // shape is suppressed, so this is a rendering-only fix, not an engine/validation change.
+  for (const positionType of ['vehicle_hull_defilade', 'vehicle_turret_defilade']) {
+    // Every vehicle's clear span (12 ft) exceeds the stringer table on its own, so roofPath is
+    // 'engineered_required' for ANY threat once overhead cover is requested (span-forced, not
+    // just threat-forced) — 'earth_on_stringers' is unreachable for this shape family, which is
+    // exactly why ROOF_SPAN_EXCEEDED's own test fixture is a vehicle position.
+    const r = compute(defaultInputs({ positionType, overheadCover: true, threat: 'sa-556' }));
+    const geo = r.geometry as GeometryModel;
+    assert.equal(geo.section.roofPath, 'engineered_required', positionType + ': fixture must exercise the (span-forced) engineered path');
+    const section = drawSection(r);
+    assert.ok(!section.includes('ENGINEERED ROOF — SEE ENGINEER'), positionType + ': no engineered hazard block drawn');
+    assert.ok(!section.includes('url(#pat-engineered)'), positionType + ': no engineered hazard pattern');
+    assert.ok(!section.includes('url(#pat-cover)'), positionType + ': no earth-cover slab drawn either');
+  }
+});
+
 test('the roof\'s rear overhang is the structural bearing shelf, not the parapet\'s own thickness', () => {
   // geo.section.rearOverhang = max(bearingEachEnd, setbackDepthFrac * depthOfCut) — a doctrine
   // leaf about how far stringers must land on undisturbed earth, NOT parapetW (an unrelated
