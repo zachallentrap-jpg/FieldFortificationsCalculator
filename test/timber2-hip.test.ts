@@ -9,7 +9,9 @@ import assert from 'node:assert/strict';
 import { generateStructure } from '../src/timber/families/index';
 import { tileSurface } from '../src/timber/subsystems/coverings';
 import { familyById } from '../src/timber/catalog';
-import { hipLenPerFtRun, jackDifference, planeSpanAt, roofPlanes } from '../src/timber/subsystems/roofFamilies';
+import { hipDropFt, hipLenPerFtRun, jackDifference, planeSpanAt, roofPlanes } from '../src/timber/subsystems/roofFamilies';
+import { DRESSED } from '../src/timber/types';
+import { LUMBER } from '../src/timber/doctrine';
 
 function hipModel(risePer12 = 6) {
   const spec = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset));
@@ -362,20 +364,83 @@ test('THE PITCH: a hip\'s commons, jacks and hips all land on ONE eave line', ()
     const [a, b] = endsOf(m);
     assert.ok(Math.abs(riseOverRun(a, b) - slope / Math.SQRT2) < 1e-9, `${m.id}: hip pitch`);
   }
-  // All three land on ONE eave line. That is the property the bug broke.
-  const eaveY = endsOf(hips[0]!)[0]![1]!;
-  for (const m of [...commons, ...jacks, ...hips]) {
+  // Commons and jacks land on ONE eave line. That is the property the pitch bug broke.
+  //
+  // THE DATUM IS A COMMON RAFTER, not a hip, and that is deliberate. A common is square to the
+  // plane it carries, so it defines the plane; a hip is canted to two of them and is now DROPPED
+  // by `hipDropFt` so its arrises land flat. Anchoring on the hip would have hidden the drop
+  // inside the datum and asserted nothing about it.
+  const eaveY = endsOf(commons[0]!)[0]![1]!;
+  for (const m of [...commons, ...jacks]) {
     const low = endsOf(m)[0]!;
     assert.ok(Math.abs(low[1]! - eaveY) < 1e-9,
       `${m.id}: its eave end sits ${((low[1]! - eaveY) * 12).toFixed(2)} in off the eave line`);
   }
-  // And the commons meet the hips at the ridge, at the same point.
-  const ridgeY = endsOf(hips[0]!)[1]![1]!;
+  // And the hips sit exactly one drop below it, at both ends — not approximately, and not zero.
+  const drop = hipDropFt(DRESSED[LUMBER.rafterNominal.value as string]!.d,
+    DRESSED[LUMBER.rafterNominal.value as string]!.w, slope);
+  assert.ok(drop > 0.002 / 12, 'a hip at a real pitch has a real drop');
+  for (const m of hips) {
+    const low = endsOf(m)[0]!;
+    assert.ok(Math.abs(low[1]! - (eaveY - drop)) < 1e-9,
+      `${m.id}: dropped ${((eaveY - low[1]!) * 12).toFixed(4)} in, should be ${(drop * 12).toFixed(4)}`);
+  }
+  // And the commons meet the ridge at the ridge point — the hips meet it one drop lower.
+  const ridgeY = endsOf(hips[0]!)[1]![1]! + drop;
   for (const m of commons) {
     const high = endsOf(m)[1]!;
     assert.ok(Math.abs(high[1]! - ridgeY) < 1e-9,
       `${m.id}: its ridge end sits ${((high[1]! - ridgeY) * 12).toFixed(2)} in off the ridge`);
     assert.ok(Math.abs(high[2]! - spec.dims.widthFt / 2) < 1e-9, `${m.id}: ridge end missed z = W/2`);
+  }
+});
+
+test('THE DROP: a dropped hip puts its arrises ON the roof, exactly where a common reaches', () => {
+  // The property the drop exists for, and the one worth pinning: a hip is canted to both slopes
+  // it lies under, so a plain rectangular stick centred on the hip line stands its top ARRISES
+  // proud of both planes — 2.848 in against the 2.750 a common rafter reaches, on a 4-in-12 2x6.
+  // With a deck that half inch of plywood buries it; with roof deck "none" the roofing clears the
+  // arrises by 0.022 in and they z-fight through as a line of specks down every hip.
+  //
+  // Measured perpendicular to the plane, from the ridge board's centre — which lies ON the rafter
+  // plane at the ridge, and is therefore a datum that does not move when the hip does.
+  const axesOf = (rot: readonly number[]) => {
+    const ry = rot[1]!, rz = rot[2]!;
+    const C = Math.cos(ry), S = Math.sin(ry), c = Math.cos(rz), s = Math.sin(rz);
+    return { Y: [-C * s, c, S * s], Z: [S, 0, C] };
+  };
+  const dot = (a: number[], b: readonly number[]) => a[0]! * b[0]! + a[1]! * b[1]! + a[2]! * b[2]!;
+
+  for (const risePer12 of [2, 4, 6, 12]) {
+    const spec = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset));
+    spec.dims = { lengthFt: 16, widthFt: 12 };
+    spec.roof = { kind: 'hip', risePer12, overhangFt: 1 };
+    const model = generateStructure(spec);
+    const planes = roofPlanes(model.spec as never, 0);
+    const ridge = model.members.find((m) => m.role === 'ridge')!;
+    const highestArris = (role: string) => {
+      let worst = -Infinity;
+      for (const m of model.members.filter((x) => x.role === role)) {
+        const { Y, Z } = axesOf(m.rotation);
+        const hd = m.actual.d / 12 / 2, hw = m.actual.w / 12 / 2;
+        for (const p of planes) {
+          const c = [0, 1, 2].map((i) => m.position[i]! - ridge.position[i]!);
+          const base = dot(c, p.normal);
+          if (Math.abs(base) > 0.05) continue; // only the planes this piece actually lies under
+          for (const sy of [1, -1]) for (const sz of [1, -1]) {
+            worst = Math.max(worst, base + dot([0, 1, 2].map((i) => sy * hd * Y[i]! + sz * hw * Z[i]!), p.normal));
+          }
+        }
+      }
+      return worst * 12;
+    };
+    const common = highestArris('rafter');
+    const hip = highestArris('hipRafter');
+    assert.ok(Math.abs(common - DRESSED[LUMBER.rafterNominal.value as string]!.d / 2) < 1e-6,
+      `${risePer12}-in-12: a common should reach exactly half its depth, got ${common.toFixed(4)} in`);
+    assert.ok(Math.abs(hip - common) < 1e-6,
+      `${risePer12}-in-12: the hip's arris reaches ${hip.toFixed(4)} in where a common reaches `
+      + `${common.toFixed(4)} — an undropped hip holds the sheathing off the roof`);
   }
 });
 

@@ -596,10 +596,44 @@ export function hipLenPerFtRun(slope: number): number {
   return Math.sqrt(2 + slope * slope);
 }
 
+/**
+ * How far to DROP a hip rafter so the sheathing lies flat across it, in feet of VERTICAL fall.
+ *
+ * A common rafter is square to the plane it carries: centre it on that plane and its top face IS
+ * the plane. A hip is not. It lies under the FOLD between two slopes, canted to both, so a plain
+ * rectangular stick centred on the hip line has its two top ARRISES standing proud of both planes
+ * — measured on a 16 x 12 4-in-12 hip, 2.848 in above the plane where a common reaches 2.750.
+ *
+ * A framer has two ways out, and both are named jobs: BACK the hip (bevel its top edge to the two
+ * planes, leaving a shallow ridge down the middle) or DROP it — set it low enough that the arrises
+ * land ON the planes and the sheathing bears on them. Dropping is the common choice because it is
+ * one saw setting on the seat cut instead of a rip down twelve feet, and it is what this models.
+ *
+ * Perpendicular to a plane, the arris of a stick `d` deep and `w` thick sits at
+ *
+ *     (d/2)·(√2/2)·√(2+t²)/√(1+t²)  +  (w/2)·(√2/2)·t/√(1+t²)
+ *
+ * for slope `t` — the first term from the depth, the second from the half-thickness the cant swings
+ * up. Subtract the `d/2` a common reaches, then divide by cos(pitch) to turn a perpendicular
+ * excess into the vertical fall you actually cut. Both roof planes give the same answer, which is
+ * what makes ONE drop serve a hip that carries two slopes.
+ *
+ * At 4-in-12 with a 2x6 that is 0.103 in — three thirty-seconds, small and not nothing: without it
+ * a roof with no deck clears the arrises by 0.022 in and they z-fight through the roofing.
+ */
+export function hipDropFt(rafterDIn: number, rafterWIn: number, slope: number): number {
+  const halfD = rafterDIn / 2;
+  const halfW = rafterWIn / 2;
+  // Perpendicular excess over what a common rafter reaches, times cos(pitch) already cancelled:
+  // proj·√(1+t²) − (d/2)·√(1+t²) is the vertical fall directly.
+  const vertical = (Math.SQRT2 / 2) * (halfD * Math.sqrt(2 + slope * slope) + halfW * slope)
+    - halfD * Math.sqrt(1 + slope * slope);
+  return Math.max(0, vertical) / IN_PER_FT;
+}
+
 /** The constant by which each successive jack rafter shortens, in feet. */
 export function jackDifference(slope: number, spacingFt: number): number {
-  return spacingFt * Math.sqrt(1 + slope * slope);
-}
+  return spacingFt * Math.sqrt(1 + slope * slope);}
 
 export function generateHip(input: HipInput): Member[] {
   const emit = makeEmitter('HP');
@@ -681,17 +715,28 @@ export function generateHip(input: HipInput): Member[] {
   }
 
   // Four hips, corner to ridge end. The run is the DIAGONAL, which is the whole difference.
+  //
+  // AND THE HIP IS DROPPED. A common rafter is square to the plane it carries, so centring it on
+  // that plane puts its top face exactly on the roof. A hip is canted to BOTH slopes it lies
+  // under, so a plain stick on the hip line stands its two top arrises proud of both — 0.098 in
+  // on a 4-in-12 2x6, which is why a roof with no deck showed the arrises z-fighting through the
+  // roofing in a line of specks down every hip. `hipDropFt` states the fall that lands them on
+  // the planes; the alternative a framer has is to BACK the hip, and the cut list says which.
   const hipLen = (halfSpan + oh) * hipLenPerFtRun(slope);
+  const rafterD = DRESSED[rafterNominal]!.d;
+  const rafterW = DRESSED[rafterNominal]!.w;
+  const drop = hipDropFt(rafterD, rafterW, slope);
   for (const [cx, cz] of [[-oh, -oh], [L + oh, -oh], [L + oh, W + oh], [-oh, W + oh]] as [number, number][]) {
     const rx = cx < L / 2 ? L / 2 - ridgeLen / 2 : L / 2 + ridgeLen / 2;
     const run = Math.hypot(rx - cx, W / 2 - cz);
     emit('hipRafter', rafterNominal, {
       cutLengthFt: hipLen,
-      position: [(cx + rx) / 2, (roofY - oh * slope + ridgeY) / 2, (cz + W / 2) / 2],
+      position: [(cx + rx) / 2, (roofY - oh * slope + ridgeY) / 2 - drop, (cz + W / 2) / 2],
       rotation: [0, Math.atan2(-(W / 2 - cz), rx - cx), Math.atan2(ridgeY - (roofY - oh * slope), run)],
       stage,
       nailing: '3-16d at the ridge; jacks bear on it both sides (PH)',
-      doctrineRef: `${citeOf(LUMBER.rafterNominal)} — hip run is the diagonal: ${hipLenPerFtRun(slope).toFixed(3)} ft per ft of common run`,
+      doctrineRef: `${citeOf(LUMBER.rafterNominal)} — hip run is the diagonal: ${hipLenPerFtRun(slope).toFixed(3)} ft per ft of common run`
+        + `; DROP the hip ${(drop * IN_PER_FT).toFixed(3)} in (or back it) so the sheathing lies flat`,
     });
   }
 

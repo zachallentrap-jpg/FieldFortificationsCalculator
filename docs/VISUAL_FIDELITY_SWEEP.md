@@ -52,7 +52,8 @@ screenshots get read.
 | **Hip roof — the common rafters' pitch** | **Fixed** — rotated to a rise measured from the plate over a run measured from the eave, so every common sat 1.84 in proud of the roof at the eave and 1.84 in below the ridge. The jacks and hips were right; only the commons dissented. |
 | **The ridge cap** | **Fixed** — the cap was laid at DECK level and every course of roofing stacked on top of it, so the 2x8 ridge board showed through the piece whose whole job is to be outermost. |
 | **Gable + roof deck "none" + roofing** | **Fixed** — the frozen gable decks itself whatever the spec says, but the roofing's lift was read off the spec, so "no deck" sank every course into the deck that was there and the plywood striped through the roof. |
-| **Hip + roof deck "none" + roofing** | **Checked; diagnosed, not fixed.** The roof is right. What shows is an UNBACKED HIP: measured below. |
+| **Hip + roof deck "none" + roofing** | **Partly fixed.** The hip was UNBACKED and is now dropped — real, measured, pinned. But that was NOT what the specks were; see the correction below. |
+| **The hip drop** | **Fixed** — a hip is canted to both slopes it lies under, so a plain stick stood its arrises 0.098 in proud of the roof. Dropped, and the figure is on the cut list. |
 
 ## The shed that had no walls above the plate
 
@@ -814,15 +815,42 @@ sheathing lies flat across it. Neither is modelled. With a deck the half inch of
 error; without one the roofing clears it by a forty-fifth of an inch, which is coplanar as far as a
 depth buffer is concerned, and the arrises z-fight through as specks.
 
-**Recorded rather than fixed, deliberately.** The fix is small and has a proper name — drop the hip
-by `0.098 in / cos(pitch)`, and say so on the cut list, because a framer needs to be told. But it
-moves a member position that three tests now pin, including the one asserting that commons, jacks
-and hips all land on a single eave line. Changing that assertion to expect a drop is legitimate
-ONLY if the drop is the deliberate subject of the change — done as a side effect of chasing specks,
-it is a test rewritten to agree with whatever the code now does. It wants its own pass, with the
-cut-list note as part of the deliverable.
+### The drop, done deliberately — and a correction
+
+`hipDropFt(d, w, slope)` states the vertical fall that lands the arrises on the planes:
+
+    (√2/2)·( (d/2)·√(2+t²) + (w/2)·t )  −  (d/2)·√(1+t²)
+
+The first term is where the arris actually sits, perpendicular to a plane — depth plus the
+half-thickness the cant swings up — and the second is the `d/2` a common reaches. Both planes give
+the same answer, which is what lets ONE drop serve a hip carrying two slopes. At 4-in-12 with a 2x6
+it is 0.103 in. `generateHip` applies it and the cut list now says *"DROP the hip 0.103 in (or back
+it) so the sheathing lies flat"*, because a framer has to be told which job to do.
+
+Measured after: the hip's highest arris reaches **2.7500 in** above the plane at 2, 4, 6 and
+12-in-12 — exactly what a common rafter reaches. Disable the drop and the test fails with
+`the hip's arris reaches 2.8185 in where a common reaches 2.7500`. The test that used to anchor the
+eave line on a HIP now anchors it on a COMMON, deliberately: a common is square to the plane and
+defines it, and anchoring on the hip would have hidden the drop inside the datum.
+
+**The correction.** The previous pass blamed the specks on this. That was wrong. With the drop
+applied and every arris flush, the specks are still there — and a raycast into one lands on a
+CEILING JOIST, two feet below the roof, through a fully finished roofing surface. They are not
+framing standing proud; they are **pinholes through the roofing**, and what the plywood deck was
+doing in the control was not burying an arris but plugging the hole behind it. The unbacked hip was
+real, measured and worth fixing on its own merits; it simply was not the thing in the picture.
 
 ## What is still open
+
+- **Pinholes through the roofing.** Next target, and now properly located. Roofing courses lap up
+  the slope but BUTT exactly along the eave: `u0 = lo + r * sheetLen`, `u1 = min(u0 + sheetLen, hi)`,
+  so consecutive sheets in a course share an edge to the last bit. A ray that hits that shared edge
+  passes between them, which is why a raycast into a speck comes back holding a ceiling joist. With
+  a deck the hole is plugged from behind and nothing shows; with roof deck "none" you see straight
+  through the roof. Worth checking while fixing it: `corrugatedSideLapIn` is being spent as the
+  COURSE lap (up the slope), and a side lap is by name the lap between neighbouring sheets ACROSS
+  the slope — which is exactly the joint that is currently butted. The lap may be on the wrong
+  axis, in which case one change closes the pinholes and puts the material where doctrine says.
 
 - **`roofDeck: 'skip'` is a dead option.** Skip sheathing — spaced boards under corrugated — is in
   both the spec type and the covering module's input type, and nothing produces or consumes it: no
