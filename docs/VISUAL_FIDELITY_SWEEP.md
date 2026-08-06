@@ -69,6 +69,7 @@ screenshots get read.
 | **The roof a share link hands in** | **Fixed** — three ways a pasted link broke the workbench: a shed with no `highSide` and a spec with no `roof` both THREW, leaving "Laying out the frame…" spinning forever with no canvas; an unknown roof kind framed a building with no roof and said nothing. |
 | **Every other section a share link hands in** | **Fixed** — deleting each top-level key of the shipped preset in turn: SIX of the eight threw. `family`, `dims`, `spacing`, `coverings`, `stories` and `foundation` all produced the same dead spinner. An unknown foundation kind silently poured piers. |
 | **What fills a rough opening** | **Fixed** — every door and window on all fourteen cards was a HOLE you could see the cripples through. `OpeningSpec.fill` was written by every preset and read by nothing; the roles existed; the plan named the module by filename and it did not exist. |
+| **Getting to the door** | **Fixed** — every door on a piered card opened onto a 2 ft 3½ in drop to clear air. `BuildingSpec.entrySteps` was set to `true` by every hut and read by nothing, one field along from `fill`, in the same file. |
 
 ## The shed that had no walls above the plate
 
@@ -1420,3 +1421,63 @@ did **not** move: built openings are appended after the legacy path, which is un
   `'propped'` draws the same closed pair as `'side'`. A propped leaf is a rotated panel plus a
   prop stick, and no shipped card sets it.
 - **`ac-sleeve`** builds nothing. It is in the fill union and no card asks for it.
+
+## The door with nothing under it
+
+Having just built the door leaves, the obvious next question is what you stand on to reach one.
+`BuildingSpec.entrySteps` is declared, set to `true` by every hut in `buildingSpecForHut`, and read
+by **nothing** — one field along from `fill`, found the same way, in the same file. The plan says it
+in a line: *"Entry steps: stair math reused at every door when floor raised ≥ 1.5 ft."*
+
+Measured on the shipped cards:
+
+| threshold above grade | cards |
+|---|---|
+| 2 ft 3½ in | gp-frame, sea/swa/b/squad hut, latrine |
+| 1 ft 1½ in | guard shack, storage shed |
+
+An elevation of the GP building's door end shows it plainly: leaf, floor band, then clear air down
+to a pier footing. Five cards had a door nobody could use.
+
+`generateEntrySteps` places the flight and `generateStair` cuts it — same riser rule, same
+stringers, same LS figures, no second copy of the stair math. `arriveAt` is why the placement is
+one line: a flight is positioned by where you step OFF it, and you step off an entry stair at the
+threshold, facing in. The two cards at 1 ft 1½ in get nothing, which is the rule doing its job:
+that is a long step up, not a stair.
+
+### What the tests caught that the render did not
+
+**The top tread was buried in the wall.** A flight normally puts a tread at every riser top
+including the last, flush with the landing — correct for a deck you step off sideways onto, wrong
+for a threshold with a wall in it. Kept, it put 189 cubic inches of tread inside the sole plate and
+27 inside the siding, at every door. The landing IS that tread: `omitTopTread` drops it, opt-in, so
+the tower's and the platform's stairs do not move.
+
+**Both flights numbered their pieces from one.** `generateStair` hard-coded `makeEmitter('AC')`,
+which is right while a structure has ONE stair. A building with two doors has two, and the seeded
+sweep found `AC-stringer-01` twice in the same model within a dozen specs. Ids are what selection,
+the highlight and the packet's anchors key on. Each flight now carries its own `ES<n>` prefix.
+
+**The footprint check had to learn what an entry stair is.** C-7 asserts nothing flies off into
+space, and a stair is the one thing here that is *supposed* to leave the footprint. The allowance is
+derived from `solveFlight` — the same solver the stair is cut with, not an estimate of it — and
+from the rise to the THRESHOLD rather than to the floor, because the fuzzer writes doors with a sill
+on them and a door 3 ft 6 in up needs a flight that much longer. Both corrections came from the test
+failing on cases a hand-picked list would never have contained.
+
+**The LS gate wanted a consumer.** `entryStepMinRiseFt` is life-safety — the failure mode is a step
+out of a doorway into a drop — and the register requires every LS constant to name the members it
+produces. It names `tread` and `stringer`.
+
+### Measured and left alone: the stringer's foot
+
+A stringer is drawn as a plain raked stick, so its lower corner dips **4.04 in below the ground it
+stands on**; the real piece is cut square at the foot. That is `generateStair`'s geometry and the
+tower's and platform's stairs have had it as long as they have existed, so it is recorded here with
+its number rather than folded into this change. The flight's centreline does start exactly at grade,
+which is what the test asserts.
+
+Worth noting for the method: the first version of that test asserted on the stringers' bounding
+box and failed, and the box was not the piece — **a box round a raked member spans its whole lean**,
+the same trap this sweep has now hit three times. The stringers are checked by sampling their
+centreline; the treads are flat and axis-aligned, so their boxes are exact and are used directly.

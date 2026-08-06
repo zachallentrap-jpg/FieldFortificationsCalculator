@@ -174,6 +174,23 @@ export interface StairInput {
    * height, over open ground. `base`/`up` are ignored when this is given.
    */
   arriveAt?: { at: [x: number, z: number]; dir: [x: number, z: number] };
+  /**
+   * Leave the topmost tread off, because the landing IS that tread.
+   *
+   * A flight normally puts a tread at every riser top including the last, flush with the landing
+   * — right for a deck, where you step off sideways onto planks at the same level. An ENTRY
+   * stair does not arrive at a deck; it arrives at a threshold with a wall in it. Keeping that
+   * last tread buried it in the sole plate and the siding, 189 cubic inches of one solid inside
+   * another, on every door of every raised card. What you step onto there is the floor.
+   */
+  omitTopTread?: boolean;
+  /**
+   * Member-id prefix. Defaults to 'AC', which is right while a structure has ONE stair — the
+   * tower's, the basement's. A building with two doors has two, and both came out numbering
+   * their own pieces from one: `AC-stringer-01` twice in the same model. Ids are what the
+   * picker, the highlight and the packet's anchors key on, so a duplicate is not cosmetic.
+   */
+  idPrefix?: string;
 }
 
 /** One flight's start, in plan — the geometry the emitter walks. */
@@ -225,7 +242,7 @@ export interface StairResult {
 }
 
 export function generateStair(input: StairInput): StairResult {
-  const emit = makeEmitter('AC');
+  const emit = makeEmitter(input.idPrefix ?? 'AC');
   const { base, up, baseY, topY, widthFt, stage } = input;
   const stringerNominal = STAIR.stringerNominal.value as string;
   const treadNominal = STAIR.treadNominal.value as string;
@@ -285,7 +302,8 @@ export function generateStair(input: StairInput): StairResult {
     // edge, and a stair rendered as a comb of 9 1/4-in fins with nothing to walk on.
     const treadYaw = Math.atan2(-across[1], across[0]);
     const treadT = DRESSED[treadNominal]!.w / IN_PER_FT;
-    for (let i = 1; i <= sol.risers; i++) {
+    const lastTread = input.omitTopTread && f === flightCount - 1 ? sol.risers - 1 : sol.risers;
+    for (let i = 1; i <= lastTread; i++) {
       const d = ((i - 1) * sol.treadIn) / IN_PER_FT;
       emit('tread', treadNominal, {
         cutLengthFt: widthFt,

@@ -232,3 +232,172 @@ test('the ledges are counted once, on the boards that are nailed through them', 
   assert.match(board.nailing, new RegExp(`^${2 * (OPENING.doorLedges.value as number)}-6d\\b`),
     `the board buys two nails per ledge; got "${board.nailing}"`);
 });
+
+// ── Getting to the door ──────────────────────────────────────────────────────
+//
+// `BuildingSpec.entrySteps` was declared, set to `true` by every hut, and read by nothing —
+// the same shape as `fill` above, found the same way in the same file. Measured before the fix:
+// a piered building's threshold stands 2 ft 3 1/2 in above grade, so five cards had a door
+// opening onto clear air down to the pier footings.
+
+import { STAIR } from '../src/timber/doctrine';
+import { generateStair } from '../src/timber/subsystems/access';
+
+/** Rotate the member's own long axis into world space — for sampling a RAKED piece. */
+const axis = (m: Member): V3 => {
+  const [rx, ry, rz] = m.rotation;
+  let [x, y, z] = [1, 0, 0] as V3;
+  let a = x * Math.cos(rz) - y * Math.sin(rz);
+  let b = x * Math.sin(rz) + y * Math.cos(rz);
+  x = a; y = b;
+  a = y * Math.cos(rx) - z * Math.sin(rx);
+  b = y * Math.sin(rx) + z * Math.cos(rx);
+  y = a; z = b;
+  a = x * Math.cos(ry) + z * Math.sin(ry);
+  b = -x * Math.sin(ry) + z * Math.cos(ry);
+  return [a, y, b];
+};
+
+/** Entry flights carry an `ES<n>` id prefix — one per door, so two doors cannot collide. */
+const entryStair = (m: ReturnType<typeof modelOf>) =>
+  m.members.filter((x) => (x.role === 'stringer' || x.role === 'tread') && /^ES\d/.test(x.id));
+
+test('EVERY DOOR THE FLOOR LIFTED OUT OF REACH HAS STEPS — and no others do', () => {
+  const minRise = OPENING.entryStepMinRiseFt.value as number;
+  let withSteps = 0, without = 0;
+  for (const fam of FAMILY_TABLE) {
+    const m = modelOf(fam.id);
+    const openings = openingsOf(m.spec).filter((o) => o.kind === 'door');
+    const hasClosingIn = m.stagePlan.some((p) => p.key === 'siding');
+    if (openings.length === 0 || !hasClosingIn) continue;
+    const rise = (m.levels.subfloorTop ?? 0) - (m.levels.gradeY ?? 0);
+    const treads = m.members.filter((x) => x.role === 'tread');
+    if (rise >= minRise) {
+      withSteps++;
+      assert.ok(treads.length > 0,
+        `${fam.id}: threshold stands ${rise.toFixed(3)} ft above grade and there is nothing to stand on`);
+    } else {
+      without++;
+      assert.equal(treads.length, 0,
+        `${fam.id}: only ${rise.toFixed(3)} ft up — that is a step, not a stair`);
+    }
+  }
+  assert.ok(withSteps >= 5, `only ${withSteps} cards needed steps`);
+  assert.ok(without >= 1, 'the threshold rule is exercised in both directions');
+});
+
+test('the steps reach the ground and stop at the threshold', () => {
+  const m = modelOf('gp-frame');
+  const stair = entryStair(m);
+  assert.ok(stair.length > 0);
+  // The flight's CENTRELINE starts at grade. Its box does not, and that is a property of the
+  // shared stair rather than of this caller: a stringer is drawn as a plain raked stick, so its
+  // lower corner dips 4.04 in below the ground it stands on — the real piece is cut square at
+  // the foot. The tower's and the platform's stairs have had it as long as they have existed;
+  // measured and recorded in the sweep rather than folded into this change.
+  const feet = stair.filter((x) => x.role === 'stringer').map((x) => {
+    const half = x.cutLength / 24;
+    const d = axis(x);
+    return x.position[1]! - d[1] * half;
+  });
+  assert.ok(Math.abs(Math.min(...feet) - m.levels.gradeY) < 1e-6,
+    `the flight's centreline starts at y=${Math.min(...feet).toFixed(4)} and the ground is at ${m.levels.gradeY.toFixed(4)}`);
+  // The topmost TREAD is one riser below the threshold: the threshold is the last tread.
+  const treads = m.members.filter((x) => x.role === 'tread');
+  const topTread = Math.max(...treads.flatMap((t) => box(t).y));
+  const doorSill = Math.min(...m.members.filter((x) => x.role === 'doorBoard').flatMap((b) => box(b).y));
+  const riser = (STAIR.targetRiserIn.value as number) / IN_PER_FT;
+  assert.ok(topTread < doorSill - riser / 2,
+    `the top tread is at ${topTread.toFixed(4)} and the sill at ${doorSill.toFixed(4)} — that is not a riser apart`);
+});
+
+test('NO TREAD IS BURIED IN THE BUILDING', () => {
+  // The regression. A flight normally puts a tread at every riser top including the last, flush
+  // with the landing — right for a deck you step off sideways onto, wrong for a threshold with a
+  // wall in it. Kept, it put 189 cubic inches of tread inside the sole plate and 27 inside the
+  // siding, on every door of every raised card.
+  //
+  // Treads are FLAT and axis-aligned, so their boxes are exactly the piece. The stringers are
+  // RAKED and theirs are not — a box round a leaning member spans its whole lean and answers
+  // nothing, which is why they are sampled in the next test instead of boxed here.
+  for (const id of ['gp-frame', 'sea-hut', 'latrine', 'b-hut', 'squad-hut', 'swa-hut']) {
+    const m = modelOf(id);
+    const treads = m.members.filter((x) => x.role === 'tread');
+    assert.ok(treads.length > 0, `${id} has no treads`);
+    const rest = m.members.filter((x) => x.role !== 'tread' && x.role !== 'stringer');
+    for (const t of treads) {
+      const a = box(t);
+      for (const r of rest) {
+        const b = box(r);
+        const dx = Math.min(a.x[1]!, b.x[1]!) - Math.max(a.x[0]!, b.x[0]!);
+        const dy = Math.min(a.y[1]!, b.y[1]!) - Math.max(a.y[0]!, b.y[0]!);
+        const dz = Math.min(a.z[1]!, b.z[1]!) - Math.max(a.z[0]!, b.z[0]!);
+        assert.ok(dx <= 1e-9 || dy <= 1e-9 || dz <= 1e-9,
+          `${id}: ${t.id} runs into ${r.id} (${r.role}) by ${(dx * IN_PER_FT).toFixed(2)} x ${(dy * IN_PER_FT).toFixed(2)} x ${(dz * IN_PER_FT).toFixed(2)} in`);
+      }
+    }
+  }
+});
+
+test('and no stringer passes through anything, sampled along its own lean', () => {
+  for (const id of ['gp-frame', 'sea-hut', 'latrine']) {
+    const m = modelOf(id);
+    const stringers = m.members.filter((x) => x.role === 'stringer' && /^ES\d/.test(x.id));
+    assert.ok(stringers.length > 0);
+    const rest = m.members.filter((x) => x.role !== 'tread' && x.role !== 'stringer');
+    for (const s of stringers) {
+      const half = s.cutLength / 24;
+      const d = axis(s);
+      for (let t = -1; t <= 1; t += 0.02) {
+        const p: V3 = [s.position[0]! + d[0] * half * t, s.position[1]! + d[1] * half * t, s.position[2]! + d[2] * half * t];
+        for (const r of rest) {
+          const b = box(r);
+          const inside = p[0] > b.x[0]! && p[0] < b.x[1]! && p[1] > b.y[0]! && p[1] < b.y[1]! && p[2] > b.z[0]! && p[2] < b.z[1]!;
+          assert.ok(!inside, `${id}: ${s.id} passes through ${r.id} (${r.role})`);
+        }
+      }
+    }
+  }
+});
+
+test('the steps are centred on their door and as wide as it', () => {
+  const m = modelOf('gp-frame');
+  const treads = m.members.filter((x) => x.role === 'tread');
+  const doorZ = m.members.filter((x) => x.role === 'doorBoard' && x.wall === 'W').flatMap((b) => box(b).z);
+  const stairZ = treads.filter((t) => box(t).x[0]! < 1).flatMap((t) => box(t).z);
+  assert.ok(doorZ.length > 0 && stairZ.length > 0);
+  const mid = (v: number[]) => (Math.min(...v) + Math.max(...v)) / 2;
+  assert.ok(Math.abs(mid(doorZ) - mid(stairZ)) < 0.02,
+    `the stair is centred at ${mid(stairZ).toFixed(3)} and the door at ${mid(doorZ).toFixed(3)}`);
+  const width = Math.max(...stairZ) - Math.min(...stairZ);
+  assert.ok(Math.abs(width - (OPENING.doorWidthFt.value as number)) < 1e-6,
+    `the stair is ${width.toFixed(3)} ft wide against a ${OPENING.doorWidthFt.value} ft door`);
+});
+
+test('entrySteps: false takes them away again', () => {
+  // The flag exists so a card that genuinely wants none — a drawing of the frame, a building
+  // against a loading dock — can say so. It defaults ON because a door out of reach is not a
+  // design choice.
+  const spec = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset)) as Record<string, unknown>;
+  spec.entrySteps = false;
+  const m = generateStructure(spec as unknown as StructureSpec);
+  assert.equal(m.members.filter((x) => x.role === 'tread').length, 0);
+  assert.ok(m.members.filter((x) => x.role === 'doorBoard').length > 0, 'the door is still hung');
+});
+
+test('omitTopTread is opt-in — the tower and platform stairs are untouched', () => {
+  // The option went into the SHARED stair generator, so the two callers that were already right
+  // must not move. Same input, same flight, one more tread than the entry stair asks for.
+  const base = {
+    base: [0, 0] as [number, number], up: [1, 0] as [number, number],
+    baseY: 0, topY: 6, widthFt: 3, stage: 1,
+  };
+  const withTop = generateStair(base).members.filter((x) => x.role === 'tread').length;
+  const without = generateStair({ ...base, omitTopTread: true }).members.filter((x) => x.role === 'tread').length;
+  assert.equal(without, withTop - 1, 'exactly one tread is dropped, and only when asked');
+  assert.ok(withTop > 1);
+  for (const id of ['tower', 'platform']) {
+    const m = modelOf(id);
+    assert.ok(m.members.some((x) => x.role === 'tread' || x.role === 'ladderRung'), `${id} still has a way up`);
+  }
+});

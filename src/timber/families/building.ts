@@ -28,7 +28,7 @@ import { generateRoofCovering, generateWallCovering, generateInfillCovering, gen
 import { generateFloorOnBearings, joistNominalFor } from '../subsystems/floorSystem';
 import { generatePartitions } from '../subsystems/partitions';
 import { generateOpenFront, removeClosedWall } from '../subsystems/openFront';
-import { generateBuiltOpenings } from '../subsystems/builtOpenings';
+import { generateBuiltOpenings, generateEntrySteps } from '../subsystems/builtOpenings';
 import { LUMBER, PANEL, FOUNDATION, IN_PER_FT } from '../doctrine';
 import { headerForSpan } from '../normalize';
 
@@ -351,6 +351,19 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
       skinThickFt: sheathingThick + sidingThick,
       ...(spec.shutters ? { shutters: spec.shutters } : {}),
     }));
+    // And something to stand on. `entrySteps` defaults ON: a door the floor has lifted out of
+    // reach is not a design choice, and the flag exists so a card that genuinely wants none —
+    // a drawing of the frame, a building against a loading dock — can say so.
+    if (spec.entrySteps !== false) {
+      members.push(...generateEntrySteps({
+        surfaces: skinSurfaces,
+        openings: story.openings,
+        stage: closingIn,
+        thresholdY: levels.subfloorTop,
+        gradeY: levels.gradeY,
+        skinThickFt: sheathingThick + sidingThick,
+      }));
+    }
   }
 
   return { members, levels, stagePlan, walls };

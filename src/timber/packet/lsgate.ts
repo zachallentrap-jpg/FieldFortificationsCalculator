@@ -123,6 +123,11 @@ export const LS_CONSUMERS: Readonly<Record<string, LsConsumer>> = {
   // Latrine pit depth: an excavation people stand beside. No member represents the pit itself,
   // so it prints whenever the riser box does — that is the structure over the hole.
   'LATRINE.pitDepthFt': { roles: ['riserBox'] , label: 'Pit depth' },
+
+  // How far a threshold may stand above grade before its door needs steps. The failure mode is
+  // a step out of a doorway into a two-foot drop, so it is LS; the treads are what it produces,
+  // and if they are there this figure is what put them there.
+  'OPENING.entryStepMinRiseFt': { roles: ['tread', 'stringer'] , label: 'Entry-step threshold' },
 };
 
 /** Which of the register's values this build actually rests on. */

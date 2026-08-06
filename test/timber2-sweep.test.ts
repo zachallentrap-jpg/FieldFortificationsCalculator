@@ -10,6 +10,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateStructure } from '../src/timber/families/index';
+import { STAIR } from '../src/timber/doctrine';
+import { solveFlight } from '../src/timber/subsystems/access';
 import { bomSummary } from '../src/timber/bom';
 import { thumbnailFor } from '../src/timber/thumbnails';
 import { specToJson } from '../src/timber/normalize';
@@ -157,8 +159,23 @@ test('AABB stays inside the footprint plus its spec-derived allowances (C-7)', (
     const model = generateStructure(spec);
     const s = model.spec as BuildingSpec;
     const oh = s.roof.kind === 'none' ? 0 : s.roof.overhangFt;
-    // Allowances: the eave overhang, the cap-plate corner lap, and a skid's own width.
-    const slack = oh + 1.5;
+    // Allowances: the eave overhang, the cap-plate corner lap, and a skid's own width — plus,
+    // now, the entry stair, which is the one thing here that is SUPPOSED to leave the footprint.
+    // A flight to a raised threshold runs out from the wall by roughly its rise over the stair
+    // pitch; the floor is never more than a storey up, so one flight's run is the bound and it
+    // is derived from the same figures the stair is cut to rather than picked to make this pass.
+    // The entry stair is the one thing here that is SUPPOSED to leave the footprint, and how far
+    // it leaves by is the rise it climbs. That rise is measured to the THRESHOLD, not to the
+    // floor: the fuzzer writes doors with a sill on them, and a door 3 ft 6 in up needs a flight
+    // that much longer. `solveFlight` is the same solver the stair is cut with, so this is the
+    // real run rather than an estimate — the first cut used the doctrine target riser and the
+    // unit run and under-read whenever the solver adds a riser to stay under the maximum.
+    const floorRise = Math.max(0, (model.levels.subfloorTop ?? 0) - (model.levels.gradeY ?? 0));
+    const sills = (s.stories[0]?.openings ? Object.values(s.stories[0].openings) : [])
+      .flatMap((list) => (list ?? []).filter((o) => o.kind === 'door').map((o) => o.sillHeightFt));
+    const rise = floorRise + Math.max(0, ...sills, 0);
+    const stairRun = solveFlight(rise).runFt + (STAIR.minTreadIn.value as number) / 12;
+    const slack = oh + 1.5 + stairRun;
     for (const m of model.members) {
       const half = m.cutLength / 12 / 2;
       assert.ok(

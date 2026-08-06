@@ -30,6 +30,7 @@ import type { OpeningFill, OpeningSpec, WallOpenings } from '../spec';
 import { makeEmitter } from '../emit';
 import { OPENING, HUT, IN_PER_FT, citeOf } from '../doctrine';
 import { wallTilePlacement, type WallSurface } from './coverings';
+import { generateStair } from './access';
 
 export interface BuiltOpeningsInput {
   surfaces: WallSurface[];
@@ -268,3 +269,74 @@ export function fillBuildsSomething(fill: OpeningFill | undefined): boolean {
 }
 
 export type { WallId };
+
+// ── Getting to the door ──────────────────────────────────────────────────────
+
+export interface EntryStepsInput {
+  surfaces: WallSurface[];
+  openings: WallOpenings;
+  stage: number;
+  /** Top of the finished floor — where a threshold is. */
+  thresholdY: number;
+  /** Where the ground is, under this building. */
+  gradeY: number;
+  /** Everything on the wall's outer face, so the bottom tread clears the siding. */
+  skinThickFt: number;
+}
+
+/**
+ * STEPS AT EVERY DOOR THE FLOOR HAS LIFTED OUT OF REACH.
+ *
+ * `BuildingSpec.entrySteps` was declared, set to `true` by every hut, and read by nothing — the
+ * same shape as `OpeningSpec.fill`, found the same way and in the same file. The plan's §2.6 says
+ * it in one line: "Entry steps: stair math reused at every door when floor raised >= 1.5 ft."
+ *
+ * Measured on the shipped cards: a piered building's threshold stands 2 ft 3 1/2 in above grade
+ * and a skid building's 1 ft 1 1/2 in. So five cards had a door you could not use — the leaf, now
+ * that there is one, opens onto clear air down to the pier footings — and two are below the
+ * threshold where a long step up is the honest answer and no steps belong.
+ *
+ * The stair math is `generateStair`'s, not a second copy: same riser rule, same stringers, same
+ * treads, same LS-tagged figures. What this adds is only WHERE it goes — and `arriveAt` is the
+ * reason that is one line rather than a guess, because a flight is positioned by where you step
+ * off it. You step off an entry stair at the threshold, facing in.
+ */
+export function generateEntrySteps(input: EntryStepsInput): Member[] {
+  const { surfaces, openings, stage, thresholdY, gradeY, skinThickFt } = input;
+  const minRise = OPENING.entryStepMinRiseFt.value as number;
+  const out: Member[] = [];
+  let flight = 0;
+  for (const s of surfaces) {
+    const list: OpeningSpec[] = openings[s.wall] ?? [];
+    for (const cut of s.cutouts) {
+      const o = list[cut.openingIndex];
+      if (!o || o.kind !== 'door') continue;
+      const sillY = thresholdY + cut.v0;
+      const rise = sillY - gradeY;
+      if (rise < minRise) continue;
+      // The landing is the threshold: on the wall's outer face, centred on the opening, and the
+      // last step is INTO the building — so the travel direction is the wall's inward normal.
+      const uMid = (cut.u0 + cut.u1) / 2;
+      const face = s.faceOffsetFt + skinThickFt;
+      const at: [number, number] = [
+        s.origin[0] + s.along[0] * uMid + s.normal[0] * face,
+        s.origin[1] + s.along[1] * uMid + s.normal[1] * face,
+      ];
+      out.push(...generateStair({
+        base: at,
+        up: [-s.normal[0], -s.normal[1]],
+        baseY: gradeY,
+        topY: sillY,
+        widthFt: cut.u1 - cut.u0,
+        stage,
+        arriveAt: { at, dir: [-s.normal[0], -s.normal[1]] },
+        // The threshold is the top tread. See `omitTopTread`.
+        omitTopTread: true,
+        // One prefix per door: a building with two of them had two flights both numbering their
+        // pieces from `AC-stringer-01`, and an id is what selection and the packet key on.
+        idPrefix: `ES${++flight}`,
+      }).members);
+    }
+  }
+  return out;
+}

@@ -217,6 +217,12 @@ export const OPENING = {
   /** How far a shutter laps past the opening, so a closed one shows no light gap. */
   shutterLapIn: doc(1, 'FM 5-426 shutter laps the opening (PH)', { unit: 'in' }),
   shutterBattens: doc(2, 'FM 5-426 batten shutter — two battens (PH)'),
+  /**
+   * How far a threshold has to stand above grade before the door needs steps. Below it the step
+   * up is one long stride, which is what a doorsill on a skid building is; above it the door is
+   * unusable without something to stand on.
+   */
+  entryStepMinRiseFt: doc(1.5, 'FM 5-426 entry steps at a raised floor (PH)', { unit: 'ft', lifeSafety: true }),
 } as const;
 
 // ── Named structure dimensions (plan §2.2 — the "exhaustive hut family") ─────
