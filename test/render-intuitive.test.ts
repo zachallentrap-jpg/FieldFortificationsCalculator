@@ -316,6 +316,23 @@ test('bunker_op_cp gets a real parapet ring, ENEMY arrow, and FRONT/REAR labels 
   assert.ok(!trench.includes('>FRONT<'), 'connecting_trench still has no FRONT/REAR labels');
 });
 
+test('atgm_javelin draws its safety-critical backblast danger area to the rear; nothing else does', () => {
+  // doctrine/positions.ts's backblast.clearanceFt is flagged safetyCritical: true, but until now
+  // it only ever surfaced as a text warning (validate.ts's ATGM_BACKBLAST) — never drawn, unlike
+  // every other safety-relevant dimension this app draws to scale (roof setback, standoff, wall
+  // taper). A hazard the operator must physically keep clear of but can't see on the plan is a
+  // real gap, not just a documentation nicety.
+  const atgm = compute(defaultInputs({ positionType: 'atgm_javelin' }));
+  const plan = drawPlan(atgm);
+  assert.ok(plan.includes('aria-label="Backblast danger area — keep clear"'), 'backblast hazard zone drawn with its own callout');
+  assert.ok(plan.includes('url(#pat-engineered)'), 'reuses the established hazard pattern, not a new one');
+  assert.ok(plan.includes(">25'-0\"<") || plan.includes('>25.0'), 'the 25 ft clearance is dimensioned, not just implied');
+
+  // Positive control: a position with no backblast concern draws none of this.
+  const oneMan = drawPlan(compute(defaultInputs({ positionType: 'one_man' })));
+  assert.ok(!oneMan.includes('Backblast'), 'one_man has no backblast hazard to draw');
+});
+
 test('elbow rests render for positions that define them, at the front lip not the rear', () => {
   const oneMan = compute(defaultInputs({ positionType: 'one_man' }));
   const oneManGeo = oneMan.geometry as GeometryModel;
