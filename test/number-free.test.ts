@@ -10,9 +10,14 @@ import { fileURLToPath } from 'node:url';
 const ENGINE = fileURLToPath(new URL('../src/engine', import.meta.url));
 const MODULES = ['compute', 'geometry', 'materials', 'labor', 'validate', 'explain', 'round', 'mission', 'plan'];
 
-// Structural decimals that are NOT doctrinal magnitudes: 0.5 (a half / midpoint) and small
-// rounding epsilons written in scientific notation (e.g. 1e-9).
-const ALLOWED = new Set(['0.5']);
+// Structural decimals that are NOT doctrinal magnitudes: 0.5 (a half / midpoint); 0.9 and 0.35,
+// the self-intersection clamps on the unrevetted-wall taper (geometry.ts's wallTaperFt, matching
+// scene3d.ts's identical pushBayBox taperAmount clamp) — "don't let the drawn slope visually eat
+// the parapet or collide with the opposite wall," not a doctrinal batter figure to confirm
+// against a pub (the truthful message for "this soil can't hold this cut" is the
+// REVET_REQUIRED_SOIL validation error, not a steeper drawn slope); and small rounding epsilons
+// written in scientific notation (e.g. 1e-9).
+const ALLOWED = new Set(['0.5', '0.9', '0.35']);
 
 // Strip comments and string literals so only real numeric literals remain.
 function stripNonCode(src: string): string {

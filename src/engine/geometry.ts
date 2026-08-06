@@ -4,6 +4,7 @@
 // a single projector (render/project.ts) so nothing drifts.
 
 import { parapet, berm, overhead } from '../doctrine/protection';
+import { soils } from '../doctrine/soils';
 import type { ShapeId } from '../doctrine/positions';
 import type { RoofPath } from './types';
 import type { Calc } from './compute';
@@ -42,6 +43,11 @@ export interface GeometryModel {
     parapetH: number;
     setback: number;
     rearOverhang: number;
+    // How far the excavation wall flares outward at grade vs. the floor (feet), for an
+    // unrevetted earth wall in loose soil — 0 when revetted (revetment holds the wall vertical
+    // regardless of soil) or the soil needs no batter. Same formula the 3D model already used
+    // (scene3d.ts's pushBayBox taperAmount) — feet, same axis as holeW.
+    wallTaper: number;
     coverOn: boolean;
     roofPath: RoofPath;
     coverT: number;
@@ -88,6 +94,22 @@ function elbowMarks(count: number, holeL: number, holeW: number): SumpMark[] {
     marks.push({ xFt, yFt });
   }
   return marks;
+}
+
+// How far an UNREVETTED earth excavation wall flares outward at grade vs. the floor — steeper
+// soils (sand, silt) batter more, revetted walls stay vertical regardless of soil (the facing
+// holds it), and round/vehicle excavations use their own shape (never this rect-family taper).
+// Identical formula to the 3D model's pushBayBox taperAmount so the two views agree on the same
+// doctrine-driven slope instead of the 2D section silently drawing every soil as a plumb wall.
+function wallTaperFt(calc: Calc): number {
+  if (calc.isVehicle || calc.isCircular || calc.inputs.revetment !== 'none') return 0;
+  const soilRow = soils[calc.inputs.soil];
+  if (!soilRow) return 0;
+  return Math.min(
+    soilRow.wallSlopeRatio.value * calc.depthOfCut,
+    calc.parapetW * 0.9,
+    Math.min(calc.holeL, calc.holeW) * 0.35,
+  );
 }
 
 export function buildGeometry(calc: Calc): GeometryModel {
@@ -174,6 +196,7 @@ export function buildGeometry(calc: Calc): GeometryModel {
       // standoff that governs the FRONT (`setback` above): the threat approaches from the
       // front only, so the rear has no aperture-clearance concern, just a bearing one.
       rearOverhang: Math.max(overhead.bearingEachEnd.value, overhead.setbackDepthFrac.value * calc.depthOfCut),
+      wallTaper: wallTaperFt(calc),
       coverOn: calc.coverOn,
       roofPath: calc.roofPath,
       coverT: calc.coverT,
