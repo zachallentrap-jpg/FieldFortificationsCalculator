@@ -461,7 +461,13 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
       parts.push({ kind: 'box', x: sx, y: coverY - s.coverT / 2 - 0.15, z: coverZ, w: 0.35, h: 0.3, d: coverD, role: 'stringer' });
     }
   } else if (engineeredRoof && geo.shape !== 'vehicle_ramp') {
-    parts.push({ kind: 'box', x: 0, y: 1.4, z: 0, w: p.holeL + 1.5, h: 0.2, d: p.holeW + 1.5, role: 'engineeredCover', label: 'Engineered roof — see engineer' });
+    // Footprint matches the 2D section's hazard block exactly (holeW + parapetW there) — this
+    // marker fabricates no real structure (§2.7), so there's no doctrine leaf to size it from,
+    // but the two views of the same "needs an engineer" flag should still agree on how big a
+    // banner they draw over the position instead of each inventing its own constant (this used
+    // a flat +1.5 ft/side that didn't match the 2D section's +parapetW — 3.0 ft for one_man —
+    // leaving the two views 1.5 ft apart on the same hazard marker for the identical position).
+    parts.push({ kind: 'box', x: 0, y: 1.4, z: 0, w: p.holeL + p.parapetW, h: 0.2, d: p.holeW + p.parapetW, role: 'engineeredCover', label: 'Engineered roof — see engineer' });
   }
 
   // ── Firing platform / firing step ─────────────────────────────────────────
