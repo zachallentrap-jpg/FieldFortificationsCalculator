@@ -8,6 +8,7 @@ import { compute } from '../src/engine/compute';
 import { drawPlan } from '../src/render/drawPlan';
 import { drawSection } from '../src/render/drawSection';
 import { drawIso } from '../src/render/drawIso';
+import { buildScene3D } from '../src/render3d/scene3d';
 import { positions } from '../src/doctrine/positions';
 import { overhead } from '../src/doctrine/protection';
 import type { GeometryModel } from '../src/engine/geometry';
@@ -100,6 +101,31 @@ test('section carries header, standing figure + scale, single-accent dims, cover
   assertCalloutLegendConsistent(section, 'section');
   assertMinFont(section, 'section');
   assertNoDimCollision(section, 'section');
+});
+
+test('a firing platform never draws wider/longer than the hole it\'s built in', () => {
+  // fifty_cal's doctrine firingPlatform.W (3.0 ft) exceeds its own hole.W (2.0 ft) — drawn at
+  // full size the platform overhangs the excavation by 1 ft in both the plan and the 3D model,
+  // a standing surface floating past the wall of the hole it's supposedly built in. geo.plan.
+  // platform is clamped to the hole's own L/W so the DRAWING never claims a platform bigger
+  // than the hole that contains it; the BOM/labor volume is untouched (still the true doctrine
+  // value, via compute.ts's platformVol) since this is a rendering-only clamp.
+  for (const [id, pos] of Object.entries(positions)) {
+    if (!pos.firingPlatform) continue;
+    const r = compute(defaultInputs({ positionType: id }));
+    const geo = r.geometry as GeometryModel;
+    assert.ok(geo.plan.platform, id + ': platform present');
+    assert.ok(geo.plan.platform!.W <= geo.plan.holeW + 1e-9, id + ": drawn platform.W (" + geo.plan.platform!.W + ") must not exceed hole.W (" + geo.plan.holeW + ")");
+    assert.ok(geo.plan.platform!.L <= geo.plan.holeL + 1e-9, id + ": drawn platform.L (" + geo.plan.platform!.L + ") must not exceed hole.L (" + geo.plan.holeL + ")");
+
+    // Cross-check the 3D model's platform box uses the SAME clamped footprint, not the raw
+    // doctrine value directly (it reads geo.plan.platform, so this mostly guards against a
+    // future refactor that reintroduces a second, unclamped read of the doctrine leaf).
+    const scene = buildScene3D(r);
+    const platformBox = scene.parts.find((p) => p.kind === 'box' && p.role === 'platform') as { d: number; w: number } | undefined;
+    assert.ok(platformBox, id + ': 3D platform box present');
+    assert.ok(platformBox!.d <= geo.plan.holeW + 1e-9, id + ': 3D platform depth must not exceed the hole either');
+  }
 });
 
 test('the section\'s grenade sump sits at the REAR, matching the plan\'s own sump marks and the 3D model', () => {
