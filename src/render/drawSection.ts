@@ -29,8 +29,15 @@ export function drawSection(result: Result): string {
 
   const s = geo.section;
   const isVehicle = geo.shape === 'vehicle_ramp';
-  const earthRoof = s.coverOn && s.roofPath === 'earth_on_stringers';
-  const engineered = s.roofPath === 'engineered_required';
+  // A vehicle defilade is never roofed — there's no parapet for a built structure to span
+  // between, and the vehicle's own armor plus the terrain defilade already are the protection.
+  // scene3d.ts already excludes vehicle_ramp from both the earth-roof and engineered-hazard
+  // branches entirely (nobody ever designed a "roof over a vehicle pit" geometry); this section
+  // used to draw the engineered hazard block for it anyway (calc.roofPath/coverOn themselves are
+  // left untouched — they still feed the specs panel and ROOF_SPAN_EXCEEDED correctly — only the
+  // schematic's attempt to depict an undesigned shape is suppressed here, matching the 3D view).
+  const earthRoof = !isVehicle && s.coverOn && s.roofPath === 'earth_on_stringers';
+  const engineered = !isVehicle && s.roofPath === 'engineered_required';
   const halfBay = s.holeW / 2;
   const aboveTop = s.parapetH + (earthRoof ? s.coverT + 0.4 : 0) + (engineered ? 1.6 : 0);
   const margin = Math.max(1, s.parapetW);
