@@ -652,3 +652,63 @@ test('CORRUGATED SHEETS LAP — a butted joint is a hole you can see the joists 
     assert.equal(lifts.length, 2, `${kind}: lapping sheets need two heights, found ${lifts.length}`);
   }
 });
+
+test('A STRIP CLEAR OF THE TAPER IS ONE SHEET — banding follows the strip, not the plane', () => {
+  // The band count was the PLANE's taper: how much the whole roof narrows over a run. Right for a
+  // roll course, which spans the entire eave and really must step down the rake. Nonsense for a
+  // 26-in strip. On a 16 x 12 hip the plane narrows 14 ft over its slope, so EVERY strip took the
+  // maximum 8 bands and the roof came out as 176 pieces of 26 by 11 in — including the strips
+  // sitting squarely in the middle of a slope with nothing to clip them. The gable, whose taper is
+  // zero, gave one 7.4-ft sheet per strip: the right answer, and the tell.
+  //
+  // Eight butted seams up every strip is also eight more places for a ray to pass between two
+  // coplanar rectangles, which is what the specks scattered across a hip were.
+  // A slope longer than one sheet legitimately takes more than one piece up it — that is the END
+  // LAP, not banding. The property is that BANDING adds nothing on top of that: on a gable, the
+  // number of pieces stacked at one place along the eave is exactly the number of runs.
+  const runsUp = (kind: 'gable' | 'hip') => {
+    const { model } = roofingPieces('corrugated', kind);
+    const slopeLen = roofPlanes(model.spec as BuildingSpec, 0)[0]!.slopeLengthFt;
+    const sheet = ROOFING.corrugatedLengthFt.value as number;
+    const exposure = sheet - (ROOFING.corrugatedEndLapIn.value as number) / 12;
+    return Math.max(1, Math.ceil(slopeLen / exposure));
+  };
+  const stackedAtOneX = (pieces: { position: readonly number[] }[], southOf: number) => {
+    const byX = new Map<string, number>();
+    for (const m of pieces.filter((x) => x.position[2]! < southOf)) {
+      const k = m.position[0]!.toFixed(3);
+      byX.set(k, (byX.get(k) ?? 0) + 1);
+    }
+    return Math.max(...byX.values());
+  };
+
+  const gable = roofingPieces('corrugated', 'gable');
+  const gW = (gable.model.spec as BuildingSpec).dims.widthFt;
+  assert.equal(stackedAtOneX(gable.pieces, gW / 2), runsUp('gable'),
+    'a rectangle tapers by nothing, so every strip is one piece per run — banding must add none');
+
+  // A hip DOES have strips that must step down its rakes, but it must also still have WHOLE
+  // ones — the strips sitting squarely in the middle of a slope with nothing to clip them. Before
+  // the fix not one piece on a hip reached a full sheet: every strip was cut into the maximum 8
+  // bands, so the tallest piece anywhere was an eighth of a run.
+  const hip = roofingPieces('corrugated', 'hip').pieces;
+  const sheetLenFt = ROOFING.corrugatedLengthFt.value as number;
+  const whole = hip.filter((m) => Math.abs(m.actual.d / 12 - sheetLenFt) < 1e-9);
+  assert.ok(whole.length > 0,
+    `a hip must still lay whole ${sheetLenFt}-ft sheets where nothing clips them; the tallest piece `
+    + `is ${(Math.max(...hip.map((m) => m.actual.d / 12))).toFixed(3)} ft`);
+});
+
+test('no piece of corrugated is narrower than one corrugation', () => {
+  // Near the apex of a triangular face a strip clips to almost nothing. The plausibility check
+  // found quarter-inch "sheets" on the tower's cab — you cannot cut and fasten a piece of
+  // corrugated narrower than a single rib.
+  const corrugation = (ROOFING.corrugatedSideLapIn.value as number)
+    / (ROOFING.corrugatedSideLapCorrugations.value as number);
+  for (const kind of ['gable', 'hip'] as const) {
+    for (const m of roofingPieces('corrugated', kind).pieces) {
+      assert.ok(m.cutLength >= corrugation - 1e-9,
+        `${kind}: ${m.id} is ${m.cutLength.toFixed(3)} in wide, less than one ${corrugation.toFixed(3)}-in corrugation`);
+    }
+  }
+});

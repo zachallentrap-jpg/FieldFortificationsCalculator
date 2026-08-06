@@ -691,48 +691,28 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
         // you, so the bill gets truer at the same time as the picture.
         const taper = Math.abs(planeSpanAt(plane, v0).hi - planeSpanAt(plane, v0).lo
           - (planeSpanAt(plane, v1).hi - planeSpanAt(plane, v1).lo));
-        const bands = Math.min(TOLERANCE.maxTaperBands, Math.max(1, Math.ceil(taper / TOLERANCE.hipCapFt)));
-        for (let k = 0; k < bands; k++) {
-        const vb0 = v0 + ((v1 - v0) * k) / bands;
-        const vb1 = v0 + ((v1 - v0) * (k + 1)) / bands;
-        const a = planeSpanAt(plane, vb0);
-        const b = planeSpanAt(plane, vb1);
-        const lo = Math.min(a.lo, b.lo);
-        const hi = Math.max(a.hi, b.hi);
-        const courseRun = hi - lo;
-        if (courseRun <= TOLERANCE.epsFt) continue;
-        const sheetLen = isRoll ? courseRun : sheetAcrossFt;
-        const advance = isRoll ? courseRun : acrossExposureFt;
-        const runs = isRoll ? 1 : Math.max(1, Math.ceil((courseRun - (sheetLen - advance)) / advance));
-        for (let r = 0; r < runs; r++) {
-          const u0 = lo + r * advance;
-          const u1 = Math.min(u0 + sheetLen, hi);
-          // Each course laps the one below it, so consecutive courses share `lapIn` of the
-          // slope. Placed at one common lift they were two slabs in the same plane —
-          // interpenetrating, z-fighting, and reading as a stepped seam the width of the lap.
-          // Stack them instead: course c rides on the c courses under it. The buildup is real
-          // (lapped roofing does thicken toward the ridge) and tiny — five 1/4-in courses is
-          // 1 1/4 in over a 12-ft slope — but it is what turns the lap into a clean shadow line.
-          // `roofTilePlacement`'s lift is to the tile's CENTRE, so every term here is measured
-          // to the middle of the course: rafter top, deck, a hair of clearance, the courses
-          // already under this one, and finally half of this course's own thickness. Leaving
-          // that last half out sank each course an eighth of an inch INTO the deck, and the
-          // deck striped through — the same class of mistake as the sign above, seen twice.
-          //
-          // AND THE SIDE LAP NEEDS THE SAME TREATMENT, on the other axis. Two coplanar plates
-          // overlapping by 3.25 in z-fight down the whole joint. Stacking monotonically the way
-          // the courses do is not available here: a 50-ft eave is 27 strips, and 27 quarter-inches
-          // is a roof that ramps almost seven inches from one end to the other. So the strips
-          // ALTERNATE — every other sheet laid over its two neighbours — which is bounded at one
-          // thickness, reads as the lap standing proud, and is a real way to lay corrugated even
-          // if shingling them all one way is the commoner one. Roll is one piece per course and
-          // never takes this term.
-          const sideLift = isRoll ? 0 : (r % 2) * coveringThick;
+
+        // One piece, wherever it lands. The lift is the whole reason this is a closure: it is
+        // built from three independent terms and every caller needs the same three.
+        //
+        // `c` stacks the runs up the slope, because each laps the one below and two coplanar
+        // plates in one plane interpenetrate and z-fight. `roofTilePlacement`'s lift is to the
+        // tile's CENTRE, so every term is measured to the middle: rafter top, deck, a hair of
+        // clearance, the runs already under this one, and half of this piece's own thickness.
+        // Leaving that last half out sank each course an eighth of an inch INTO the deck.
+        //
+        // AND THE SIDE LAP NEEDS THE SAME TREATMENT, on the other axis. Two coplanar plates
+        // overlapping by 3.25 in z-fight down the whole joint. Stacking monotonically the way the
+        // runs do is not available here: a 50-ft eave is 27 strips, and 27 quarter-inches is a
+        // roof that ramps almost seven inches end to end. So the strips ALTERNATE — every other
+        // sheet over its two neighbours — bounded at one thickness. Roll is one piece per course
+        // and never takes this term.
+        const layPiece = (u0: number, u1: number, vb0: number, vb1: number, sideParity: number) => {
           const p = roofTilePlacement(
             plane,
             { u0, u1, v0: vb0, v1: vb1 },
             rafterHalfFt + deckThick + paperThick + TOLERANCE.surfaceLiftFt
-              + c * coveringThick + sideLift + coveringThick / 2,
+              + c * coveringThick + sideParity * coveringThick + coveringThick / 2,
           );
           emit('roofingCourse', nominal, {
             cutLengthFt: u1 - u0,
@@ -743,7 +723,79 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
             nailing: isRoll ? 'roofing nails @ 6" laps (PH)' : 'lead-head nails at every 3rd corrugation (PH)',
             doctrineRef: cite,
           });
+        };
+
+        if (isRoll) {
+          // A roll course spans the WHOLE eave, so the plane's taper is its taper, and it steps
+          // down the rake in bands. Unchanged, and byte-for-byte what it was.
+          const bands = Math.min(TOLERANCE.maxTaperBands, Math.max(1, Math.ceil(taper / TOLERANCE.hipCapFt)));
+          for (let k = 0; k < bands; k++) {
+            const vb0 = v0 + ((v1 - v0) * k) / bands;
+            const vb1 = v0 + ((v1 - v0) * (k + 1)) / bands;
+            const a = planeSpanAt(plane, vb0);
+            const b = planeSpanAt(plane, vb1);
+            const lo = Math.min(a.lo, b.lo);
+            const hi = Math.max(a.hi, b.hi);
+            if (hi - lo <= TOLERANCE.epsFt) continue;
+            layPiece(lo, hi, vb0, vb1, 0);
+          }
+          continue;
         }
+
+        // A CORRUGATED STRIP IS 26 INCHES WIDE, AND MOST OF THEM ARE NOWHERE NEAR A HIP.
+        //
+        // The band count above is the PLANE's taper — right for a roll course, which spans the
+        // whole eave and really does have to step down the rake. Applied to a narrow strip it is
+        // nonsense: on a 16 x 12 hip the plane narrows 14 ft over its slope, so every strip got
+        // cut into the maximum 8 bands and the roof came out as 176 pieces of 26 by 11 in. The
+        // gable, which tapers by nothing, gave one 7.4-ft sheet per strip — the right answer, and
+        // the tell. Eight butted seams up every strip is also eight more places for a ray to slip
+        // between two coplanar rectangles, which is what the specks scattered over a hip were.
+        //
+        // What decides whether one rectangle can stand in for a strip is how much THAT STRIP's
+        // own clipped width changes over the run — zero for a strip that lies wholly inside the
+        // plane, whatever the rest of the roof is doing.
+        const s0 = planeSpanAt(plane, v0);
+        const s1 = planeSpanAt(plane, v1);
+        const lo = Math.min(s0.lo, s1.lo);
+        const hi = Math.max(s0.hi, s1.hi);
+        if (hi - lo <= TOLERANCE.epsFt) continue;
+        const strips = Math.max(1, Math.ceil((hi - lo - (sheetAcrossFt - acrossExposureFt)) / acrossExposureFt));
+        for (let r = 0; r < strips; r++) {
+          const su0 = lo + r * acrossExposureFt;
+          const su1 = Math.min(su0 + sheetAcrossFt, hi);
+          const clippedWidth = (v: number) => {
+            const sp = planeSpanAt(plane, v);
+            return Math.max(0, Math.min(su1, sp.hi) - Math.max(su0, sp.lo));
+          };
+          const stripTaper = Math.abs(clippedWidth(v1) - clippedWidth(v0));
+          const bands = Math.min(TOLERANCE.maxTaperBands, Math.max(1, Math.ceil(stripTaper / TOLERANCE.hipCapFt)));
+          for (let k = 0; k < bands; k++) {
+            const vb0 = v0 + ((v1 - v0) * k) / bands;
+            const vb1 = v0 + ((v1 - v0) * (k + 1)) / bands;
+            const a = planeSpanAt(plane, vb0);
+            const b = planeSpanAt(plane, vb1);
+            const clo = Math.max(su0, Math.min(a.lo, b.lo));
+            const chi = Math.min(su1, Math.max(a.hi, b.hi));
+            // A SLIVER IS NOT A SHEET. Near the apex of a triangular face a strip clips to almost
+            // nothing — the plausibility check found quarter-inch "sheets" on the tower's cab, and
+            // it was right to. Two floors, both derived rather than picked:
+            //
+            //   from the second strip on, the SIDE LAP. Both strips are clipped to the same edge
+            //   and the previous one starts a lap further back, so anything narrower than the lap
+            //   is already wholly inside it — dropping it covers the same roof with one fewer
+            //   absurdity on the cut list.
+            //
+            //   for the first strip, ONE CORRUGATION — the side lap over the corrugations it
+            //   spans, which doctrine already carries as 3 1/4 in across 1 1/2. You cannot cut and
+            //   fasten a piece of corrugated narrower than a single rib, and what little it would
+            //   have covered sits under the caps that meet at the apex.
+            const corrugationFt = (ROOFING.corrugatedSideLapIn.value as number)
+              / (ROOFING.corrugatedSideLapCorrugations.value as number) / IN_PER_FT;
+            const minPieceFt = r > 0 ? sheetAcrossFt - acrossExposureFt : corrugationFt;
+            if (chi - clo <= minPieceFt) continue;
+            layPiece(clo, chi, vb0, vb1, r % 2);
+          }
         }
       }
     }

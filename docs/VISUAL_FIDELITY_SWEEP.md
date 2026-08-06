@@ -52,6 +52,7 @@ screenshots get read.
 | **Hip roof — the common rafters' pitch** | **Fixed** — rotated to a rise measured from the plate over a run measured from the eave, so every common sat 1.84 in proud of the roof at the eave and 1.84 in below the ridge. The jacks and hips were right; only the commons dissented. |
 | **The ridge cap** | **Fixed** — the cap was laid at DECK level and every course of roofing stacked on top of it, so the 2x8 ridge board showed through the piece whose whole job is to be outermost. |
 | **Gable + roof deck "none" + roofing** | **Fixed** — the frozen gable decks itself whatever the spec says, but the roofing's lift was read off the spec, so "no deck" sank every course into the deck that was there and the plywood striped through the roof. |
+| **Corrugated banding on a hip** | **Fixed** — the band count was the whole PLANE's taper, so every strip on a hip was cut into the maximum 8 bands: 176 pieces of 26 x 11 in where a gable gave one sheet per strip. |
 | **Corrugated sheet layout** | **Fixed** — sheets were laid 8 ft along the eave x 26 in up the slope (on their side) with their joints butted; they now run their length up the slope and side-lap. |
 | **Hip + roof deck "none" + roofing** | **Partly fixed.** The hip was UNBACKED and is now dropped — real, measured, pinned. But that was NOT what the specks were; see the correction below. |
 | **The hip drop** | **Fixed** — a hip is canted to both slopes it lies under, so a plain stick stood its arrises 0.098 in proud of the roof. Dropped, and the figure is on the cut list. |
@@ -843,13 +844,13 @@ real, measured and worth fixing on its own merits; it simply was not the thing i
 
 ## What is still open
 
-- **Taper bands butt.** On a HIP, a strip is cut into bands up the slope so a rectangle can stand
-  in for a tapering one, and consecutive bands share an edge exactly: `vb0 = v0 + (v1-v0)*k/bands`.
-  That is the same butted-joint pinhole the sheets had, on the other axis, and it is what the few
-  remaining specks along a hip are. A GABLE has no taper, so `bands` is 1 and it renders with none
-  at all — which is the check that isolates it. Bands are subdivisions of ONE sheet rather than
-  separate sheets, so the fix is not a lap: it is to stop the tiler splitting a piece into abutting
-  rectangles, or to overlap the subdivisions and lift them the way the side lap now is.
+- **The steps at a raked edge still butt.** Where a strip genuinely must follow a rake it is
+  approximated by a staircase, and consecutive steps share an edge exactly — the same butted-joint
+  pinhole, now confined to the hips instead of covering the roof. A gable has none at all. Steps
+  are subdivisions of ONE sheet rather than separate sheets, so the fix is not a lap: either stop
+  splitting a piece into abutting rectangles, or break the coplanarity the way the side lap now
+  does. What is left is a handful of specks along the hip lines, against dozens over the whole
+  roof before.
 - **`roofDeck: 'skip'` is a dead option.** Skip sheathing — spaced boards under corrugated — is in
   both the spec type and the covering module's input type, and nothing produces or consumes it: no
   card offers it, and no branch builds it. A shared link can still set it (`decodeSpec` validates
@@ -919,3 +920,29 @@ commoner.
 
 The check that it worked is a deckless gable, where nothing is behind the roofing to plug a hole:
 **no specks at all**, where before there were dozens.
+
+## Banding a strip by the whole roof's taper
+
+Laying corrugated up the slope turned up a second fault immediately behind the first. A course is
+cut into BANDS up the slope so a rectangle can stand in for a tapering one, and the band count was
+`ceil(plane taper / hip cap width)` — how much the WHOLE PLANE narrows over the run.
+
+That is right for a roll course, which spans the entire eave and really must step down the rake. It
+is nonsense for a 26-in strip. Measured on a 16 × 12 hip: the plane narrows 14 ft over its slope, so
+every strip took the capped maximum of 8 bands and the roof came out as **176 pieces of 26 × 11 in**
+— including the strips sitting squarely in the middle of a slope with nothing to clip them. The
+gable, whose taper is zero, gave **one 7.4-ft sheet per strip**: the right answer, and the tell.
+
+What decides whether one rectangle can stand in for a strip is how much THAT STRIP's own clipped
+width changes over the run — zero for a strip lying wholly inside the plane, whatever the rest of
+the roof is doing. With that, a hip lays whole sheets down the middle of each slope and steps only
+along its rakes. Eight butted seams up every strip was also eight more places for a ray to pass
+between two coplanar rectangles, which is what the specks scattered across a hip were.
+
+**And the plausibility check caught what the change broke.** Near the apex of a triangular face a
+strip clips to almost nothing, and the tower's cab came out with quarter-inch "sheets". Two floors,
+both derived rather than picked: from the second strip on, the SIDE LAP (both strips clip to the
+same edge and the previous one starts a lap further back, so anything narrower is already inside
+it); for the first strip, ONE CORRUGATION — the side lap over the corrugations it spans, 3¼ in
+across 1½, which doctrine already carries. You cannot cut and fasten a piece of corrugated narrower
+than a single rib.
