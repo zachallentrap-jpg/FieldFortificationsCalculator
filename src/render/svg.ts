@@ -69,6 +69,7 @@ export const CALLOUTS: Record<string, CalloutDef> = {
   enemy: { n: 12, label: 'Enemy direction' },
   berm: { n: 13, label: 'Dozed dirt mound up front (berm)' },
   ramp: { n: 14, label: 'Vehicle access ramp' },
+  elbow: { n: 15, label: 'Elbow rest (aiming support)' },
 };
 
 // Disc sizes meet the legibility floor (--disc-min-px 16, --label-min-px 11).

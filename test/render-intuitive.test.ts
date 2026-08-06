@@ -9,6 +9,7 @@ import { drawPlan } from '../src/render/drawPlan';
 import { drawSection } from '../src/render/drawSection';
 import { drawIso } from '../src/render/drawIso';
 import { positions } from '../src/doctrine/positions';
+import type { GeometryModel } from '../src/engine/geometry';
 import { defaultInputs } from './helpers';
 
 // (label, number) for every callout disc; plus the same split into body vs legend.
@@ -118,6 +119,26 @@ test('sectors of fire render for positions that have them, with the enemy arrow'
     }
   }
   assert.ok(sawSectors, 'at least one position renders sectors of fire');
+});
+
+test('elbow rests render for positions that define them, at the front lip not the rear', () => {
+  const oneMan = compute(defaultInputs({ positionType: 'one_man' }));
+  const oneManGeo = oneMan.geometry as GeometryModel;
+  assert.equal(oneManGeo.plan.elbows.length, 2, 'one_man defines 2 elbow rests (positions.ts elbowHoles)');
+  const twoMan = compute(defaultInputs({ positionType: 'two_man' }));
+  assert.equal((twoMan.geometry as GeometryModel).plan.elbows.length, 4, 'two_man defines 4 elbow rests');
+  for (const e of oneManGeo.plan.elbows) assert.ok(e.yFt < 0, 'elbow rests sit at the front (enemy-facing) lip, y < 0');
+  for (const s of oneManGeo.plan.sumps) assert.ok(s.yFt > 0, 'sumps sit near the rear wall, y > 0 — elbow rests must not collide with them');
+
+  const plan = drawPlan(oneMan);
+  assert.ok(plan.includes('aria-label="Elbow rest (aiming support)"'), 'elbow rest callout drawn');
+  assertCalloutLegendConsistent(plan, 'plan (one_man, elbow rests)');
+
+  // mg_crew has no elbow rests (crew-served positions use a firing platform instead) — must
+  // not draw a stray elbow callout with nothing behind it.
+  const mgCrew = compute(defaultInputs({ positionType: 'mg_crew' }));
+  assert.equal((mgCrew.geometry as GeometryModel).plan.elbows.length, 0, 'mg_crew has a firing platform, not elbow rests');
+  assert.ok(!drawPlan(mgCrew).includes('Elbow rest'), 'no elbow callout drawn when the position has none');
 });
 
 test('iso schematic carries its header and a consistent legend', () => {

@@ -184,6 +184,20 @@ export function drawPlan(result: Result): string {
     }
   }
 
+  // Elbow rests — small notches cut into the front lip of the bay where a prone/kneeling
+  // firer's elbows brace while aiming (one per firer per sector, one_man: 2, two_man: 4).
+  // Drawn as ticks (not circles) so they read distinctly from the sump marks at a glance.
+  let elbowCalloutPlaced = false;
+  for (const e of p.elbows) {
+    const c = px(e.xFt, e.yFt);
+    parts.push(el('rect', { x: c[0] - 4, y: c[1] - 2.5, width: 8, height: 5, fill: 'var(--draw-timber)', stroke: 'var(--draw-outline)', 'stroke-width': 1, rx: 1.5 }));
+    if (!elbowCalloutPlaced) {
+      used.add('elbow');
+      parts.push(callout('elbow', c[0] - 14, c[1], used));
+      elbowCalloutPlaced = true;
+    }
+  }
+
   // ── A–A cut line (matches drawSection) ─────────────────────────────────────────
   // Extends past the ramp for vehicles — halfW (from outerW) doesn't reach it (the ramp's
   // rear extent is the ramp run, not a mirrored parapet margin).

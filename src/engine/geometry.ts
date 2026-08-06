@@ -31,6 +31,7 @@ export interface GeometryModel {
     parapetW: number;
     sectors: { present: boolean; leftDeg: number; rightDeg: number };
     sumps: SumpMark[];
+    elbows: SumpMark[];
     platform: { L: number; W: number } | null;
     enemy: 'front';
   };
@@ -65,6 +66,22 @@ function sumpMarks(count: number, holeL: number, holeW: number): SumpMark[] {
   const marks: SumpMark[] = [];
   for (let i = 0; i < count; i++) {
     // Spread evenly across the frontage.
+    const frac = count === 1 ? 0.5 : i / (count - 1);
+    const xFt = (frac - 0.5) * (holeL - 1);
+    marks.push({ xFt, yFt });
+  }
+  return marks;
+}
+
+// Elbow rests (one_man: 2, two_man: 4 — one per firer per sector of fire) are a firing-edge
+// feature, not a floor feature: they sit at the FRONT lip of the bay where a prone/kneeling
+// firer's elbows brace against the parapet, opposite the sump's rear-wall placement. Same
+// even-spread-across-frontage math as sumpMarks, mirrored to the front wall.
+function elbowMarks(count: number, holeL: number, holeW: number): SumpMark[] {
+  if (count <= 0) return [];
+  const yFt = -(holeW / 2 - 0.5); // near the front wall
+  const marks: SumpMark[] = [];
+  for (let i = 0; i < count; i++) {
     const frac = count === 1 ? 0.5 : i / (count - 1);
     const xFt = (frac - 0.5) * (holeL - 1);
     marks.push({ xFt, yFt });
@@ -137,6 +154,7 @@ export function buildGeometry(calc: Calc): GeometryModel {
         rightDeg: az ? az.rightDeg : 45,
       },
       sumps: sumpMarks(calc.sumpCount, calc.holeL, calc.holeW),
+      elbows: elbowMarks(calc.position.elbowHoles, calc.holeL, calc.holeW),
       platform:
         calc.hasPlatform && calc.position.firingPlatform
           ? { L: calc.position.firingPlatform.L.value, W: calc.position.firingPlatform.W.value }

@@ -38,6 +38,7 @@ export function describe(result: Result, view: DrawView): A11y {
   if (result.cover.roofPath === 'engineered_required') features.push('an engineered roof (designed by others)');
   if (result.inputs.revetment !== 'none') features.push('revetted walls');
   if (result.inputs.sump) features.push('grenade sumps');
+  if (geo.plan.elbows.length > 0) features.push('elbow rests');
   if (result.inputs.camouflage) features.push('camouflage');
 
   const featureText = features.length ? ' Features: ' + features.join(', ') + '.' : '';
