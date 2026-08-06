@@ -133,6 +133,12 @@ export interface BuildingSpec extends SpecCommon {
   interiorStairs?: boolean; // default true at 2 stories; false is LEGAL (ladder instead)
   openFront?: WallId; // storage shed: posts + header; that wall takes no openings
   /**
+   * Whether the windows get shutters, and how. Lives here as well as on `HutSpec` because the
+   * hut translates itself into a `BuildingSpec` and the covering pass runs inside the building
+   * generator — a field the translation drops is a field the generator cannot see.
+   */
+  shutters?: 'none' | 'side' | 'propped';
+  /**
    * Full-run horizontal bands the wall covering is cut around — the hut family's screened band.
    * Heights are above the sole-plate top, like an opening's sill.
    */

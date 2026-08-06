@@ -304,6 +304,10 @@ export function generateInfillCovering(input: InfillCoveringInput): Member[] {
 
 // ── Wall surfaces ────────────────────────────────────────────────────────────
 
+// Re-exported so anything that places pieces on a wall imports the surface and the placement
+// convention from the same module — see `wallTilePlacement`.
+export type { WallSurface };
+
 export interface WallCoveringInput {
   surfaces: WallSurface[];
   kind: 'plywood' | 'boards' | 'boardAndBatten';
@@ -313,8 +317,15 @@ export interface WallCoveringInput {
   standoffFt: number;
 }
 
-/** Place a tile on a wall surface, returning world position + rotation. */
-function wallTilePlacement(
+/**
+ * Place a tile on a wall surface, returning world position + rotation.
+ *
+ * EXPORTED because it is the one place that knows where a thing nailed to a wall goes, and the
+ * tower cab is what happens when a second place decides for itself: it centred its panels on the
+ * corner posts' own centreline and buried them in the frame. `standoffFt` may be NEGATIVE — a
+ * door leaf hangs INSIDE the wall face, at `-thickFt`, not outboard of it.
+ */
+export function wallTilePlacement(
   s: WallSurface,
   t: Rect,
   standoffFt: number,

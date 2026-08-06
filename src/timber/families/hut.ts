@@ -77,6 +77,9 @@ export function buildingSpecForHut(spec: HutSpec): BuildingSpec {
     ...(spec.partitions ? { partitions: spec.partitions }
       : spec.variant === 'bHut' ? { partitions: bHutPartitions(lengthFt) } : {}),
     entrySteps: true,
+    // Carried across, not dropped: the shutter mode is a hut field and the thing that hangs
+    // shutters runs inside `generateBuilding`.
+    ...(spec.shutters ? { shutters: spec.shutters } : {}),
     // The band is a hole in the siding, not a decal over it. Resolved here rather than in
     // `generateHut` so the covering pass — which runs inside `generateBuilding` — can see it.
     ...(bandFor(spec) ? { wallBands: [bandRect(bandFor(spec)!)] } : {}),

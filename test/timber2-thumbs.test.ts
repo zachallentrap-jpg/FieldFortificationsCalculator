@@ -54,10 +54,13 @@ test('solid art is deterministic, self-contained, and inside its size budget', (
     assert.ok(!/<image|xlink:href|url\(/i.test(a), `${f.id}: external reference`);
     // A solid drawing is polygons, not strokes, so it is legitimately bigger than the line art —
     // but a card that ships a quarter-megabyte of SVG is a card that janks a phone.
-    // 300 KB, raised from 260 KB when the gable ends started being closed in: the raked
-    // infill is real geometry the drawing was previously missing, not bloat. The budget's
-    // job is catching a renderer that starts emitting a polygon per nail, and it still does.
-    assert.ok(a.length < 300_000, `${f.id}: solid art is ${a.length} bytes`);
+    // 340 KB, raised from 300 KB when the openings started being FILLED — the doors and
+    // shutters are real geometry the drawing was previously missing, in the same way the raked
+    // infill was when this moved from 260 KB. The largest card is gp-frame at 310 KB: forty
+    // window boards, sixteen battens and two ledged doors, on a card that used to draw eight
+    // holes. The budget's job is catching a renderer that starts emitting a polygon per nail,
+    // and 30 KB of headroom above the largest real card still does that.
+    assert.ok(a.length < 340_000, `${f.id}: solid art is ${a.length} bytes`);
   }
 });
 

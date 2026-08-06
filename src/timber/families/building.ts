@@ -28,6 +28,7 @@ import { generateRoofCovering, generateWallCovering, generateInfillCovering, gen
 import { generateFloorOnBearings, joistNominalFor } from '../subsystems/floorSystem';
 import { generatePartitions } from '../subsystems/partitions';
 import { generateOpenFront, removeClosedWall } from '../subsystems/openFront';
+import { generateBuiltOpenings } from '../subsystems/builtOpenings';
 import { LUMBER, PANEL, FOUNDATION, IN_PER_FT } from '../doctrine';
 import { headerForSpan } from '../normalize';
 
@@ -328,6 +329,28 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
         stage: requireOrdinal(stagePlan, 'siding'), standoffFt: sheathingThick,
       }),
     );
+  }
+
+  // WHAT FILLS THE OPENINGS. Hung with the exterior finish, because that is when a door goes on
+  // and because the `siding` stage is the only one that exists here — a bare-frame card (custom
+  // ships with no sheathing and no siding) has no closing-in stage and gets no door, which is
+  // right: it is a framing drawing, and its openings are meant to read as holes.
+  const closingIn = ordinalOf(stagePlan, 'siding');
+  if (closingIn !== undefined) {
+    const sheathingThick = spec.coverings.wallSheathing !== 'none'
+      ? wallLayerThicknessFt(spec.coverings.wallSheathing === 'boards' ? 'boards' : 'plywood')
+      : 0;
+    const sidingThick = spec.coverings.siding !== 'none'
+      ? wallLayerThicknessFt(spec.coverings.siding === 'boardAndBatten' ? 'boardAndBatten'
+        : spec.coverings.siding === 'boards' ? 'boards' : 'plywood')
+      : 0;
+    members.push(...generateBuiltOpenings({
+      surfaces: skinSurfaces,
+      openings: story.openings,
+      stage: closingIn,
+      skinThickFt: sheathingThick + sidingThick,
+      ...(spec.shutters ? { shutters: spec.shutters } : {}),
+    }));
   }
 
   return { members, levels, stagePlan, walls };

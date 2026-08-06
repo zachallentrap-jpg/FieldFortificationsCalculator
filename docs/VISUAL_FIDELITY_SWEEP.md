@@ -68,6 +68,7 @@ screenshots get read.
 | Guard tower cab pyramid — wood showing through the roofing | **Checked, nothing wrong.** The warm band along one hip was my own harness's HOVER tint. See the note below. |
 | **The roof a share link hands in** | **Fixed** — three ways a pasted link broke the workbench: a shed with no `highSide` and a spec with no `roof` both THREW, leaving "Laying out the frame…" spinning forever with no canvas; an unknown roof kind framed a building with no roof and said nothing. |
 | **Every other section a share link hands in** | **Fixed** — deleting each top-level key of the shipped preset in turn: SIX of the eight threw. `family`, `dims`, `spacing`, `coverings`, `stories` and `foundation` all produced the same dead spinner. An unknown foundation kind silently poured piers. |
+| **What fills a rough opening** | **Fixed** — every door and window on all fourteen cards was a HOLE you could see the cripples through. `OpeningSpec.fill` was written by every preset and read by nothing; the roles existed; the plan named the module by filename and it did not exist. |
 
 ## The shed that had no walls above the plate
 
@@ -1327,3 +1328,95 @@ Five of the new cases fail on the old normalize, four of them by throwing.
 Still uncovered, and recorded rather than half-done: the per-family fields beyond `SpecCommon` — a
 tower's `platformHeightFt` and `cabPlanFt`, a bunker's cover depth, a platform's ramp. Same door,
 same shape, not yet probed.
+
+## Every door in the toolkit was a hole
+
+Zoomed in on the GP building's south wall. The four windows are rectangles you look **through** —
+the cripples and the rough sill are visible inside each one, because the siding is correctly cut
+around the rough opening and nothing was ever put in it. Same at both doors. Same on all fourteen
+cards.
+
+What makes this one worth writing down is that everything needed to notice was already in the tree:
+
+- `OpeningSpec.fill` is written by every catalog preset and by both the "+ Door" and "+ Window"
+  buttons, as `'door-ledged'` and `'window-shutter'`. **Nothing read it.** Not one branch, anywhere.
+- `MemberRole` has carried `'doorBoard' | 'doorLedge' | 'doorBrace' | 'shutter'` since T5.
+  Nothing emitted them.
+- `labels.ts` has a plain-language name for `shutter` — for a member that had never existed.
+- `TIMBER2_PLAN.md`'s T5 contents name **`builtOpenings.ts` by filename**, and its acceptance
+  list names the test — "ledged door w/ brace-direction test" — which was never written because
+  the module never was. T5 is marked complete.
+
+A field nothing reads is invisible. A field that **everything writes and nothing reads** is
+invisible in a way that looks finished.
+
+### What got built
+
+A **ledged-and-braced door** as a real assembly, because its geometry is the teaching point:
+1x6 boards, three ledges across the back, two braces between them. The brace direction is the
+whole of it — a brace running down from the hinge jamb to the latch is in TENSION across nailed
+lap joints and the door racks into a parallelogram, so it has to rise AWAY from the hinge and take
+the leaf's sag in compression. The hinge jamb is stated (the u0 edge) rather than inferred, because
+with no hinge in the model the direction would otherwise be arbitrary and no test could tell right
+from wrong. A positive `rz` in the wall's own frame is the assertion, on every brace of every card.
+
+**Shutters** as a closed side-hinged pair, hung on the finished wall rather than in the opening,
+lapping it by an inch so a closed one shows no light gap. Built as boards and battens: a leaf of
+loose boards is not a shutter, and nobody buys a 19-inch-wide 1x6.
+
+**Screen inserts** for the fills that ask for them, using the `screenPanel` the hut's screened
+band already uses.
+
+Openings whose `fill` is `'rough'` still get nothing, which is a real state and not an oversight —
+the storage shed says `'rough'` explicitly on its 8-ft opening, and that is right: that one is a
+bay you back a trailer into, not a leaf. A card with nothing closing it in (`custom` ships with no
+sheathing and no siding, so it has no closing-in stage) gets no doors either, which is right for a
+framing drawing.
+
+### Three things the tests found that the eye did not
+
+**The braces were cut to the full diagonal.** A brace is a stick with WIDTH, and a rectangle of
+width w laid on a diagonal overhangs the corners of its bay by half that width in each direction.
+Cut to the diagonal, each brace stood 3⅝ in outside the leaf — past the jamb, in the wall. Its own
+nailing note said "cut to fit between the ledges" and it did not. Shortened by the width's own
+projection, using the larger of the two ratios because the bay is not square.
+
+**The `batten` role was already taken.** The shutter's cross-pieces were first emitted as
+`batten` — the right carpentry word — and the first probe written against the change duly
+reported 117 built-opening members on the storage shed, which has none: `batten` already means the
+strip over a board-and-batten SIDING joint. A role is a question the model gets asked, and two
+answers to it is a role nothing can filter on. They carry `shutter` now.
+
+**The hardware bill was silently skipping four whole schedules.** `timber2-fasteners` has a test
+whose entire job is to fail on any nailing schedule the take-off cannot read — "silence here is
+the whole honesty claim" — and it walked `gp-frame` and stopped. `gp-frame` has no screened band,
+no tower legs and no crib wall, so:
+
+| schedule | members | on |
+|---|---|---|
+| `staples @ 4" + batten` | 4 per hut | every screened band |
+| `bolted at both ends and where the diagonals cross` (+4 more) | 36 | the guard tower |
+| `spiked to each post` / `spiked to every stringer` | 73 | the crib bunker |
+
+None of it was on the hardware list. The test now walks **every shipped card**, and the take-off
+learned staples, bolts and spikes — plus an explicit "nothing to fasten" list for massing, earth
+and the pieces that stand by their own embedment, because `return true` there means "read, and the
+count is none" and must never be reached by a pattern loose enough to swallow something real.
+
+### Cost
+
+The solid picker cards grew: gp-frame is 310 KB against a 300 KB budget. Raised to 340 KB with the
+same reasoning the last raise used — doors and shutters are real geometry the drawing was
+previously missing, the budget's job is catching a renderer that emits a polygon per nail, and
+30 KB of headroom above the largest real card still does that. The frozen frame and compat goldens
+did **not** move: built openings are appended after the legacy path, which is untouched.
+
+### Left undone, on purpose
+
+- **Hinges and hasps are not counted.** The plan's T5 wants T-hinges and hasps as counted items;
+  there is a `hardware` role for it and nothing populates it. A door with no hinge is still a door
+  you can see; a bill with no hinges is a bill somebody has to catch.
+- **Propped shutters.** `HutSpec.shutters` is now consumed — `'none'` suppresses the pair — but
+  `'propped'` draws the same closed pair as `'side'`. A propped leaf is a rotated panel plus a
+  prop stick, and no shipped card sets it.
+- **`ac-sleeve`** builds nothing. It is in the fill union and no card asks for it.

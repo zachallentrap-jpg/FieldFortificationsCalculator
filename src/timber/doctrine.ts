@@ -207,6 +207,16 @@ export const OPENING = {
   cornerSetbackFt: doc(2, 'FM 5-426 opening layout (PH)', { unit: 'ft' }),
   /** Spacing between the windows a long wall gets by default. */
   windowPitchFt: doc(12, 'FM 5-426 opening layout (PH)', { unit: 'ft' }),
+  // ── What fills the opening (plan §2.6 TO-built sub-assemblies) ─────────────
+  doorBoardNominal: doc('1x6', 'FM 5-426 ledged-and-braced door — 1x6 boards (PH)'),
+  doorLedgeNominal: doc('1x6', 'FM 5-426 ledged-and-braced door — ledges and braces (PH)'),
+  doorLedges: doc(3, 'FM 5-426 ledged-and-braced door — three ledges (PH)'),
+  doorBraces: doc(2, 'FM 5-426 ledged-and-braced door — two braces, in compression (PH)'),
+  /** Gap all round a leaf inside its rough opening, so it swings. */
+  leafClearanceIn: doc(0.25, 'FM 5-426 door fitting clearance (PH)', { unit: 'in' }),
+  /** How far a shutter laps past the opening, so a closed one shows no light gap. */
+  shutterLapIn: doc(1, 'FM 5-426 shutter laps the opening (PH)', { unit: 'in' }),
+  shutterBattens: doc(2, 'FM 5-426 batten shutter — two battens (PH)'),
 } as const;
 
 // ── Named structure dimensions (plan §2.2 — the "exhaustive hut family") ─────

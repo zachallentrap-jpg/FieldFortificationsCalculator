@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fastenerTakeoff, fastenersForMember } from '../src/timber/fasteners';
-import { familyById } from '../src/timber/catalog';
+import { familyById, FAMILY_TABLE } from '../src/timber/catalog';
 import { generateStructure } from '../src/timber/families/index';
 import type { Member } from '../src/timber/types';
 
@@ -82,13 +82,20 @@ test('no schedule in a real building goes unread', () => {
   // This is the test that makes the rest meaningful: it walks every member of a shipped family
   // and fails if ANY nailing schedule falls through every rule. Silence here is the whole
   // honesty claim — a hardware list that skips what it did not understand looks complete.
-  const model = generateStructure(JSON.parse(JSON.stringify(familyById('gp-frame')!.preset)));
-  const take = fastenerTakeoff(model.members);
-  assert.deepEqual(take.unparsed, [], `unread schedules: ${take.unparsed.map((u) => u.schedule).join(' | ')}`);
-  assert.ok(take.lines.length > 0);
-  for (const line of take.lines) {
-    assert.ok(Number.isInteger(line.count) && line.count > 0, `${line.spec} count`);
-    assert.ok(line.usedFor.length > 0, `${line.spec} has no attribution`);
+  //
+  // EVERY SHIPPED CARD, not one. This walked `gp-frame` alone for as long as it existed, and
+  // `gp-frame` has no screened band — so the sea-hut's `staples @ 4" + batten` went unread on
+  // four members per hut, in the one check whose entire job is to notice that.
+  for (const fam of FAMILY_TABLE) {
+    const model = generateStructure(JSON.parse(JSON.stringify(fam.preset)));
+    const take = fastenerTakeoff(model.members);
+    assert.deepEqual(take.unparsed, [],
+      `${fam.id} unread schedules: ${take.unparsed.map((u) => `${u.schedule} (x${u.members})`).join(' | ')}`);
+    assert.ok(take.lines.length > 0, `${fam.id} bought no fasteners at all`);
+    for (const line of take.lines) {
+      assert.ok(Number.isInteger(line.count) && line.count > 0, `${fam.id}: ${line.spec} count`);
+      assert.ok(line.usedFor.length > 0, `${fam.id}: ${line.spec} has no attribution`);
+    }
   }
 });
 
