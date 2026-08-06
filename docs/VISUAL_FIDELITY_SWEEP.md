@@ -1952,3 +1952,44 @@ Two guardrail tests then caught two bare magnitudes in the new code, and both we
 prop's foot had been "85% down the leaf"; it now meets the leaf's **free edge**, which is where a
 prop actually goes and is a place rather than a number. Its minimum length is now the toolkit's
 own `TOLERANCE.minSliverFt` rather than a hand-picked half inch.
+
+## The stair the safety rule forced on, with nothing to hold
+
+A family/access combination the sweep had never rendered: **the guard tower at a height that makes
+a ladder illegal.** `normalizeSpec` switches a 24-ft tower to a switchback stair and says so — the
+card's own lock list cites EM 385-1-1 for exactly this. Three flights, two landings, 24 ft of
+climb, and **not one rail anywhere on it.** Every one of the model's 21 rail and toe-board members
+was at 24 ft or above, on the platform the stair arrives at.
+
+`StairResult.landings` has carried the comment *"Landing centres, for the railing pass"* since the
+module was written. Grep found no reader anywhere — `tower.ts` takes `.members` and drops the rest.
+The same shape as `fill`, `entrySteps` and `shutters` before it: **the field that names the missing
+work is right there in the type, written by the thing that knows and read by nobody.**
+
+Now emitted by `generateStair` itself, because whether an edge needs a rail is not the caller's
+decision to make — that is `railings.ts`'s stated philosophy and `railRequired` is its answer:
+
+- **Every flight, both sides.** Posts plumb on the stringers at the doctrine spacing; top and mid
+  rails **raked at the flight's own pitch**, their heights measured PLUMB from the nosing line,
+  which is how a stair rail is measured and why the rails lean and the posts do not.
+- **Every landing**, through the existing `generateRailing` and the `landings` the API already
+  returned — railed on all four sides but the ones a flight passes through. A 180° turn puts both
+  flights on the same side, so three sides are railed; a quarter turn opens two.
+- **Nothing below the threshold.** A hut's entry steps rise 2 ft 5 in against a 2 ft 6 in
+  fall-protection figure and are left alone. Three steps with a handrail would be this tool
+  inventing a requirement.
+
+`generateRailing` needed an `idPrefix` of its own: every call numbers from one, so a platform and
+two landings all produced `RL-railPost-01`. The stair generator hit this exact thing with its own
+flights and it is the same fix.
+
+Seven regression tests, four failing on the old code. Two guard the boundary in both directions —
+the sub-threshold flight and id uniqueness — and one had to be tightened after it passed
+**vacuously** on the old model: "each rail runs its own flight" is trivially true when there are no
+rails, so it now asserts there are twelve to check first.
+
+### One wrong test, and the reason
+
+Matching a mid rail to its top rail by plan position alone found a rail 9¾ ft away. A switchback
+stacks its flights over one another, so flight 1 and flight 3 share a plan line *exactly*. Matched
+on height as well.

@@ -35,6 +35,14 @@ export interface RailingInput {
   stage: number;
   /** Toe boards keep a dropped tool off the person below; on by default at height. */
   toeBoards?: boolean;
+  /**
+   * Member-id prefix. Defaults to 'RL', which is right while a structure has ONE railed surface.
+   * A switchback stair has a landing at every turn and each one is a railed surface of its own —
+   * and every call numbers its pieces from one, so without this two landings and a platform all
+   * carry `RL-railPost-01`. Ids are what selection, the highlight and the packet's anchors key
+   * on; the stair generator hit this exact thing with its own flights and it is the same fix.
+   */
+  idPrefix?: string;
 }
 
 /** True when EM 385-1-1's fall-protection threshold applies to a surface at this height. */
@@ -59,7 +67,7 @@ export function coveredSpans(edge: RailEdge): [number, number][] {
 }
 
 export function generateRailing(input: RailingInput): Member[] {
-  const emit = makeEmitter('RL');
+  const emit = makeEmitter(input.idPrefix ?? 'RL');
   // ONE POST PER HOLE. Every edge runs its posts inclusive of both ends, which is right for the
   // edge and wrong for the perimeter: at each corner the two edges meeting there each set a post,
   // and the model carried two 4x4s in the same place. Four of them on the platform and four on

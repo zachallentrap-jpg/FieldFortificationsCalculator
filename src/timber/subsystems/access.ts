@@ -17,8 +17,9 @@
 import type { Member } from '../types';
 import { DRESSED } from '../types';
 import { makeEmitter } from '../emit';
-import { LADDER, STAIR, IN_PER_FT, citeOf } from '../doctrine';
+import { LADDER, RAIL, STAIR, IN_PER_FT, citeOf } from '../doctrine';
 import { stringerDropFt } from '../stringerCuts';
+import { generateRailing, railRequired, type RailEdge } from './railings';
 
 /** Divide-by-zero guard on a degenerate run. Arithmetic, not doctrine. */
 const EPS_FT = 1e-6;
@@ -235,6 +236,10 @@ export interface StairResult {
 export function generateStair(input: StairInput): StairResult {
   const emit = makeEmitter(input.idPrefix ?? 'AC');
   const { base, up, baseY, topY, widthFt, stage } = input;
+  const railPostNominal = RAIL.postNominal.value as string;
+  const railMemberNominal = RAIL.memberNominal.value as string;
+  const railTopH = (RAIL.topHeightIn.value as number) / IN_PER_FT;
+  const railMidH = (RAIL.midHeightIn.value as number) / IN_PER_FT;
   const stringerNominal = STAIR.stringerNominal.value as string;
   const treadNominal = STAIR.treadNominal.value as string;
   const stringerCount = STAIR.stringerCount.value as number;
@@ -349,6 +354,57 @@ export function generateStair(input: StairInput): StairResult {
         doctrineRef: citeOf(STAIR.minTreadIn),
       });
     }
+    // ── THE RAIL. A flight of stairs is an open edge, and this one had none.
+    //
+    // `StairResult.landings` has carried the comment "Landing centres, for the railing pass"
+    // since the module was written, and nothing anywhere read the field. So a 24-ft guard tower
+    // — switched to a stair by EM 385-1-1 precisely because a ladder that high is not acceptable
+    // — climbed three flights past two landings with nothing to hold and nothing to stop a fall,
+    // while the platform it arrives at carried a full guardrail with a toe board.
+    //
+    // Whether an edge needs a rail is not the caller's decision to make; that is `railings.ts`'s
+    // stated philosophy and `railRequired` is its answer. Measured from the bottom of the whole
+    // climb, so a three-step entry stair is left alone and a tower's is not.
+    if (railRequired(y + risePerFlight - baseY)) {
+      const railYaw = Math.atan2(-dir[1], dir[0]);
+      const railLen = (sol.risers - 1) * Math.hypot(T, R);
+      const bays = Math.max(1, Math.ceil(sol.runFt / (RAIL.postSpacingMaxFt.value as number)));
+      const postDepth = DRESSED[railPostNominal]!.d / IN_PER_FT;
+      for (const side of [-1, 1] as const) {
+        const off = (side * widthFt) / 2;
+        const px = (d: number): number => at[0] + dir[0] * d + across[0] * off;
+        const pz = (d: number): number => at[1] + dir[1] * d + across[1] * off;
+        // The walking line is the NOSING line: one riser up at the flight's base, climbing at
+        // the unit run's own pitch. Rail heights are measured PLUMB from it, which is how a
+        // stair rail is measured and why the rails are raked and the posts are not.
+        const walkY = (d: number): number => y + R + (d * R) / T;
+        for (let i = 0; i <= bays; i++) {
+          const d = (sol.runFt * i) / bays;
+          emit('railPost', railPostNominal, {
+            cutLengthFt: railTopH + postDepth,
+            position: [px(d), walkY(d) + railTopH / 2, pz(d)],
+            rotation: [0, 0, Math.PI / 2],
+            stage,
+            nailing: 'bolted to the stringer (PH)',
+            doctrineRef: citeOf(RAIL.postSpacingMaxFt),
+          });
+        }
+        const mid = sol.runFt / 2;
+        for (const [h, role, cite] of [
+          [railTopH, 'railTop', citeOf(RAIL.topHeightIn)],
+          [railMidH, 'railMid', citeOf(RAIL.midHeightIn)],
+        ] as [number, 'railTop' | 'railMid', string][]) {
+          emit(role, railMemberNominal, {
+            cutLengthFt: railLen,
+            position: [px(mid), walkY(mid) + h, pz(mid)],
+            rotation: [0, railYaw, pitch],
+            stage,
+            nailing: '2-16d ea post (PH)',
+            doctrineRef: cite,
+          });
+        }
+      }
+    }
     y += risePerFlight;
     if (f < flightCount - 1) {
       // The landing spans from the top of this flight to the foot of the next, whichever way
@@ -372,6 +428,41 @@ export function generateStair(input: StairInput): StairResult {
         nailing: '2-16d ea bearer (PH)',
         doctrineRef: citeOf(STAIR.headroomIn),
       });
+      // AND THE LANDING IS AN OPEN EDGE TOO — three of them on a switchback, and it had none
+      // either. Railed on every side but the ones a flight passes through: you arrive against
+      // this flight's direction and leave along the next one's, which on a 180° turn is the same
+      // side and on a quarter turn is two different ones.
+      if (railRequired(y - baseY)) {
+        const nextDir = path.steps[f + 1]!.dir;
+        // The landing runs from the head of this flight to the foot of the next; when those are
+        // the same point it is square on the stair's own width.
+        const gap = Math.hypot(next[0] - top[0], next[1] - top[1]);
+        const longAxis: [number, number] = gap > EPS_FT
+          ? [(next[0] - top[0]) / gap, (next[1] - top[1]) / gap]
+          : [across[0], across[1]];
+        const shortAxis: [number, number] = [-longAxis[1], longAxis[0]];
+        const hl = span / 2;
+        const hs = widthFt / 2;
+        const corner = (a: number, b: number): [number, number] => [
+          cx + longAxis[0] * a * hl + shortAxis[0] * b * hs,
+          cz + longAxis[1] * a * hl + shortAxis[1] * b * hs,
+        ];
+        const sides: { from: [number, number]; to: [number, number]; out: [number, number] }[] = [
+          { from: corner(-1, -1), to: corner(1, -1), out: [-shortAxis[0], -shortAxis[1]] },
+          { from: corner(1, -1), to: corner(1, 1), out: [longAxis[0], longAxis[1]] },
+          { from: corner(1, 1), to: corner(-1, 1), out: [shortAxis[0], shortAxis[1]] },
+          { from: corner(-1, 1), to: corner(-1, -1), out: [-longAxis[0], -longAxis[1]] },
+        ];
+        const edges: RailEdge[] = [];
+        sides.forEach((e, i) => {
+          const arrives = -(e.out[0] * dir[0] + e.out[1] * dir[1]) > 0.5;
+          const leaves = e.out[0] * nextDir[0] + e.out[1] * nextDir[1] > 0.5;
+          if (!arrives && !leaves) edges.push({ id: `L${f}-${i}`, from: e.from, to: e.to });
+        });
+        emit.members.push(...generateRailing({
+          edges, deckY: y, stage, idPrefix: `${input.idPrefix ?? 'AC'}L${f + 1}`,
+        }));
+      }
     }
   }
   return { members: emit.members, flights, landings };
