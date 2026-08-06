@@ -18,6 +18,7 @@ import type { Member } from '../types';
 import { DRESSED } from '../types';
 import { makeEmitter } from '../emit';
 import { LADDER, STAIR, IN_PER_FT, citeOf } from '../doctrine';
+import { stringerDropFt } from '../stringerCuts';
 
 /** Divide-by-zero guard on a degenerate run. Arithmetic, not doctrine. */
 const EPS_FT = 1e-6;
@@ -284,11 +285,20 @@ export function generateStair(input: StairInput): StairResult {
     const midX = at[0] + dir[0] * (sol.runFt / 2);
     const midZ = at[1] + dir[1] * (sol.runFt / 2);
     const across: [number, number] = [-dir[1], dir[0]];
+    // HALF THE BOARD BELONGS BELOW THE NOSINGS AND NONE OF IT ABOVE. Centred on the line from
+    // the flight's base to its landing, a 2x12 stood 4 in proud of every tread and buried the
+    // same 4 in under the ground it starts on. The line is the stringer's TOP EDGE, so the piece
+    // drops half a face width down its own local -Y — not straight down, because it is pitched.
+    const drop = stringerDropFt(DRESSED[stringerNominal]!.d, yaw, pitch);
     for (let i = 0; i < stringerCount; i++) {
       const off = stringerCount === 1 ? 0 : (i / (stringerCount - 1) - 0.5) * widthFt;
       emit('stringer', stringerNominal, {
         cutLengthFt: slopeLen,
-        position: [midX + across[0] * off, y + risePerFlight / 2, midZ + across[1] * off],
+        position: [
+          midX + across[0] * off + drop[0],
+          y + risePerFlight / 2 + drop[1],
+          midZ + across[1] * off + drop[2],
+        ],
         rotation: [0, yaw, pitch],
         stage,
         nailing: 'bolted at head and foot (PH)',

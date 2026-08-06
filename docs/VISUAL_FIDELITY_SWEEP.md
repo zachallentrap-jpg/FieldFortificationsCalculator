@@ -70,6 +70,7 @@ screenshots get read.
 | **Every other section a share link hands in** | **Fixed** — deleting each top-level key of the shipped preset in turn: SIX of the eight threw. `family`, `dims`, `spacing`, `coverings`, `stories` and `foundation` all produced the same dead spinner. An unknown foundation kind silently poured piers. |
 | **What fills a rough opening** | **Fixed** — every door and window on all fourteen cards was a HOLE you could see the cripples through. `OpeningSpec.fill` was written by every preset and read by nothing; the roles existed; the plan named the module by filename and it did not exist. |
 | **Getting to the door** | **Fixed** — every door on a piered card opened onto a 2 ft 3½ in drop to clear air. `BuildingSpec.entrySteps` was set to `true` by every hut and read by nothing, one field along from `fill`, in the same file. |
+| **The ends of a stair stringer** | **Fixed** — every flight in the toolkit ended in two sharp wedges: the foot stabbing 4 in below the ground it stands on, the head the same distance above the landing, and half the board standing proud of the treads it carries. |
 
 ## The shed that had no walls above the plate
 
@@ -1477,7 +1478,64 @@ tower's and platform's stairs have had it as long as they have existed, so it is
 its number rather than folded into this change. The flight's centreline does start exactly at grade,
 which is what the test asserts.
 
+> **Taken up in the next pass, and it was two errors rather than one.** See below.
+
 Worth noting for the method: the first version of that test asserted on the stringers' bounding
 box and failed, and the box was not the piece — **a box round a raked member spans its whole lean**,
 the same trap this sweep has now hit three times. The stringers are checked by sampling their
 centreline; the treads are flat and axis-aligned, so their boxes are exact and are used directly.
+
+## A stringer is not a stick on a slope
+
+The previous pass measured this and left it: a stair stringer's lower corner dips 4.04 in below the
+ground the flight starts on. Cropped hard on the entry steps, what that looks like is three sharp
+diagonal wedges stabbing through the ground plane, and three more waving in the air above the top
+tread. Every stair in the toolkit — the tower's, the platform's, the new entry steps — ends that
+way at both ends.
+
+Reading the picture rather than the number turned up a second error the number had hidden. **Half
+the board was standing above the treads it carries.** `generateStair` places the stringer centred
+on the line from the flight's base to its landing, and that line is the stringer's TOP EDGE — the
+line of the tread nosings. Centred on it, a 2x12 stood 4 in proud of every tread and buried the
+same 4 in in the earth, which is also why the foot's dip and the head's rise were the same figure.
+
+So two fixes, and they are different in kind:
+
+**Where the piece goes** is `generateStair`'s: the centre drops half a face width along the board's
+own local −Y — not straight down, because the board is pitched. `stringerDropFt` returns it as a
+world offset so nothing has to know the rotation convention twice.
+
+**What shape the piece is** is a cut profile, the same route the rafter's bird's-mouth notch
+already travels: a 2D outline in the member's own frame handed to `cutLumberPiece`. A stringer's
+ends are cut square to the WORLD rather than to the board — level at the foot so it sits flat on
+the ground, plumb at the head so it bears flat on the header. For a pitched board those are not
+square cuts, which is exactly why a box got both wrong. The two bites are reciprocals — face width
+over the tangent at the foot, face width times it at the head — because one is measured against the
+horizontal and the other against the vertical.
+
+Nothing here touches `cutLength`: you cut the ends OFF a board of that length, and the cut list is
+right to ask for the whole board.
+
+### The tests had to be rewritten to describe the piece
+
+Both of the previous pass's stringer tests failed on the fix, and both were right to: they measured
+the raw stick. One asserted the CENTRELINE starts at grade, which stopped being true the moment the
+piece dropped below it; the other sampled the centreline for collisions and found it entering a
+floor joist, which the cut piece does not — the plumb face stops at the wall.
+
+They sample `stringerEndProfile` now. The lesson is one this sweep keeps relearning in new forms:
+after a bounding box round a raked member, and an orthographic elevation, the third thing that is
+not the piece is **the piece before it is cut**. The sampler takes the profile's own corners
+explicitly as well as a grid, because an even-odd test is ambiguous exactly ON the boundary and the
+boundary is where the answer lives — the first version missed the lowest corner by 0.046 in and
+reported the foot as floating.
+
+### Still out of scope, and named
+
+- **The basement stair** is emitted by the frozen `floor.ts` (`FL-stringer-*`), which is C-10 and
+  not editable here. It has the same 4.44-in wedges.
+- **The platform's ramp** (`PF-stringer-*`) is its own emitter in `families/platform.ts`, not
+  `generateStair`, and its stringers dip 5.55 in. Same shape of fix, different file.
+- **The thumbnail painter draws boxes**, so the picker cards still show the uncut stringer. At
+  220x150 over a forty-foot building that is well under a pixel; the 3D view and the solid card are
+  what this change is for.
