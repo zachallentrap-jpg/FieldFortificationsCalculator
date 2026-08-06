@@ -63,6 +63,7 @@ screenshots get read.
 | Double-coverage roll roofing (`rollDouble`) | **Checked, clean.** Nothing wrong. Five courses where single coverage lays three — the 50% lap — laid along the eave from the eave up, which is how roll goods go on. |
 | **Roll roofing below its minimum slope** | **Fixed** — the two minimum-slope figures were cited on every course and checked nowhere, so a 1-in-12 roof under single-coverage roll came out clean. |
 | **The hip drop** | **Fixed** — a hip is canted to both slopes it lies under, so a plain stick stood its arrises 0.098 in proud of the roof. Dropped, and the figure is on the cut list. |
+| **Guard tower — the cab's cladding** | **Fixed** — every panel was centred on the corner posts' own centreline, so it ran 1¾ in into the post at each end and its outer face sat 1½ in inside the frame. All four posts stood proud of the wall they were meant to be behind. |
 
 ## The shed that had no walls above the plate
 
@@ -1087,3 +1088,56 @@ else. The tell was that `studio.ts` needed a special case at all: a role that ha
 differently from every other role is usually a role whose data is wrong. The test asserts through
 the shared convention rather than against either renderer, because the bug was precisely that two
 renderers disagreed about what the numbers meant.
+
+## The one wall that skipped the covering path
+
+Every wall in this toolkit gets its skin from `generateWallCovering`, and `wallTilePlacement`
+decides where a panel goes: `s.faceOffsetFt + standoffFt + thickFt / 2`. Read it as a sentence and
+it says the panel's INNER face lands on the wall's outer face, and the framing ends up behind it.
+That is not a detail — it is the definition of cladding.
+
+The guard tower's cab is the exception. It is hand-rolled in `tower.ts`, and it started from
+nothing. Its four panels were placed on the corner LINE:
+
+```ts
+position: [(p[0] + q[0]) / 2, cabBaseY + halfW / 2, (p[1] + q[1]) / 2],
+cutLengthFt: run,
+```
+
+`p` and `q` are the cab corners — which are also where the four 4x4 corner posts are centred. So
+the wall was laid down the middle of its own frame. Measured on the shipped preset:
+
+- Each panel ran **1¾ in into each of the two posts it spans between** — 3½ ft × ½ in × 1¾ in of
+  one solid inside another, eight times, once per (panel, post) pair.
+- Each panel's outer face sat **1½ in inside the posts' outer faces**, so all four posts stood
+  proud of the wall on every elevation, with a reveal line down both sides of each.
+- Adjacent panels **overlapped each other ¼ in × ¼ in** in the corner, both of them buried in the
+  post anyway.
+
+The screen band above the half-wall had all of it too, on the same centreline.
+
+**Rendered it first.** From far enough away the cab reads as "recessed panels between exposed
+posts", which is a real way to build something and is why this survived every previous look at
+this family — the stray panel under the cab, the stair, the cab roof, the guardrail gap and the
+ladder were all found on this same structure. Cropped hard on one corner it is unmistakable: the
+post is a bar standing in front of two panels that vanish into it.
+
+The fix pushes the skin out by the post's half-thickness plus half its own, which is
+`wallTilePlacement`'s expression with `faceOffsetFt` supplied by the frame instead of by a wall
+surface. That leaves the corner to close, and four panels each spanning corner to corner would meet
+in an L with the post's arris showing between them. So the two z-walls run the full outer width and
+the two x-walls butt into them — the ordinary sheathing lap, and the reason `cutLengthFt` is no
+longer simply the corner-to-corner run. The screen gets the same treatment at its own thickness:
+both bands are fastened to the same plane, and the thinner one simply projects less.
+
+The tests measure against the posts **as the model emits them**, not against 3½ in, and they check
+both directions. No overlap is half the claim; a skin held off its frame would also have no overlap
+and would look nearly the same from outside, so a second test asserts each panel's inner face lands
+exactly on the post plane. Four fail on the old generator, naming the numbers above.
+
+Worth recording as a class: **a surface that does not go through the shared path will not have the
+shared path's fixes.** Two earlier passes in this file corrected placement bugs in
+`wallTilePlacement` — the two-layer standoff and the infill profiles — and neither reached the cab,
+because the cab never asked. The cab roof is the counter-example in the same file: its framing is
+hand-rolled but its sheathing and roofing go through `generateRoofCovering`, and a comment there
+says why. The walls had no such comment because nobody had noticed they needed one.

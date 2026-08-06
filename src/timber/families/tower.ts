@@ -301,39 +301,67 @@ export function generateTower(spec: TowerSpec): TowerResult {
   }
 
   // ── Cab.
+  //
+  // CLADDING GOES ON THE OUTSIDE OF A FRAME. Every cab panel used to be centred on the corner
+  // LINE — which is the corner posts' own centreline — so each one ran 1¾ in into the post at
+  // both of its ends, its outer face sat 1½ in INSIDE the posts' outer faces, and all four
+  // posts stood proud of the wall they were supposed to be behind. `wallTilePlacement` gets this
+  // right for every other wall in the toolkit by starting from the surface's `faceOffsetFt`;
+  // the cab is hand-rolled and started from nothing.
+  //
+  // The corner also has to be closed. Four panels each spanning corner to corner would meet in
+  // an L that leaves the post's arris showing, so the two z-walls run the full outer width and
+  // the two x-walls butt into them: the ordinary sheathing lap, and the reason `cutLengthFt` is
+  // not simply the corner-to-corner run.
+  const cabCorners: [number, number][] = [
+    [cx - deckHalf, cx - deckHalf], [cx + deckHalf, cx - deckHalf],
+    [cx + deckHalf, cx + deckHalf], [cx - deckHalf, cx + deckHalf],
+  ];
+  const cabPostHalfFt = DRESSED['4x4']!.w / 2 / IN_PER_FT;
+  const cabPanel = (f: number, thickFt: number): { cutLengthFt: number; x: number; z: number; yaw: number } => {
+    const p = cabCorners[f]!;
+    const q = cabCorners[(f + 1) % 4]!;
+    const run = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    // Outward normal of a face wound this way is the run direction turned a quarter right.
+    const nx = (q[1] - p[1]) / run;
+    const nz = -(q[0] - p[0]) / run;
+    const out = cabPostHalfFt + thickFt / 2;
+    const overrun = cabPostHalfFt + (f % 2 === 0 ? thickFt : 0);
+    return {
+      cutLengthFt: run + 2 * overrun,
+      x: (p[0] + q[0]) / 2 + nx * out,
+      z: (p[1] + q[1]) / 2 + nz * out,
+      yaw: Math.atan2(-(q[1] - p[1]), q[0] - p[0]),
+    };
+  };
   const cabWallH = spec.cab.walls === 'open-rail'
     ? 0
     : spec.cab.walls === 'half-wall' ? (TOWER.cabHalfWallFt.value as number) : (TOWER.cabWallHeightFt.value as number);
   const cabBaseY = deckY + deckThick / IN_PER_FT;
   if (cabWallH > 0) {
     const halfW = spec.cab.walls === 'half-wall-screen' ? (TOWER.cabHalfWallFt.value as number) : cabWallH;
+    const sidingT = (PANEL.sidingThickIn.value as number) / IN_PER_FT;
+    const screenT = (HUT.screenClothThickIn.value as number) / IN_PER_FT;
+    const screenH = (TOWER.cabWallHeightFt.value as number) - halfW;
     for (let f = 0; f < 4; f++) {
-      const a: [number, number] = [cx - deckHalf, cx - deckHalf];
-      const corners: [number, number][] = [
-        [cx - deckHalf, cx - deckHalf], [cx + deckHalf, cx - deckHalf],
-        [cx + deckHalf, cx + deckHalf], [cx - deckHalf, cx + deckHalf],
-      ];
-      void a;
-      const p = corners[f]!;
-      const q = corners[(f + 1) % 4]!;
-      const run = Math.hypot(q[0] - p[0], q[1] - p[1]);
-      const yaw = Math.atan2(-(q[1] - p[1]), q[0] - p[0]);
+      const w = cabPanel(f, sidingT);
       emit('siding', `${PANEL.widthFt.value}x${PANEL.lengthFt.value} panel`, {
-        cutLengthFt: run,
-        position: [(p[0] + q[0]) / 2, cabBaseY + halfW / 2, (p[1] + q[1]) / 2],
-        rotation: [0, yaw, 0],
+        cutLengthFt: w.cutLengthFt,
+        position: [w.x, cabBaseY + halfW / 2, w.z],
+        rotation: [0, w.yaw, 0],
         stage: sCab,
         actual: { w: PANEL.sidingThickIn.value as number, d: halfW * IN_PER_FT },
         nailing: '8d @ 6" edges / 12" field (PH)',
         doctrineRef: citeOf(TOWER.cabHalfWallFt),
       });
       if (spec.cab.walls === 'half-wall-screen') {
+        const s = cabPanel(f, screenT);
         emit('screenPanel', 'screen cloth', {
-          cutLengthFt: run,
-          position: [(p[0] + q[0]) / 2, cabBaseY + halfW + ((TOWER.cabWallHeightFt.value as number) - halfW) / 2, (p[1] + q[1]) / 2],
-          rotation: [0, yaw, 0],
+          cutLengthFt: s.cutLengthFt,
+          position: [s.x, cabBaseY + halfW + screenH / 2, s.z],
+          rotation: [0, s.yaw, 0],
           stage: sCab,
-          actual: { w: HUT.screenClothThickIn.value as number, d: ((TOWER.cabWallHeightFt.value as number) - halfW) * IN_PER_FT },
+          actual: { w: HUT.screenClothThickIn.value as number, d: screenH * IN_PER_FT },
           nailing: 'staples @ 4" + batten (PH)',
           doctrineRef: citeOf(TOWER.cabWallHeightFt),
         });
