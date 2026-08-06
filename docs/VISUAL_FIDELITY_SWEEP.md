@@ -2027,3 +2027,47 @@ Four regression tests over the two changes, all failing on the old code, and the
 to be re-ordered to say so: it asserted the plank COUNT before the overlap, so on the old model it
 failed with *"2 landing planks"* instead of *"AC-tread-12 is 30.0 in wide and only 15.0 in of it is
 over the landing"* — the right number, reported by the wrong claim.
+
+## A post-and-plank wall is two layers, and it was modelled as one
+
+The planks were laid on the posts' own centreline, so at every post station a plank ran straight
+**through** the post it crossed:
+
+```
+crib-bunker, shipped post-plank card
+  lagging-through-post overlaps   176 pairs
+  deepest                          59.8 in³   (BK-lagging-27 inside BK-post-11)
+```
+
+And it is not a question of which side looks tidier. **The earth is outside and it pushes in**, so
+the planks belong on the outer face with the posts behind them: the load then bears the planks
+*onto* the posts, which is the whole reason a soldier-pile wall is built that way round. On the
+posts' own line the planks were retaining nothing.
+
+So the wall band is now the plank plus the post — `postThick + lagThick` — with the plank at the
+outer face and the post line inset behind it. The clear interior is unchanged (it is measured from
+the posts' inner face either way); the bunker's outside grew by the plank, 16.917 ft to 17.167.
+Three things moved with the post line and had to: the **cap beam**, which centred on the whole band
+would hang a plank's width out over the lagging and miss as much of the post it bears on; and the
+**door jambs and header**, which are posts.
+
+**The baffle had the same mistake at half the depth.** It stood its own lagging off by HALF a
+post — which puts the plank's centre on the post's face and half of every board inside it. Face to
+face now, like the wall.
+
+Three regression tests, all failing on the old wall, and the second one is the reason the first is
+not enough: a plank laid *inboard* of the posts would be just as free of overlaps and exactly
+wrong, so it is measured per side against the building line — the planks' outer face IS the
+building line, and the posts are inboard of them.
+
+Three existing tests moved with it, and only their constant: `bunkerGeom` derived the wall
+thickness from the post alone. The claims — the wall fills its footprint, the interior is the
+interior asked for, the stringers lie inside the building — are unchanged.
+
+### Seen while measuring, not changed
+
+- **The top lagging course stands 1¾ in proud of the posts and laps into the cap beam.** 6 ft 6 in
+  of wall is 10.759 courses of a 7¼-in plank; the loop runs `y < H` so it lays eleven, and the last
+  one's top reaches 6.6458 against a wall top of 6.5000 and a cap underside of 6.5000. Visible in
+  an outside view as a step at every post. The fix is to RIP the last course to fit — stopping the
+  loop early instead would leave a 5½-in slot under the cap, which is worse. **Next target.**

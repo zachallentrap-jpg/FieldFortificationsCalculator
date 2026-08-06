@@ -453,9 +453,12 @@ function bunkerGeom(wallType: string, over: Record<string, unknown> = {}) {
   // Read the dimensions BACK from the model: the envelope clamps, and a test that sizes the
   // building off what it asked for measures a bunker that was never built.
   const spec = model.spec as unknown as Record<string, number>;
+  // A POST-AND-PLANK WALL IS TWO LAYERS: the plank on the outer face and the post behind it.
+  // It used to be modelled as one, with the planks laid on the posts' own centreline and running
+  // straight through them, so this figure was the post alone.
   const wallThick = wallType === 'crib'
     ? (DRESSED[BUNKER.cribLogNominal.value as string]!.w / IN_PER_FT) * 3
-    : DRESSED[BUNKER.postNominal.value as string]!.w / IN_PER_FT;
+    : (DRESSED[BUNKER.postNominal.value as string]!.w + DRESSED[BUNKER.laggingNominal.value as string]!.w) / IN_PER_FT;
   const caps = model.members.filter((k) => k.role === 'capBeam');
   const capBottom = Math.min(...caps.map((k) => boxB(k).y[0]!));
   const wall = model.members.filter((k) => WALL_ROLES.has(k.role) && boxB(k).y[1]! <= capBottom + 1e-9);
@@ -707,5 +710,101 @@ test('and every stringer bears on both caps across its whole thickness', () => {
     const outer = model.members.filter((k) => k.role === 'capBeam');
     const xMax = Math.max(...outer.map((k) => boxB(k).x[1]!));
     for (const s of stringers) assert.ok(boxB(s).x[1]! <= xMax + 1e-9);
+  }
+});
+
+// ── The wall is two layers ───────────────────────────────────────────────────
+//
+// A post-and-plank wall is planks on the outer face and posts behind them, and it was modelled as
+// one layer: the planks laid on the posts' own centreline, running straight THROUGH every post
+// they crossed. 176 overlapping pairs on the shipped card, the deepest 59.8 in³ of one solid
+// inside another.
+//
+// And it is not a question of which side looks tidier. The earth is OUTSIDE and it pushes in, so
+// the planks belong on the outer face with the posts behind them: the load bears the planks onto
+// the posts, which is the whole reason a soldier-pile wall is built that way round. On the posts'
+// own line the planks were retaining nothing.
+
+test('A PLANK DOES NOT PASS THROUGH A POST', () => {
+  for (const wallType of ['post-plank', 'crib']) {
+    const { model } = bunkerGeom(wallType);
+    const lag = model.members.filter((x) => x.role === 'lagging');
+    const posts = model.members.filter((x) => x.role === 'post');
+    if (wallType === 'crib') {
+      assert.equal(lag.filter((x) => boxB(x).y[1]! < 7).length, 0, 'a crib has no lagging in its walls');
+      continue;
+    }
+    assert.ok(lag.length > 20 && posts.length > 4, `${wallType}: nothing to check`);
+    let worst = 0;
+    let pair = '';
+    for (const l of lag) {
+      const a = boxB(l);
+      for (const p of posts) {
+        const b = boxB(p);
+        const dx = Math.min(a.x[1]!, b.x[1]!) - Math.max(a.x[0]!, b.x[0]!);
+        const dy = Math.min(a.y[1]!, b.y[1]!) - Math.max(a.y[0]!, b.y[0]!);
+        const dz = Math.min(a.z[1]!, b.z[1]!) - Math.max(a.z[0]!, b.z[0]!);
+        if (dx > 1e-9 && dy > 1e-9 && dz > 1e-9) {
+          const v = dx * dy * dz * 1728;
+          if (v > worst) { worst = v; pair = `${l.id} and ${p.id}`; }
+        }
+      }
+    }
+    assert.equal(worst, 0, `${wallType}: ${pair} occupy the same ${worst.toFixed(1)} in³`);
+  }
+});
+
+test('and the planks are OUTBOARD of the posts, where the earth bears them onto it', () => {
+  // A plank inboard of the posts would be just as free of overlaps and exactly wrong: the earth
+  // would push it off them. Measured per side, against the wall band's own outer face.
+  const { model, wallThick, outerL, outerW } = bunkerGeom('post-plank');
+  const capBottom = Math.min(...model.members.filter((k) => k.role === 'capBeam').map((k) => boxB(k).y[0]!));
+  const lag = model.members.filter((x) => x.role === 'lagging' && boxB(x).y[1]! <= capBottom + 1e-9);
+  const posts = model.members.filter((x) => x.role === 'post');
+  assert.ok(lag.length > 20);
+  const sweeps: { axis: 0 | 2; span: number }[] = [{ axis: 0, span: outerL }, { axis: 2, span: outerW }];
+  for (const { axis, span } of sweeps) {
+    const near = (k: (typeof lag)[number]): boolean => (axis === 0 ? boxB(k).x : boxB(k).z)[1]! < span / 2;
+    const far = (k: (typeof lag)[number]): boolean => (axis === 0 ? boxB(k).x : boxB(k).z)[0]! > span / 2;
+    // On the near side, the outermost material is the plank and the innermost is the post.
+    for (const [pick, edge, label] of [[near, 0, 'near'], [far, 1, 'far']] as [typeof near, 0 | 1, string][]) {
+      const wallLag = lag.filter((k) => pick(k) && (axis === 0 ? boxB(k).x : boxB(k).z)[1]! - (axis === 0 ? boxB(k).x : boxB(k).z)[0]! < wallThick + 1e-9);
+      const wallPost = posts.filter((k) => pick(k));
+      if (wallLag.length === 0 || wallPost.length === 0) continue;
+      const face: number = edge === 0 ? 0 : span;
+      const lagFace = edge === 0
+        ? Math.min(...wallLag.map((k) => (axis === 0 ? boxB(k).x : boxB(k).z)[0]!))
+        : Math.max(...wallLag.map((k) => (axis === 0 ? boxB(k).x : boxB(k).z)[1]!));
+      const postFace = edge === 0
+        ? Math.min(...wallPost.map((k) => (axis === 0 ? boxB(k).x : boxB(k).z)[0]!))
+        : Math.max(...wallPost.map((k) => (axis === 0 ? boxB(k).x : boxB(k).z)[1]!));
+      assert.ok(Math.abs(lagFace - face) < 1e-9,
+        `${label} wall on axis ${axis}: the planks' outer face is at ${lagFace.toFixed(4)}, not the building line ${face.toFixed(4)}`);
+      const inboard = edge === 0 ? postFace - lagFace : lagFace - postFace;
+      assert.ok(inboard > 1e-9,
+        `${label} wall on axis ${axis}: the posts are ${(inboard * IN_PER_FT).toFixed(2)} in inboard of the planks — the earth would push the planks off them`);
+    }
+  }
+});
+
+test('and the baffle\'s own planks sit on its posts, not inside them', () => {
+  // The same mistake at half the depth: the baffle stood its lagging off by HALF a post, which
+  // puts the plank's own centre on the post's face and half of every board inside it.
+  const { model } = bunkerGeom('post-plank');
+  const baffle = model.members.filter((x) => x.role === 'baffleWall');
+  assert.ok(baffle.length > 0, 'the preset has a baffle');
+  const bPosts = baffle.filter((x) => Math.abs(Math.abs(x.rotation[2]!) - Math.PI / 2) < 1e-6);
+  const bLag = baffle.filter((x) => !bPosts.includes(x));
+  assert.ok(bPosts.length >= 2 && bLag.length > 0);
+  for (const l of bLag) {
+    const a = boxB(l);
+    for (const p of bPosts) {
+      const b = boxB(p);
+      const dx = Math.min(a.x[1]!, b.x[1]!) - Math.max(a.x[0]!, b.x[0]!);
+      const dy = Math.min(a.y[1]!, b.y[1]!) - Math.max(a.y[0]!, b.y[0]!);
+      const dz = Math.min(a.z[1]!, b.z[1]!) - Math.max(a.z[0]!, b.z[0]!);
+      assert.ok(dx <= 1e-9 || dy <= 1e-9 || dz <= 1e-9,
+        `${l.id} is ${(dx * IN_PER_FT).toFixed(2)} in inside ${p.id}`);
+    }
   }
 });

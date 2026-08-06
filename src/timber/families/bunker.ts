@@ -103,9 +103,26 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
   const capNominal = BUNKER.capNominal.value as string;
   const lagNominal = BUNKER.laggingNominal.value as string;
   const postSpacing = BUNKER.postSpacingFt.value as number;
+  // A POST-AND-PLANK WALL IS TWO LAYERS, and it was modelled as one.
+  //
+  // The planks were laid on the posts' own centreline, so at every post station the plank ran
+  // straight THROUGH the post: 176 overlapping pairs on the shipped card, the deepest 59.8 in³
+  // of one solid inside another. And it is not a question of which side looks tidier. The earth
+  // is OUTSIDE and it pushes in, so the planks belong on the outer face and the posts behind
+  // them: the load then bears the planks onto the posts, which is the whole reason a soldier-pile
+  // wall is built that way round. On the posts' line the planks were retaining nothing.
+  //
+  // So the wall band is the plank plus the post. The clear interior is unchanged — it is measured
+  // from the posts' inner face either way — and the bunker's outside grew by the plank.
+  const postThick = DRESSED[postNominal]!.w / IN_PER_FT;
+  const lagThick = DRESSED[lagNominal]!.w / IN_PER_FT;
   const wallThick = spec.wallType === 'crib'
     ? DRESSED[BUNKER.cribLogNominal.value as string]!.w / IN_PER_FT * 3
-    : DRESSED[postNominal]!.w / IN_PER_FT;
+    : postThick + lagThick;
+  /** Inset of the POST line from the outer face — the plank is outboard of it. */
+  const postInset = spec.wallType === 'crib' ? wallThick / 2 : lagThick + postThick / 2;
+  /** How far outboard of the post line a plank's own centre sits, face to face. */
+  const lagStandoff = spec.wallType === 'crib' ? 0 : (postThick + lagThick) / 2;
 
   // The clear span the overhead has to cross is the interior width, and the stated depth of
   // soil is what it carries. Both are printed rather than assumed.
@@ -134,7 +151,9 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
   // The entrance framing was already right: its jambs and header sit at `wallThick / 2`. The wall
   // was the one piece that disagreed, which is what made it hard to see: everything it was
   // supposed to meet was in the right place.
-  const halfWall = wallThick / 2;
+  // The corners are the POST line. On a crib that is the wall's centreline; on a post-and-plank
+  // wall the planks stand a plank's thickness outboard of it, at `lagStandoff`.
+  const halfWall = postInset;
   const corners: [number, number][] = [
     [halfWall, halfWall],
     [outerL - halfWall, halfWall],
@@ -227,7 +246,11 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
           doctrineRef: citeOf(BUNKER.postNominal),
         });
       }
-      // Lagging behind the posts, holding the face between them.
+      // Lagging on the OUTER face of the posts, holding the earth off them. The outward normal
+      // of a side is its own direction turned right: the corners run counter-clockwise in plan,
+      // so `(uz, -ux)` points away from the bunker on every one of the four.
+      const nx = uz * lagStandoff;
+      const nz = -ux * lagStandoff;
       const lagH = DRESSED[lagNominal]!.d / IN_PER_FT;
       // One course is one board unless the doorway interrupts it, in which case it is the two
       // boards either side of the opening — which is what you would cut, and what leaves a hole.
@@ -239,7 +262,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
           const mid = (u0 + u1) / 2;
           emit('lagging', lagNominal, {
             cutLengthFt: u1 - u0,
-            position: [a[0] + ux * mid, y, a[1] + uz * mid],
+            position: [a[0] + ux * mid + nx, y, a[1] + uz * mid + nz],
             rotation: [0, Math.atan2(-uz, ux), 0],
             stage: sWall,
             nailing: 'spiked to each post (PH)',
@@ -253,7 +276,9 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
   // ── Caps along the two long walls, carrying the stringers.
   const capD = DRESSED[capNominal]!.d / IN_PER_FT;
   const capY = wallTopY + capD / 2;
-  for (const z of [wallThick / 2, outerW - wallThick / 2]) {
+  // ON THE POSTS. A cap centred on the whole band would hang a plank's width out over the
+  // lagging and miss as much of the post it is supposed to bear on.
+  for (const z of [postInset, outerW - postInset]) {
     emit('capBeam', capNominal, {
       cutLengthFt: outerL,
       position: [outerL / 2, capY, z],
@@ -328,7 +353,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
   for (const z of [doorZ0 - jambT / 2, doorZ1 + jambT / 2]) {
     emit('post', jambNominal, {
       cutLengthFt: wallTopY,
-      position: [wallThick / 2, wallTopY / 2, z],
+      position: [postInset, wallTopY / 2, z],
       rotation: [0, 0, Math.PI / 2],
       stage: sEntry,
       nailing: 'set against the end of the wall run; capped (PH)',
@@ -338,7 +363,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
   const headerNominal = LUMBER.headerNominal.value as string;
   emit('header', headerNominal, {
     cutLengthFt: doorWidth + 2 * jambT,
-    position: [wallThick / 2, wallTopY + DRESSED[headerNominal]!.d / IN_PER_FT / 2, outerW / 2],
+    position: [postInset, wallTopY + DRESSED[headerNominal]!.d / IN_PER_FT / 2, outerW / 2],
     rotation: [0, Math.PI / 2, 0],
     stage: sEntry,
     nailing: '3-16d ea end (PH)',
@@ -378,7 +403,10 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
     for (let y = lagH / 2; y < H; y += lagH) {
       emit('baffleWall', lagNominal, {
         cutLengthFt: run,
-        position: [-offset - DRESSED[postNominal]!.w / IN_PER_FT / 2, Math.min(y, H - lagH / 2), (baffleZ0 + baffleZ1) / 2],
+        // Face to face with the baffle's posts. Standing off by HALF a post put the plank's own
+        // centre on the post's face, so half of every board was inside the post — the same
+        // mistake as the wall's lagging, at half the depth.
+        position: [-offset - (DRESSED[postNominal]!.w + DRESSED[lagNominal]!.w) / IN_PER_FT / 2, Math.min(y, H - lagH / 2), (baffleZ0 + baffleZ1) / 2],
         rotation: [0, Math.PI / 2, 0],
         stage: sEntry,
         nailing: 'spiked to each post (PH)',
