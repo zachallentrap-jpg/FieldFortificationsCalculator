@@ -773,3 +773,117 @@ test('a RAMP stringer is not a stair and is not cut like one', () => {
     assert.equal(stairGeometryOf(s), null, `${s.id} was read as a flight of stairs`);
   }
 });
+
+// ── The propped shutter ──────────────────────────────────────────────────────
+//
+// `shutters` is a three-value enum on `BuildingSpec` and on `HutSpec`, it survives a share link,
+// and `emitShutterPair` was the only thing any value but 'none' reached — so 'side' and 'propped'
+// produced BYTE-IDENTICAL geometry. A hut shut up for the night and the same hut open to the
+// breeze were the same model. And any other string at all — a typo, a value from a later version
+// — was accepted in silence and came back as shut windows.
+
+const shutterSig = (mode: string): string => {
+  const spec = JSON.parse(JSON.stringify(familyById('sea-hut' as never)!.preset)) as Record<string, unknown>;
+  spec.shutters = mode;
+  return generateStructure(spec as unknown as StructureSpec).members
+    .filter((x) => x.role === 'shutter')
+    .map((x) => `${x.nominal}|${x.cutLength.toFixed(4)}|${x.position.map((v) => v.toFixed(4))}|${x.rotation.map((v) => v.toFixed(4))}`)
+    .join(';');
+};
+
+const proppedHut = () => {
+  const spec = JSON.parse(JSON.stringify(familyById('sea-hut' as never)!.preset)) as Record<string, unknown>;
+  spec.shutters = 'propped';
+  return generateStructure(spec as unknown as StructureSpec);
+};
+
+test('PROPPED IS NOT THE SAME AS SIDE-HUNG — the option builds a different thing', () => {
+  const side = shutterSig('side');
+  const propped = shutterSig('propped');
+  assert.ok(side.length > 0 && propped.length > 0, 'both modes hang something');
+  assert.notEqual(propped, side, "'propped' and 'side' produce identical geometry");
+  assert.equal(shutterSig('none'), '', "'none' still hangs nothing");
+  // A propped shutter is ONE leaf per opening, not a pair: that is what top-hinged means, and it
+  // is why the two modes are different pieces rather than the same pieces at an angle.
+  const m = proppedHut();
+  const props = m.members.filter((x) => x.role === 'shutter' && x.nominal === '2x2');
+  assert.ok(props.length > 0, 'a propped shutter is propped on something');
+  const windows = new Set(m.members.filter((x) => x.role === 'shutter').map((x) => `${x.wall}:${Math.round(x.position[0] / 3)}:${Math.round(x.position[2] / 3)}`));
+  assert.ok(props.length <= windows.size, 'one stick per opening, not one per board');
+});
+
+test('and it swings OUT of the wall, not through it', () => {
+  // The sign that had to be got right and was not the first time: `rx` tilts a wall-mounted piece
+  // toward the local +Z of `[0, yaw, 0]`, which is the wall's INWARD normal. The first cut swung
+  // every leaf back through the wall it hangs on, and because the battens are placed by position
+  // alone and were right either way, the render read as a tangle of sticks rather than a leaf.
+  const m = proppedHut();
+  const dims = (m.spec as unknown as { dims: { lengthFt: number; widthFt: number } }).dims;
+  const cx = dims.lengthFt / 2;
+  const cz = dims.widthFt / 2;
+  const out = (p: readonly number[]): number => Math.hypot(p[0]! - cx, p[2]! - cz);
+  const leaves = m.members.filter((x) => x.role === 'shutter' && x.nominal !== '2x2'
+    && Math.abs(Math.abs(x.rotation[2]!) - Math.PI / 2) < 1e-9);
+  assert.ok(leaves.length >= 4, `${leaves.length} leaf boards found`);
+  for (const b of leaves) {
+    const half = b.cutLength / 24;
+    const a = rotate(b, [half, 0, 0]);
+    const p1: V3 = [b.position[0] + a[0], b.position[1] + a[1], b.position[2] + a[2]];
+    const p2: V3 = [b.position[0] - a[0], b.position[1] - a[1], b.position[2] - a[2]];
+    const [hi, lo] = p1[1] > p2[1] ? [p1, p2] : [p2, p1];
+    assert.ok(hi[1] - lo[1] > 0.1, `${b.id} is not hanging from anything`);
+    assert.ok(out(lo) > out(hi) + 0.1,
+      `${b.id}: its free edge is ${(out(lo) - out(hi)).toFixed(3)} ft further out than its hinge — a propped shutter swings AWAY from the wall`);
+  }
+});
+
+test('and the stick reaches from the leaf back to the wall', () => {
+  const m = proppedHut();
+  const dims = (m.spec as unknown as { dims: { lengthFt: number; widthFt: number } }).dims;
+  const cx = dims.lengthFt / 2;
+  const cz = dims.widthFt / 2;
+  const out = (p: readonly number[]): number => Math.hypot(p[0]! - cx, p[2]! - cz);
+  const props = m.members.filter((x) => x.role === 'shutter' && x.nominal === '2x2');
+  const leaves = m.members.filter((x) => x.role === 'shutter' && x.nominal !== '2x2'
+    && Math.abs(Math.abs(x.rotation[2]!) - Math.PI / 2) < 1e-9);
+  assert.ok(props.length > 0 && leaves.length > 0);
+  for (const s of props) {
+    const half = s.cutLength / 24;
+    const a = rotate(s, [half, 0, 0]);
+    const p1: V3 = [s.position[0] + a[0], s.position[1] + a[1], s.position[2] + a[2]];
+    const p2: V3 = [s.position[0] - a[0], s.position[1] - a[1], s.position[2] - a[2]];
+    const [hi, lo] = p1[1] > p2[1] ? [p1, p2] : [p2, p1];
+    assert.ok(out(hi) > out(lo) + 0.1,
+      `${s.id}: the stick leans the wrong way — its top is ${(out(hi) - out(lo)).toFixed(3)} ft out from its foot`);
+    // Its head lands on a leaf, and its foot comes back to the wall.
+    const near = Math.min(...leaves.map((b) => {
+      const h = b.cutLength / 24;
+      const v = rotate(b, [h, 0, 0]);
+      return Math.min(
+        Math.hypot(b.position[0] + v[0] - hi[0], b.position[1] + v[1] - hi[1], b.position[2] + v[2] - hi[2]),
+        Math.hypot(b.position[0] - v[0] - hi[0], b.position[1] - v[1] - hi[1], b.position[2] - v[2] - hi[2]),
+      );
+    }));
+    assert.ok(near < 1.5, `${s.id}: its head is ${near.toFixed(2)} ft from the nearest leaf edge — it props nothing`);
+  }
+});
+
+test('and a shutter mode nobody wrote is repaired and SAID', () => {
+  // `decodeSpec` takes any JSON with a `family` key, and this field was read with a bare
+  // `!== 'none'` — so every unknown value came back as the closed pair with nothing said. The
+  // same shape as the roof kind and the foundation kind, which are both guarded a few lines up.
+  const spec = JSON.parse(JSON.stringify(familyById('sea-hut' as never)!.preset)) as Record<string, unknown>;
+  spec.shutters = 'open';
+  const m = generateStructure(spec as unknown as StructureSpec);
+  const said = m.issues.find((i) => i.path === 'shutters');
+  assert.ok(said, 'an unknown shutter mode is accepted in silence');
+  assert.match(said!.message, /none, side and propped/, 'and the message names the choices');
+  assert.equal((m.spec as unknown as { shutters: string }).shutters, 'side');
+  // And the three it knows are left alone.
+  for (const mode of ['none', 'side', 'propped']) {
+    const ok = JSON.parse(JSON.stringify(familyById('sea-hut' as never)!.preset)) as Record<string, unknown>;
+    ok.shutters = mode;
+    assert.equal(generateStructure(ok as unknown as StructureSpec).issues.filter((i) => i.path === 'shutters').length, 0,
+      `${mode} was repaired and should not have been`);
+  }
+});

@@ -1910,3 +1910,45 @@ is laid on the nosing line, and its centreline low end necessarily sits about a 
 *above* its foot corner — because the corner is what touches the ground. Replaced with the two
 claims the proxy stood for: nothing of the cut piece is under the ground, and the flight that
 starts at grade starts exactly there.
+
+## Collar ties — checked, clean
+
+A member type nothing in this sweep had looked at. Every tie on `gp-frame`, `sea-hut`, `b-hut`,
+`squad-hut` and `swa-hut` laps BOTH opposing rafters: measured in each rafter's own frame, the
+tie's end sits at local y = 0.0000 — dead centre of the rafter's 5½-in face — and at local x well
+inside its length. The ties stand on edge, in the roof's upper third, on a 4-ft spacing that lands
+on a rafter station because 4 ft is exactly three 16-in bays. A gable-end elevation at the rafter
+stage confirms it. **Nothing wrong.**
+
+Two of my own probes were wrong before the third was right, and both are the raked-box trap in new
+clothes: a bounding box round a rafter spans its whole lean, so "the tie's box touches the rafter's
+box" is nearly content-free; and walking along the tie's own centreline never enters the rafter at
+all, because the tie is nailed to its SIDE — the two centrelines are 1½ in apart by construction.
+
+## The shutter mode that drew the other mode's shutter
+
+`shutters` is a three-value enum on `BuildingSpec` and on `HutSpec`, it survives a share link, and
+`emitShutterPair` was the only thing any value but `'none'` reached. So **`'side'` and `'propped'`
+produced byte-identical geometry** — a hut shut up for the night and the same hut open to the
+breeze were the same model. No preset writes the field, so the only way to reach it is a link, and
+a link is exactly where an unchecked value comes from: **any other string at all was accepted in
+silence** and came back as the closed pair.
+
+`'propped'` now builds what it says: ONE leaf the full width of the opening, hinged along its top
+edge, swung out 45° and held by a stick that meets its free edge. Not a pair — a pair is
+side-hinged, which is what `'side'` means, and is why the two modes are different pieces rather
+than the same pieces at an angle. The unknown value is repaired to `'side'` and says so, the same
+way the roof kind and the foundation kind already do a few lines up in `normalize.ts`.
+
+### The sign I got wrong, and what hid it
+
+`rx` tilts a wall-mounted piece toward the local +Z of `[0, yaw, 0]` — which is the wall's
+**inward** normal, not its outward one. `π − angle` swung every leaf back *through* the wall it
+hangs on. The battens are placed by position alone and were right either way, so the render came
+out as a tangle of crossing sticks rather than as a leaf pointing the wrong way, and it took a
+numeric probe of the members' own axes to see which piece was actually wrong.
+
+Two guardrail tests then caught two bare magnitudes in the new code, and both were right to. The
+prop's foot had been "85% down the leaf"; it now meets the leaf's **free edge**, which is where a
+prop actually goes and is a place rather than a number. Its minimum length is now the toolkit's
+own `TOLERANCE.minSliverFt` rather than a hand-picked half inch.

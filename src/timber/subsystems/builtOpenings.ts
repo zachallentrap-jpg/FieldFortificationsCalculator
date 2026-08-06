@@ -28,7 +28,7 @@ import type { Member, WallId } from '../types';
 import { DRESSED } from '../types';
 import type { OpeningFill, OpeningSpec, WallOpenings } from '../spec';
 import { makeEmitter } from '../emit';
-import { OPENING, HUT, IN_PER_FT, citeOf } from '../doctrine';
+import { OPENING, HUT, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
 import { wallTilePlacement, type WallSurface } from './coverings';
 import { generateStair } from './access';
 
@@ -44,6 +44,18 @@ export interface BuiltOpeningsInput {
 }
 
 const ft = (inches: number): number => inches / IN_PER_FT;
+
+/**
+ * How far a propped shutter swings open.
+ *
+ * Geometry, not doctrine: no manual states an angle, because in the field you prop it as far as
+ * the weather lets you. Forty-five degrees is the figure that reads as "open" from every angle
+ * the workbench can orbit to, sheds rain off the leaf, and leaves a stick short enough to cut
+ * from an offcut. The stick meets the leaf at its FREE EDGE — which is where a prop goes, and is
+ * a place rather than a number.
+ */
+const PROP_ANGLE = Math.PI / 4;
+const PROP_NOMINAL = '2x2';
 
 /** Widths of the boards that cover a run, last one ripped — what you would really cut. */
 function boardRun(runFt: number, boardWFt: number): { u0: number; u1: number }[] {
@@ -66,6 +78,7 @@ export function generateBuiltOpenings(input: BuiltOpeningsInput): Member[] {
   const lap = ft(OPENING.shutterLapIn.value as number);
   const ledgeCount = OPENING.doorLedges.value as number;
   const braceCount = OPENING.doorBraces.value as number;
+  const battenCount = OPENING.shutterBattens.value as number;
 
   for (const s of surfaces) {
     const list: OpeningSpec[] = openings[s.wall] ?? [];
@@ -88,7 +101,10 @@ export function generateBuiltOpenings(input: BuiltOpeningsInput): Member[] {
 
       // ── And what hangs on the wall outside it ─────────────────────────────
       const wantsShutter = fill === 'window-shutter' || fill === 'window-screen-shutter';
-      if (wantsShutter && (input.shutters ?? 'side') !== 'none') {
+      const mode = input.shutters ?? 'side';
+      if (wantsShutter && mode === 'propped') {
+        emitProppedShutter(s, cut, roW, roH);
+      } else if (wantsShutter && mode !== 'none') {
         emitShutterPair(s, cut, roW, roH);
       }
     }
@@ -257,6 +273,108 @@ export function generateBuiltOpenings(input: BuiltOpeningsInput): Member[] {
           doctrineRef: citeOf(OPENING.shutterBattens),
         });
       }
+    }
+  }
+
+  /**
+   * A PROPPED SHUTTER, which is a different thing from a closed one and was drawing the same
+   * pieces in the same places.
+   *
+   * `shutters: 'propped'` is on `BuildingSpec` and on `HutSpec`, it survives a share link, and
+   * `emitShutterPair` was the only thing either value reached — so 'side' and 'propped' produced
+   * BYTE-IDENTICAL geometry. A hut's hot-weather configuration and its shut-up-for-the-night one
+   * looked the same, and the option was a label with nothing behind it.
+   *
+   * What it is: ONE leaf the full width of the opening, hinged along its TOP edge, swung out and
+   * up, and held there by a stick. Not a pair — a pair is side-hinged, which is what 'side' means
+   * and is why the two modes are different pieces and not the same pieces at an angle.
+   */
+  function emitProppedShutter(s: WallSurface, cut: { u0: number; u1: number; v0: number; v1: number },
+    roW: number, roH: number): void {
+    const leafW = roW + 2 * lap;
+    const leafH = roH + 2 * lap;
+    const u0 = cut.u0 - lap;
+    // The hinge is the leaf's top edge when it is shut, and the leaf swings about it. Everything
+    // below is measured DOWN THE LEAF from there, so the pieces stay on the leaf as it opens.
+    const hingeV = cut.v1 + lap;
+    const cos = Math.cos(PROP_ANGLE);
+    const sin = Math.sin(PROP_ANGLE);
+    /** Where a piece `dh` down the leaf sits: its height, and how far it stands off the wall. */
+    const along = (dh: number): { v: number; out: number } => ({
+      v: hingeV - dh * cos,
+      out: skinThickFt + dh * sin,
+    });
+
+    const mid = along(leafH / 2);
+    for (const b of boardRun(leafW, boardW)) {
+      // The rect's v range only supplies the CENTRE and the piece's length, both of which are
+      // measured down the leaf — the leaf is not vertical any more, so its extent in world v is
+      // not its length and must not be used as one.
+      const p = wallTilePlacement(s,
+        { u0: u0 + b.u0, u1: u0 + b.u1, v0: mid.v - leafH / 2, v1: mid.v + leafH / 2 },
+        mid.out, boardT);
+      emit('shutter', boardNominal, {
+        cutLengthFt: p.heightFt,
+        position: p.position,
+        // Swung out about the hinge, DOWN and AWAY from the wall.
+        //
+        // `rx` tilts the piece's length axis out of the wall plane, and the direction it tilts
+        // toward is the local +Z of `[0, yaw, 0]` — which is the wall's INWARD normal, not its
+        // outward one. `π − angle` swung every leaf back through the wall it hangs on; `π +
+        // angle` swings it out. (The battens are placed by position alone and were right either
+        // way, which is what made the render read as a tangle of sticks rather than a leaf.)
+        rotation: [Math.PI + PROP_ANGLE, p.rotation[1]!, Math.PI / 2],
+        stage,
+        wall: s.wall,
+        actual: { w: DRESSED[boardNominal]!.w, d: p.widthFt * IN_PER_FT },
+        nailing: '2-6d ea batten, clenched (PH)',
+        doctrineRef: citeOf(OPENING.shutterLapIn),
+      });
+    }
+    // The battens run ACROSS the leaf, along the hinge, so opening it does not turn them — only
+    // carry them down and out.
+    for (let i = 0; i < battenCount; i++) {
+      const t = battenCount === 1 ? 0.5 : i / (battenCount - 1);
+      const dh = ledgeD / 2 + t * (leafH - ledgeD);
+      const a = along(dh);
+      const p = wallTilePlacement(s, { u0, u1: u0 + leafW, v0: a.v - ledgeD / 2, v1: a.v + ledgeD / 2 },
+        a.out + boardT, ledgeT);
+      emit('shutter', ledgeNominal, {
+        cutLengthFt: p.widthFt,
+        position: p.position,
+        rotation: p.rotation,
+        stage,
+        wall: s.wall,
+        actual: { w: DRESSED[ledgeNominal]!.w, d: p.heightFt * IN_PER_FT },
+        nailing: 'boards are nailed through it and clenched over — counted on the boards (PH)',
+        doctrineRef: citeOf(OPENING.shutterLapIn),
+      });
+    }
+    // THE STICK. A shutter propped on nothing is a shutter that shuts, and the whole difference
+    // between the two modes is that something holds this one up. It runs from near the leaf's
+    // bottom rail back to the wall under the opening.
+    const head = along(leafH);
+    const footV = cut.v0;
+    const dv = head.v - footV;
+    const dOut = head.out - skinThickFt;
+    const len = Math.hypot(dv, dOut);
+    // A stick shorter than the toolkit's own sliver is not a stick; the shutter is small enough
+    // to hold itself open on its hinge.
+    if (len > TOLERANCE.minSliverFt) {
+      const p = wallTilePlacement(s,
+        { u0: (cut.u0 + cut.u1) / 2 - ft(DRESSED[PROP_NOMINAL]!.d) / 2, u1: (cut.u0 + cut.u1) / 2 + ft(DRESSED[PROP_NOMINAL]!.d) / 2,
+          v0: (head.v + footV) / 2 - len / 2, v1: (head.v + footV) / 2 + len / 2 },
+        (head.out + skinThickFt) / 2 - skinThickFt + skinThickFt, ft(DRESSED[PROP_NOMINAL]!.w));
+      emit('shutter', PROP_NOMINAL, {
+        cutLengthFt: len,
+        position: p.position,
+        // Leans out to meet the leaf — negative for the same reason the leaf's own tilt is.
+        rotation: [-Math.atan2(dOut, dv), p.rotation[1]!, Math.PI / 2],
+        stage,
+        wall: s.wall,
+        nailing: 'loose stick — hooked over a nail at each end (PH)',
+        doctrineRef: citeOf(OPENING.shutterLapIn),
+      });
     }
   }
 

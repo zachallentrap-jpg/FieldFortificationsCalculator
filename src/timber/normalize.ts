@@ -504,6 +504,33 @@ export function normalizeSpec(spec: StructureSpec): NormalizeResult {
   return normalizeSpec2(spec, issues);
 }
 
+/**
+ * `shutters` is a three-value enum on two different specs, and ANY string got through.
+ *
+ * `builtOpenings` tested it for `'none'` and treated everything else as the closed pair, so a
+ * link carrying `shutters: "open"` — or a typo, or a value from a later version of this tool —
+ * came back as shut windows with nothing said. The same shape as the roof kind and the
+ * foundation kind above: repaired, and SAID.
+ *
+ * Mutates in place because it is the same object `repairSections` just handed back, and because
+ * the field lives on two spec branches that are normalized separately further down.
+ */
+const SHUTTER_MODES = new Set(['none', 'side', 'propped']);
+
+function repairShutters(spec: StructureSpec, issues: SpecIssue[]): void {
+  const s = spec as { shutters?: unknown };
+  if (s.shutters === undefined) return;
+  if (typeof s.shutters === 'string' && SHUTTER_MODES.has(s.shutters)) return;
+  issues.push({
+    path: 'shutters',
+    kind: 'clamped',
+    message: `"${String(s.shutters)}" is not a way to hang a shutter — hung them side-hinged. `
+      + 'The choices are none, side and propped.',
+    severity: 'warn',
+  });
+  s.shutters = 'side';
+}
+
 function normalizeSpec2(raw: StructureSpec, issues: SpecIssue[]): NormalizeResult {
   // Every family extends `SpecCommon`, so dims/spacing/coverings are repaired for all of them.
   // The three that only a BuildingSpec declares are repaired only for a building: a hut carries
@@ -515,6 +542,7 @@ function normalizeSpec2(raw: StructureSpec, issues: SpecIssue[]): NormalizeResul
     issues,
     raw.family === 'building' ? SPEC_SECTIONS_BUILDING : SPEC_SECTIONS_COMMON,
   );
+  repairShutters(spec, issues);
   switch (spec.family) {
     case 'building':
       return { spec: normalizeBuilding(spec, issues), issues };
