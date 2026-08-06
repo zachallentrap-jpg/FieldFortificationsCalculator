@@ -72,6 +72,7 @@ screenshots get read.
 | **Getting to the door** | **Fixed** — every door on a piered card opened onto a 2 ft 3½ in drop to clear air. `BuildingSpec.entrySteps` was set to `true` by every hut and read by nothing, one field along from `fill`, in the same file. |
 | **The ends of a stair stringer** | **Fixed** — every flight in the toolkit ended in two sharp wedges: the foot stabbing 4 in below the ground it stands on, the head the same distance above the landing, and half the board standing proud of the treads it carries. |
 | **The loading ramp's toe** | **Fixed** — the ramp's walking surface started AT grade, so everything holding it up was underground: the toe plank entirely, and the stringers 12.34 in deep for the last six feet of a twenty-four-foot run. |
+| **Crib bunker — the doorway itself** | **Fixed** — jambs, header and baffle all framed an opening that was then LAGGED SHUT: eleven full-width courses across it and two wall posts standing in the clear span. Every point sampled inside it came back solid. |
 
 ## The shed that had no walls above the plate
 
@@ -1597,3 +1598,49 @@ platform's own FOOTINGS as "underground", which is where footings go; one demand
 underside sit exactly on grade when the boards are laid across the ramp from the toe up, so the
 first board's underside is legitimately half a board's rise above it; and one measured the slope
 from a bounding box round those boards and read 3% shallow.
+
+## A doorway with everything but the hole
+
+The crib bunker's entrance has had two passes already — one added the jamb posts, one moved the
+baffle so it actually shuts the sightline instead of covering half the opening. Both were about
+what stands AROUND the doorway. Nobody had checked the doorway.
+
+`bunker.ts` frames it exactly: two jamb posts on the opening's edges, a header spanning them, a
+baffle wall standing off outside. Fifty lines earlier, the wall pass emits a lagging course at
+every height across the **full run of every side**, and knows nothing about a door. So the opening
+was boarded over — eleven full-width courses from the ground to the wall top — and two of the
+wall's own posts stood inside the clear span, each overlapping a jamb by 0.6 in for good measure.
+Sampling the doorway rectangle: **160 of 160 points solid.** The bunker had no way in.
+
+The fix moves the doorway's geometry above the wall block — it was computed fifty lines below the
+only code that needed to know — and gives the entrance wall a gap: posts that would stand in the
+opening are not built (the jamb is their replacement), and each lagging course becomes the two
+boards either side of it, which is what you would actually cut. The other three sides are
+untouched, and a test asserts that by counting distinct course lengths: three unbroken sides have
+exactly two.
+
+The conservation check is the one this codebase already uses for siding — **covered plus hole equals
+wall**, measured per course so a missing course cannot hide inside a total.
+
+### The test that passed for the wrong reason
+
+The first cut of "no post stands in the doorway" passed against the OLD generator, which is how I
+found out it was worthless. It identified the jambs as "posts on the entrance wall standing under
+the header" — and the two posts that were standing in the opening also stand under the header, so
+they were classified as jambs and excluded from the check that was looking for them.
+
+A jamb is a post whose **outer face is where the header ends**. Under that definition the two
+intruders are what they are, and the test fails on the old code with `BK-post-13 intrudes 5.50 in
+into the opening the header spans`. Three of the five new cases fail there now; before the fix to
+the fixture, only two did.
+
+### Recorded, not changed
+
+- **A 1¾-in gap above the header.** The long walls carry a cap beam filling the band from the post
+  tops to the overhead stringers; the end wall has only the header, which is shallower, so a slot
+  runs along the top of the entrance wall between the header and the overhead cover. It is not
+  structural — the stringers span the short way and bear on the long walls — but it is a hole in
+  the overhead line, and worth a look on its own.
+- **`wallType: 'crib'`** builds its walls through `generateCribWall`, an entirely separate emitter
+  that also knows nothing about the doorway. The shipped preset is `post-plank`, so this pass
+  fixed what ships; the crib option needs the same treatment and has not had it.

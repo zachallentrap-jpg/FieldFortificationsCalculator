@@ -29,7 +29,7 @@ import type { Member } from '../types';
 import { DRESSED } from '../types';
 import type { BunkerSpec } from '../spec';
 import { makeEmitter } from '../emit';
-import { BUNKER, LUMBER, IN_PER_FT, citeOf, COVER_DEPTH_NOTE } from '../doctrine';
+import { BUNKER, LUMBER, TOLERANCE, IN_PER_FT, citeOf, COVER_DEPTH_NOTE } from '../doctrine';
 import { stagePlan, requireOrdinal, type StagePlanEntry } from '../stagePlan';
 import { generateCribWall } from '../subsystems/cribwork';
 import type { FloorLevels } from '../floor';
@@ -123,6 +123,21 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
   const corners: [number, number][] = [
     [0, 0], [outerL, 0], [outerL, outerW], [0, outerW],
   ];
+
+  // ── THE DOORWAY IS A HOLE, and the wall pass has to be told so.
+  //
+  // Resolved here rather than fifty lines down where it is framed, because the framing was the
+  // only thing that knew about it. Jambs, a header and a baffle were all placed correctly around
+  // an opening that was then LAGGED SHUT: eleven full-width courses ran straight across it, and
+  // two of the wall's own posts stood inside the clear span, each overlapping a jamb by 0.6 in.
+  // Every point sampled inside the doorway rectangle came back solid. The bunker had no way in.
+  const doorWidth = Math.min(ENTRY_WIDTH_FT, outerW - 2 * wallThick);
+  const doorZ0 = outerW / 2 - doorWidth / 2;
+  const doorZ1 = outerW / 2 + doorWidth / 2;
+  const jambNominal = postNominal;
+  const jambT = DRESSED[jambNominal]!.w / IN_PER_FT;
+  /** What the wall must leave clear, in world z: the opening plus the jambs that frame it. */
+  const doorClear: [number, number] = [doorZ0 - jambT, doorZ1 + jambT];
   if (spec.wallType === 'crib') {
     // ONE POST PER CORNER. Each side runs its posts inclusive of both ends, so every corner of
     // the crib got a 6x6 from the side arriving and another from the side leaving — four doubled
@@ -152,9 +167,20 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       const run = Math.hypot(b[0] - a[0], b[1] - a[1]);
       const ux = (b[0] - a[0]) / run;
       const uz = (b[1] - a[1]) / run;
+      // The entrance is in the -X end wall, so that is the side with something to leave out.
+      const onEntryWall = Math.abs(a[0]) < 1e-9 && Math.abs(b[0]) < 1e-9;
+      const uOf = (pz: number): number => (pz - a[1]) * uz;
+      const gap: [number, number] | null = onEntryWall
+        ? (uOf(doorClear[0]) < uOf(doorClear[1])
+          ? [uOf(doorClear[0]), uOf(doorClear[1])]
+          : [uOf(doorClear[1]), uOf(doorClear[0])])
+        : null;
+      const halfPost = DRESSED[postNominal]!.d / IN_PER_FT / 2;
       const n = Math.max(2, Math.round(run / postSpacing) + 1);
       for (let k = 0; k < n; k++) {
         const d = (run * k) / (n - 1);
+        // A post that would stand in the doorway is not built; the jamb is its replacement.
+        if (gap && d + halfPost > gap[0] + 1e-9 && d - halfPost < gap[1] - 1e-9) continue;
         const px = a[0] + ux * d;
         const pz = a[1] + uz * d;
         const spot = `${px.toFixed(6)}|${pz.toFixed(6)}`;
@@ -171,15 +197,23 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       }
       // Lagging behind the posts, holding the face between them.
       const lagH = DRESSED[lagNominal]!.d / IN_PER_FT;
+      // One course is one board unless the doorway interrupts it, in which case it is the two
+      // boards either side of the opening — which is what you would cut, and what leaves a hole.
+      const spans: [number, number][] = gap
+        ? ([[0, gap[0]], [gap[1], run]] as [number, number][]).filter((sp) => sp[1] - sp[0] > TOLERANCE.minSliverFt)
+        : [[0, run]];
       for (let y = lagH / 2; y < H; y += lagH) {
-        emit('lagging', lagNominal, {
-          cutLengthFt: run,
-          position: [(a[0] + b[0]) / 2, y, (a[1] + b[1]) / 2],
-          rotation: [0, Math.atan2(-uz, ux), 0],
-          stage: sWall,
-          nailing: 'spiked to each post (PH)',
-          doctrineRef: citeOf(BUNKER.laggingNominal),
-        });
+        for (const [u0, u1] of spans) {
+          const mid = (u0 + u1) / 2;
+          emit('lagging', lagNominal, {
+            cutLengthFt: u1 - u0,
+            position: [a[0] + ux * mid, y, a[1] + uz * mid],
+            rotation: [0, Math.atan2(-uz, ux), 0],
+            stage: sWall,
+            nailing: 'spiked to each post (PH)',
+            doctrineRef: citeOf(BUNKER.laggingNominal),
+          });
+        }
       }
     }
   }
@@ -241,11 +275,6 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
   //   something spanning them, standing on the ground and no taller than what it shields.
   //   THE HEADER spanned the doorway a foot and a half inboard of it, bearing on nothing. Over
   //   a crib bunker — whose ends are open by construction — it hung in mid-air.
-  const doorWidth = Math.min(ENTRY_WIDTH_FT, outerW - 2 * wallThick);
-  const doorZ0 = outerW / 2 - doorWidth / 2;
-  const doorZ1 = outerW / 2 + doorWidth / 2;
-  const jambNominal = postNominal;
-  const jambT = DRESSED[jambNominal]!.w / IN_PER_FT;
   // Jambs first: the header has to land on something, and on a crib bunker there is no end wall
   // for it to land on.
   for (const z of [doorZ0 - jambT / 2, doorZ1 + jambT / 2]) {

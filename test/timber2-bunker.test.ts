@@ -171,3 +171,141 @@ test('THE EARTH COVER IS A BLANKET, not a slab on edge — one convention, every
   assert.ok(under >= structureTop - 1.0,
     `the cover's underside is at ${under.toFixed(2)} but the structure reaches ${structureTop.toFixed(2)} — it is buried in the bunker`);
 });
+
+// ── The doorway ──────────────────────────────────────────────────────────────
+//
+// Everything that FRAMES the entrance was already right: two jamb posts on the opening's edges,
+// a header spanning them, and a baffle standing off outside it that an earlier pass fixed so it
+// shuts the sightline. The opening itself was not there. The wall pass emits a lagging course at
+// every height across the full run of every side and knew nothing about a door, so eleven
+// full-width courses ran straight across it — and two of the wall's own posts stood inside the
+// clear span, each overlapping a jamb by 0.6 in. Every one of 160 points sampled inside the
+// doorway rectangle came back solid. The bunker had no way in.
+
+type V3B = [number, number, number];
+
+function rotB(m: { rotation: readonly number[] }, v: V3B): V3B {
+  const [rx, ry, rz] = m.rotation as [number, number, number];
+  let [x, y, z] = v;
+  let a = x * Math.cos(rz) - y * Math.sin(rz);
+  let b = x * Math.sin(rz) + y * Math.cos(rz);
+  x = a; y = b;
+  a = y * Math.cos(rx) - z * Math.sin(rx);
+  b = y * Math.sin(rx) + z * Math.cos(rx);
+  y = a; z = b;
+  a = x * Math.cos(ry) + z * Math.sin(ry);
+  b = -x * Math.sin(ry) + z * Math.cos(ry);
+  return [a, y, b];
+}
+
+function boxB(m: { cutLength: number; actual: { w: number; d: number }; rotation: readonly number[]; position: readonly number[] }) {
+  const h: V3B = [m.cutLength / 24, m.actual.d / 24, m.actual.w / 24];
+  const pts: V3B[] = [];
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+    const r = rotB(m, [sx * h[0], sy * h[1], sz * h[2]]);
+    pts.push([m.position[0]! + r[0], m.position[1]! + r[1], m.position[2]! + r[2]]);
+  }
+  const g = (i: number): [number, number] => [Math.min(...pts.map((p) => p[i]!)), Math.max(...pts.map((p) => p[i]!))];
+  return { x: g(0), y: g(1), z: g(2) };
+}
+
+/** The bunker, plus where its doorway is — read off the header, which spans jamb to jamb. */
+function bunkerWithDoor(over: Record<string, unknown> = {}) {
+  const spec = preset();
+  Object.assign(spec, over);
+  const m = generateStructure(spec);
+  const header = m.members.find((x) => x.role === 'header')!;
+  const hb = boxB(header);
+  // A JAMB is a post whose outer face is where the header ends — not merely any post standing
+  // somewhere under it. The looser reading swallowed the two wall posts that used to stand IN the
+  // opening and made the test that looks for them pass without checking anything.
+  const jambs = m.members.filter((x) => x.role === 'post' && boxB(x).x[0]! < 1
+    && (Math.abs(boxB(x).z[0]! - hb.z[0]!) < 1e-6 || Math.abs(boxB(x).z[1]! - hb.z[1]!) < 1e-6));
+  return { model: m, header, hb, jambs };
+}
+
+test('THE DOORWAY IS A HOLE — the wall is not lagged across it', () => {
+  const { model, hb, jambs } = bunkerWithDoor();
+  assert.equal(jambs.length, 2, 'two jambs frame the opening');
+  // The clear span is between the jambs' INNER faces: the near jamb's far edge to the far
+  // jamb's near edge.
+  const byZ = [...jambs].sort((p, q) => boxB(p).z[0]! - boxB(q).z[0]!);
+  const clear: [number, number] = [boxB(byZ[0]!).z[1]!, boxB(byZ[1]!).z[0]!];
+  assert.ok(clear[1] - clear[0] > 3, `the clear opening is only ${(clear[1] - clear[0]).toFixed(2)} ft`);
+  const top = hb.y[0]!; // the header's underside is the head of the opening
+  let solid = 0, total = 0;
+  for (let y = 0.2; y < top - 0.1; y += 0.2) {
+    for (let z = clear[0] + 0.1; z < clear[1] - 0.1; z += 0.15) {
+      for (let x = -0.2; x < 0.5; x += 0.1) {
+        total++;
+        for (const k of model.members) {
+          if (k.role === 'soilGhost') continue; // massing, not built
+          const b = boxB(k);
+          if (x > b.x[0]! && x < b.x[1]! && y > b.y[0]! && y < b.y[1]! && z > b.z[0]! && z < b.z[1]!) { solid++; break; }
+        }
+      }
+    }
+  }
+  assert.ok(total > 1000, 'the opening was actually sampled');
+  assert.equal(solid, 0, `${solid} of ${total} points inside the clear opening are solid`);
+});
+
+test('the lagging is CUT around it, not left off — both sides are still boarded', () => {
+  // The other way to open a doorway is to stop lagging that wall, which would leave the two
+  // stretches either side of the entrance as bare posts.
+  const { model, hb } = bunkerWithDoor();
+  const endWall = model.members.filter((x) => x.role === 'lagging'
+    && boxB(x).x[1]! - boxB(x).x[0]! < 1 && boxB(x).x[0]! < 1);
+  assert.ok(endWall.length > 0, 'the entrance wall is still lagged');
+  const left = endWall.filter((x) => boxB(x).z[1]! <= hb.z[0]! + 1e-6);
+  const right = endWall.filter((x) => boxB(x).z[0]! >= hb.z[1]! - 1e-6);
+  assert.ok(left.length > 0 && right.length > 0, 'boarded on both sides of the opening');
+  assert.equal(left.length + right.length, endWall.length, 'and nothing crosses it');
+  // Conservation, the same discipline the covering pass uses: what is boarded plus the hole is
+  // the wall. Measured per course so a missing course cannot hide inside the total.
+  const courses = new Map<number, number>();
+  for (const x of endWall) {
+    const b = boxB(x);
+    const key = Math.round(b.y[0]! * 1e6);
+    courses.set(key, (courses.get(key) ?? 0) + (b.z[1]! - b.z[0]!));
+  }
+  const wallRun = Math.max(...endWall.map((x) => boxB(x).z[1]!)) - Math.min(...endWall.map((x) => boxB(x).z[0]!));
+  const hole = hb.z[1]! - hb.z[0]!;
+  for (const [, covered] of courses) {
+    assert.ok(Math.abs(covered - (wallRun - hole)) < 1e-6,
+      `a course covers ${covered.toFixed(4)} ft; the wall less the opening is ${(wallRun - hole).toFixed(4)}`);
+  }
+});
+
+test('no post stands in the doorway, and none of them fouls a jamb', () => {
+  const { model, hb, jambs } = bunkerWithDoor();
+  const jambIds = new Set(jambs.map((j) => j.id));
+  for (const p of model.members.filter((x) => x.role === 'post' && !jambIds.has(x.id))) {
+    const b = boxB(p);
+    if (b.x[0]! > 1) continue; // not on the entrance wall
+    const overlap = Math.min(b.z[1]!, hb.z[1]!) - Math.max(b.z[0]!, hb.z[0]!);
+    assert.ok(overlap <= 1e-9,
+      `${p.id} intrudes ${(overlap * 12).toFixed(2)} in into the opening the header spans`);
+  }
+});
+
+test('the other three walls are boarded right across, as they were', () => {
+  // A cut that fires on the wrong wall would open a hole in the side of a bunker.
+  const { model } = bunkerWithDoor();
+  const lag = model.members.filter((x) => x.role === 'lagging');
+  const sides = lag.filter((x) => {
+    const b = boxB(x);
+    return !(b.x[1]! - b.x[0]! < 1 && b.x[0]! < 1) && b.y[1]! < 7; // walls, not the roof
+  });
+  assert.ok(sides.length > 0);
+  const runs = new Set(sides.map((x) => Math.round(x.cutLength * 1e3)));
+  assert.equal(runs.size, 2, `expected two wall lengths on three unbroken sides, got ${[...runs].join(',')}`);
+});
+
+test('and the entrance still frames what it opens', () => {
+  const { hb, jambs } = bunkerWithDoor();
+  const zs = jambs.flatMap((j) => [boxB(j).z[0]!, boxB(j).z[1]!]);
+  assert.ok(Math.abs(Math.min(...zs) - hb.z[0]!) < 1e-6, 'the header reaches the outer face of one jamb');
+  assert.ok(Math.abs(Math.max(...zs) - hb.z[1]!) < 1e-6, 'and of the other');
+  for (const j of jambs) assert.ok(boxB(j).y[0]! < 1e-9, 'a jamb stands on the ground');
+});
