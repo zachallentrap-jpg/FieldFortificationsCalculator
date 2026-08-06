@@ -1698,3 +1698,57 @@ centred on its edge still laid 2¾ in of timber across the way in. The test caug
 - **The shipped card does not move.** `post-plank` walls are cut to the height asked for, so
   `wallTopY` is exactly what it was and the goldens are byte-identical. Everything above was
   reachable only through the non-default option — which is precisely why it lasted.
+
+## The wall that stood outside the building
+
+Went after the recorded item — *"the cap beam is not centred on the wall it caps"* — and it turned
+out the cap was never wrong. The wall was.
+
+`outerL = interiorLengthFt + 2·wallThick` makes the rectangle `[0, outerL] × [0, outerW]` the
+bunker's **outer face**. The wall was built ON that rectangle — *centred* on it. So half of every
+post and half of every lagging board stood outside the structure:
+
+```
+post-plank, shipped card (16 × 10 interior, 5½-in walls, outer 16.917 × 10.917)
+  posts     z −0.2292 .. 11.1458      ← 2¾ in past the building line, both sides
+  lagging   z −0.0625 .. 10.9792
+  capBeam   z  0.0000 .. 10.9167      ← correctly on the wall band, at wallThick / 2
+  cap over post: 0.2292 ft of a 0.4583 ft cap — exactly half, the inner half over open air
+  clear interior 10.458 × 16.458 of a stated 10 × 16 — 5½ in over, each way
+```
+
+In plan it is unmistakable: **post tabs projecting past the roof line at every station down both
+long walls**, and a matching row down each end. Fixed by putting the four corners on the wall's own
+centreline, inset `wallThick / 2` from the outer face. One four-line change; the two `onEntryWall`
+tests move with it.
+
+Everything the wall was supposed to *meet* was already in the right place — the jambs and header at
+`wallThick / 2`, the caps at `wallThick / 2`, the stringers on the caps. That is what made it
+invisible from every direction but straight down: the wall was the only piece that disagreed, and
+from inside or outside it simply looked like a wall.
+
+### What the tests had to say instead
+
+- **It fills its own footprint.** The envelope of every wall member is exactly `[0, outerL] ×
+  `[0, outerW]`. Fails on the old code with *"the wall reaches x=−0.2292 against an outer face at
+  0.0000 — 2.75 in of it is on the wrong side of the building line."*
+- **The interior is the interior asked for.** Measured with rays through the building rather than a
+  bounding box, and read **per side**: the two end walls never both present a post at the same
+  station — the doorway takes two out of the near one — so no single ray measures the stated length,
+  and demanding one measures the wrong thing. Between two posts the wall is only the 1½-in plank, so
+  the clear run there is genuinely wider; the per-ray claim is a *bound*, and the per-side equality
+  is what pins where the wall is.
+- **The cap bears across its whole width**, compared against the wall's top course *as a band* —
+  a cap is a beam and spans between bearings. Members that run the length of another wall are left
+  out; an end-wall stretcher crosses the cap's band and says nothing about what the cap sits on.
+
+### Seen while measuring, not changed
+
+- **The overhead stringers hang 3⅝ in out of each end of the bunker.** They are placed at
+  `x = outerL · i / (n−1)`, so the first and last are *centred on* the end faces: half of each 8×8
+  projects past the end wall, past the end of the cap it bears on, and out from under both the roof
+  lagging and the earth cover. The same "placed on a face instead of inside it" mistake as the wall,
+  one loop further down. **Next target.**
+- **The wall lagging is centred on the post line**, so at every post station the plank passes
+  through the post. Physically the lagging retains the earth and belongs on the *outer* face of the
+  posts. Pre-existing and unchanged by this pass.

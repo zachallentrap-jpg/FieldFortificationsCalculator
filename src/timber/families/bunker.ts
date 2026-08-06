@@ -122,8 +122,24 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
   // ── Walls
   const outerL = L + 2 * wallThick;
   const outerW = W + 2 * wallThick;
+  // THE WALL IS BUILT ON ITS OWN CENTRELINE, not on the outer face.
+  //
+  // `outerL = L + 2·wallThick` makes the rectangle [0, outerL] × [0, outerW] the bunker's OUTER
+  // FACE, and the walls were built ON that rectangle — centred on it. So half of every post and
+  // half of every lagging board stood OUTSIDE the structure, the clear interior came out 5½ in
+  // wider each way than the spec asked for (10 ft 5½ in of a stated 10 ft), and the cap beam —
+  // which is placed at `wallThick / 2`, correctly on the wall band — bore on exactly half its
+  // width, with the inner half over open air.
+  //
+  // The entrance framing was already right: its jambs and header sit at `wallThick / 2`. The wall
+  // was the one piece that disagreed, which is what made it hard to see: everything it was
+  // supposed to meet was in the right place.
+  const halfWall = wallThick / 2;
   const corners: [number, number][] = [
-    [0, 0], [outerL, 0], [outerL, outerW], [0, outerW],
+    [halfWall, halfWall],
+    [outerL - halfWall, halfWall],
+    [outerL - halfWall, outerW - halfWall],
+    [halfWall, outerW - halfWall],
   ];
 
   // ── THE DOORWAY IS A HOLE, and the wall pass has to be told so.
@@ -157,7 +173,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       const b = corners[(i + 1) % 4]!;
       // The entrance is in the -X end wall, and a stack does not know about a door unless it is
       // told. Its u axis runs from `a`, so the opening's world z maps straight onto it.
-      const onEntryWall = Math.abs(a[0]) < 1e-9 && Math.abs(b[0]) < 1e-9;
+      const onEntryWall = Math.abs(a[0] - halfWall) < 1e-9 && Math.abs(b[0] - halfWall) < 1e-9;
       const uz = (b[1] - a[1]) / Math.hypot(b[0] - a[0], b[1] - a[1]);
       const uAt = (pz: number): number => (pz - a[1]) * uz;
       const ends = onEntryWall ? [uAt(doorClear[0]), uAt(doorClear[1])].sort((p, q) => p - q) : null;
@@ -184,7 +200,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       const ux = (b[0] - a[0]) / run;
       const uz = (b[1] - a[1]) / run;
       // The entrance is in the -X end wall, so that is the side with something to leave out.
-      const onEntryWall = Math.abs(a[0]) < 1e-9 && Math.abs(b[0]) < 1e-9;
+      const onEntryWall = Math.abs(a[0] - halfWall) < 1e-9 && Math.abs(b[0] - halfWall) < 1e-9;
       const uOf = (pz: number): number => (pz - a[1]) * uz;
       const gap: [number, number] | null = onEntryWall
         ? (uOf(doorClear[0]) < uOf(doorClear[1])

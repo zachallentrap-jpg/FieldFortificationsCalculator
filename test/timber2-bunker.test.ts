@@ -423,6 +423,189 @@ test('and the crib is still a crib either side of it', () => {
   assert.ok(withGap.some((x) => boxB(x).z[1]! > 12 - 1e-6), 'and the other');
 });
 
+// ── The wall is built on its own centreline ──────────────────────────────────
+//
+// `outerL = interiorLengthFt + 2·wallThick` makes the rectangle [0, outerL] × [0, outerW] the
+// bunker's OUTER FACE. The wall was built ON that rectangle — centred on it — so half of every
+// post and half of every lagging board stood outside the structure. Measured on the shipped
+// post-plank card: the posts ran z −0.2292 .. 11.1458 across a building 10.9167 ft wide, the
+// clear interior came out 10 ft 5½ in of a stated 10 ft (and 16 ft 5½ in of a stated 16), and in
+// plan the posts showed as tabs projecting past the roof line at every station down both long
+// walls. The cap beam — placed at `wallThick / 2`, correctly on the wall band — bore on exactly
+// half its width, with the inner half over open air.
+//
+// Everything the wall was supposed to MEET was already in the right place: the jambs and the
+// header sit at `wallThick / 2`, the caps at `wallThick / 2`, the stringers on the caps. The wall
+// was the one piece that disagreed, which is what made it invisible from every direction but
+// straight down.
+
+import { DRESSED } from '../src/timber/types';
+import { IN_PER_FT } from '../src/timber/doctrine';
+
+/** Roles that make up a wall — the roof deck is `lagging` too, and is filtered off by height. */
+const WALL_ROLES = new Set(['post', 'cribLog', 'lagging']);
+
+function bunkerGeom(wallType: string) {
+  const spec = preset();
+  spec.wallType = wallType;
+  const model = generateStructure(spec);
+  const wallThick = wallType === 'crib'
+    ? (DRESSED[BUNKER.cribLogNominal.value as string]!.w / IN_PER_FT) * 3
+    : DRESSED[BUNKER.postNominal.value as string]!.w / IN_PER_FT;
+  const caps = model.members.filter((k) => k.role === 'capBeam');
+  const capBottom = Math.min(...caps.map((k) => boxB(k).y[0]!));
+  const wall = model.members.filter((k) => WALL_ROLES.has(k.role) && boxB(k).y[1]! <= capBottom + 1e-9);
+  return {
+    model, caps, wall, wallThick,
+    interiorL: spec.interiorLengthFt as number,
+    interiorW: spec.interiorWidthFt as number,
+    outerL: (spec.interiorLengthFt as number) + 2 * wallThick,
+    outerW: (spec.interiorWidthFt as number) + 2 * wallThick,
+  };
+}
+
+/**
+ * The clear run through `ms` along one plan axis, at a fixed position on the other and a fixed
+ * height — the gap containing `centre`, bounded by whatever the ray actually meets.
+ *
+ * Returns ±Infinity on a side the ray leaves without meeting anything, which is a real answer and
+ * not a failure: a crib's top course is ties on a spacing, and between two of them there is
+ * nothing to hit. Those rays are skipped by the caller rather than counted as a hole in the wall.
+ */
+function clearRun(
+  ms: readonly { role: string; cutLength: number; actual: { w: number; d: number }; rotation: readonly number[]; position: readonly number[] }[],
+  axis: 0 | 2, other: number, y: number, centre: number,
+): [number, number] | null {
+  let lo = -Infinity;
+  let hi = Infinity;
+  for (const k of ms) {
+    const b = boxB(k);
+    const o = axis === 2 ? b.x : b.z;
+    if (other <= o[0]! || other >= o[1]!) continue;
+    if (y <= b.y[0]! || y >= b.y[1]!) continue;
+    const a = axis === 2 ? b.z : b.x;
+    if (a[1]! <= centre) lo = Math.max(lo, a[1]!);
+    else if (a[0]! >= centre) hi = Math.min(hi, a[0]!);
+    else return null; // the middle of the bunker is solid, which is its own kind of wrong
+  }
+  return [lo, hi];
+}
+
+test('THE WALL FILLS ITS OWN FOOTPRINT — nothing it is made of stands outside the building', () => {
+  for (const wallType of ['post-plank', 'crib']) {
+    const { wall, outerL, outerW } = bunkerGeom(wallType);
+    assert.ok(wall.length > 10, `${wallType}: no wall found`);
+    const xs = wall.flatMap((k) => boxB(k).x);
+    const zs = wall.flatMap((k) => boxB(k).z);
+    for (const [name, got, want] of [
+      ['x', Math.min(...xs), 0], ['x', Math.max(...xs), outerL],
+      ['z', Math.min(...zs), 0], ['z', Math.max(...zs), outerW],
+    ] as [string, number, number][]) {
+      assert.ok(Math.abs(got - want) < 1e-9,
+        `${wallType}: the wall reaches ${name}=${got.toFixed(4)} against an outer face at ${want.toFixed(4)} `
+        + `— ${((got - want) * IN_PER_FT).toFixed(2)} in of it is on the wrong side of the building line`);
+    }
+  }
+});
+
+test('and the interior it encloses is the interior the spec asked for', () => {
+  // The complement of the test above, and the one that actually failed before: the old wall did
+  // not overhang INWARD, it overhung OUTWARD, so the clear space came out half a wall thickness
+  // too generous in every direction. Measured by rays through the building rather than off a
+  // bounding box, because a bounding box round a wall with a doorway in it answers a different
+  // question.
+  for (const wallType of ['post-plank', 'crib']) {
+    const { wall, wallThick, outerL, outerW, interiorL, interiorW } = bunkerGeom(wallType);
+    // `axis` is the one being MEASURED; `stationSpan` is the one the ray's position slides along.
+    const sweeps: { axis: 0 | 2; stationSpan: number; measuredSpan: number; stated: number }[] = [
+      { axis: 2, stationSpan: outerL, measuredSpan: outerW, stated: interiorW },
+      { axis: 0, stationSpan: outerW, measuredSpan: outerL, stated: interiorL },
+    ];
+    for (const { axis, stationSpan, measuredSpan, stated } of sweeps) {
+      const wantLo = wallThick;
+      const wantHi = measuredSpan - wallThick;
+      // Tracked per SIDE, not as a clear run. The two end walls never both present a post at the
+      // same station — the doorway takes two out of the near one — so no single ray measures the
+      // stated length, and demanding one would be demanding the wrong thing.
+      let deepestLo = -Infinity;
+      let shallowestHi = Infinity;
+      let loSeen = 0;
+      let hiSeen = 0;
+      for (let t = wallThick + 0.2; t < stationSpan - wallThick; t += 0.1) {
+        for (const y of [0.4, 1.7, 3.1, 4.6]) {
+          const run = clearRun(wall, axis, t, y, measuredSpan / 2);
+          assert.ok(run, `${wallType}: the middle of the bunker is solid at ${t.toFixed(2)}, ${y}`);
+          // Each side is read on its own. A ray that leaves through a gap between ties, or
+          // straight out of the doorway, measures nothing on THAT side — and the two sides are
+          // not interchangeable: the only stations where the far end wall has a post are the two
+          // the doorway takes out of the near one, so pairing them would discard exactly the
+          // measurements that matter.
+          //
+          // Nothing may stand INSIDE the stated interior. Between two posts the wall is only the
+          // plank, so the clear run there is wider than this and that is the wall's own shape —
+          // this is a bound, and the equalities below are what pin where the wall actually is.
+          if (Number.isFinite(run[0])) {
+            assert.ok(run[0]! <= wantLo + 1e-9,
+              `${wallType}: at ${t.toFixed(2)}, ${y} the near wall reaches ${run[0]!.toFixed(4)} into a stated interior starting at ${wantLo.toFixed(4)}`);
+            deepestLo = Math.max(deepestLo, run[0]!);
+            loSeen++;
+          }
+          if (Number.isFinite(run[1])) {
+            assert.ok(run[1]! >= wantHi - 1e-9,
+              `${wallType}: at ${t.toFixed(2)}, ${y} the far wall reaches ${run[1]!.toFixed(4)} into a stated interior ending at ${wantHi.toFixed(4)}`);
+            shallowestHi = Math.min(shallowestHi, run[1]!);
+            hiSeen++;
+          }
+        }
+      }
+      assert.ok(loSeen > 20 && hiSeen > 20, `${wallType}: only ${loSeen}/${hiSeen} rays met a wall`);
+      // And the wall REACHES that line: somewhere along each side, its innermost material is
+      // exactly a wall thickness in from the outer face. Both together are the stated interior.
+      assert.ok(Math.abs(deepestLo - wantLo) < 1e-9,
+        `${wallType}: the near wall reaches ${deepestLo.toFixed(4)} where the interior starts at ${wantLo.toFixed(4)} `
+        + `— ${((wantLo - deepestLo) * IN_PER_FT).toFixed(2)} in of clear space the spec never asked for`);
+      assert.ok(Math.abs(shallowestHi - wantHi) < 1e-9,
+        `${wallType}: the far wall reaches ${shallowestHi.toFixed(4)} where the interior ends at ${wantHi.toFixed(4)}`);
+      assert.ok(Math.abs((wantHi - wantLo) - stated) < 1e-9, `the arithmetic above is ${stated} ft of interior`);
+    }
+  }
+});
+
+test('and the cap beam is centred on the wall it caps, bearing across its whole width', () => {
+  // Recorded last pass as "the cap beam is not centred on the wall it caps", which was true and
+  // was the wall's fault, not the cap's.
+  //
+  // Compared against the wall's TOP COURSE as a band, not as solid material: a cap is a beam and
+  // spans between bearings, exactly as it does over the posts of a post-plank wall. Members that
+  // run the length of another wall are left out — an end-wall stretcher crosses the cap's band and
+  // says nothing about what the cap sits on.
+  for (const wallType of ['post-plank', 'crib']) {
+    const { caps, wall, wallThick } = bunkerGeom(wallType);
+    assert.equal(caps.length, 2, `${wallType}: a bunker is capped on both long walls`);
+    const bearing = wall.filter((k) => k.role === 'post' || k.role === 'cribLog');
+    const top = Math.max(...bearing.map((k) => boxB(k).y[1]!));
+    const topCourse = bearing.filter((k) => boxB(k).y[1]! > top - 1e-9);
+    assert.ok(topCourse.length >= 4, `${wallType}: nothing at the top of the wall for the cap to bear on`);
+    for (const cap of caps) {
+      const cb = boxB(cap).z as [number, number];
+      const under = topCourse.filter((k) => {
+        const z = boxB(k).z as [number, number];
+        return z[1] - z[0] <= 2 * wallThick + 1e-9 && z[1] > cb[0] + 1e-9 && z[0] < cb[1] - 1e-9;
+      });
+      assert.ok(under.length > 0, `${wallType}: ${cap.id} has no wall under it at all`);
+      const band: [number, number] = [
+        Math.min(...under.map((k) => boxB(k).z[0]!)),
+        Math.max(...under.map((k) => boxB(k).z[1]!)),
+      ];
+      assert.ok(band[0] <= cb[0] + 1e-9 && band[1] >= cb[1] - 1e-9,
+        `${wallType}: ${cap.id} covers z ${cb[0].toFixed(4)}..${cb[1].toFixed(4)} and the wall under it is `
+        + `${band[0].toFixed(4)}..${band[1].toFixed(4)} — ${((Math.max(0, band[0] - cb[0]) + Math.max(0, cb[1] - band[1])) * IN_PER_FT).toFixed(2)} in of the cap is over air`);
+      assert.ok(Math.abs((band[0] + band[1]) / 2 - (cb[0] + cb[1]) / 2) < 1e-9,
+        `${wallType}: ${cap.id} is centred at ${((cb[0] + cb[1]) / 2).toFixed(4)} on a wall centred at ${((band[0] + band[1]) / 2).toFixed(4)}`);
+    }
+  }
+});
+
 test('the crib bunker\'s other three walls are unbroken', () => {
   const m = bunkerOf('crib');
   const hb = boxB(m.members.find((x) => x.role === 'header')!);
