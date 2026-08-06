@@ -57,8 +57,19 @@ export function drawSection(result: Result): string {
   const earthBottom = px(0, s.depthOfCut + 1.0)[1];
   parts.push(el('rect', { x: gL[0], y: gradeY, width: gR[0] - gL[0], height: earthBottom - gradeY, fill: 'url(#pat-earth)' }));
 
-  const bayTL = px(-halfBay, 0);
-  parts.push(el('rect', { x: bayTL[0], y: bayTL[1], width: proj.lenPx(s.holeW), height: proj.lenPx(s.depthOfCut), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-cut)' }));
+  // An unrevetted wall in loose soil battens outward toward grade (s.wallTaper, doctrine's
+  // wallSlopeRatio × depth, capped the same way the 3D model caps it) — a plumb rectangle only
+  // when revetted or wallTaper is 0. Degenerates to the exact same rectangle when wallTaper is 0
+  // (the two top corners collapse onto the bottom corners' x), so this single polygon replaces
+  // the old unconditional rect rather than branching on taper presence.
+  const bayFloorL = px(-halfBay, s.depthOfCut);
+  const bayFloorR = px(halfBay, s.depthOfCut);
+  const bayGradeR = px(halfBay + s.wallTaper, 0);
+  const bayGradeL = px(-halfBay - s.wallTaper, 0);
+  parts.push(el('polygon', {
+    points: bayFloorL.join(',') + ' ' + bayFloorR.join(',') + ' ' + bayGradeR.join(',') + ' ' + bayGradeL.join(','),
+    fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-cut)',
+  }));
   used.add('bay');
   parts.push(callout('bay', ...px(halfBay * 0.15, s.depthOfCut * 0.62), used));
 

@@ -102,6 +102,34 @@ test('section carries header, standing figure + scale, single-accent dims, cover
   assertNoDimCollision(section, 'section');
 });
 
+test('the section draws an unrevetted earth wall sloped per soil, and a revetted wall perfectly plumb', () => {
+  // Doctrine (soils.<id>.wallSlopeRatio) says an unrevetted wall in loose soil battens outward —
+  // the 3D model has drawn this for a while (scene3d.ts's pushBayBox), but the 2D section always
+  // drew a plumb rectangle regardless of soil, silently contradicting the 3D view of the SAME
+  // position. geo.section.wallTaper is the shared, doctrine-driven value both views now read.
+  const silt = compute(defaultInputs({ positionType: 'one_man', soil: 'silt', revetment: 'none' }));
+  const siltGeo = silt.geometry as GeometryModel;
+  assert.ok(siltGeo.section.wallTaper > 0, 'silt (wallSlopeRatio 0.75) with no revetment must taper');
+
+  const siltSection = drawSection(silt);
+  const bayPoly = siltSection.match(/<polygon points="([^"]+)" fill="var\(--draw-bay\)"/);
+  assert.ok(bayPoly, 'bay is drawn as a polygon (trapezoid), not a rect, when tapered');
+  const xs = bayPoly![1]!.split(' ').map((p) => Number(p.split(',')[0]));
+  // 4 points: floor-left, floor-right, grade-right, grade-left. A taper widens the grade pair
+  // relative to the floor pair — grade-right.x > floor-right.x and grade-left.x < floor-left.x.
+  assert.equal(xs.length, 4, 'bay polygon has exactly 4 points');
+  const [floorLx, floorRx, gradeRx, gradeLx] = xs as [number, number, number, number];
+  assert.ok(gradeRx > floorRx, 'grade-level right edge sits outboard of the floor edge (flares out)');
+  assert.ok(gradeLx < floorLx, 'grade-level left edge sits outboard of the floor edge (flares out)');
+
+  // Revetment holds the wall vertical regardless of soil (the facing IS the structure) —
+  // wallTaper must be exactly 0, and the same silt soil now draws a plumb-walled rect/degenerate
+  // trapezoid (grade edges collapse onto the floor edges).
+  const revetted = compute(defaultInputs({ positionType: 'one_man', soil: 'silt', revetment: 'sandbag_facing' }));
+  const revettedGeo = revetted.geometry as GeometryModel;
+  assert.equal(revettedGeo.section.wallTaper, 0, 'a revetted wall never tapers, regardless of soil');
+});
+
 test('engineered roof is drawn honestly (hazard block, no fabricated earth cover)', () => {
   const section = drawSection(compute(defaultInputs({ positionType: 'bunker_op_cp', threat: 'at-he-contact' })));
   assert.ok(section.includes('ENGINEERED ROOF — SEE ENGINEER'), 'engineered hazard label');
