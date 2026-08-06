@@ -56,6 +56,7 @@ screenshots get read.
 | **Corrugated sheet layout** | **Fixed** — sheets were laid 8 ft along the eave x 26 in up the slope (on their side) with their joints butted; they now run their length up the slope and side-lap. |
 | **Hip + roof deck "none" + roofing** | **Partly fixed.** The hip was UNBACKED and is now dropped — real, measured, pinned. But that was NOT what the specks were; see the correction below. |
 | Guard tower — the guardrail gap vs. where the ladder arrives | **Checked, correct.** Nothing wrong. The opening is centred exactly on the ladder; the read that said otherwise is below. |
+| **Building with `roof.kind: 'none'`** | **Engine clean, panel fixed** — the model builds no roof and advertises no roof stages, but the panel went on offering Roof deck, Roofing and the felt toggle for a roof that does not exist. |
 | Custom card (`custom`) — bare frame, no siding, no roofing | **Checked, clean.** Nothing wrong. Piers on footings, floor frame, framed openings, gable rafters and deck, rake studs stepping up. |
 | **Guard tower — the ladder** | **Fixed** — set plumb inside a BATTERED frame, it crossed the leg plane about 9.6 ft up and ran through two brace diagonals with 8.9 in of overlap. |
 | Double-coverage roll roofing (`rollDouble`) | **Checked, clean.** Nothing wrong. Five courses where single coverage lays three — the 50% lap — laid along the eave from the eave up, which is how roll goods go on. |
@@ -1034,3 +1035,26 @@ scratch — `NO_COVERINGS`, so nothing is hidden behind siding or roofing and ev
 show. Piers on footings, floor frame and subfloor, stud walls with header, trimmers and sill at
 both openings, gable rafters, plywood deck, and the gable-end studs stepping up under the rake.
 Clean.
+
+## Four walls and no roof
+
+`roof.kind: 'none'` is a real option on the custom card, and the ENGINE handles it properly —
+which is worth saying first, because the whole point of checking edge cases is that most of them
+turn out fine. A roofless building comes out with zero roof members and a stage plan of seven
+stages ending at the siding, every one of them populated: no rafters, no deck, no roofing, and no
+dead stop on the scrubber advertising a stage nothing will fill.
+
+The PANEL did not keep up. With the roof set to None it still offered **Roof deck**, **Roofing**
+and **Felt under the roofing** — three controls for a roof that does not exist. Pick corrugated
+there and nothing appears, nothing is said, and the spec quietly carries `roofDeck: 'plywood'` on a
+building with nothing to nail it to. The felt row already had an `applies` predicate, checking the
+roof DECK; it just never asked whether there was a roof.
+
+Now gated, in the live panel: with a gable all six covering rows are offered; with None, the three
+roof rows go and **wall sheathing and siding stay**, because a roofless building still has walls.
+The roof picker stays too, so the choice is reversible.
+
+Two things the tests had to be told, both mine to get wrong. `configSchemaFor` takes a family ID and
+returns `{ family, groups }`, not an array. And a role pattern loose enough to catch `ridgeCap` also
+catches `capPlate` — which is the plate on top of a WALL and belongs on a roofless building, so the
+roof roles are named explicitly rather than matched.

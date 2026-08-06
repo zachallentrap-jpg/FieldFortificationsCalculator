@@ -337,6 +337,15 @@ export function configSchemaFor(familyId: FamilyId): PanelSchema {
     const field = key.split('.')[1] as keyof FamilyDef['coverings'];
     const options = family.coverings[field];
     if (!options || options.length === 0) continue;
+    // NO ROOF, NO ROOF COVERINGS. The custom card offers `roof.kind: 'none'` — four walls and
+    // no roof at all, which the engine builds correctly and which stops its stage plan at the
+    // siding. The PANEL went on offering "Roof deck", "Roofing" and the felt toggle anyway, so
+    // you could pick corrugated for a building with nothing to nail it to, watch nothing appear,
+    // and not be told why. The spec kept the choice too. Wall sheathing and siding are unaffected:
+    // a roofless building still has walls.
+    const hasRoof = (spec: unknown): boolean =>
+      ((spec as { roof?: { kind?: string } }).roof?.kind ?? 'gable') !== 'none';
+    const roofSide = field === 'roofDeck' || field === 'roofing';
     // Purlins only exist where the roof can take them. The frozen gable branch lays its own
     // solid deck (C-9), so offering "Purlins (for metal)" under a gable would promise a deck
     // the engine will not build. Two rows, same path: the applies-predicate picks the one
@@ -349,18 +358,19 @@ export function configSchemaFor(familyId: FamilyId): PanelSchema {
       skin.push({
         path: key, label, control: 'select', options: solid,
         optionLabels: labelsFor(solid, COVERING_LABELS),
-        applies: (spec) => isGable(spec),
+        applies: (spec) => hasRoof(spec) && isGable(spec),
         help: 'A gable here is built the drawing-set way — sheathed solid. Purlins come with the other roof shapes.',
       }, {
         path: key, label, control: 'select', options,
         optionLabels: labelsFor(options, COVERING_LABELS),
-        applies: (spec) => !isGable(spec),
+        applies: (spec) => hasRoof(spec) && !isGable(spec),
       });
       continue;
     }
     skin.push({
       path: key, label, control: 'select', options,
       optionLabels: labelsFor(options, key === 'coverings.roofing' ? ROOFING_LABELS : COVERING_LABELS),
+      ...(roofSide ? { applies: hasRoof } : {}),
     });
   }
   // Felt under the roofing. A real choice with a real line on the bill, and until now no way to
@@ -373,7 +383,9 @@ export function configSchemaFor(familyId: FamilyId): PanelSchema {
       control: 'toggle',
       help: 'Underlayment between the deck and the roofing, lapped from the eave up.',
       cite: 'FM 5-426 felt underlayment (PH)',
-      applies: (spec) => ((spec as { coverings?: { roofDeck?: string } }).coverings?.roofDeck ?? 'none') !== 'none',
+      applies: (spec) =>
+        ((spec as { roof?: { kind?: string } }).roof?.kind ?? 'gable') !== 'none'
+        && ((spec as { coverings?: { roofDeck?: string } }).coverings?.roofDeck ?? 'none') !== 'none',
     });
   }
   // The open front. The storage-shed card has always offered it — "a wide door bay, or leave the

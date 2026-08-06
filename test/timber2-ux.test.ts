@@ -328,3 +328,58 @@ test('plain names read as carpentry, not as code', () => {
     assert.ok(!/[A-Z]/.test(name.replace(/\(.*\)|X-|T-|SEA|SWA/g, '')), `${role}: "${name}" looks like an identifier`);
   }
 });
+
+test('NO ROOF, NO ROOF COVERINGS — the panel stops offering what cannot be built', () => {
+  // The custom card offers `roof.kind: 'none'` — four walls and no roof at all. The engine builds
+  // that correctly: zero roof members, and a stage plan that stops at the siding rather than
+  // advertising roof stages nothing would fill. The PANEL went on offering "Roof deck", "Roofing"
+  // and the felt toggle anyway, so you could pick corrugated for a building with nothing to nail
+  // it to, watch nothing appear, and never be told why — while the spec kept the choice.
+  //
+  // Wall sheathing and siding must survive: a roofless building still has walls.
+  const family = familyById('custom')!;
+  const schema = configSchemaFor('custom');
+  const pathsFor = (roofKind: string): string[] => {
+    const spec = JSON.parse(JSON.stringify(family.preset));
+    spec.roof = roofKind === 'none' ? { kind: 'none' } : { kind: roofKind, risePer12: 4, overhangFt: 1 };
+    return schema.groups
+      .flatMap((g) => g.rows)
+      .filter((r) => !r.applies || r.applies(spec))
+      .map((r) => r.path);
+  };
+
+  const withGable = pathsFor('gable');
+  for (const p of ['coverings.wallSheathing', 'coverings.siding', 'coverings.roofDeck', 'coverings.roofing']) {
+    assert.ok(withGable.includes(p), `a gable should still be offered ${p}`);
+  }
+
+  const withNone = pathsFor('none');
+  for (const p of ['coverings.roofDeck', 'coverings.roofing', 'coverings.buildingPaper']) {
+    assert.ok(!withNone.includes(p), `${p} must not be offered on a building with no roof`);
+  }
+  for (const p of ['coverings.wallSheathing', 'coverings.siding']) {
+    assert.ok(withNone.includes(p), `${p} is a WALL covering — a roofless building still has walls`);
+  }
+  // And the roof picker itself stays, so the choice is reversible.
+  assert.ok(withNone.includes('roof.kind'), 'the roof picker must remain');
+});
+
+test('a building with no roof builds no roof, and advertises no roof stages', () => {
+  // The other half of the same case, on the engine side — recorded because it is what made the
+  // panel's silence worth fixing rather than merely untidy.
+  const spec = JSON.parse(JSON.stringify(familyById('custom')!.preset));
+  spec.roof = { kind: 'none' };
+  spec.coverings = { ...spec.coverings, roofDeck: 'plywood', roofing: 'corrugated' };
+  const model = generateStructure(spec as never);
+  // Named, not matched: a pattern loose enough to catch `ridgeCap` also catches `capPlate`,
+  // which is the plate on top of a WALL and belongs on a roofless building.
+  const ROOF_ROLES = new Set(['rafter', 'jackRafter', 'hipRafter', 'ridge', 'collarTie', 'purlin',
+    'roofPanel', 'roofingCourse', 'ridgeCap', 'felt', 'fascia']);
+  const roofish = model.members.filter((m) => ROOF_ROLES.has(m.role));
+  assert.equal(roofish.length, 0, `no roof means no roof members, got ${roofish.map((m) => m.role).join(',')}`);
+  const filled = new Set<number>(model.members.map((m) => m.stage as number));
+  for (const e of model.stagePlan) {
+    assert.ok(e.noMembers || filled.has(e.ordinal),
+      `stage ${e.ordinal} (${e.key}) is advertised and empty — a dead stop on the scrubber`);
+  }
+});
