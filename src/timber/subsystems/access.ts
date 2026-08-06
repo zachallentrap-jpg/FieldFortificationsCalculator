@@ -269,26 +269,49 @@ export function generateStair(input: StairInput): StairResult {
     const at = path.steps[f]!.at;
     const dir = path.steps[f]!.dir;
     const yaw = Math.atan2(-dir[1], dir[0]);
-    // Stringers run the slope; length is the hypotenuse of rise and run.
-    const slopeLen = Math.hypot(risePerFlight, sol.runFt);
-    const pitch = Math.atan2(risePerFlight, Math.max(EPS_FT, sol.runFt));
-    const midX = at[0] + dir[0] * (sol.runFt / 2);
-    const midZ = at[1] + dir[1] * (sol.runFt / 2);
     const across: [number, number] = [-dir[1], dir[0]];
-    // HALF THE BOARD BELONGS BELOW THE NOSINGS AND NONE OF IT ABOVE. Centred on the line from
-    // the flight's base to its landing, a 2x12 stood 4 in proud of every tread and buried the
-    // same 4 in under the ground it starts on. The line is the stringer's TOP EDGE, so the piece
-    // drops half a face width down its own local -Y — not straight down, because it is pitched.
-    const drop = stringerDropFt(DRESSED[stringerNominal]!.d, yaw, pitch);
+    // THE STOCK IS LAID OUT FROM THE NOSING LINE, which is the line a framing square walks: it
+    // runs through the nose of every tread, at the UNIT RUN's own pitch, and the board hangs its
+    // full face width below it. The sawtooth is then cut out of what is left — seats and riser
+    // faces, in `stairStringerProfile`, which reads the flight straight back off the piece.
+    //
+    // The board used to be laid on the line from the GROUND at the base to the LANDING at the
+    // head. That line is a third steeper than the nosing line, a full riser low at the foot and
+    // level with it only at the very top, so every tread crossed it — part buried in the board,
+    // part hanging in the air. No arrangement of the treads could fix that: the fault was the
+    // shape of the board under them.
+    const R = risePerFlight / sol.risers;
+    const T = sol.treadIn / IN_PER_FT;
+    const cut = sol.risers > 1;
+    const pitch = cut
+      ? Math.atan2(R, T)
+      : Math.atan2(risePerFlight, Math.max(EPS_FT, sol.runFt));
+    const faceW = DRESSED[stringerNominal]!.d / IN_PER_FT;
+    // Along the rake, measured from the nosing line's start at (d = 0, h = R): the foot corner
+    // sits one riser below it, and the head corner is `risers − 1` whole steps up it.
+    const sMin = cut ? -R * Math.sin(pitch) : -Math.hypot(risePerFlight, sol.runFt) / 2;
+    const sMax = cut ? (sol.risers - 1) * Math.hypot(T, R) : Math.hypot(risePerFlight, sol.runFt) / 2;
+    const slopeLen = sMax - sMin;
+    const sMid = (sMin + sMax) / 2;
+    // The member's CENTRE is half a face width below the nosing line, which is not straight down.
+    const dMid = sMid * Math.cos(pitch) + (faceW / 2) * Math.sin(pitch);
+    const hMid = R + sMid * Math.sin(pitch) - (faceW / 2) * Math.cos(pitch);
+    const drop = cut ? null : stringerDropFt(DRESSED[stringerNominal]!.d, yaw, pitch);
     for (let i = 0; i < stringerCount; i++) {
       const off = stringerCount === 1 ? 0 : (i / (stringerCount - 1) - 0.5) * widthFt;
       emit('stringer', stringerNominal, {
         cutLengthFt: slopeLen,
-        position: [
-          midX + across[0] * off + drop[0],
-          y + risePerFlight / 2 + drop[1],
-          midZ + across[1] * off + drop[2],
-        ],
+        position: drop
+          ? [
+            at[0] + dir[0] * (sol.runFt / 2) + across[0] * off + drop[0],
+            y + risePerFlight / 2 + drop[1],
+            at[1] + dir[1] * (sol.runFt / 2) + across[1] * off + drop[2],
+          ]
+          : [
+            at[0] + dir[0] * dMid + across[0] * off,
+            y + hMid,
+            at[1] + dir[1] * dMid + across[1] * off,
+          ],
         rotation: [0, yaw, pitch],
         stage,
         nailing: 'bolted at head and foot (PH)',

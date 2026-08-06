@@ -30,7 +30,7 @@ import {
 import { cameraRigsFor, memberAabb, type CameraRig } from './camera';
 import { roofingTiling } from './tiling';
 import { seatCutsFor, seatProfile, type SeatCut } from '../../timber/birdsMouth';
-import { stringerEndProfile } from '../../timber/stringerCuts';
+import { stringerEndProfile, stairStringerProfile } from '../../timber/stringerCuts';
 import { riserLidOf, seatOpeningsFor, seatOpeningPath } from '../../timber/riserSeats';
 import { fmtFtIn } from '../../timber/units';
 
@@ -254,11 +254,14 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
         riserHoles,
       );
     } else if (m.role === 'stringer') {
-      // A stringer's ends are cut square to the WORLD, not to the board: level at the foot so it
-      // sits flat on the ground, plumb at the head so it bears flat on the header. Drawn as a
-      // plain raked box it ended in two sharp wedges, one 4 in under the earth and one the same
-      // distance above the landing, on every stair in the toolkit.
-      p = cutLumberPiece(group, stringerEndProfile(m), m.actual.w / 12);
+      // A STAIR stringer is cut: a level seat under every tread, a plumb face between each pair,
+      // the foot cut level on the ground and the head plumb at the landing. Drawn as a plain
+      // raked box it ended in two sharp wedges — one 4 in under the earth, one the same distance
+      // above the landing — and its straight top edge crossed every tread it was meant to carry.
+      //
+      // A RAMP's stringer carries the same role and has no steps to cut, so it falls back to the
+      // end cuts alone. `stairStringerProfile` says which is which off the piece itself.
+      p = cutLumberPiece(group, stairStringerProfile(m) ?? stringerEndProfile(m), m.actual.w / 12);
     } else if (seat?.length) {
       // A NOTCHED rafter. The plain prop is a box, and a box laid at pitch across a cap plate
       // intersects it — 3 inches of rafter buried in the plate at every bearing, on every roof.

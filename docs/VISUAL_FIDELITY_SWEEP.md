@@ -1847,3 +1847,66 @@ the bird's-mouth travels — and the local-frame mapping is
 `localX = −hx + Δd·cos p + Δh·sin p`, `localY = hy − Δd·sin p + Δh·cos p` from the flight's base.
 What it needs beyond that is the stringer repositioned onto the nosing line (so there is material
 above the seats to cut away) and the foot drop that goes with it. **Next target.**
+
+## The stringer that was never cut
+
+The recorded target, and the one the tread pass could not reach. **A stair stringer is CUT, and the
+cuts are the stair.** Its top edge is not a rake, it is a staircase: a level seat under every tread
+and a plumb riser face between each pair. Drawn as a board with a straight top edge, flat treads
+laid on it can only ever meet it along a *line* — so every tread was part buried in the stringer
+and part hanging in the air, and no arrangement of the treads could fix it, because the fault was
+the shape of the board under them.
+
+```
+share of each tread's own thickness the stringer stood THROUGH
+              before        after
+platform  1    20%           0%
+          2    38%           0%
+          3    55%           0%
+          4    73%           0%
+          5    93%           0%
+
+share of each tread's depth actually seated on the stringer
+gp-frame  1    36%          100%
+```
+
+Three lines are involved and only one of them is the stringer:
+
+- **The nosing line** runs through the nose of every tread — slope `R/T`, from `(0, R)` at the base
+  to `((N−1)T, N·R)` at the landing. This is the line a framing square walks, and the line the
+  stock is laid out from: the board hangs its full face width below it.
+- **The line as built** ran from `(0, 0)` to `((N−1)T, N·R)` — from the *ground* at the base to the
+  landing at the head. A third steeper than the nosing line, a full riser low at the foot, level
+  with it only at the very top. Every tread crossed it.
+- **The sawtooth** is what carries treads: seat `i` level at `h = i·R − t` from `d = (i−1)T` to
+  `d = iT`, with a plumb face between each seat and the next.
+
+The board moves onto the nosing line and `stairStringerProfile` cuts the rest — sawtooth, level
+foot where the underside reaches the ground (a 9⅙-in flat on a 2x12 at 7¼/10), plumb head at the
+landing edge, all one polygon. Traced into world space on a hut's entry flight:
+
+```
+foot            y −2.2917   = grade exactly
+seats           y −1.8125, −1.2083, −0.6042   = the three tread undersides, exactly
+riser faces     x 50.5417, 49.7083, 48.8750, 48.0417   = one unit run apart, exactly
+head            y  0.1250   = the threshold
+```
+
+**Nothing is threaded through the model to do this.** The unit run is doctrine and the same for
+every flight, the pitch gives the riser, and the length gives the count — so `stairGeometryOf`
+reads the whole flight back off the piece, the way `birdsMouth` and `riserSeats` read theirs off
+the members the engine already emitted. The loading platform's RAMP shares the `stringer` role,
+carries a NEGATIVE pitch and has no steps; it reads as not-a-stair and keeps its two end cuts.
+
+Four regression tests, three of which fail on the pre-sawtooth placement (*"is not readable as a
+cut stringer"*, *"stands through ES1-tread-01"*, *"seated over 36% of its depth, not all of it"*)
+and one — the ramp guard — which must pass both ways and does.
+
+### A test that was a proxy, and stopped being true
+
+`A STRINGER IS CUT LEVEL AT THE FOOT` asserted the foot was not below the low end of the board's
+own **centreline**. That held only while the board lay on the base-to-landing line. A cut stringer
+is laid on the nosing line, and its centreline low end necessarily sits about a fifth of an inch
+*above* its foot corner — because the corner is what touches the ground. Replaced with the two
+claims the proxy stood for: nothing of the cut piece is under the ground, and the flight that
+starts at grade starts exactly there.

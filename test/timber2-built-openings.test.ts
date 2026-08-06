@@ -242,7 +242,7 @@ test('the ledges are counted once, on the boards that are nailed through them', 
 
 import { STAIR } from '../src/timber/doctrine';
 import { generateStair } from '../src/timber/subsystems/access';
-import { stringerEndProfile } from '../src/timber/stringerCuts';
+import { stringerEndProfile, stairStringerProfile } from '../src/timber/stringerCuts';
 
 /**
  * World-space sample points of a stringer AS CUT — not of the raw stick it is cut from.
@@ -252,7 +252,10 @@ import { stringerEndProfile } from '../src/timber/stringerCuts';
  * describes what is actually drawn. Sampling the cut profile does.
  */
 function cutSamples(m: Member): V3[] {
-  const prof = stringerEndProfile(m);
+  // A STAIR stringer is a sawtooth and a RAMP's is a raked board with two end cuts. Which one a
+  // piece is is read off the piece, exactly as the viewer reads it — measuring a cut stringer
+  // against the rectangle it was sawn from is measuring the stick, not the piece.
+  const prof = stairStringerProfile(m) ?? stringerEndProfile(m);
   const hz = m.actual.w / 24;
   const out: V3[] = [];
   const inside = (px: number, py: number): boolean => {
@@ -511,7 +514,7 @@ function unrotate(m: Member, v: V3): V3 {
 function insideStringer(s: Member, p: V3): boolean {
   const l = unrotate(s, [p[0] - s.position[0], p[1] - s.position[1], p[2] - s.position[2]]);
   if (Math.abs(l[2]) > s.actual.w / 24) return false;
-  const prof = stringerEndProfile(s);
+  const prof = stairStringerProfile(s) ?? stringerEndProfile(s);
   let hit = false;
   for (let i = 0, j = prof.length - 1; i < prof.length; j = i++) {
     const [xi, yi] = prof[i]!; const [xj, yj] = prof[j]!;
@@ -573,6 +576,8 @@ test('A STRINGER IS CUT LEVEL AT THE FOOT AND PLUMB AT THE HEAD, on every stair 
     const spec = JSON.parse(JSON.stringify(familyById(id as never)!.preset)) as Record<string, unknown>;
     patch(spec);
     const m = generateStructure(spec as unknown as StructureSpec);
+    const gradeY = m.levels.gradeY ?? 0;
+    let lowest = Infinity;
     // The frozen basement stair and the platform's RAMP are not `generateStair`'s — different
     // emitters, recorded separately, deliberately out of this change.
     for (const s of m.members.filter((x) => x.role === 'stringer' && !x.id.startsWith('FL-') && !x.id.startsWith('PF-'))) {
@@ -586,14 +591,19 @@ test('A STRINGER IS CUT LEVEL AT THE FOOT AND PLUMB AT THE HEAD, on every stair 
       // Plumb head: every point at the top shares one height too — the landing.
       const atHead = pts.filter((p) => p[1] > hi - 1e-6);
       assert.ok(atHead.length >= 2, `${id}/${s.id}: the head is a point, not a plumb face`);
-      // And the piece spans exactly the flight: no corner outside the run it belongs to.
-      const half = s.cutLength / 24;
-      const d = axis(s);
-      const ends = [s.position[1]! - d[1] * half, s.position[1]! + d[1] * half];
-      const dropIn = ((Math.min(...ends) - lo) * IN_PER_FT);
-      assert.ok(Math.abs(dropIn) < 1e-6 || dropIn < 0,
-        `${id}/${s.id}: the cut foot still hangs ${dropIn.toFixed(3)} in below the flight`);
+      // And nothing of the cut piece is under the ground it stands on.
+      //
+      // This used to be asserted as "the foot is not below the low end of the board's own
+      // CENTRELINE", which was a proxy — true only while the board was laid on the line from the
+      // flight's base to its landing. A cut stringer is laid on the NOSING LINE instead, and its
+      // centreline low end necessarily sits about a fifth of an inch above its foot corner,
+      // because the corner is what touches the ground. The claim the proxy stood for is here.
+      assert.ok(lo >= gradeY - 1e-9,
+        `${id}/${s.id}: the cut foot is ${((gradeY - lo) * IN_PER_FT).toFixed(3)} in under the ground`);
+      lowest = Math.min(lowest, lo);
     }
+    assert.ok(Math.abs(lowest - gradeY) < 1e-9,
+      `${id}: the lowest flight's foot is ${((lowest - gradeY) * IN_PER_FT).toFixed(3)} in off the ground it starts from`);
   }
   assert.ok(checked >= 12, `only ${checked} stringers checked`);
 });
@@ -625,4 +635,141 @@ test('the top edge of a stringer IS the line of the nosings', () => {
   const sill = Math.min(...m.members.filter((x) => x.role === 'doorBoard').flatMap((b) => box(b).y));
   assert.ok(stringerTop <= sill + 1e-6,
     `a stringer reaches ${stringerTop.toFixed(4)}, above the threshold at ${sill.toFixed(4)}`);
+});
+
+// ── The sawtooth ─────────────────────────────────────────────────────────────
+//
+// The stringer's top edge was a straight rake from the flight's base to its landing. You cannot
+// lay flat treads on a straight raked edge: each one meets it along a line, so every tread was
+// part buried in the stringer and part hanging in the air, and no arrangement of the treads could
+// fix it because the fault was the shape of the board underneath them. Measured before, as a
+// share of each tread's own thickness that the stringer stood through: 20%, 38%, 55%, 73%, 93%
+// up the loading platform's flight.
+//
+// The board is now laid out from the NOSING LINE — the line a framing square walks, through the
+// nose of every tread — and the sawtooth is cut out of what hangs below it: a level seat under
+// every tread, a plumb face between each pair.
+
+import { stairGeometryOf } from '../src/timber/stringerCuts';
+
+test('THE STRINGER IS CUT: a level seat under every tread', () => {
+  for (const id of ['gp-frame', 'platform', 'sea-hut']) {
+    const m = modelOf(id);
+    const stringers = m.members.filter((x) => x.role === 'stringer' && !x.id.startsWith('FL-') && !x.id.startsWith('PF-'));
+    assert.ok(stringers.length > 0, `${id} has no stair stringers`);
+    for (const s of stringers) {
+      const g = stairGeometryOf(s);
+      assert.ok(g, `${id}/${s.id} is not readable as a cut stringer`);
+      assert.equal(g.runFt * IN_PER_FT, 10, 'the seats are the doctrine unit run deep');
+      // The seats are level in the WORLD, which for a pitched board is NOT square to it — a
+      // level edge of the profile is a raked one in the board's own frame, which is exactly why
+      // a straight-topped board could never carry a flat tread.
+      const prof = stairStringerProfile(s)!;
+      const wy = prof.map(([lx, ly]) => s.position[1] + lx * Math.sin(s.rotation[2]) + ly * Math.cos(s.rotation[2]));
+      const wPlan = prof.map(([lx, ly]) => lx * Math.cos(s.rotation[2]) - ly * Math.sin(s.rotation[2]));
+      let level = 0;
+      let plumb = 0;
+      for (let i = 0; i < prof.length; i++) {
+        const j = (i + 1) % prof.length;
+        if (Math.abs(wy[i]! - wy[j]!) < 1e-9) level++;
+        if (Math.abs(wPlan[i]! - wPlan[j]!) < 1e-9) plumb++;
+      }
+      // One seat per tread plus the level cut at the foot; one riser face per tread plus the
+      // plumb cut at the head. Nothing else in the outline is square to the world.
+      assert.equal(level, g.seats + 1, `${id}/${s.id}: ${level} level faces for ${g.seats} treads and a foot`);
+      // Counted as PLACES rather than edges: the head is two collinear segments of one face —
+      // up the last riser to the landing, then back down the whole depth of the board.
+      const risers = new Set<number>();
+      for (let i = 0; i < prof.length; i++) {
+        const j = (i + 1) % prof.length;
+        if (Math.abs(wPlan[i]! - wPlan[j]!) < 1e-9) risers.add(Math.round(wPlan[i]! * 1e6));
+      }
+      assert.equal(risers.size, g.seats + 1,
+        `${id}/${s.id}: ${risers.size} plumb faces for ${g.seats} treads and a head`);
+      const at = [...risers].map((v) => v / 1e6).sort((a, b) => a - b);
+      for (let i = 1; i < at.length; i++) {
+        // 2e-6 ft, because the set above is keyed on micro-feet — tighter than the key itself.
+        assert.ok(Math.abs(Math.abs(at[i]! - at[i - 1]!) - g.runFt) < 2e-6,
+          `${id}/${s.id}: riser faces ${(Math.abs(at[i]! - at[i - 1]!) * IN_PER_FT).toFixed(3)} in apart, not the ${g.runFt * IN_PER_FT} in unit run`);
+      }
+      void plumb;
+    }
+  }
+});
+
+test('and NO stringer stands through the tread it carries', () => {
+  // The number that says the sawtooth is real. Before: the straight rake crossed 20–93% of each
+  // tread's own thickness on the way up a flight.
+  for (const id of ['gp-frame', 'platform', 'sea-hut', 'tower']) {
+    const spec = JSON.parse(JSON.stringify(familyById(id as never)!.preset)) as Record<string, unknown>;
+    if (id === 'tower') spec.access = 'stair';
+    const m = generateStructure(spec as unknown as StructureSpec);
+    const treads = m.members.filter((x) => x.role === 'tread');
+    const stringers = m.members.filter((x) => x.role === 'stringer' && !x.id.startsWith('FL-') && !x.id.startsWith('PF-'));
+    if (treads.length === 0) continue;
+    for (const t of treads) {
+      const tb = box(t);
+      const run = tb.x[1]! - tb.x[0]! < tb.z[1]! - tb.z[0]! ? 0 : 2;
+      const [u0, u1] = run === 0 ? tb.x : tb.z;
+      for (const s of stringers) {
+        const across = s.position[run === 0 ? 2 : 0];
+        if (across < (run === 0 ? tb.z[0]! : tb.x[0]!) || across > (run === 0 ? tb.z[1]! : tb.x[1]!)) continue;
+        for (let k = 1; k < 40; k++) {
+          const u = u0! + ((u1! - u0!) * k) / 40;
+          // Just inside the tread's own thickness: if the board is there, it is through the tread.
+          const p: V3 = run === 0
+            ? [u, (tb.y[0]! + tb.y[1]!) / 2, across]
+            : [across, (tb.y[0]! + tb.y[1]!) / 2, u];
+          assert.ok(!insideStringer(s, p),
+            `${id}: ${s.id} stands through ${t.id} at ${p.map((v) => v.toFixed(3)).join(', ')}`);
+        }
+      }
+    }
+  }
+});
+
+test('and every tread bears on its seat across its WHOLE depth', () => {
+  // Not "some bearing" — the seat is a unit run deep and a tread is 9¼ in, so a tread that is on
+  // its step is supported end to end. This is the claim a line contact could never satisfy.
+  for (const id of ['gp-frame', 'platform']) {
+    const m = modelOf(id);
+    const treads = m.members.filter((x) => x.role === 'tread');
+    const stringers = m.members.filter((x) => x.role === 'stringer' && !x.id.startsWith('PF-'));
+    assert.ok(treads.length > 0);
+    for (const t of treads) {
+      const tb = box(t);
+      const run = tb.x[1]! - tb.x[0]! < tb.z[1]! - tb.z[0]! ? 0 : 2;
+      const [u0, u1] = run === 0 ? tb.x : tb.z;
+      let best = 0;
+      for (const s of stringers) {
+        const across = s.position[run === 0 ? 2 : 0];
+        if (across < (run === 0 ? tb.z[0]! : tb.x[0]!) || across > (run === 0 ? tb.z[1]! : tb.x[1]!)) continue;
+        let on = 0;
+        // The INTERIOR, sampled at 0.23 in: the tread's nose lands exactly on the seat's own
+        // downhill corner, and an even-odd test is ambiguous precisely on the boundary. So the
+        // claim is "seated to within a sample of each edge", which is what can be asked exactly.
+        for (let k = 1; k < 40; k++) {
+          const u = u0! + ((u1! - u0!) * k) / 40;
+          const p: V3 = run === 0 ? [u, tb.y[0]! - 0.004, across] : [across, tb.y[0]! - 0.004, u];
+          if (insideStringer(s, p)) on++;
+        }
+        best = Math.max(best, on / 39);
+      }
+      assert.ok(best > 0.999,
+        `${id}: ${t.id} is seated over ${(best * 100).toFixed(0)}% of its depth, not all of it`);
+    }
+  }
+});
+
+test('a RAMP stringer is not a stair and is not cut like one', () => {
+  // The platform carries both: a stair up to the deck and a ramp down off it, and they share the
+  // role. The ramp's pitch is NEGATIVE — the toolkit contains both handednesses — and it has no
+  // steps, so it keeps the two end cuts and nothing else.
+  const m = modelOf('platform');
+  const ramp = m.members.filter((x) => x.id.startsWith('PF-stringer'));
+  assert.ok(ramp.length > 0, 'the preset has a ramp');
+  for (const s of ramp) {
+    assert.ok(s.rotation[2]! < 0, `${s.id} is the ramp: it runs downhill out of its +X end`);
+    assert.equal(stairGeometryOf(s), null, `${s.id} was read as a flight of stairs`);
+  }
 });
