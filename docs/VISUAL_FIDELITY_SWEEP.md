@@ -842,15 +842,34 @@ real, measured and worth fixing on its own merits; it simply was not the thing i
 
 ## What is still open
 
-- **Pinholes through the roofing.** Next target, and now properly located. Roofing courses lap up
-  the slope but BUTT exactly along the eave: `u0 = lo + r * sheetLen`, `u1 = min(u0 + sheetLen, hi)`,
-  so consecutive sheets in a course share an edge to the last bit. A ray that hits that shared edge
-  passes between them, which is why a raycast into a speck comes back holding a ceiling joist. With
-  a deck the hole is plugged from behind and nothing shows; with roof deck "none" you see straight
-  through the roof. Worth checking while fixing it: `corrugatedSideLapIn` is being spent as the
-  COURSE lap (up the slope), and a side lap is by name the lap between neighbouring sheets ACROSS
-  the slope — which is exactly the joint that is currently butted. The lap may be on the wrong
-  axis, in which case one change closes the pinholes and puts the material where doctrine says.
+- **Corrugated sheets are laid on their side, and the joints between them are butted.** Next
+  target. Measured on a 48 × 20 gable, every full piece is **8.000 ft along the eave × 26.00 in up
+  the slope**, and consecutive pieces in a course sit at an edge-to-edge offset of **exactly 0** —
+  butted, no lap.
+
+  A corrugated sheet is 26 in wide × 8 ft long with the corrugations running along its LENGTH, and
+  it is laid with that length running UP the slope so the water runs down the channels. The ribs in
+  the render already do run up-slope — `roofingTexture` says so in its own comment and the repeat
+  mapping delivers it, which is worth stating because it was the first thing I suspected and it is
+  not wrong. But the ribs running up-slope across a piece whose length runs along the eave means
+  the ribs cross the sheet's 8-ft dimension: **the sheet is rotated 90 degrees from how it is laid.**
+
+  The consequences are a set, not a detail. `corrugatedSideLapIn` (3.25 in, "1.5 corrugations") is
+  being spent as the lap between COURSES up the slope, where an end lap belongs; the joint it is
+  named for — between neighbouring sheets across the slope — is the one that is butted. A 7.4-ft
+  slope should be ONE sheet from eave to ridge with no horizontal joint at all, and instead gets
+  four horizontal courses. And a butted joint is a hole: a ray at the shared edge passes between
+  the two pieces, which is why a raycast into a speck on a deckless hip comes back holding a
+  CEILING JOIST. With a deck the hole is plugged from behind and nothing shows.
+
+  Laying it right — 26-in strips running up the slope, side-lapping across, end-lapping only where
+  the slope exceeds 8 ft — closes the pinholes, puts the lap on the axis doctrine names it for, and
+  fixes the take-off in one change. It also needs care: the taper clip is written course-wise (clip
+  u by the span at v) and transposes to strip-wise, the hip coverage tests are written against the
+  course layout, and lapped flat plates z-fight unless each lapping piece is lifted, which is what
+  the existing `c * coveringThick` stacking does up the slope and would need an equivalent across.
+  Bounded, but not a one-line change — which is why it is written down here rather than started at
+  the end of a pass.
 
 - **`roofDeck: 'skip'` is a dead option.** Skip sheathing — spaced boards under corrugated — is in
   both the spec type and the covering module's input type, and nothing produces or consumes it: no
