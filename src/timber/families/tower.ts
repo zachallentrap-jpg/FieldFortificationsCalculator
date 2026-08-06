@@ -19,7 +19,7 @@ import type { Member } from '../types';
 import { DRESSED } from '../types';
 import type { TowerSpec } from '../spec';
 import { makeEmitter } from '../emit';
-import { TOWER, RAIL, PANEL, HUT, IN_PER_FT, citeOf } from '../doctrine';
+import { TOWER, RAIL, PANEL, HUT, LUMBER, IN_PER_FT, citeOf } from '../doctrine';
 import { stagePlan, requireOrdinal, type StagePlanEntry } from '../stagePlan';
 import { generateRailing, railRequired, type RailEdge } from '../subsystems/railings';
 import { generateLadder, generateStair } from '../subsystems/access';
@@ -431,13 +431,58 @@ export function generateTower(spec: TowerSpec): TowerResult {
       eaveLengthFt: half * 2,
       slopeLengthFt: slopeLen,
     }];
+    // ── THE HIGH SIDE HAS TO STAND ON SOMETHING.
+    //
+    // A shed is one slope, so its high edge is a WALL: the pyramid gets away without one because
+    // its four hips lean on each other at a peak, and this branch was written as if the same were
+    // true. Measured on the shipped cab, the rafters ran from 22.845 up to 26.613 while every
+    // post and screen panel in the cab topped out at 23.063 — three and a half feet of roof
+    // carried on nothing at all, over the heads of the two observers the card is sized for.
+    //
+    // The building's own shed roof has framed a pony wall for this since T2, and an earlier pass
+    // through this sweep had to give that pony wall the plate it was missing. The cab gets the
+    // same two pieces: posts up the rear corners, and a plate across them for the rafters to land
+    // on.
+    // The plate's top is the roof plane AT THE WALL, which is not the same as the plane at the
+    // high edge: the rafters run past the wall by the cab's overhang, exactly as they do at the
+    // eave. `eaveY + fall` is the height over the overhang's far edge and put the plate 4 in
+    // above the bearing line the rafters actually cross.
+    const highY = eaveY + (fall * (deckHalf * 2 + overhang)) / (half * 2);
+    const plateNom = LUMBER.plateNominal.value as string;
+    const plateD = DRESSED[plateNom]!.d / IN_PER_FT;
+    for (const x of [cx - deckHalf, cx + deckHalf]) {
+      emit('post', '4x4', {
+        // Up to the UNDERSIDE of the plate, not to the top of the wall: a plate sits ON its
+        // posts, and running them both to the same height buries it in them.
+        cutLengthFt: highY - plateD - eaveY,
+        position: [x, (eaveY + highY - plateD) / 2, cx + deckHalf],
+        rotation: [0, 0, Math.PI / 2],
+        stage: sRoof,
+        nailing: 'bolted to the cab post below (PH)',
+        doctrineRef: citeOf(TOWER.cabRisePer12),
+      });
+    }
+    emit('capPlate', plateNom, {
+      cutLengthFt: deckHalf * 2,
+      position: [cx, highY - plateD / 2, cx + deckHalf],
+      rotation: [0, 0, 0],
+      stage: sRoof,
+      nailing: '2-16d ea post (PH)',
+      doctrineRef: citeOf(TOWER.cabRisePer12),
+    });
     // Rafters span the slope, so they are spaced ACROSS it — along X — and run toward +Z going
     // up, matching the plane. They used to be spaced along Z, which is the direction they RUN,
     // so all three were laid end to end down the same line instead of across the roof.
-    for (const x of [cx - deckHalf, cx, cx + deckHalf]) {
+    //
+    // AND THERE WERE THREE OF THEM, at the two edges and the middle: 48 in on centre across an
+    // 8-ft cab, on a card whose own `spacing.rafterSpacingIn` says 16. Hardcoding the count is
+    // how a spacing becomes a coincidence.
+    const rafterOc = spec.spacing.rafterSpacingIn / IN_PER_FT;
+    const bays = Math.max(1, Math.ceil((deckHalf * 2) / rafterOc));
+    for (let i = 0; i <= bays; i++) {
       emit('rafter', '2x6', {
         cutLengthFt: slopeLen,
-        position: [x, eaveY + rise, cx],
+        position: [cx - deckHalf + (deckHalf * 2 * i) / bays, eaveY + rise, cx],
         rotation: [0, -Math.PI / 2, Math.atan2(fall, half * 2)],
         stage: sRoof,
         nailing: 'toenail 3-8d ea plate (PH)',

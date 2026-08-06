@@ -2205,3 +2205,46 @@ building really has, with the reason written in it.
 Five regression tests, four failing on the old code — the fifth is the guard that must pass both
 ways: **every shipped card still normalizes with nothing to repair.** A table-driven repair pass is
 one typo away from "fixing" a preset.
+
+## The cab roof with nothing under its high side
+
+The guard tower's cab offers two roofs and the sweep had only ever looked at the pyramid.
+`cab.roof: 'shed'` is a slope over the same box, and a slope's high edge is a **wall**:
+
+```
+tower preset, 8-ft cab, shed roof
+  rafters run      y 22.845  →  26.613
+  cab posts and screen panels all top out at   23.063
+  → 3 ft 6½ in of roof carried on nothing at all
+```
+
+The pyramid gets away without a high wall because its four hips lean on each other at a peak, and
+this branch was written as if the same were true. The building's own shed roof has framed a pony
+wall for it since T2 — and an earlier pass through this sweep had to give that pony wall the plate
+it was missing. The cab now gets the same two pieces: posts up the rear corners, and a plate across
+them. Using the `capPlate` role means the existing bird's-mouth derivation finds it, so the rafters
+seat on it rather than crossing it.
+
+**And there were three rafters** — at the two edges and the middle, 48 in on centre across an 8-ft
+cab, on a card whose own `spacing.rafterSpacingIn` says 16. Hardcoding the count is how a spacing
+becomes a coincidence.
+
+### Two wrong versions of the same assertion
+
+1. *"The rafter's high end lands on the plate."* It does not, and should not: a shed's rafters run
+   past their high wall by the cab's overhang exactly as they run past the low one. The test failed
+   at 1.00 ft, which is `TOWER.cabOverhangFt` to the inch. Restated as bearing **at the plate's own
+   station**, interpolated along the rafter.
+2. Then the plate itself was 4 in high, because I put its top at `eaveY + fall` — the plane's
+   height over the **overhang's far edge**, not over the wall. The bearing line at the wall is
+   `eaveY + fall·(2·deckHalf + overhang)/(2·half)`.
+
+### And one existing test moved
+
+`timber2-tower-cab` found the cab's stage as *"the last stage a 4x4 post appears in, which is the
+only place 4x4 posts and cladding share a stage."* True until a shed cab grew two 4x4 posts that
+are roof framing and land in a later stage with no cladding in it. That file is about cladding
+against the posts it hangs on, so the cladding picks the stage now.
+
+Three regression tests, two failing on the old code; the third is the guard that the **pyramid cab
+is untouched** — no common rafters, four hips, and no high plate it should never have grown.

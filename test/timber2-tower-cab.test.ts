@@ -60,9 +60,15 @@ function cab(over: Record<string, unknown> = {}) {
   const spec = JSON.parse(JSON.stringify(familyById('tower')!.preset));
   Object.assign(spec, over);
   const model = generateStructure(spec);
-  // The cab's own stage — the last one its 4x4 posts appear in, which is the only place 4x4
-  // posts and cladding share a stage.
-  const stage = Math.max(...model.members.filter((m) => m.role === 'post' && m.nominal === '4x4').map((m) => m.stage));
+  // The cab's own stage, found from the CLADDING rather than from the posts. It used to be "the
+  // last stage a 4x4 post appears in, which is the only place 4x4 posts and cladding share a
+  // stage" — true until a shed cab grew the two 4x4 posts that carry its high side, which are
+  // roof framing and land in a later stage with no cladding in it at all. What this file is
+  // about is cladding against the posts it hangs on, so the cladding is what picks the stage.
+  const clad = model.members.filter((m) => m.role === 'siding' || m.role === 'screenPanel');
+  const stage = clad.length > 0
+    ? Math.max(...clad.map((m) => m.stage))
+    : Math.max(...model.members.filter((m) => m.role === 'post' && m.nominal === '4x4').map((m) => m.stage));
   return {
     spec,
     posts: model.members.filter((m) => m.role === 'post' && m.nominal === '4x4' && m.stage === stage),
