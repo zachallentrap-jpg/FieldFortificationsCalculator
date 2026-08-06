@@ -12,6 +12,7 @@ import { buildScene3D } from '../src/render3d/scene3d';
 import { positions } from '../src/doctrine/positions';
 import { overhead } from '../src/doctrine/protection';
 import type { GeometryModel } from '../src/engine/geometry';
+import type { Inputs } from '../src/engine/types';
 import { defaultInputs } from './helpers';
 
 // (label, number) for every callout disc; plus the same split into body vs legend.
@@ -359,4 +360,39 @@ test('iso schematic carries its header and a consistent legend', () => {
   assert.ok(iso.includes('>ENEMY<'), 'orientation preserved');
   assertCalloutLegendConsistent(iso, 'iso');
   assertMinFont(iso, 'iso');
+});
+
+test('layout quality (dim collision, callout/legend consistency, min font) holds across every position under stress configs, not just the two single default fixtures', () => {
+  // render-nan.test.ts already fuzzes position × threat × overheadCover broadly, but only for
+  // "never NaN" — the LAYOUT QUALITY checks (assertNoDimCollision, assertCalloutLegendConsistent,
+  // assertMinFont) had only ever run against two single, mostly-default configs (one for plan,
+  // one for section) across this whole loop's 12 iterations of structural changes (wall taper,
+  // backblast zone, sump reposition, platform clamp, roof setback/overhang, elbow rests). None of
+  // those per-feature tests would catch a DIFFERENT config accidentally colliding two dimension
+  // labels or orphaning a callout from the legend. This sweeps every position type through a
+  // handful of "extreme" configs designed to stress the geometry that changed this session:
+  // reinforced (deepest cut, thickest cover, biggest wall taper), silt (steep unrevetted taper),
+  // every extra feature on at once (sump/step/camo), and a heavy engineered-roof threat (biggest
+  // hazard-block footprint) — the kinds of configs most likely to push labels into each other.
+  const STRESS_CONFIGS: Partial<Inputs>[] = [
+    { standard: 'reinforced', soil: 'silt', revetment: 'none', overheadCover: true, threat: 'ind-art-155', sump: true, firingStep: true, camouflage: true },
+    { standard: 'hasty', soil: 'sand', revetment: 'sandbag_facing', overheadCover: false, threat: 'none' },
+    { standard: 'reinforced', soil: 'clay', revetment: 'none', overheadCover: true, threat: 'at-tank', sump: true, firingStep: true, camouflage: true },
+    { standard: 'deliberate', soil: 'rock', revetment: 'timber_plywood', overheadCover: true, threat: 'sa-556', sump: true },
+    { unit: 'metric', standard: 'reinforced', soil: 'silt', revetment: 'none', overheadCover: true, threat: 'ind-mtr-120', sump: true, firingStep: true },
+  ];
+  for (const positionType of Object.keys(positions)) {
+    for (const cfg of STRESS_CONFIGS) {
+      const ctx = positionType + '/' + JSON.stringify(cfg);
+      const r = compute(defaultInputs({ ...cfg, positionType }));
+      const plan = drawPlan(r);
+      assertCalloutLegendConsistent(plan, ctx + ' plan');
+      assertMinFont(plan, ctx + ' plan');
+      assertNoDimCollision(plan, ctx + ' plan');
+      const section = drawSection(r);
+      assertCalloutLegendConsistent(section, ctx + ' section');
+      assertMinFont(section, ctx + ' section');
+      assertNoDimCollision(section, ctx + ' section');
+    }
+  }
 });
