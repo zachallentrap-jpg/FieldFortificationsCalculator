@@ -10,7 +10,7 @@ import {
   northArrow, azimuthLabel, scaleBar,
 } from './chrome';
 import { describe, a11yAttrs } from './a11y';
-import { positions } from '../doctrine/positions';
+import { positions, backblast } from '../doctrine/positions';
 import { fmtLength } from '../doctrine/units';
 import type { GeometryModel, DimSpec } from '../engine/geometry';
 import type { Result } from '../engine/types';
@@ -52,9 +52,16 @@ export function drawPlan(result: Result): string {
   const armLen = geo.shape === 'l_shape' ? Math.max(2.5, p.holeL * 0.6) : 0;
   const rampRunFt = isVehicle ? dm.get('ramp_run')?.valueFt ?? 0 : 0;
   const rampWidthFt = Math.min(p.holeL, p.holeW);
+  // ATGM/Javelin backblast: a rear danger area the doctrine flags SAFETY-CRITICAL
+  // (backblast.clearanceFt) but that, until now, only ever appeared as a text warning
+  // (validate.ts's ATGM_BACKBLAST) — never drawn anywhere, unlike every other safety-relevant
+  // dimension this app draws to scale. Extends the projector bounds like the ramp run does, so
+  // it's shown at its real size rather than abbreviated.
+  const isAtgm = result.inputs.positionType === 'atgm_javelin';
+  const backblastFt = isAtgm ? backblast.clearanceFt.value : 0;
 
   const proj = makeProjector(
-    { minX: -halfL - sidePad, maxX: halfL + sidePad + armLen, minY: -halfW - enemyMargin, maxY: halfW + sidePad + 1 + stemLen + rampRunFt },
+    { minX: -halfL - sidePad, maxX: halfL + sidePad + armLen, minY: -halfW - enemyMargin, maxY: halfW + sidePad + 1 + stemLen + rampRunFt + backblastFt },
     { x: 0, y: HEADER_H + 20, w: W, h: H - LEGEND_H - (HEADER_H + 20), pad: 30 },
   );
   const px = (xf: number, yf: number): [number, number] => proj.toPx(xf, yf);
@@ -200,6 +207,23 @@ export function drawPlan(result: Result): string {
       parts.push(callout('elbow', c[0] - 14, c[1], used));
       elbowCalloutPlaced = true;
     }
+  }
+
+  // ATGM/Javelin backblast danger area — a rear hazard zone, not excavated ground. Uses the
+  // same hazard styling already established for the engineered-roof marker (§2.7's visual
+  // language for "the operator must respect this, it isn't a built feature") rather than
+  // inventing a new one.
+  if (backblastFt > 0) {
+    const halfBackblastW = Math.max(halfL, p.holeL / 2 + 1);
+    const zTL = px(-halfBackblastW, halfW);
+    const zBR = px(halfBackblastW, halfW + backblastFt);
+    parts.push(el('rect', {
+      x: zTL[0], y: zTL[1], width: zBR[0] - zTL[0], height: zBR[1] - zTL[1],
+      fill: 'url(#pat-engineered)', stroke: 'var(--draw-engineered)', 'stroke-width': 'var(--w-outline)',
+    }));
+    used.add('backblast');
+    parts.push(callout('backblast', ...px(0, halfW + backblastFt / 2), used));
+    parts.push(vDim(px(0, halfW)[1], px(0, halfW + backblastFt)[1], zBR[0] + 16, fmtLength(backblastFt, unit)));
   }
 
   // ── A–A cut line (matches drawSection) ─────────────────────────────────────────
