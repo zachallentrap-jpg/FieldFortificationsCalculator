@@ -178,9 +178,18 @@ export function buildGeometry(calc: Calc): GeometryModel {
       },
       sumps: sumpMarks(calc.sumpCount, calc.holeL, calc.holeW),
       elbows: elbowMarks(calc.position.elbowHoles, calc.holeL, calc.holeW),
+      // Drawn footprint only — clamped to the hole's own size (fifty_cal's doctrine platform.W
+      // is 3.0 ft in a 2.0 ft-wide hole; drawn at full size it overhung the excavation by 1 ft
+      // in both the plan and the 3D model, a platform floating a foot past the wall of the hole
+      // it's built in). The BOM/labor volume still uses the true, unclamped doctrine value
+      // (calc.position.firingPlatform via platformVol in compute.ts) — this clamp is rendering-
+      // only and never touches the doctrine leaf itself.
       platform:
         calc.hasPlatform && calc.position.firingPlatform
-          ? { L: calc.position.firingPlatform.L.value, W: calc.position.firingPlatform.W.value }
+          ? {
+              L: Math.min(calc.position.firingPlatform.L.value, calc.holeL),
+              W: Math.min(calc.position.firingPlatform.W.value, calc.holeW),
+            }
           : null,
       enemy: 'front',
     },
