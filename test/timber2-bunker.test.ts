@@ -10,6 +10,7 @@ import { familyById, FAMILY_TABLE } from '../src/timber/catalog';
 import { stringerFor } from '../src/timber/families/bunker';
 import { generateCribWall, cribCourseCount } from '../src/timber/subsystems/cribwork';
 import { BUNKER } from '../src/timber/doctrine';
+import type { Member as Member2 } from '../src/timber/types';
 import { SPEC_PATH_DEFS } from '../src/timber/spec';
 
 const preset = () => JSON.parse(JSON.stringify(familyById('crib-bunker')!.preset));
@@ -806,5 +807,64 @@ test('and the baffle\'s own planks sit on its posts, not inside them', () => {
       assert.ok(dx <= 1e-9 || dy <= 1e-9 || dz <= 1e-9,
         `${l.id} is ${(dx * IN_PER_FT).toFixed(2)} in inside ${p.id}`);
     }
+  }
+});
+
+// ── A run of boards closes on its limit ──────────────────────────────────────
+//
+// This family lays boards in three places and got the remainder wrong three different ways.
+// Six foot six of wall is 10.759 courses of a 7¼-in plank; the overhead is 18.483 boards wide:
+//
+//   the WALL laid eleven whole courses, so the top one stood 1¾ in proud of the posts and 1¾ in
+//   INTO the cap beam, the whole way round;
+//   the BAFFLE clamped its last course's centre back down, so that board lay 1¾ in ON TOP OF the
+//   one below it — the same figure again, as duplicated material;
+//   the OVERHEAD clamped the same way across its width and came out 3½ in SHORT of the far wall,
+//   which is 3½ in of roof with the earth straight onto the stringers.
+//
+// One answer to all three: the last board of a run is ripped to fit.
+
+const runOf = (ms: Member2[], axis: 1 | 2): [number, number][] => {
+  const seen: [number, number][] = [];
+  for (const k of ms) {
+    const b = axis === 1 ? boxB(k).y : boxB(k).z;
+    if (!seen.some((u) => Math.abs(u[0] - b[0]!) < 1e-9)) seen.push([b[0]!, b[1]!]);
+  }
+  return seen.sort((a, b) => a[0] - b[0]);
+};
+
+test('A RUN OF BOARDS CLOSES ON ITS LIMIT — nothing past it, nothing doubled, nothing short', () => {
+  const { model, outerW } = bunkerGeom('post-plank');
+  const H = (model.spec as unknown as { clearHeightFt: number }).clearHeightFt;
+  const stock = DRESSED[BUNKER.laggingNominal.value as string]!;
+  const cases: [string, Member2[], 1 | 2, number][] = [
+    ['the wall', model.members.filter((x) => x.role === 'lagging'
+      && boxB(x).y[1]! < H + 0.5 && Math.abs(x.rotation[0]!) < 1e-9), 1, H],
+    ['the baffle', model.members.filter((x) => x.role === 'baffleWall'
+      && Math.abs(x.rotation[1]! - Math.PI / 2) < 1e-6), 1, H],
+    ['the overhead', model.members.filter((x) => x.role === 'lagging'
+      && Math.abs(x.rotation[0]! + Math.PI / 2) < 1e-6), 2, outerW],
+  ];
+  for (const [label, ms, axis, limit] of cases) {
+    assert.ok(ms.length > 5, `${label}: only ${ms.length} boards`);
+    const run = runOf(ms, axis);
+    assert.ok(Math.abs(run[0]![0]) < 1e-9, `${label}: the first board starts at ${run[0]![0].toFixed(4)}, not 0`);
+    const last = run[run.length - 1]!;
+    assert.ok(Math.abs(last[1] - limit) < 1e-9,
+      `${label}: the last board ends at ${last[1].toFixed(4)} against a limit of ${limit.toFixed(4)} `
+      + `— ${((last[1] - limit) * IN_PER_FT).toFixed(2)} in ${last[1] > limit ? 'past' : 'short of'} it`);
+    for (let i = 1; i < run.length; i++) {
+      assert.ok(Math.abs(run[i]![0] - run[i - 1]![1]) < 1e-9,
+        `${label}: board ${i} starts at ${run[i]![0].toFixed(4)} where the one below ends at ${run[i - 1]![1].toFixed(4)} `
+        + `— ${(Math.abs(run[i]![0] - run[i - 1]![1]) * IN_PER_FT).toFixed(2)} in of ${run[i]![0] < run[i - 1]![1] ? 'overlap' : 'gap'}`);
+    }
+    // A rip is NARROWER than the stock, never wider: closing the run by widening the last board
+    // would satisfy everything above and put a board on the list that nobody can cut.
+    for (const k of ms) {
+      assert.ok(k.actual.d <= stock.d + 1e-9,
+        `${label}: ${k.id} claims a ${k.actual.d.toFixed(2)} in face on a ${k.nominal}, which is ${stock.d} in`);
+    }
+    assert.ok(run.some(([a, b]) => b - a < stock.d / IN_PER_FT - 1e-9),
+      `${label}: no board was ripped, so the run happens to divide evenly — this case tests nothing`);
   }
 });

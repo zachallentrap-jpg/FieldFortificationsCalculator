@@ -257,14 +257,20 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       const spans: [number, number][] = gap
         ? ([[0, gap[0]], [gap[1], run]] as [number, number][]).filter((sp) => sp[1] - sp[0] > TOLERANCE.minSliverFt)
         : [[0, run]];
-      for (let y = lagH / 2; y < H; y += lagH) {
+      // THE LAST BOARD OF A RUN IS RIPPED TO FIT, which is what you do with a remainder and
+      // what none of this family's three board runs did. Six foot six of wall is 10.759 courses
+      // of a 7¼-in plank: laying eleven whole ones stood the top course 1¾ in proud of the posts
+      // and 1¾ in INTO the cap beam, the whole way round, on the shipped card.
+      for (let v = 0; v < H - TOLERANCE.epsFt; v += lagH) {
+        const cut = Math.min(lagH, H - v);
         for (const [u0, u1] of spans) {
           const mid = (u0 + u1) / 2;
           emit('lagging', lagNominal, {
             cutLengthFt: u1 - u0,
-            position: [a[0] + ux * mid + nx, y, a[1] + uz * mid + nz],
+            position: [a[0] + ux * mid + nx, v + cut / 2, a[1] + uz * mid + nz],
             rotation: [0, Math.atan2(-uz, ux), 0],
             stage: sWall,
+            actual: { w: DRESSED[lagNominal]!.w, d: cut * IN_PER_FT },
             nailing: 'spiked to each post (PH)',
             doctrineRef: citeOf(BUNKER.laggingNominal),
           });
@@ -323,15 +329,20 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
   const lagW = DRESSED[lagNominal]!.d / IN_PER_FT;
   const lagT = DRESSED[lagNominal]!.w / IN_PER_FT;
   const lagY = stringerY + stringerD / 2 + lagT / 2;
-  for (let z = lagW / 2; z < outerW; z += lagW) {
+  // Ripped to fit at the far side, like the wall. Clamping the last board's CENTRE back inside
+  // the building — which is what `Math.min` did here — leaves the run short by the remainder
+  // instead: 3½ in of overhead with the earth straight onto the stringers, down one long side.
+  for (let v = 0; v < outerW - TOLERANCE.epsFt; v += lagW) {
+    const cut = Math.min(lagW, outerW - v);
     emit('lagging', lagNominal, {
       cutLengthFt: outerL,
-      position: [outerL / 2, lagY, Math.min(z, outerW - lagW / 2)],
+      position: [outerL / 2, lagY, v + cut / 2],
       // Lagging is the roof DECK — laid flat, edge to edge. The spacing loop steps by face
       // width and the height by thickness, so at [0,0,0] the two disagreed and the roof came
       // out as a rank of boards on edge with daylight between them.
       rotation: [-Math.PI / 2, 0, 0],
       stage: sLag,
+      actual: { w: DRESSED[lagNominal]!.w, d: cut * IN_PER_FT },
       nailing: 'spiked to every stringer (PH)',
       doctrineRef: citeOf(BUNKER.laggingNominal),
     });
@@ -400,13 +411,18 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       });
     }
     const lagH = DRESSED[lagNominal]!.d / IN_PER_FT;
-    for (let y = lagH / 2; y < H; y += lagH) {
+    // And the baffle, which handled its own remainder a third way: it clamped the last course's
+    // centre down to `H − lagH/2`, so the top board lay 1¾ in ON TOP OF the one below it — the
+    // same figure again, as duplicated material instead of an overshoot.
+    for (let v = 0; v < H - TOLERANCE.epsFt; v += lagH) {
+      const cut = Math.min(lagH, H - v);
       emit('baffleWall', lagNominal, {
         cutLengthFt: run,
+        actual: { w: DRESSED[lagNominal]!.w, d: cut * IN_PER_FT },
         // Face to face with the baffle's posts. Standing off by HALF a post put the plank's own
         // centre on the post's face, so half of every board was inside the post — the same
         // mistake as the wall's lagging, at half the depth.
-        position: [-offset - (DRESSED[postNominal]!.w + DRESSED[lagNominal]!.w) / IN_PER_FT / 2, Math.min(y, H - lagH / 2), (baffleZ0 + baffleZ1) / 2],
+        position: [-offset - (DRESSED[postNominal]!.w + DRESSED[lagNominal]!.w) / IN_PER_FT / 2, v + cut / 2, (baffleZ0 + baffleZ1) / 2],
         rotation: [0, Math.PI / 2, 0],
         stage: sEntry,
         nailing: 'spiked to each post (PH)',

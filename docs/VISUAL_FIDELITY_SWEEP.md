@@ -2071,3 +2071,38 @@ interior asked for, the stringers lie inside the building — are unchanged.
   one's top reaches 6.6458 against a wall top of 6.5000 and a cap underside of 6.5000. Visible in
   an outside view as a step at every post. The fix is to RIP the last course to fit — stopping the
   loop early instead would leave a 5½-in slot under the cap, which is worse. **Next target.**
+
+## Three board runs, three ways of getting the remainder wrong
+
+The recorded target, and looking for it turned up two more of the same thing. This family lays
+boards in three places and none of them closed:
+
+```
+6 ft 6 in of wall  = 10.759 courses of a 7¼-in plank
+11 ft 2 in of roof = 18.483 boards
+
+  WALL      laid eleven whole courses    → top course 1¾ in proud of the posts,
+                                            and 1¾ in INTO the cap beam, all the way round
+  BAFFLE    clamped the last centre down → that board lay 1¾ in ON TOP OF the one below it
+  OVERHEAD  clamped the same way across  → 3½ in SHORT of the far wall, which is 3½ in of
+                                            overhead with the earth straight onto the stringers
+```
+
+Same figure twice as an overshoot and as duplicated material, and a third time as a hole. **One
+answer to all three: the last board of a run is ripped to fit** — the same thing `boardRun` in
+`builtOpenings.ts` has always done for a wall's siding. All three runs now start at 0, close
+exactly on their limit, and meet edge to edge with nothing doubled.
+
+The overhead went from 18 boards to 19; the nineteenth is the 3½-in rip.
+
+One regression test with the claim stated once and checked in all three places, plus two guards
+that matter more than they look:
+
+- **A rip is NARROWER than the stock, never wider.** Closing a run by widening the last board
+  satisfies every other assertion here and puts a board on the cut list that nobody can cut — the
+  landing's fake 30-in `2x10` two passes ago was exactly that mistake.
+- **At least one board in each run must actually be ripped**, or the case divides evenly and the
+  test is checking nothing.
+
+It fails on the old generator at the first of the three: *"the wall: the last board ends at 6.6458
+against a limit of 6.5000 — 1.75 in past it."*
