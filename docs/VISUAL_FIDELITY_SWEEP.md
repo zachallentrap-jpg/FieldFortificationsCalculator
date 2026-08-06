@@ -66,6 +66,7 @@ screenshots get read.
 | **Guard tower — the cab's cladding** | **Fixed** — every panel was centred on the corner posts' own centreline, so it ran 1¾ in into the post at each end and its outer face sat 1½ in inside the frame. All four posts stood proud of the wall they were meant to be behind. |
 | **The corrugation pitch on a cut roof** | **Fixed** — the rib scale was rounded to whole texture tiles and floored at one, so every piece narrower than 39 in got twelve corrugations squeezed into it. 48 of 108 pieces on a pyramid, 98 of 304 on a hip, 4 of 104 on a gable. |
 | Guard tower cab pyramid — wood showing through the roofing | **Checked, nothing wrong.** The warm band along one hip was my own harness's HOVER tint. See the note below. |
+| **The roof a share link hands in** | **Fixed** — three ways a pasted link broke the workbench: a shed with no `highSide` and a spec with no `roof` both THREW, leaving "Laying out the frame…" spinning forever with no canvas; an unknown roof kind framed a building with no roof and said nothing. |
 
 ## The shed that had no walls above the plate
 
@@ -1200,6 +1201,8 @@ before they screenshot.**
 
 ### Lead, not yet a finding: a shed roof with no `highSide`
 
+> **Resolved in the next pass — it was reachable.** See "Laying out the frame, forever" below.
+
 `RoofSpec` makes `highSide` required on a shed, and nothing supplies it if it is missing —
 `normalizeSpec` leaves the roof untouched, and `generateShed` does
 `walls.surfaces.find((s) => s.wall === highSide)!` on line 450, where the `!` is a lie: the build
@@ -1209,3 +1212,56 @@ lookup is written with an `if (high)` guard, so the file already disagrees with 
 This is only a defect if such a spec can reach the engine — a shared `?c=` link or an import is the
 obvious candidate, and that has NOT been checked. Recorded here so the next pass starts from the
 question rather than from the crash.
+
+## Laying out the frame, forever
+
+The previous pass left a question rather than a finding: `generateShed` does
+`walls.surfaces.find((s) => s.wall === highSide)!` and `highSide` is required on a shed, so the
+build throws if it is missing — but could a spec like that ever reach the engine?
+
+It can. `decodeSpec` is the app's untrusted boundary and it is deliberately permissive:
+
+```ts
+if (!parsed || typeof parsed !== 'object' || !('family' in parsed)) return null;
+return parsed;
+```
+
+Any JSON with a `family` key is accepted and handed to `generateStructure`. That is a defensible
+design — links have to survive version drift, and the file's own pyramid note already says a
+pyramid roof "only arrived through a shared link" — but it means `normalizeSpec` is the whole of
+the validation, and it checked the roof's KIND and never its per-kind fields.
+
+Built the link and opened it. **The workbench renders completely and never finishes.** Title bar,
+Copy link, Command packet, the View/Stage/Cut menus, the plate-layout card on the right — and in
+the middle a spinner reading "Laying out the frame…" that never stops. `hasCanvas: false`, no
+members, no issue, no error visible anywhere. It does not look broken; it looks slow.
+
+Probing the whole roof union off one preset found three holes, not one:
+
+| roof off the link | before |
+|---|---|
+| `{kind:'shed', …}` with no `highSide` | **threw** `Cannot read properties of undefined (reading 'runFt')` |
+| `highSide: 'up'` | same throw |
+| no `roof` key at all | **threw** `Cannot read properties of undefined (reading 'kind')` |
+| `{kind:'dome', …}` | 656 members, **zero roof framing, zero issues** |
+
+The last row is the one worth dwelling on. It is the exact defect the pyramid comment in
+`normalize.ts` was written about — "a building open to the sky … and not one word said about it" —
+and it was still there for every kind outside the union, because the fix that time was written for
+one value rather than for the set.
+
+All three are repaired where every path already goes: `generateStructure` calls `normalizeSpec`
+first, so the store, the share link and the importer are all covered by one block. A missing or
+malformed roof becomes the standard gable; an unknown kind becomes a gable and names what was
+asked for; a shed with no high side takes the north wall, which is what the panel writes anyway,
+so an app-made link and a hand-made one now describe the same roof. Every one of them **says so**
+in the issues banner — the amber line is now the first thing on the page.
+
+The test file pins the door as well as the guard: its last case asserts that `decodeSpec` really
+does pass `{kind:'dome'}` through unvalidated, so if that ever changes, the guard is re-examined
+rather than left standing on faith. Five of its seven cases fail on the old normalize, four of
+them by throwing.
+
+Unchecked, and the obvious next question: `foundation` is the other discriminated union on a
+building spec, with per-kind fields of its own (`crawlFt`, `depthFt`, `stairs`). Nothing here has
+looked at what a link does to it.

@@ -226,7 +226,40 @@ function normalizeBuilding(spec: BuildingSpec, issues: SpecIssue[]): BuildingSpe
     }
   }
 
+  // THE ROOF ARRIVES FROM OUTSIDE. `decodeSpec` accepts any JSON with a `family` key, so the
+  // roof this function is handed is whatever a share link said it was — and until this block ran
+  // it was trusted to be a well-formed member of the union. Three ways it was not, all of them
+  // reachable by pasting a link and all of them measured:
+  //
+  //   · `roof` absent entirely     → threw on `.kind`; the workbench sat on "Laying out the
+  //                                  frame…" forever, with no canvas and nothing said.
+  //   · `kind` not in the union    → framed 656 members and NO ROOF, with zero issues. The same
+  //                                  silence the pyramid note below was written about.
+  //   · `shed` with no `highSide`  → threw on `walls.surfaces.find(…)!` in `generateShed`. The
+  //                                  panel always writes one, so only a hand-made link gets here.
+  //
+  // A thrown generator is the worst of the three: the shell renders, the spinner never stops, and
+  // the user is looking at a page that appears to be working. Everything below repairs and SAYS
+  // SO, which is this file's whole contract.
+  const ROOF_KINDS = new Set(['gable', 'shed', 'flat', 'hip', 'pyramid', 'none']);
   let roof = spec.roof;
+  if (!roof || typeof roof !== 'object' || typeof (roof as { kind?: unknown }).kind !== 'string') {
+    issues.push({
+      path: 'roof',
+      kind: 'clamped',
+      message: 'This build arrived with no roof at all — framed as the standard gable so there is something to look at.',
+      severity: 'warn',
+    });
+    roof = { kind: 'gable', risePer12: 4, overhangFt: 1 };
+  } else if (!ROOF_KINDS.has(roof.kind)) {
+    issues.push({
+      path: 'roof.kind',
+      kind: 'clamped',
+      message: `"${roof.kind}" is not a roof this tool frames — framed as the standard gable. The kinds it knows are gable, shed, hip, flat and none.`,
+      severity: 'warn',
+    });
+    roof = { kind: 'gable', risePer12: 4, overhangFt: 1 };
+  }
   // A BUILDING HAS NO PYRAMID. `pyramid` is the guard tower's cab roof and the tower generator
   // owns it; the building path frames gable, hip, shed and flat and silently framed NOTHING for
   // a pyramid. The picker never offers it, so this only arrived through a shared link — and
@@ -246,6 +279,23 @@ function normalizeBuilding(spec: BuildingSpec, issues: SpecIssue[]): BuildingSpe
       severity: 'warn',
     });
     roof = { ...roof, kind: 'hip' };
+  }
+  if (roof.kind === 'shed' && !WALL_ORDER.includes(roof.highSide)) {
+    // A shed is one slope, and which way it runs is the whole shape of the building — so this is
+    // not a field that can be left out. `generateShed` looks the wall up and takes the answer as
+    // given; with nothing to find it threw, and a thrown generator is a workbench that never
+    // stops loading. North matches what the panel writes, so an app-made link and a hand-made
+    // one now describe the same roof.
+    const was = (roof as { highSide?: unknown }).highSide;
+    issues.push({
+      path: 'roof.highSide',
+      kind: 'clamped',
+      message: was === undefined
+        ? 'A shed roof has to say which wall is the high one — took the north wall.'
+        : `"${String(was)}" is not a wall (they are N, S, E and W) — took the north wall as the high side.`,
+      severity: 'warn',
+    });
+    roof = { ...roof, highSide: 'N' };
   }
   if (roof.kind === 'gable' || roof.kind === 'shed' || roof.kind === 'hip') {
     roof = {
