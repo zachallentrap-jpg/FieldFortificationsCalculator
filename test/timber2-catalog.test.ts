@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { FAMILY_TABLE, familyById, pickerGroups, shippedFamilies, GROUP_ORDER } from '../src/timber/catalog';
 import { generateStructure } from '../src/timber/families/index';
 import { normalizeSpec, specToJson } from '../src/timber/normalize';
+import { ROOFING } from '../src/timber/doctrine';
 import type { BuildingSpec } from '../src/timber/spec';
 
 test('every shipped preset normalizes clean and generates a real structure', () => {
@@ -128,4 +129,51 @@ test('covering options offered by a card are options the engine implements', () 
       }
     }
   }
+});
+
+test('ROLL ROOFING HAS A MINIMUM SLOPE, and the toolkit must not print it on a roof that breaks it', () => {
+  // `rollMinSlopePer12` (2) and `rollDoubleMinSlopePer12` (1) sat in doctrine used for nothing but
+  // the `doctrineRef` string stamped on each course. So a 1-in-12 gable under single-coverage roll
+  // came out clean, citing "FM 5-426 exposed-nail roll roofing minimum slope" on a roof at half the
+  // slope that rule requires. Stated on the drawing, enforced nowhere.
+  //
+  // Reachable straight from the panel: every card offers `flat` and offers `roll`, and normalize's
+  // own comment floors flat at 1:12 "because that is the minimum double-coverage roll roofing is
+  // rated for" — which is only true if the roofing IS double coverage.
+  const rollMin = ROOFING.rollMinSlopePer12.value as number;
+  const dblMin = ROOFING.rollDoubleMinSlopePer12.value as number;
+  const check = (roofing: string, risePer12: number, kind: 'gable' | 'flat' = 'gable') => {
+    const spec = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset));
+    spec.roof = kind === 'flat'
+      ? { kind, drainPer12: risePer12, overhangFt: 1 }
+      : { kind, risePer12, overhangFt: 1 };
+    spec.coverings = { ...spec.coverings, roofing };
+    const out = normalizeSpec(spec as never);
+    return {
+      warned: out.issues.filter((i) => i.path === 'coverings.roofing'),
+      roofing: (out.spec as { coverings: { roofing: string } }).coverings.roofing,
+    };
+  };
+
+  // Under the minimum: warned, once, and naming both figures.
+  const bad = check('roll', rollMin - 1);
+  assert.equal(bad.warned.length, 1, `roll at ${rollMin - 1} in 12 must be flagged`);
+  assert.ok(bad.warned[0]!.message.includes(`${rollMin} in 12`), 'the warning must name the rule it is enforcing');
+  assert.equal(bad.warned[0]!.severity, 'warn');
+  // WARN, NEVER SUBSTITUTE. Handing back a different covering would put a material on the drawing
+  // nobody chose — this module clamps numbers, it does not pick materials.
+  assert.equal(bad.roofing, 'roll', 'the covering must come back exactly as it was asked for');
+
+  // At the minimum, and above it: silent.
+  assert.equal(check('roll', rollMin).warned.length, 0, `roll AT ${rollMin} in 12 is legal`);
+  assert.equal(check('roll', rollMin + 4).warned.length, 0);
+  // Double coverage buys the shallower roof, which is the whole reason it exists.
+  assert.equal(check('rollDouble', dblMin).warned.length, 0, `double coverage AT ${dblMin} in 12 is legal`);
+  assert.equal(check('rollDouble', rollMin - 1).warned.length, 0, 'double coverage is rated where plain roll is not');
+  // A flat roof floors at 1:12 — legal for double coverage, a leak for plain roll.
+  assert.equal(check('rollDouble', 1, 'flat').warned.length, 0);
+  assert.equal(check('roll', 1, 'flat').warned.length, 1, 'plain roll on a flat roof is the case the floor was written for');
+  // Corrugated carries no minimum in doctrine, so nothing is invented for it.
+  assert.equal(check('corrugated', 1, 'flat').warned.length, 0, 'no figure, no check');
+  assert.equal(check('none', 1, 'flat').warned.length, 0);
 });

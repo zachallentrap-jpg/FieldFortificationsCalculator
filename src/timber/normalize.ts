@@ -21,7 +21,7 @@ import type {
 import { SPEC_PATH_DEFS, WALL_ORDER, specPath } from './spec';
 import type { WallId } from './types';
 import { DRESSED } from './types';
-import { SPAN, LUMBER, IN_PER_FT } from './doctrine';
+import { SPAN, LUMBER, ROOFING, IN_PER_FT } from './doctrine';
 import { defaultOpenings } from './openings';
 import { hutDims } from './families/hut';
 
@@ -258,6 +258,42 @@ function normalizeBuilding(spec: BuildingSpec, issues: SpecIssue[]): BuildingSpe
     // double-coverage roll roofing is rated for, and built-up roofing is not modeled.
     const drain = clampPath(roof.drainPer12 ?? 1, 'roof.drainPer12', issues);
     roof = { ...roof, overhangFt: clampPath(roof.overhangFt, 'roof.overhangFt', issues), drainPer12: drain };
+  }
+
+  // ROLL ROOFING HAS A MINIMUM SLOPE, and the toolkit was printing it on every course of roofs
+  // that broke it. `rollMinSlopePer12` (2) and `rollDoubleMinSlopePer12` (1) sat in doctrine used
+  // for nothing but the `doctrineRef` string stamped on each piece — so a 1-in-12 gable under
+  // single-coverage roll came out clean, citing "FM 5-426 exposed-nail roll roofing minimum
+  // slope" on a roof half the slope that rule requires. The rule was stated on the drawing and
+  // enforced nowhere.
+  //
+  // The flat-roof floor two branches up is the same rule read the other way — "floored at 1:12
+  // because that is the minimum double-coverage roll roofing is rated for" — which is only true
+  // if the roofing IS double coverage. Plain roll on a flat roof is a leak.
+  //
+  // WARN, never substitute. This module clamps numbers; it does not choose materials. Handing
+  // back a different roofing than the one asked for would put a covering on the drawing that
+  // nobody selected, and the operator would learn nothing.
+  const rollMin = ROOFING.rollMinSlopePer12.value as number;
+  const rollDoubleMin = ROOFING.rollDoubleMinSlopePer12.value as number;
+  const risePer12 = roof.kind === 'flat' ? (roof.drainPer12 ?? 1)
+    : roof.kind === 'none' ? Infinity
+    : roof.risePer12;
+  const minFor = spec.coverings.roofing === 'roll' ? rollMin
+    : spec.coverings.roofing === 'rollDouble' ? rollDoubleMin
+    : 0;
+  if (minFor > 0 && risePer12 < minFor - 1e-9) {
+    const label = spec.coverings.roofing === 'roll' ? 'Exposed-nail roll roofing' : 'Double-coverage roll roofing';
+    const remedy = spec.coverings.roofing === 'roll'
+      ? ` Double coverage is rated to ${rollDoubleMin} in 12, or raise the pitch.`
+      : ' Raise the pitch — nothing rolled goes lower.';
+    issues.push({
+      path: 'coverings.roofing',
+      kind: 'ls-note',
+      message: `${label} needs ${minFor} in 12 and this roof falls ${risePer12} in 12.`
+        + `${remedy} The tool has NOT changed the covering.`,
+      severity: 'warn',
+    });
   }
 
   let foundation = spec.foundation;

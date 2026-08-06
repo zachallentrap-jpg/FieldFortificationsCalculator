@@ -55,6 +55,8 @@ screenshots get read.
 | **Corrugated banding on a hip** | **Fixed** — the band count was the whole PLANE's taper, so every strip on a hip was cut into the maximum 8 bands: 176 pieces of 26 x 11 in where a gable gave one sheet per strip. |
 | **Corrugated sheet layout** | **Fixed** — sheets were laid 8 ft along the eave x 26 in up the slope (on their side) with their joints butted; they now run their length up the slope and side-lap. |
 | **Hip + roof deck "none" + roofing** | **Partly fixed.** The hip was UNBACKED and is now dropped — real, measured, pinned. But that was NOT what the specks were; see the correction below. |
+| Double-coverage roll roofing (`rollDouble`) | **Checked, clean.** Nothing wrong. Five courses where single coverage lays three — the 50% lap — laid along the eave from the eave up, which is how roll goods go on. |
+| **Roll roofing below its minimum slope** | **Fixed** — the two minimum-slope figures were cited on every course and checked nowhere, so a 1-in-12 roof under single-coverage roll came out clean. |
 | **The hip drop** | **Fixed** — a hip is canted to both slopes it lies under, so a plain stick stood its arrises 0.098 in proud of the roof. Dropped, and the figure is on the cut list. |
 
 ## The shed that had no walls above the plate
@@ -946,3 +948,27 @@ same edge and the previous one starts a lap further back, so anything narrower i
 it); for the first strip, ONE CORRUGATION — the side lap over the corrugations it spans, 3¼ in
 across 1½, which doctrine already carries. You cannot cut and fasten a piece of corrugated narrower
 than a single rib.
+
+## A rule printed on every course and enforced nowhere
+
+`rollDouble` was the target and `rollDouble` is fine: on a 16 × 12 gable it lays five courses where
+single coverage lays three — the 50 per cent lap, exactly — along the eave and from the eave up,
+which is how roll goods go on. Checked, clean.
+
+What it turned up is next to it. `rollMinSlopePer12` (2 in 12) and `rollDoubleMinSlopePer12`
+(1 in 12) sat in doctrine used for **nothing but the `doctrineRef` string stamped on each piece**.
+Measured: a 1-in-12 gable under single-coverage roll produced **zero issues**, while every course of
+it carried the citation *"FM 5-426 exposed-nail roll roofing minimum slope"* — a roof at half the
+slope that rule requires, quoting the rule.
+
+Reachable straight from the panel: every card offers `flat`, every card offers `roll`, and flat
+floors at 1 in 12. Normalize's own comment says why it floors there — *"because that is the minimum
+slope double-coverage roll roofing is rated for"* — which is only true if the roofing IS double
+coverage. The rule was written down in the code that needed it and never asked.
+
+Now warned, at the spec level, naming both figures and the remedy. **WARN, never substitute**: this
+module clamps numbers, it does not choose materials, and handing back a covering nobody selected
+would put a different roof on the drawing than the one the operator asked for. Confirmed in the
+live app, not just in a test — the message reaches the issues panel on a flat roof with plain roll.
+
+Corrugated carries no minimum slope in doctrine, so nothing is invented for it: no figure, no check.
