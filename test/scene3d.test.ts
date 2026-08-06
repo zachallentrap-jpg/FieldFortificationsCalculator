@@ -48,6 +48,25 @@ test('engineered munitions NEVER get a fabricated cover box in 3D (§2.7)', () =
   }
 });
 
+test('the 3D engineered-roof hazard marker\'s footprint matches the 2D section\'s exactly (holeW/holeL + parapetW)', () => {
+  // Neither view fabricates a real structure here (§2.7) so there's no doctrine leaf sizing this
+  // marker, but the two views of the same "needs an engineer" flag must still agree on how big a
+  // banner they draw — the 3D box previously used a flat +1.5 ft/side constant that didn't match
+  // the 2D section's +parapetW (3.0 ft for one_man), leaving the views 1.5 ft apart per side.
+  for (const threat of ['at-rpg', 'at-tank', 'at-he-contact', 'blast-vbied']) {
+    const r = compute(defaultInputs({ positionType: 'one_man', overheadCover: true, threat, sump: false }));
+    const geo = r.geometry as { section: { roofPath: string }; plan: { holeL: number; holeW: number; parapetW: number } };
+    assert.equal(geo.section.roofPath, 'engineered_required', threat + ': fixture must exercise the engineered path');
+    const scene = buildScene3D(r);
+    const hazard = scene.parts.find((p) => p.kind === 'box' && p.role === 'engineeredCover') as { w: number; d: number } | undefined;
+    assert.ok(hazard, threat + ': hazard marker present');
+    const expectedW = geo.plan.holeL + geo.plan.parapetW;
+    const expectedD = geo.plan.holeW + geo.plan.parapetW;
+    assert.ok(Math.abs(hazard!.w - expectedW) < 1e-9, threat + ': 3D hazard width ' + hazard!.w + ' != holeL+parapetW ' + expectedW);
+    assert.ok(Math.abs(hazard!.d - expectedD) < 1e-9, threat + ': 3D hazard depth ' + hazard!.d + ' != holeW+parapetW ' + expectedD + ' (2D section\'s own hazard-block formula)');
+  }
+});
+
 test('3D roof cover\'s front/rear insets exactly match the 2D section\'s own setback and rearOverhang', () => {
   // geo.section.setback (threat-aware, front-only) and geo.section.rearOverhang (structural
   // bearing-shelf only, no threat concern) are the SAME engine-computed values the 2D section
