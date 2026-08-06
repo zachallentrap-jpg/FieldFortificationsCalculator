@@ -440,7 +440,17 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     // greater (ATP 5-238 / FM 5-103, both source-verified). The old flat +1 ft per side was
     // right for a shallow 4-ft cut but far too little for a deep one — the cover would bear on
     // the spoil lip and collapse the model's own load path.
-    const setback = Math.max(1.0, 0.25 * s.depthOfCut);
+    //
+    // Also floored by s.setback — the SAME safety-critical, threat-aware standoff (max of the
+    // selected threat's standoffMin and the depth fraction) that drives the 2D section's "Roof
+    // setback" dimension and the specs panel. Without this floor, this local bearing-shelf
+    // formula silently ignored the threat: for any indirect/blast threat whose standoffMin
+    // exceeds 1.0 ft (ind-mtr-81 through ind-art-155, blast-demo — up to 2.0 ft), the 3D model
+    // drew a SMALLER front gap than the 2D section and specs panel reported for the identical
+    // position — the two views of the same design disagreed on a safety-critical dimension.
+    // For threats with standoffMin ≤ 1.0 ft this is a no-op (s.setback never exceeds the
+    // existing bearing-shelf floor there), so small-arms geometry is unchanged.
+    const setback = Math.max(1.0, 0.25 * s.depthOfCut, s.setback);
     const coverY = s.coverT / 2 + 0.15;
     parts.push({ kind: 'box', x: 0, y: coverY, z: 0, w: p.holeL + 2 * setback, h: s.coverT, d: p.holeW + 2 * setback, role: 'cover', label: 'Roof cover', finish: 'sandbag' });
     const n = Math.max(1, Math.min(s.stringers, 8));

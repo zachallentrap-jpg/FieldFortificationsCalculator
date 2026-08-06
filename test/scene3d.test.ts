@@ -48,6 +48,28 @@ test('engineered munitions NEVER get a fabricated cover box in 3D (§2.7)', () =
   }
 });
 
+test('3D roof cover never sits closer to front than the 2D section\'s own threat-aware setback', () => {
+  // geo.section.setback (max of the selected threat's standoffMin and the depth fraction) is
+  // the SAME safety-critical value the 2D section draws as "Roof setback" and the specs panel
+  // reports — the 3D cover box must never draw a smaller front gap than that for the identical
+  // position/threat, or the two views disagree on a safety-critical dimension.
+  for (const threat of ['sa-556', 'ind-mtr-81', 'ind-art-105', 'ind-art-155', 'blast-demo']) {
+    const r = compute(defaultInputs({ positionType: 'one_man', overheadCover: true, threat, sump: false }));
+    const geo = r.geometry as { section: { setback: number; roofPath: string } };
+    assert.equal(geo.section.roofPath, 'earth_on_stringers', threat + ': fixture must exercise the earth roof path');
+    const scene = buildScene3D(r);
+    const cover = scene.parts.find((p) => p.kind === 'box' && p.role === 'cover') as { w: number; d: number } | undefined;
+    assert.ok(cover, threat + ': cover box present');
+    // The 3D setback is recoverable from the cover box's own footprint: d = holeW + 2*setback3d.
+    const full = r.geometry as { plan: { holeL: number; holeW: number } };
+    const setback3d = (cover!.d - full.plan.holeW) / 2;
+    assert.ok(
+      setback3d >= geo.section.setback - 1e-9,
+      threat + ': 3D setback ' + setback3d.toFixed(3) + ' ft is smaller than the 2D/specs-panel setback ' + geo.section.setback.toFixed(3) + ' ft',
+    );
+  }
+});
+
 test('parapet and cover exist and are never tagged with the revetment\'s finish, regardless of choice', () => {
   for (const revetment of ['none', 'sandbag_facing', 'pickets_wire', 'corrugated_metal', 'timber_plywood']) {
     const r = compute(defaultInputs({ revetment, overheadCover: true }));
