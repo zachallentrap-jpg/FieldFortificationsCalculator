@@ -56,6 +56,7 @@ screenshots get read.
 | **Corrugated sheet layout** | **Fixed** — sheets were laid 8 ft along the eave x 26 in up the slope (on their side) with their joints butted; they now run their length up the slope and side-lap. |
 | **Hip + roof deck "none" + roofing** | **Partly fixed.** The hip was UNBACKED and is now dropped — real, measured, pinned. But that was NOT what the specks were; see the correction below. |
 | Guard tower — the guardrail gap vs. where the ladder arrives | **Checked, correct.** Nothing wrong. The opening is centred exactly on the ladder; the read that said otherwise is below. |
+| **Crib bunker — the earth cover** | **Fixed** — `actual.w`/`actual.d` were swapped against the shared convention, and the 3D viewer carried a private swap to undo it, so the picker card drew the cover 10.92 ft tall on edge instead of a 2-ft blanket. |
 | **Building with `roof.kind: 'none'`** | **Engine clean, panel fixed** — the model builds no roof and advertises no roof stages, but the panel went on offering Roof deck, Roofing and the felt toggle for a roof that does not exist. |
 | Custom card (`custom`) — bare frame, no siding, no roofing | **Checked, clean.** Nothing wrong. Piers on footings, floor frame, framed openings, gable rafters and deck, rake studs stepping up. |
 | **Guard tower — the ladder** | **Fixed** — set plumb inside a BATTERED frame, it crossed the leg plane about 9.6 ft up and ran through two brace diagonals with 8.9 in of overlap. |
@@ -1058,3 +1059,31 @@ Two things the tests had to be told, both mine to get wrong. `configSchemaFor` t
 returns `{ family, groups }`, not an array. And a role pattern loose enough to catch `ridgeCap` also
 catches `capPlate` — which is the plate on top of a WALL and belongs on a roofless building, so the
 roof roles are named explicitly rather than matched.
+
+## Two swaps that cancelled each other, and one renderer that never knew
+
+Every member in the toolkit means the same thing by its section: `actual.d` is the face width —
+local Y, and at rotation [0,0,0] the VERTICAL one — and `actual.w` is the thickness on local Z.
+
+The crib bunker's `soilGhost` had the two the wrong way round, setting `w` to the cover depth and
+`d` to the bunker's width. And `studio.ts` carried a private swap of its own for exactly that role,
+building its box as `(len, w, d)` where every other role in the same function uses `(len, d, w)`.
+The two cancelled, the 3D view was right, and **every other consumer of `actual` was wrong**.
+
+`thumbnails.ts` reads the convention straight, and it has no special case. So the picker card —
+the first thing anyone sees of this family — drew the earth cover **10.92 ft tall and 2 ft deep**
+instead of 2 ft tall and 10.92 deep: a dark monolith standing on edge on the bunker's roof,
+spanning y 3.37 to 14.29 when the structure itself tops out at 7.83. It engulfed the building it
+was supposed to be lying on.
+
+Fixed in the EMITTER, not by teaching the thumbnail painter about the exception — one convention,
+every consumer. The viewer's private swap comes out with it, and because both go at once the 3D
+geometry is byte-identical: `(len, w, d)` on the old numbers and `(len, d, w)` on the new are the
+same box. Only the bunker's solid card moves.
+
+The lesson is the shape of the bug rather than its size. A wrong value and a compensating wrong
+reader look **completely correct** from the one place anyone was looking, and stay wrong everywhere
+else. The tell was that `studio.ts` needed a special case at all: a role that has to be handled
+differently from every other role is usually a role whose data is wrong. The test asserts through
+the shared convention rather than against either renderer, because the bug was precisely that two
+renderers disagreed about what the numbers meant.

@@ -135,3 +135,39 @@ test('the entrance baffle actually blocks the entrance', () => {
     assert.ok(Math.abs(p.position[1] - p.cutLength / 24) < 1e-9, `${p.id} does not reach the ground`);
   }
 });
+
+test('THE EARTH COVER IS A BLANKET, not a slab on edge — one convention, every consumer', () => {
+  // `actual.d` is the face width (local Y, and with rotation [0,0,0] the VERTICAL one) and
+  // `actual.w` is the thickness on local Z. Every member in the toolkit means that. The soil
+  // ghost had the two swapped, and `studio.ts` carried a private swap of its own to undo it — so
+  // the 3D view came out right and every OTHER consumer of `actual` came out wrong.
+  //
+  // `thumbnails.ts` reads the convention straight, so the picker card drew the cover 10.92 ft
+  // tall and 2 ft deep instead of 2 ft tall and 10.92 deep: a monolith standing on edge on the
+  // bunker's roof, engulfing the structure, on the first thing anyone sees of this family.
+  //
+  // Asserted through the SHARED convention rather than against either renderer, because the bug
+  // was precisely that two renderers disagreed about what the numbers meant.
+  const spec = JSON.parse(JSON.stringify(familyById('crib-bunker')!.preset));
+  const depth = spec.designCoverDepthFt as number;
+  assert.ok(depth > 0, 'the preset states a cover depth');
+  const ghost = generateStructure(spec as never).members.find((m) => m.role === 'soilGhost');
+  assert.ok(ghost, 'a stated cover depth draws a cover');
+
+  // World extents under the standard frame: length on local X, `d` on local Y, `w` on local Z.
+  assert.deepEqual(ghost!.rotation, [0, 0, 0], 'the cover lies square to the plan');
+  const tallFt = ghost!.actual.d / 12;
+  const deepFt = ghost!.actual.w / 12;
+  assert.ok(Math.abs(tallFt - depth) < 1e-9,
+    `the cover is drawn ${tallFt.toFixed(2)} ft tall; the stated depth is ${depth} ft`);
+  assert.ok(deepFt > depth,
+    `the cover spans ${deepFt.toFixed(2)} ft across the bunker — a blanket is wider than it is thick`);
+
+  // And it sits ON the structure: its underside at the top of everything else, not through it.
+  const under = ghost!.position[1]! - tallFt / 2;
+  const structureTop = Math.max(...generateStructure(spec as never).members
+    .filter((m) => m.role !== 'soilGhost')
+    .map((m) => m.position[1]!));
+  assert.ok(under >= structureTop - 1.0,
+    `the cover's underside is at ${under.toFixed(2)} but the structure reaches ${structureTop.toFixed(2)} — it is buried in the bunker`);
+});

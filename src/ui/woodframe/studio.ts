@@ -225,8 +225,11 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
       // MASSING, not material. Translucent and unlit so it can never be mistaken for something
       // that was built, and its member card carries the boundary sentence as its doctrine ref.
       p = new THREE.Group();
+      // (len, d, w) — the same mapping every other role in this function uses. It used to read
+      // (len, w, d), a private swap that cancelled a swap in the emitter, so the 3D view was right
+      // and every other consumer of `actual` was wrong. Fixed in the emitter instead.
       p.add(new THREE.Mesh(
-        new THREE.BoxGeometry(Math.max(0.05, m.cutLength / 12), Math.max(0.05, m.actual.w / 12), Math.max(0.05, m.actual.d / 12)),
+        new THREE.BoxGeometry(Math.max(0.05, m.cutLength / 12), Math.max(0.05, m.actual.d / 12), Math.max(0.05, m.actual.w / 12)),
         new THREE.MeshBasicMaterial({ color: 0x8a7a5e, transparent: true, opacity: 0.22, depthWrite: false }),
       ));
       group.add(p);

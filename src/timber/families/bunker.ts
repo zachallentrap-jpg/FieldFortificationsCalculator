@@ -318,7 +318,14 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       position: [outerL / 2, lagY + lagT / 2 + spec.designCoverDepthFt / 2, outerW / 2],
       rotation: [0, 0, 0],
       stage: requireOrdinal(plan, 'soil-ghost'),
-      actual: { w: spec.designCoverDepthFt * IN_PER_FT, d: outerW * IN_PER_FT },
+      // THE SAME CONVENTION AS EVERY OTHER MEMBER: `d` is the face width — local Y, and with
+      // rotation [0,0,0] that is the VERTICAL one — and `w` is the thickness on local Z. These
+      // two were swapped, and the 3D viewer carried a private swap of its own to undo it, so the
+      // pair looked right and nothing else did. `thumbnails.ts` reads the convention straight, so
+      // the picker card drew the earth cover 10.92 ft tall and 2 ft deep instead of 2 ft tall and
+      // 10.92 deep: a monolith standing on edge on the bunker's roof, engulfing the structure,
+      // on the first thing anyone sees of this family.
+      actual: { w: outerW * IN_PER_FT, d: spec.designCoverDepthFt * IN_PER_FT },
       nailing: 'not built — massing only (PH)',
       doctrineRef: COVER_DEPTH_NOTE,
     });
