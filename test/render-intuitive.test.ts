@@ -130,6 +130,31 @@ test('the section draws an unrevetted earth wall sloped per soil, and a revetted
   assert.equal(revettedGeo.section.wallTaper, 0, 'a revetted wall never tapers, regardless of soil');
 });
 
+test('one_man never draws a firing step in 2D, even with the toggle on (modeling spec §2.f)', () => {
+  // compute.ts forces firingStepOn false for one_man regardless of the input toggle (an
+  // armpit-deep hole is dug for standing fire and takes no step — the section/plan drawings
+  // must never teach a feature the doctrine forbids). The 3D view already has a dedicated test
+  // for this (scene3d-stages.test.ts); this locks down the SAME invariant for the 2D views,
+  // which had no direct coverage.
+  const on = compute(defaultInputs({ positionType: 'one_man', firingStep: true }));
+  const off = compute(defaultInputs({ positionType: 'one_man', firingStep: false }));
+  assert.equal((on.geometry as GeometryModel).section.firingStepOn, false, 'firingStepOn forced false even with the toggle on');
+  assert.equal((on.geometry as GeometryModel).plan.platform, null, 'one_man has no structural firing platform');
+
+  const sectionOn = drawSection(on);
+  const sectionOff = drawSection(off);
+  assert.equal(sectionOn, sectionOff, 'the firingStep toggle produces byte-identical section output for one_man');
+  assert.ok(!sectionOn.includes('Step up to shoot'), 'no firing-step callout in the section, toggle on or off');
+
+  const planOn = drawPlan(on);
+  assert.ok(!planOn.includes('Step up to shoot'), 'no firing-step callout in the plan either');
+
+  // Positive control: a position that DOES take a firing-step ledge still shows one, so this
+  // isn't testing a feature that's broken/missing everywhere.
+  const twoMan = compute(defaultInputs({ positionType: 'two_man', firingStep: true }));
+  assert.ok(drawSection(twoMan).includes('Step up to shoot'), 'two_man keeps its firing-step ledge');
+});
+
 test('engineered roof is drawn honestly (hazard block, no fabricated earth cover)', () => {
   const section = drawSection(compute(defaultInputs({ positionType: 'bunker_op_cp', threat: 'at-he-contact' })));
   assert.ok(section.includes('ENGINEERED ROOF — SEE ENGINEER'), 'engineered hazard label');
