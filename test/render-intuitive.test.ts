@@ -214,6 +214,24 @@ test('one_man never draws a firing step in 2D, even with the toggle on (modeling
   assert.ok(drawSection(twoMan).includes('Step up to shoot'), 'two_man keeps its firing-step ledge');
 });
 
+test('positions with no modeled aiming direction (sectorsOfFire: false) never draw a firing step either', () => {
+  // "Step up TO SHOOT" only makes sense for a position that aims over its own front wall in the
+  // first place. mortar_pit fires high-angle indirect (laid by aiming stakes/FDC data, not
+  // sighted over a parapet); the vehicle defilades fire from the vehicle's own sights, not a
+  // dismounted soldier on a dug ledge; bunker_op_cp and connecting_trench have no facing
+  // direction at all (same reason their plan view already omits FRONT/REAR). None of the five
+  // has sectorsOfFire, and none had this checked before — compute.ts's firingStepOn only ever
+  // excluded one_man specifically, for an unrelated (armpit-deep) reason.
+  for (const positionType of ['mortar_pit', 'vehicle_hull_defilade', 'vehicle_turret_defilade', 'bunker_op_cp', 'connecting_trench']) {
+    assert.equal(positions[positionType]?.sectorsOfFire, false, positionType + ': fixture assumption — must have no modeled aiming direction');
+    const r = compute(defaultInputs({ positionType, firingStep: true }));
+    const geo = r.geometry as GeometryModel;
+    assert.equal(geo.section.firingStepOn, false, positionType + ": firingStepOn forced false even with the toggle on");
+    assert.ok(!drawSection(r).includes('Step up to shoot'), positionType + ': no firing-step callout in the section');
+    assert.ok(!drawPlan(r).includes('Step up to shoot'), positionType + ': no firing-step callout in the plan');
+  }
+});
+
 test('engineered roof is drawn honestly (hazard block, no fabricated earth cover)', () => {
   const section = drawSection(compute(defaultInputs({ positionType: 'bunker_op_cp', threat: 'at-he-contact' })));
   assert.ok(section.includes('ENGINEERED ROOF — SEE ENGINEER'), 'engineered hazard label');
