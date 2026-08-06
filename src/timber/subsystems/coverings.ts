@@ -615,14 +615,44 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
   }
 
   // ── Roofing: courses from the eave up, each lapping the one below.
+  //
+  // ROLL GOODS AND CORRUGATED SHEET ARE LAID AT RIGHT ANGLES TO EACH OTHER, and for a long time
+  // this laid both as roll. A 36-in roll unrolls ALONG the eave and you work up the slope in
+  // courses — which is what the loop below does, and for roll it is right. A 26 x 96 in
+  // corrugated sheet does not: its corrugations run along its 8-ft LENGTH and that length runs UP
+  // the slope, so water runs down the channels instead of across them. Laid as courses it came
+  // out 8 ft along the eave by 26 in up the slope — the sheet on its side.
+  //
+  // Measured before this change, on a 48 x 20 gable: every full piece 8.000 ft along the eave by
+  // 26.00 in up the slope, and consecutive pieces in a course at an edge-to-edge offset of
+  // EXACTLY 0. Three things wrong at once. `corrugatedSideLapIn` — the lap between neighbouring
+  // sheets ACROSS the slope — was being spent between courses UP it, where an end lap belongs. A
+  // 7.4-ft slope got four horizontal courses where one sheet reaches eave to ridge. And a butted
+  // joint is a hole: a ray at the shared edge passes between the two pieces, which is why a
+  // raycast into one of the specks on a deckless hip came back holding a ceiling joist.
+  //
+  // The loop already had the right shape — pieces along u, stepping up in v — so what changes is
+  // which figure feeds which axis. Roll keeps exactly what it had and comes out byte-for-byte.
   if (roofing !== 'none') {
     const isRoll = roofing === 'roll' || roofing === 'rollDouble';
     const widthIn = isRoll ? (ROOFING.rollWidthIn.value as number) : (ROOFING.corrugatedWidthIn.value as number);
     const lapIn = isRoll
       ? (roofing === 'rollDouble' ? widthIn / 2 : (ROOFING.rollEndLapIn.value as number))
       : (ROOFING.corrugatedSideLapIn.value as number);
-    const exposureFt = (widthIn - lapIn) / IN_PER_FT;
-    const courseWFt = widthIn / IN_PER_FT;
+    // UP THE SLOPE: how far each piece starts above the last, and how far one piece reaches.
+    // Roll: a 36-in course lapping 6. Corrugated: an 8-ft sheet lapping its end lap.
+    const sheetUpFt = isRoll
+      ? widthIn / IN_PER_FT
+      : (ROOFING.corrugatedLengthFt.value as number);
+    const upExposureFt = isRoll
+      ? (widthIn - lapIn) / IN_PER_FT
+      : sheetUpFt - (ROOFING.corrugatedEndLapIn.value as number) / IN_PER_FT;
+    // ACROSS THE SLOPE: roll runs the whole way in one piece; corrugated is 26-in sheets
+    // side-lapping each other.
+    const sheetAcrossFt = isRoll ? Infinity : widthIn / IN_PER_FT;
+    const acrossExposureFt = isRoll ? Infinity : (widthIn - lapIn) / IN_PER_FT;
+    const exposureFt = upExposureFt;
+    const courseWFt = sheetUpFt;
     const nominal = isRoll
       ? (roofing === 'rollDouble' ? 'roll roofing (double coverage)' : 'roll roofing')
       : `corrugated ${ROOFING.corrugatedWidthIn.value}x${ROOFING.corrugatedLengthFt.value}`;
@@ -671,10 +701,11 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
         const hi = Math.max(a.hi, b.hi);
         const courseRun = hi - lo;
         if (courseRun <= TOLERANCE.epsFt) continue;
-        const sheetLen = isRoll ? courseRun : (ROOFING.corrugatedLengthFt.value as number);
-        const runs = isRoll ? 1 : Math.ceil(courseRun / sheetLen);
+        const sheetLen = isRoll ? courseRun : sheetAcrossFt;
+        const advance = isRoll ? courseRun : acrossExposureFt;
+        const runs = isRoll ? 1 : Math.max(1, Math.ceil((courseRun - (sheetLen - advance)) / advance));
         for (let r = 0; r < runs; r++) {
-          const u0 = lo + r * sheetLen;
+          const u0 = lo + r * advance;
           const u1 = Math.min(u0 + sheetLen, hi);
           // Each course laps the one below it, so consecutive courses share `lapIn` of the
           // slope. Placed at one common lift they were two slabs in the same plane —
@@ -687,10 +718,21 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
           // already under this one, and finally half of this course's own thickness. Leaving
           // that last half out sank each course an eighth of an inch INTO the deck, and the
           // deck striped through — the same class of mistake as the sign above, seen twice.
+          //
+          // AND THE SIDE LAP NEEDS THE SAME TREATMENT, on the other axis. Two coplanar plates
+          // overlapping by 3.25 in z-fight down the whole joint. Stacking monotonically the way
+          // the courses do is not available here: a 50-ft eave is 27 strips, and 27 quarter-inches
+          // is a roof that ramps almost seven inches from one end to the other. So the strips
+          // ALTERNATE — every other sheet laid over its two neighbours — which is bounded at one
+          // thickness, reads as the lap standing proud, and is a real way to lay corrugated even
+          // if shingling them all one way is the commoner one. Roll is one piece per course and
+          // never takes this term.
+          const sideLift = isRoll ? 0 : (r % 2) * coveringThick;
           const p = roofTilePlacement(
             plane,
             { u0, u1, v0: vb0, v1: vb1 },
-            rafterHalfFt + deckThick + paperThick + TOLERANCE.surfaceLiftFt + c * coveringThick + coveringThick / 2,
+            rafterHalfFt + deckThick + paperThick + TOLERANCE.surfaceLiftFt
+              + c * coveringThick + sideLift + coveringThick / 2,
           );
           emit('roofingCourse', nominal, {
             cutLengthFt: u1 - u0,

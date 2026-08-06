@@ -15,7 +15,7 @@ import { wallContract } from '../src/timber/subsystems/wallSystem';
 import { specFromBuildingInput, type BuildingInput } from '../src/timber/frame';
 import type { BuildingSpec, CoveringSpec } from '../src/timber/spec';
 import { DRESSED } from '../src/timber/types';
-import { LUMBER } from '../src/timber/doctrine';
+import { LUMBER, ROOFING } from '../src/timber/doctrine';
 import { rafterSeatLiftFt } from '../src/timber/birdsMouth';
 
 const area = (r: Rect): number => Math.max(0, r.u1 - r.u0) * Math.max(0, r.v1 - r.v0);
@@ -571,5 +571,84 @@ test('ROOFING CLEARS THE DECK THAT IS THERE, whoever laid it', () => {
         `${roofDeck}/${roofing}: the roofing's underside is ${((deckOuter - courseInner) * 12).toFixed(3)} in `
         + `INSIDE the deck — the deck stripes through the roof`);
     }
+  }
+});
+
+// ── Corrugated runs UP the slope, and its sheets lap ─────────────────────────
+
+function roofingPieces(roofing: 'corrugated' | 'roll', kind: 'gable' | 'hip' = 'gable') {
+  const spec = JSON.parse(JSON.stringify(familyById('gp-frame')!.preset));
+  spec.roof = { kind, risePer12: 4, overhangFt: 1 };
+  spec.coverings = { ...spec.coverings, roofDeck: 'plywood', roofing };
+  const model = generateStructure(spec);
+  return { spec, model, pieces: model.members.filter((m) => m.role === 'roofingCourse') };
+}
+
+test('A CORRUGATED SHEET RUNS ITS LENGTH UP THE SLOPE — roll runs along the eave', () => {
+  // The two materials are laid at right angles and this laid both as roll. A 36-in roll unrolls
+  // ALONG the eave and you work up in courses. A 26 x 96 in corrugated sheet does not: its
+  // corrugations run along its 8-ft length and that length runs UP the slope, so the water runs
+  // down the channels. Measured before the fix on a 48 x 20 gable, every full piece was 8.000 ft
+  // along the eave by 26.00 in up the slope — the sheet on its side.
+  const sheetW = ROOFING.corrugatedWidthIn.value as number;
+  const sheetL = ROOFING.corrugatedLengthFt.value as number;
+  const { pieces } = roofingPieces('corrugated');
+  assert.ok(pieces.length > 0, 'no corrugated emitted');
+  for (const m of pieces) {
+    assert.ok(m.cutLength <= sheetW + 1e-6,
+      `${m.id}: ${(m.cutLength / 12).toFixed(3)} ft along the eave — wider than a ${sheetW}-in sheet`);
+    assert.ok(m.actual.d <= sheetL * 12 + 1e-6,
+      `${m.id}: ${(m.actual.d / 12).toFixed(3)} ft up the slope — longer than an ${sheetL}-ft sheet`);
+  }
+  // The give-away, stated the way the bug read: a full sheet is TALLER than it is wide.
+  const full = pieces.filter((m) => Math.abs(m.actual.d - sheetL * 12) < 1e-6);
+  assert.ok(full.length > 0, 'no full-length sheet reaches up the slope');
+  for (const m of full) assert.ok(m.actual.d > m.cutLength, `${m.id}: a sheet on its side`);
+
+  // Roll is untouched: one piece per course, running the whole eave.
+  const roll = roofingPieces('roll');
+  const eave = roll.spec.dims.lengthFt as number;
+  for (const m of roll.pieces) {
+    assert.ok(Math.abs(m.cutLength / 12 - eave) < 1e-6,
+      `${m.id}: roll should run the whole ${eave}-ft eave, got ${(m.cutLength / 12).toFixed(3)}`);
+  }
+});
+
+test('CORRUGATED SHEETS LAP — a butted joint is a hole you can see the joists through', () => {
+  // Consecutive sheets in a course sat at an edge-to-edge offset of exactly 0. A ray at that
+  // shared edge passes BETWEEN the two pieces, which is why a raycast into one of the specks on a
+  // deckless hip came back holding a ceiling joist. Every neighbour must now overlap by the side
+  // lap the doctrine names — 3.25 in, one and a half corrugations.
+  const lap = (ROOFING.corrugatedSideLapIn.value as number) / 12;
+  for (const kind of ['gable', 'hip'] as const) {
+    const { model, pieces } = roofingPieces('corrugated', kind);
+    // One slope, one band: every strip in a band shares its up-slope extent exactly, so that is
+    // the key. A hip's taper splits its runs into bands, which is why this cannot just look for
+    // full 8-ft pieces — on a hip there are none.
+    const W = (model.spec as BuildingSpec).dims.widthFt;
+    const bands = new Map<string, typeof pieces>();
+    for (const m of pieces.filter((x) => x.position[2]! < W / 2)) {
+      // Extent AND position up the slope: two bands in different runs can share a height, and
+      // keying on height alone put them in one row where they read as a 26-in "lap". The 0.2-ft
+      // bucket is far coarser than the quarter-inch the alternating lift nudges z by, and far
+      // finer than the feet between runs.
+      const k = `${m.actual.d.toFixed(6)}|${Math.round(m.position[2]! * 5) / 5}`;
+      if (!bands.has(k)) bands.set(k, []);
+      bands.get(k)!.push(m);
+    }
+    const row = [...bands.values()].sort((a, b) => b.length - a.length)[0]!
+      .slice().sort((a, b) => a.position[0]! - b.position[0]!);
+    assert.ok(row.length > 2, `${kind}: expected a run of sheets across the slope, got ${row.length}`);
+    for (let i = 1; i < row.length; i++) {
+      const prevHi = row[i - 1]!.position[0]! + row[i - 1]!.cutLength / 24;
+      const thisLo = row[i]!.position[0]! - row[i]!.cutLength / 24;
+      assert.ok(thisLo < prevHi - 1e-9,
+        `${kind}: sheets ${i - 1}/${i} sit ${((thisLo - prevHi) * 12).toFixed(3)} in apart — 0 is a butt, and a butt is a hole`);
+      assert.ok(Math.abs(prevHi - thisLo - lap) < 1e-6,
+        `${kind}: lapped ${((prevHi - thisLo) * 12).toFixed(3)} in, doctrine says ${(lap * 12).toFixed(2)}`);
+    }
+    // Lapped plates at one height z-fight, so the strips alternate by exactly one thickness.
+    const lifts = [...new Set(row.map((m) => Math.round(m.position[1]! * 1e6)))];
+    assert.equal(lifts.length, 2, `${kind}: lapping sheets need two heights, found ${lifts.length}`);
   }
 });

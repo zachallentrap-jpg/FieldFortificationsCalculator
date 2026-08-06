@@ -52,6 +52,7 @@ screenshots get read.
 | **Hip roof — the common rafters' pitch** | **Fixed** — rotated to a rise measured from the plate over a run measured from the eave, so every common sat 1.84 in proud of the roof at the eave and 1.84 in below the ridge. The jacks and hips were right; only the commons dissented. |
 | **The ridge cap** | **Fixed** — the cap was laid at DECK level and every course of roofing stacked on top of it, so the 2x8 ridge board showed through the piece whose whole job is to be outermost. |
 | **Gable + roof deck "none" + roofing** | **Fixed** — the frozen gable decks itself whatever the spec says, but the roofing's lift was read off the spec, so "no deck" sank every course into the deck that was there and the plywood striped through the roof. |
+| **Corrugated sheet layout** | **Fixed** — sheets were laid 8 ft along the eave x 26 in up the slope (on their side) with their joints butted; they now run their length up the slope and side-lap. |
 | **Hip + roof deck "none" + roofing** | **Partly fixed.** The hip was UNBACKED and is now dropped — real, measured, pinned. But that was NOT what the specks were; see the correction below. |
 | **The hip drop** | **Fixed** — a hip is canted to both slopes it lies under, so a plain stick stood its arrises 0.098 in proud of the roof. Dropped, and the figure is on the cut list. |
 
@@ -842,35 +843,13 @@ real, measured and worth fixing on its own merits; it simply was not the thing i
 
 ## What is still open
 
-- **Corrugated sheets are laid on their side, and the joints between them are butted.** Next
-  target. Measured on a 48 × 20 gable, every full piece is **8.000 ft along the eave × 26.00 in up
-  the slope**, and consecutive pieces in a course sit at an edge-to-edge offset of **exactly 0** —
-  butted, no lap.
-
-  A corrugated sheet is 26 in wide × 8 ft long with the corrugations running along its LENGTH, and
-  it is laid with that length running UP the slope so the water runs down the channels. The ribs in
-  the render already do run up-slope — `roofingTexture` says so in its own comment and the repeat
-  mapping delivers it, which is worth stating because it was the first thing I suspected and it is
-  not wrong. But the ribs running up-slope across a piece whose length runs along the eave means
-  the ribs cross the sheet's 8-ft dimension: **the sheet is rotated 90 degrees from how it is laid.**
-
-  The consequences are a set, not a detail. `corrugatedSideLapIn` (3.25 in, "1.5 corrugations") is
-  being spent as the lap between COURSES up the slope, where an end lap belongs; the joint it is
-  named for — between neighbouring sheets across the slope — is the one that is butted. A 7.4-ft
-  slope should be ONE sheet from eave to ridge with no horizontal joint at all, and instead gets
-  four horizontal courses. And a butted joint is a hole: a ray at the shared edge passes between
-  the two pieces, which is why a raycast into a speck on a deckless hip comes back holding a
-  CEILING JOIST. With a deck the hole is plugged from behind and nothing shows.
-
-  Laying it right — 26-in strips running up the slope, side-lapping across, end-lapping only where
-  the slope exceeds 8 ft — closes the pinholes, puts the lap on the axis doctrine names it for, and
-  fixes the take-off in one change. It also needs care: the taper clip is written course-wise (clip
-  u by the span at v) and transposes to strip-wise, the hip coverage tests are written against the
-  course layout, and lapped flat plates z-fight unless each lapping piece is lifted, which is what
-  the existing `c * coveringThick` stacking does up the slope and would need an equivalent across.
-  Bounded, but not a one-line change — which is why it is written down here rather than started at
-  the end of a pass.
-
+- **Taper bands butt.** On a HIP, a strip is cut into bands up the slope so a rectangle can stand
+  in for a tapering one, and consecutive bands share an edge exactly: `vb0 = v0 + (v1-v0)*k/bands`.
+  That is the same butted-joint pinhole the sheets had, on the other axis, and it is what the few
+  remaining specks along a hip are. A GABLE has no taper, so `bands` is 1 and it renders with none
+  at all — which is the check that isolates it. Bands are subdivisions of ONE sheet rather than
+  separate sheets, so the fix is not a lap: it is to stop the tiler splitting a piece into abutting
+  rectangles, or to overlap the subdivisions and lift them the way the side lap now is.
 - **`roofDeck: 'skip'` is a dead option.** Skip sheathing — spaced boards under corrugated — is in
   both the spec type and the covering module's input type, and nothing produces or consumes it: no
   card offers it, and no branch builds it. A shared link can still set it (`decodeSpec` validates
@@ -908,3 +887,35 @@ real, measured and worth fixing on its own merits; it simply was not the thing i
   the text is just describing a product this toolkit does not place. Text, not geometry.
 - **The portrait painter's residual errors** — needs a per-pixel depth test, or drawing only the
   outermost skin for a finished building.
+
+## Corrugated, laid the way it is laid
+
+Roll goods and corrugated sheet are laid at right angles to each other, and this laid both as roll.
+A 36-in roll unrolls ALONG the eave and you work up the slope in courses. A 26 x 96 in corrugated
+sheet does not: its corrugations run along its 8-ft LENGTH and that length runs UP the slope, so
+the water runs down the channels instead of across them.
+
+Measured before, on a 48 x 20 gable: every full piece **8.000 ft along the eave x 26.00 in up the
+slope**, consecutive pieces at an edge-to-edge offset of **exactly 0**. Three faults in one:
+
+- `corrugatedSideLapIn` — the lap between neighbouring sheets ACROSS the slope — was spent between
+  courses UP it, where an end lap belongs. There was no end-lap figure at all; there is now, at
+  the roll figure and marked (PH) until the corrugated table is page-checked.
+- A 7.4-ft slope got four horizontal courses where one sheet reaches eave to ridge.
+- A butted joint is a hole. A ray at the shared edge passes between the two pieces, which is why a
+  raycast into one of the specks came back holding a ceiling joist.
+
+The loop already had the right shape — pieces along u, stepping up in v — so what changed is which
+figure feeds which axis. **Roll takes exactly the numbers it had and comes out byte-for-byte.**
+After: every piece 2.167 ft across x 8.000 ft up, every neighbour lapped **-3.25 in** exactly, the
+eave covered 0.000 to 48.000 with no gap.
+
+**The side lap needed the same treatment the courses already had, on the other axis.** Two coplanar
+plates overlapping by 3.25 in z-fight down the whole joint. Stacking monotonically is not available
+across a 50-ft eave — 27 strips of a quarter inch is a roof ramping seven inches end to end — so
+the strips ALTERNATE, every other sheet over its two neighbours. Bounded at one thickness, reads as
+the lap standing proud, and a real way to lay corrugated even if shingling them all one way is
+commoner.
+
+The check that it worked is a deckless gable, where nothing is behind the roofing to plug a hole:
+**no specks at all**, where before there were dozens.

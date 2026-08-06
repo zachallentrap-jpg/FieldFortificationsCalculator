@@ -306,6 +306,11 @@ export const ROOFING = {
   corrugatedLengthFt: doc(8, 'FM 5-426 corrugated metal sheet length', { unit: 'ft' }),
   corrugatedSideLapCorrugations: doc(1.5, 'FM 5-426 corrugated side lap'),
   corrugatedSideLapIn: doc(3.25, 'FM 5-426 corrugated side lap (1.5 corrugations at 2 1/6 in pitch)', { unit: 'in' }),
+  // A sheet runs its 8-ft LENGTH up the slope; the side lap above is between neighbouring sheets
+  // ACROSS it. Where a slope is longer than one sheet the next one laps its lower end, and that
+  // is a different figure — carried at the roll-roofing end lap until the corrugated table is
+  // page-checked, which is what the (PH) says.
+  corrugatedEndLapIn: doc(6, 'FM 5-426 corrugated end lap (PH)', { unit: 'in' }),
   coveringThickIn: doc(0.25, 'roofing course thickness as modeled (roll goods lie flat)', { unit: 'in' }),
   // A cap straddles the joint, so half its width lands on each slope. Roll goods are cut from
   // the same stock; corrugated comes as a formed ridge/hip piece in about the same girth.
