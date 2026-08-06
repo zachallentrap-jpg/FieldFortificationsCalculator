@@ -435,29 +435,30 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
   const earthRoof = s.coverOn && s.roofPath === 'earth_on_stringers';
   const engineeredRoof = s.roofPath === 'engineered_required';
   if (earthRoof && geo.shape !== 'vehicle_ramp') {
-    // Setback (the "dead-man" bearing shelf): the roof's stringers must land on UNDISTURBED
-    // earth back from the hole edge, ≥1 ft (one helmet) OR ¼ of the cut depth, whichever is
-    // greater (ATP 5-238 / FM 5-103, both source-verified). The old flat +1 ft per side was
-    // right for a shallow 4-ft cut but far too little for a deep one — the cover would bear on
-    // the spoil lip and collapse the model's own load path.
-    //
-    // Also floored by s.setback — the SAME safety-critical, threat-aware standoff (max of the
-    // selected threat's standoffMin and the depth fraction) that drives the 2D section's "Roof
-    // setback" dimension and the specs panel. Without this floor, this local bearing-shelf
-    // formula silently ignored the threat: for any indirect/blast threat whose standoffMin
-    // exceeds 1.0 ft (ind-mtr-81 through ind-art-155, blast-demo — up to 2.0 ft), the 3D model
-    // drew a SMALLER front gap than the 2D section and specs panel reported for the identical
-    // position — the two views of the same design disagreed on a safety-critical dimension.
-    // For threats with standoffMin ≤ 1.0 ft this is a no-op (s.setback never exceeds the
-    // existing bearing-shelf floor there), so small-arms geometry is unchanged.
-    const setback = Math.max(1.0, 0.25 * s.depthOfCut, s.setback);
+    // The roof's edges are NOT symmetric — front and rear answer different doctrinal questions:
+    //   FRONT (s.setback, -z): the threat approaches from here, so this edge must clear the
+    //   SAME safety-critical, threat-aware standoff (max of the selected threat's standoffMin
+    //   and the depth fraction) that drives the 2D section's "Roof setback" dimension and the
+    //   specs panel — both now read from the engine's own s.setback rather than a locally
+    //   re-derived, threat-blind copy (the old flat 1.0 ft floor silently ignored the threat).
+    //   REAR (s.rearOverhang, +z): purely a structural "dead-man bearing shelf" (stringers must
+    //   land on undisturbed earth, ≥1 ft OR ¼ of the cut depth, whichever is greater — ATP
+    //   5-238/FM 5-103) — no threat clearance needed since the aperture faces front only. Also
+    //   reused for the LEFT/RIGHT (x/L-axis) overhang, which has the same no-threat bearing-only
+    //   requirement. Both values come from geometry.ts (geo.section) so the 2D section, the 3D
+    //   model, and the specs panel can never drift apart on the same doctrine leaves again.
+    const frontInset = s.setback;
+    const rearInset = s.rearOverhang;
     const coverY = s.coverT / 2 + 0.15;
-    parts.push({ kind: 'box', x: 0, y: coverY, z: 0, w: p.holeL + 2 * setback, h: s.coverT, d: p.holeW + 2 * setback, role: 'cover', label: 'Roof cover', finish: 'sandbag' });
+    const coverZ = (rearInset - frontInset) / 2;
+    const coverD = p.holeW + frontInset + rearInset;
+    const coverW = p.holeL + 2 * rearInset;
+    parts.push({ kind: 'box', x: 0, y: coverY, z: coverZ, w: coverW, h: s.coverT, d: coverD, role: 'cover', label: 'Roof cover', finish: 'sandbag' });
     const n = Math.max(1, Math.min(s.stringers, 8));
     for (let i = 0; i < n; i++) {
       const frac = n === 1 ? 0.5 : i / (n - 1);
-      const sx = -halfL - setback + frac * (p.holeL + 2 * setback);
-      parts.push({ kind: 'box', x: sx, y: coverY - s.coverT / 2 - 0.15, z: 0, w: 0.35, h: 0.3, d: p.holeW + 2 * setback, role: 'stringer' });
+      const sx = -halfL - rearInset + frac * coverW;
+      parts.push({ kind: 'box', x: sx, y: coverY - s.coverT / 2 - 0.15, z: coverZ, w: 0.35, h: 0.3, d: coverD, role: 'stringer' });
     }
   } else if (engineeredRoof && geo.shape !== 'vehicle_ramp') {
     parts.push({ kind: 'box', x: 0, y: 1.4, z: 0, w: p.holeL + 1.5, h: 0.2, d: p.holeW + 1.5, role: 'engineeredCover', label: 'Engineered roof — see engineer' });

@@ -128,8 +128,12 @@ export function drawSection(result: Result): string {
   if (earthRoof) {
     // Cover bears on the parapets and spans the hole, set back from the FRONT edge by the
     // roof setback to leave a firing gap. slabW is always > 0 (no self-cancelling inset).
+    // The REAR edge overhangs by rearOverhang (structural bearing only, no threat clearance
+    // needed) — NOT the full parapet thickness (s.parapetW is the earthen wall's own thickness,
+    // an unrelated doctrine value; reusing it here overstated the roof's rear extent by ~2x-3x
+    // versus the same bearing-shelf math the front edge and the 3D model both already use).
     const slabX1 = px(Math.min(halfBay - 0.25, -halfBay + s.setback), 0)[0];
-    const slabX2 = px(halfBay + s.parapetW, 0)[0];
+    const slabX2 = px(halfBay + s.rearOverhang, 0)[0];
     const slabW = Math.max(6, slabX2 - slabX1);
     const slabBottomY = px(0, -s.parapetH)[1]; // rests on parapet tops
     const slabTopY = px(0, -(s.parapetH + s.coverT))[1];

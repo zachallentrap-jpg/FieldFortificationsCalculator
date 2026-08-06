@@ -9,6 +9,7 @@ import { drawPlan } from '../src/render/drawPlan';
 import { drawSection } from '../src/render/drawSection';
 import { drawIso } from '../src/render/drawIso';
 import { positions } from '../src/doctrine/positions';
+import { overhead } from '../src/doctrine/protection';
 import type { GeometryModel } from '../src/engine/geometry';
 import { defaultInputs } from './helpers';
 
@@ -106,6 +107,25 @@ test('engineered roof is drawn honestly (hazard block, no fabricated earth cover
   assert.ok(section.includes('ENGINEERED ROOF — SEE ENGINEER'), 'engineered hazard label');
   assert.ok(section.includes('url(#pat-engineered)'), 'engineered hazard pattern');
   assert.ok(!section.includes('url(#pat-cover)'), 'no earth-cover slab for an engineered roof');
+});
+
+test('the roof\'s rear overhang is the structural bearing shelf, not the parapet\'s own thickness', () => {
+  // geo.section.rearOverhang = max(bearingEachEnd, setbackDepthFrac * depthOfCut) — a doctrine
+  // leaf about how far stringers must land on undisturbed earth, NOT parapetW (an unrelated
+  // doctrine value: how thick the earthen parapet WALL is). Reusing parapetW here previously
+  // overstated the roof's rear extent by ~2-3x versus the same bearing-shelf math the front
+  // edge and the 3D model both use — this pins rearOverhang to its own formula so a future edit
+  // can't silently swap back to parapetW (drawSection.ts's slabX2) without a test noticing.
+  for (const [standard, threat] of [['hasty', 'sa-556'], ['deliberate', 'sa-556'], ['reinforced', 'sa-556'], ['deliberate', 'ind-art-155']] as const) {
+    const r = compute(defaultInputs({ positionType: 'one_man', overheadCover: true, standard, threat, sump: false }));
+    const geo = r.geometry as GeometryModel;
+    const expected = Math.max(overhead.bearingEachEnd.value, overhead.setbackDepthFrac.value * geo.section.depthOfCut);
+    assert.ok(
+      Math.abs(geo.section.rearOverhang - expected) < 1e-9,
+      standard + '/' + threat + ': rearOverhang ' + geo.section.rearOverhang + ' != bearing-shelf formula ' + expected,
+    );
+    assert.notEqual(geo.section.rearOverhang, geo.section.parapetW, standard + '/' + threat + ': rearOverhang must not equal parapetW');
+  }
 });
 
 test('sectors of fire render for positions that have them, with the enemy arrow', () => {

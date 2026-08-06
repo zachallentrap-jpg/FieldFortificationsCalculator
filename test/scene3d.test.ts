@@ -48,24 +48,33 @@ test('engineered munitions NEVER get a fabricated cover box in 3D (§2.7)', () =
   }
 });
 
-test('3D roof cover never sits closer to front than the 2D section\'s own threat-aware setback', () => {
-  // geo.section.setback (max of the selected threat's standoffMin and the depth fraction) is
-  // the SAME safety-critical value the 2D section draws as "Roof setback" and the specs panel
-  // reports — the 3D cover box must never draw a smaller front gap than that for the identical
-  // position/threat, or the two views disagree on a safety-critical dimension.
+test('3D roof cover\'s front/rear insets exactly match the 2D section\'s own setback and rearOverhang', () => {
+  // geo.section.setback (threat-aware, front-only) and geo.section.rearOverhang (structural
+  // bearing-shelf only, no threat concern) are the SAME engine-computed values the 2D section
+  // draws and the specs panel reports — the 3D cover box is asymmetric (front != rear) and must
+  // recover EXACTLY these two values from its own footprint, or the views disagree on a
+  // safety-critical (front) or structural (rear) dimension.
   for (const threat of ['sa-556', 'ind-mtr-81', 'ind-art-105', 'ind-art-155', 'blast-demo']) {
     const r = compute(defaultInputs({ positionType: 'one_man', overheadCover: true, threat, sump: false }));
-    const geo = r.geometry as { section: { setback: number; roofPath: string } };
+    const geo = r.geometry as { section: { setback: number; rearOverhang: number; roofPath: string }; plan: { holeW: number } };
     assert.equal(geo.section.roofPath, 'earth_on_stringers', threat + ': fixture must exercise the earth roof path');
     const scene = buildScene3D(r);
-    const cover = scene.parts.find((p) => p.kind === 'box' && p.role === 'cover') as { w: number; d: number } | undefined;
+    const cover = scene.parts.find((p) => p.kind === 'box' && p.role === 'cover') as { z: number; d: number } | undefined;
     assert.ok(cover, threat + ': cover box present');
-    // The 3D setback is recoverable from the cover box's own footprint: d = holeW + 2*setback3d.
-    const full = r.geometry as { plan: { holeL: number; holeW: number } };
-    const setback3d = (cover!.d - full.plan.holeW) / 2;
+    // z axis: negative = front (enemy side), positive = rear (file header convention). The box
+    // is centered at z with total depth d, so its two edges recover each inset independently —
+    // no assumption of symmetry, unlike halving the total overhang would require.
+    const frontEdgeZ = cover!.z - cover!.d / 2;
+    const rearEdgeZ = cover!.z + cover!.d / 2;
+    const frontInset3d = -frontEdgeZ - geo.plan.holeW / 2;
+    const rearInset3d = rearEdgeZ - geo.plan.holeW / 2;
     assert.ok(
-      setback3d >= geo.section.setback - 1e-9,
-      threat + ': 3D setback ' + setback3d.toFixed(3) + ' ft is smaller than the 2D/specs-panel setback ' + geo.section.setback.toFixed(3) + ' ft',
+      Math.abs(frontInset3d - geo.section.setback) < 1e-9,
+      threat + ': 3D front inset ' + frontInset3d.toFixed(3) + ' ft != 2D/specs-panel setback ' + geo.section.setback.toFixed(3) + ' ft',
+    );
+    assert.ok(
+      Math.abs(rearInset3d - geo.section.rearOverhang) < 1e-9,
+      threat + ': 3D rear inset ' + rearInset3d.toFixed(3) + ' ft != 2D rearOverhang ' + geo.section.rearOverhang.toFixed(3) + ' ft',
     );
   }
 });

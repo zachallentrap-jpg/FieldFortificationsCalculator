@@ -41,6 +41,7 @@ export interface GeometryModel {
     parapetW: number;
     parapetH: number;
     setback: number;
+    rearOverhang: number;
     coverOn: boolean;
     roofPath: RoofPath;
     coverT: number;
@@ -167,6 +168,12 @@ export function buildGeometry(calc: Calc): GeometryModel {
       parapetW: calc.parapetW,
       parapetH: calc.parapetH,
       setback: calc.setback,
+      // The roof's REAR overhang past the hole edge — a purely structural "dead-man bearing
+      // shelf" requirement (stringers must land on undisturbed earth, ≥ bearingEachEnd OR ¼ of
+      // the cut depth, whichever is greater — ATP 5-238/FM 5-103), NOT the threat-safety
+      // standoff that governs the FRONT (`setback` above): the threat approaches from the
+      // front only, so the rear has no aperture-clearance concern, just a bearing one.
+      rearOverhang: Math.max(overhead.bearingEachEnd.value, overhead.setbackDepthFrac.value * calc.depthOfCut),
       coverOn: calc.coverOn,
       roofPath: calc.roofPath,
       coverT: calc.coverT,
