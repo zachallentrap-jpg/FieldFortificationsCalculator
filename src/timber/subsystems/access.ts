@@ -407,51 +407,73 @@ export function generateStair(input: StairInput): StairResult {
     }
     y += risePerFlight;
     if (f < flightCount - 1) {
-      // The landing spans from the top of this flight to the foot of the next, whichever way
-      // the run turns — so it is drawn from the two path points rather than from a rule that
-      // only happened to be right for a quarter turn.
+      // THE LANDING HAS TO CARRY BOTH FLIGHTS, and it was built on the gap between them.
+      //
+      // `walkPath` turns a switchback in place and steps SIDEWAYS one stair width, so the two
+      // flights stand side by side and the pair is two widths across. The landing was drawn as a
+      // square of ONE width centred between their two centrelines — so on a 24-ft tower each 30-in
+      // tread met it over exactly 15 in, and half the width of every flight stepped off onto air.
+      // It also straddled the plane it should have started at, hanging a foot back over the last
+      // tread of the flight below.
+      //
+      // Measured in the arriving flight's own frame: ACROSS, from the far edge of one flight to
+      // the far edge of the other; ALONG, from wherever the two flights actually meet it, forward
+      // to at least the stair's own width — a landing shorter than the stair is wide is not one
+      // you can turn on.
       const top: [number, number] = [at[0] + dir[0] * sol.runFt, at[1] + dir[1] * sol.runFt];
       const next = path.steps[f + 1]!.at;
-      const cx = (top[0] + next[0]) / 2;
-      const cz = (top[1] + next[1]) / 2;
-      landings.push({ at: [cx, cz], y });
-      const platformNominal = treadNominal;
-      const span = Math.max(widthFt, Math.hypot(next[0] - top[0], next[1] - top[1]));
-      const yawL = Math.abs(next[0] - top[0]) >= Math.abs(next[1] - top[1])
-        ? 0 : Math.PI / 2;
-      emit('deckPlank', platformNominal, {
-        cutLengthFt: span,
-        position: [cx, y - DRESSED[platformNominal]!.w / IN_PER_FT / 2, cz],
-        rotation: [-Math.PI / 2, yawL, 0], // flat, like the treads
-        stage,
-        actual: { w: DRESSED[platformNominal]!.w, d: widthFt * IN_PER_FT },
-        nailing: '2-16d ea bearer (PH)',
-        doctrineRef: citeOf(STAIR.headroomIn),
-      });
+      const nextDir = path.steps[f + 1]!.dir;
+      const acrossN: [number, number] = [-nextDir[1], nextDir[0]];
+      const half = widthFt / 2;
+      const corners: [number, number][] = [
+        [top[0] + across[0] * half, top[1] + across[1] * half],
+        [top[0] - across[0] * half, top[1] - across[1] * half],
+        [next[0] + acrossN[0] * half, next[1] + acrossN[1] * half],
+        [next[0] - acrossN[0] * half, next[1] - acrossN[1] * half],
+      ];
+      const alongOf = (q: [number, number]): number => q[0] * dir[0] + q[1] * dir[1];
+      const acrossOf = (q: [number, number]): number => q[0] * across[0] + q[1] * across[1];
+      const a0 = Math.min(...corners.map(acrossOf));
+      const a1 = Math.max(...corners.map(acrossOf));
+      const l0 = Math.min(...corners.map(alongOf));
+      const l1 = Math.max(l0 + widthFt, Math.max(...corners.map(alongOf)));
+      /** Back to world from the (across, along) components — the basis is orthonormal. */
+      const world = (a: number, l: number): [number, number] => [
+        across[0] * a + dir[0] * l,
+        across[1] * a + dir[1] * l,
+      ];
+      const centre = world((a0 + a1) / 2, (l0 + l1) / 2);
+      landings.push({ at: [centre[0], centre[1]], y });
+      // AND IT IS DECKED IN REAL PLANKS. It used to be one piece of `2x10` with a face width of
+      // 30 in written onto it — a board that does not exist, on a cut list somebody has to fill.
+      const plankNominal = treadNominal;
+      const plankW = DRESSED[plankNominal]!.d / IN_PER_FT;
+      const plankT = DRESSED[plankNominal]!.w / IN_PER_FT;
+      const yawL = Math.atan2(-across[1], across[0]);
+      for (let l = l0; l < l1 - EPS_FT; l += plankW) {
+        const cut = Math.min(plankW, l1 - l);
+        const c = world((a0 + a1) / 2, l + cut / 2);
+        emit('deckPlank', plankNominal, {
+          cutLengthFt: a1 - a0,
+          position: [c[0], y - plankT / 2, c[1]],
+          rotation: [-Math.PI / 2, yawL, 0], // flat, like the treads
+          stage,
+          actual: { w: DRESSED[plankNominal]!.w, d: cut * IN_PER_FT },
+          nailing: '2-16d ea bearer (PH)',
+          doctrineRef: citeOf(STAIR.headroomIn),
+        });
+      }
       // AND THE LANDING IS AN OPEN EDGE TOO — three of them on a switchback, and it had none
       // either. Railed on every side but the ones a flight passes through: you arrive against
       // this flight's direction and leave along the next one's, which on a 180° turn is the same
       // side and on a quarter turn is two different ones.
       if (railRequired(y - baseY)) {
-        const nextDir = path.steps[f + 1]!.dir;
-        // The landing runs from the head of this flight to the foot of the next; when those are
-        // the same point it is square on the stair's own width.
-        const gap = Math.hypot(next[0] - top[0], next[1] - top[1]);
-        const longAxis: [number, number] = gap > EPS_FT
-          ? [(next[0] - top[0]) / gap, (next[1] - top[1]) / gap]
-          : [across[0], across[1]];
-        const shortAxis: [number, number] = [-longAxis[1], longAxis[0]];
-        const hl = span / 2;
-        const hs = widthFt / 2;
-        const corner = (a: number, b: number): [number, number] => [
-          cx + longAxis[0] * a * hl + shortAxis[0] * b * hs,
-          cz + longAxis[1] * a * hl + shortAxis[1] * b * hs,
-        ];
+        const corner = (a: number, l: number): [number, number] => world(a, l);
         const sides: { from: [number, number]; to: [number, number]; out: [number, number] }[] = [
-          { from: corner(-1, -1), to: corner(1, -1), out: [-shortAxis[0], -shortAxis[1]] },
-          { from: corner(1, -1), to: corner(1, 1), out: [longAxis[0], longAxis[1]] },
-          { from: corner(1, 1), to: corner(-1, 1), out: [shortAxis[0], shortAxis[1]] },
-          { from: corner(-1, 1), to: corner(-1, -1), out: [-longAxis[0], -longAxis[1]] },
+          { from: corner(a0, l0), to: corner(a1, l0), out: [-dir[0], -dir[1]] },
+          { from: corner(a1, l0), to: corner(a1, l1), out: [across[0], across[1]] },
+          { from: corner(a1, l1), to: corner(a0, l1), out: [dir[0], dir[1]] },
+          { from: corner(a0, l1), to: corner(a0, l0), out: [-across[0], -across[1]] },
         ];
         const edges: RailEdge[] = [];
         sides.forEach((e, i) => {

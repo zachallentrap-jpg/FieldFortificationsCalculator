@@ -17,6 +17,7 @@ import { familyById } from '../src/timber/catalog';
 import { generateStair } from '../src/timber/subsystems/access';
 import { RAIL, STAIR, IN_PER_FT } from '../src/timber/doctrine';
 import type { Member } from '../src/timber/types';
+import { DRESSED } from '../src/timber/types';
 import type { StructureSpec } from '../src/timber/spec';
 
 type V3 = [number, number, number];
@@ -124,10 +125,12 @@ test('and it stands the doctrine height above the treads, measured plumb', () =>
 
 test('THE LANDINGS ARE RAILED TOO — on every side but the way on and the way off', () => {
   const m = modelOf('tower', { platformHeightFt: 24 });
-  const landings = m.members.filter((x) => x.role === 'deckPlank');
-  assert.equal(landings.length, 2, 'a 24-ft switchback turns twice');
-  for (const l of landings) {
-    const y = l.position[1] + l.actual.w / 24;
+  // Grouped by HEIGHT, not by piece: a landing is decked in planks like any other floor, so the
+  // member count is its area and not the number of turns.
+  const levels = [...new Set(m.members.filter((x) => x.role === 'deckPlank')
+    .map((x) => Math.round((x.position[1] + x.actual.w / 24) * 1e6) / 1e6))];
+  assert.equal(levels.length, 2, 'a 24-ft switchback turns twice');
+  for (const y of levels) {
     const level = m.members.filter((x) => x.role === 'railTop' && !raked(x)
       && Math.abs(x.position[1] - (y + topH)) < 1e-9);
     // A 180° turn puts both flights on the same side of the landing, so exactly one of its four
@@ -168,4 +171,67 @@ test('the railing generator honours a prefix, and defaults to the one it always 
   assert.ok(a.members.some((k) => k.role === 'railTop'), 'a 12-ft climb is railed');
   for (const k of a.members) assert.match(k.id, /^ZZ/, `${k.id} ignored the prefix`);
   void edges;
+});
+
+test('A LANDING CARRIES BOTH FLIGHTS — all of both, not the gap between them', () => {
+  // `walkPath` turns a switchback in place and steps SIDEWAYS one stair width, so the two flights
+  // stand side by side and the pair is two widths across. The landing was a square of ONE width
+  // centred between their two centrelines: measured on the 24-ft tower, each 30-in tread met it
+  // over exactly 15 in, and half the width of every flight stepped off onto air.
+  const m = modelOf('tower', { platformHeightFt: 24 });
+  const deck = m.members.filter((x) => x.role === 'deckPlank');
+  assert.ok(deck.length > 0, 'the switchback has landings at all');
+  const treads = m.members.filter((x) => x.role === 'tread');
+  const plan = (k: Member) => {
+    const h: V3 = [k.cutLength / 24, k.actual.d / 24, k.actual.w / 24];
+    const xs: number[] = [];
+    const zs: number[] = [];
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) {
+      const r = rotate(k, [sx * h[0], sy * h[1], sz * h[2]]);
+      xs.push(k.position[0] + r[0]);
+      zs.push(k.position[2] + r[2]);
+    }
+    return { x: [Math.min(...xs), Math.max(...xs)] as [number, number], z: [Math.min(...zs), Math.max(...zs)] as [number, number] };
+  };
+  const levels = [...new Set(deck.map((x) => Math.round((x.position[1] + x.actual.w / 24) * 1e6) / 1e6))];
+  for (const y of levels) {
+    const planks = deck.filter((x) => Math.abs(x.position[1] + x.actual.w / 24 - y) < 1e-9);
+    const px = planks.map(plan).flatMap((b) => b.x);
+    const pz = planks.map(plan).flatMap((b) => b.z);
+    const lx: [number, number] = [Math.min(...px), Math.max(...px)];
+    const lz: [number, number] = [Math.min(...pz), Math.max(...pz)];
+    // The tread just below the landing is the last step of the flight arriving at it; the tread
+    // just above is the first step of the flight leaving. BOTH must be fully over the landing in
+    // the across direction — the direction the pair of flights is two widths wide in.
+    const below = treads.filter((t) => t.position[1] < y).sort((a, b) => b.position[1] - a.position[1])[0];
+    const above = treads.filter((t) => t.position[1] > y).sort((a, b) => a.position[1] - b.position[1])[0];
+    for (const t of [below, above]) {
+      assert.ok(t, `no flight meets the landing at ${y}`);
+      const b = plan(t!);
+      const wide = b.x[1] - b.x[0] > b.z[1] - b.z[0];
+      const [t0, t1] = wide ? b.x : b.z;
+      const [g0, g1] = wide ? lx : lz;
+      const over = Math.min(t1, g1) - Math.max(t0, g0);
+      assert.ok(Math.abs(over - (t1 - t0)) < 1e-9,
+        `landing at ${y.toFixed(2)} ft: ${t!.id} is ${((t1 - t0) * IN_PER_FT).toFixed(1)} in wide and only `
+        + `${(over * IN_PER_FT).toFixed(1)} in of it is over the landing`);
+    }
+    // And it is deep enough to turn on: a landing shorter than the stair is wide is not one.
+    const deep = Math.min(lx[1] - lx[0], lz[1] - lz[0]);
+    assert.ok(deep >= (treads[0]!.cutLength / IN_PER_FT) - 1e-9,
+      `landing at ${y.toFixed(2)} ft is ${deep.toFixed(2)} ft deep against a ${(treads[0]!.cutLength / IN_PER_FT).toFixed(2)} ft stair width`);
+  }
+});
+
+test('and it is decked in boards that exist', () => {
+  // The landing used to be ONE piece of `2x10` with a face width of 30 in written onto it — a
+  // board nobody can cut, on a list somebody has to fill. It is a floor; it gets floor boards.
+  const m = modelOf('tower', { platformHeightFt: 24 });
+  for (const k of m.members.filter((x) => x.role === 'deckPlank')) {
+    const stock = DRESSED[k.nominal];
+    assert.ok(stock, `${k.id} is a ${k.nominal}, which is not stock`);
+    assert.ok(k.actual.d <= stock!.d + 1e-9,
+      `${k.id} claims a ${k.actual.d.toFixed(2)} in face on a ${k.nominal}, which is ${stock!.d} in`);
+    assert.ok(Math.abs(k.actual.w - stock!.w) < 1e-9, `${k.id} is not ${k.nominal} thick`);
+  }
 });

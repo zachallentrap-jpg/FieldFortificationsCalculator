@@ -1993,3 +1993,37 @@ rails, so it now asserts there are twelve to check first.
 Matching a mid rail to its top rail by plan position alone found a rail 9¾ ft away. A switchback
 stacks its flights over one another, so flight 1 and flight 3 share a plan line *exactly*. Matched
 on height as well.
+
+## The landing built on the gap between the flights
+
+Last pass's railing work left one thing flagged and not checked: whether the switchback landing is
+big enough. It is not, and the number is exact.
+
+`walkPath` turns a switchback in place and steps **sideways one stair width**, so the two flights
+stand side by side and the pair is two widths across. The landing was drawn as a square of ONE
+width centred between their two centrelines:
+
+```
+24-ft tower, 2 ft 6 in flights
+  landing            x[3.000, 5.500]   ← 2 ft 6 in, the gap between the centrelines
+  arriving flight    x[4.250, 6.750]
+  departing flight   x[1.750, 4.250]
+  plan overlap       15.0 in of a 30-in tread, at both landings, both flights — exactly half
+```
+
+So **half the width of every flight stepped off onto air.** The landing also straddled the plane
+it should have started at, hanging a foot back over the last tread of the flight below.
+
+Measured now in the arriving flight's own frame: **across**, from the far edge of one flight to the
+far edge of the other; **along**, from wherever the two flights actually meet it, forward to at
+least the stair's own width — a landing shorter than the stair is wide is not one you can turn on.
+Both flights now meet it over their full 30 in.
+
+**And it is decked in boards that exist.** The landing was ONE piece of `2x10` with a face width of
+30 in written onto it — a board nobody can cut, on a list somebody has to fill. It is a floor, so
+it gets floor boards, the last one ripped.
+
+Four regression tests over the two changes, all failing on the old code, and the geometric one had
+to be re-ordered to say so: it asserted the plank COUNT before the overlap, so on the old model it
+failed with *"2 landing planks"* instead of *"AC-tread-12 is 30.0 in wide and only 15.0 in of it is
+over the landing"* — the right number, reported by the wrong claim.
