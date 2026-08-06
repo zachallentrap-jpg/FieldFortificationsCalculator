@@ -235,13 +235,30 @@ export function generateTower(spec: TowerSpec): TowerResult {
   const accessWidth = TOWER.accessWidthFt.value as number;
   const accessEdgeGap: [number, number] = [spec.cabPlanFt / 2 - accessWidth / 2, spec.cabPlanFt / 2 + accessWidth / 2];
   if (spec.access === 'ladder') {
+    // CLEAR OF THE FRAME AT EVERY HEIGHT, not just at the deck. The clearance used to be measured
+    // off the deck edge alone — right arithmetic, wrong datum. The deck edge is the narrowest
+    // point of a BATTERED frame; the legs rake out to the base, so a plumb ladder set 0.6 ft
+    // inside that sweep crosses the leg plane partway up. Measured on this preset: the ladder
+    // stood at z = 0.90 between legs running z = 0.0 at the ground and z = 1.5 at the deck, and
+    // ran through the brace diagonals with 8.9 in of overlap, crossing at about 9.6 ft.
+    //
+    // Standing it outside the widest point would clear the frame and leave the climber reaching
+    // 2.1 ft across open air at the top. Raking it at the frame's own batter is what a ladder
+    // bolted to a battered face actually does, and it holds the clearance constant: the foot
+    // sits `ladderClearanceFt` outside the leg BASE, and every rung above it keeps that gap.
+    const clearance = TOWER.ladderClearanceFt.value as number;
+    const batter = TOWER.batterPerSideFt.value as number;
+    // `halfAt` is the frame's own batter curve; reading the base off it means the ladder cannot
+    // drift from the legs if the batter ever changes.
+    const legBaseZ = cx - halfAt(spec, 0);
     const { members } = generateLadder({
-      base: [cx, cx - deckHalf - (TOWER.ladderClearanceFt.value as number)],
+      base: [cx, legBaseZ - clearance],
       facing: [0, 1],
       baseY: 0,
       landingY: deckY,
       widthFt: accessWidth,
       stage: sAccess,
+      leanPerFt: deckY > 0 ? batter / deckY : 0,
     });
     emit.members.push(...members);
   } else {

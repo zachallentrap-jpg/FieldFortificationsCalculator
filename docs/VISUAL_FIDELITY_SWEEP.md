@@ -55,6 +55,7 @@ screenshots get read.
 | **Corrugated banding on a hip** | **Fixed** — the band count was the whole PLANE's taper, so every strip on a hip was cut into the maximum 8 bands: 176 pieces of 26 x 11 in where a gable gave one sheet per strip. |
 | **Corrugated sheet layout** | **Fixed** — sheets were laid 8 ft along the eave x 26 in up the slope (on their side) with their joints butted; they now run their length up the slope and side-lap. |
 | **Hip + roof deck "none" + roofing** | **Partly fixed.** The hip was UNBACKED and is now dropped — real, measured, pinned. But that was NOT what the specks were; see the correction below. |
+| **Guard tower — the ladder** | **Fixed** — set plumb inside a BATTERED frame, it crossed the leg plane about 9.6 ft up and ran through two brace diagonals with 8.9 in of overlap. |
 | Double-coverage roll roofing (`rollDouble`) | **Checked, clean.** Nothing wrong. Five courses where single coverage lays three — the 50% lap — laid along the eave from the eave up, which is how roll goods go on. |
 | **Roll roofing below its minimum slope** | **Fixed** — the two minimum-slope figures were cited on every course and checked nowhere, so a 1-in-12 roof under single-coverage roll came out clean. |
 | **The hip drop** | **Fixed** — a hip is canted to both slopes it lies under, so a plain stick stood its arrises 0.098 in proud of the roof. Dropped, and the figure is on the cut list. |
@@ -972,3 +973,34 @@ would put a different roof on the drawing than the one the operator asked for. C
 live app, not just in a test — the message reaches the issues panel on a flat roof with plain roll.
 
 Corrugated carries no minimum slope in doctrine, so nothing is invented for it: no figure, no check.
+
+## A plumb ladder on a battered tower
+
+The tower's deck, stair and cab roof were all checked long ago. Its LADDER was not — and the
+ladder is what the shipped preset actually uses.
+
+`generateLadder` was right in itself: rails 19 ft for a 16-ft climb (the 36-in extension EM 385-1-1
+asks for), sixteen rungs at 12 in, top rung on the landing. What was wrong is where the tower put
+it. `tower.ts` set the foot at `deckHalf + ladderClearanceFt` — the doctrine clearance, measured
+off the DECK EDGE. Right arithmetic, wrong datum: the legs are battered 1.5 ft per side, so the
+frame sweeps from **z = 0.0 at the ground to z = 1.5 at the deck**, and the deck edge is its
+narrowest point. A plumb ladder at z = 0.90 sits between those figures and must cross the leg
+plane — at 0.9/1.5 × 16 ≈ **9.6 ft up**, which is exactly where it ran through the brace diagonals,
+overlapping them by **8.9 in**.
+
+Standing it outside the widest point instead clears the frame and leaves the climber reaching
+2.1 ft across open air at the top, which is not an improvement. **Raking it at the frame's own
+batter is what a ladder bolted to a battered face does**, and it holds the clearance constant:
+0.6 ft at the foot, 0.6 ft at the deck, 0.6 ft at every rung between — measured, and asserted as
+constant rather than merely sufficient.
+
+Two traps worth recording. The first render looked damning and proved nothing: a front elevation is
+orthographic, so a ladder 0.9 ft in front of a brace crosses it on screen whether or not it touches.
+The second was mine — after raking the ladder I re-ran a BOUNDING-BOX clearance check and it
+reported the overlap had got worse, because a box round a leaning member spans its whole lean.
+A raked member has to be sampled at matching heights, and the rungs, sitting on the centreline, are
+the sample points. Same mistake as the sweep made in its very first pass, caught quicker.
+
+The rake also has to be paid for in the rail: 36 in above the landing is a HEIGHT, so a raked rail
+is longer than a plumb one by its own hypotenuse — 19.083 ft, not 19. The wall ladder the two-story
+building uses takes `leanPerFt` 0 by default and comes out exactly as before.

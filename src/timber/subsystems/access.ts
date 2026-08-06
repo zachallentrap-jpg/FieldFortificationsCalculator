@@ -31,6 +31,22 @@ export interface LadderInput {
   landingY: number;
   widthFt: number;
   stage: number;
+  /**
+   * Horizontal run per foot of rise, leaning the ladder BACKWARD along `facing`. Zero — a plumb
+   * ladder — is the default and the only thing a wall needs.
+   *
+   * A BATTERED TOWER NEEDS THE LEAN, and a plumb ladder on one is not a near-miss, it is a
+   * collision. The guard tower's legs rake 1.5 ft per side over a 16-ft climb, so the leg plane
+   * sweeps from z = 0.0 at the ground to z = 1.5 at the deck. A plumb ladder anywhere between
+   * those two figures crosses that plane — measured on the shipped preset, the ladder stood at
+   * z = 0.90 and ran straight through the brace diagonals, overlapping them by 8.9 in and
+   * crossing at about 9.6 ft up. Standing it outside the widest point instead would clear the
+   * frame and land it 2.1 ft short of the deck at the top, which is not an improvement.
+   *
+   * Leaning it at the frame's own rake holds the clearance CONSTANT the whole way up: clear at
+   * the base, clear at the deck, and clear at every rung between.
+   */
+  leanPerFt?: number;
 }
 
 /**
@@ -49,25 +65,39 @@ export function generateLadder(input: LadderInput): { members: Member[]; overCag
   // Across the climber: perpendicular to `facing`, in plan.
   const ax = -facing[1];
   const az = facing[0];
-  const railLen = climb + extension;
-  const midY = baseY + railLen / 2;
+  const lean = input.leanPerFt ?? 0;
+  // A leaning rail is longer than the climb by its own hypotenuse, and the 36 in the rule asks
+  // for is 36 in of HEIGHT above the landing — so the extension is raked by the same factor.
+  const rake = Math.sqrt(1 + lean * lean);
+  const railLen = (climb + extension) * rake;
+  // The lean carries the ladder backward along `facing` as it rises.
+  const topOffset = lean * (climb + extension);
+  const midX = base[0] + (facing[0] * topOffset) / 2;
+  const midZ = base[1] + (facing[1] * topOffset) / 2;
+  const midY = baseY + (climb + extension) / 2;
+  const yaw = Math.atan2(-az, ax);
   for (const side of [-1, 1] as const) {
     emit('ladderRail', railNominal, {
       cutLengthFt: railLen,
-      position: [base[0] + ax * side * (widthFt / 2), midY, base[1] + az * side * (widthFt / 2)],
-      rotation: [0, 0, Math.PI / 2],
+      position: [midX + ax * side * (widthFt / 2), midY, midZ + az * side * (widthFt / 2)],
+      // Plumb keeps the rotation it always had, so a wall ladder comes out byte-for-byte. A
+      // leaning one swings its length onto the rake: `atan2(1, lean)` is the pitch off
+      // horizontal, and the yaw puts that lean along `facing`.
+      rotation: lean === 0
+        ? [0, 0, Math.PI / 2]
+        : [0, Math.atan2(facing[0], -facing[1]) - Math.PI / 2, Math.atan2(1, lean)],
       stage,
       nailing: 'bolted to the frame at every bay (PH)',
       doctrineRef: citeOf(LADDER.topExtensionIn),
     });
   }
-  const yaw = Math.atan2(-az, ax);
   const rungs = Math.max(1, Math.round(climb / spacing));
   for (let i = 1; i <= rungs; i++) {
-    const y = baseY + (climb * i) / rungs;
+    const t = i / rungs;
+    const y = baseY + climb * t;
     emit('ladderRung', rungNominal, {
       cutLengthFt: widthFt,
-      position: [base[0], y, base[1]],
+      position: [base[0] + facing[0] * lean * climb * t, y, base[1] + facing[1] * lean * climb * t],
       rotation: [0, yaw, 0],
       stage,
       nailing: 'let in and 2-16d ea rail (PH)',
