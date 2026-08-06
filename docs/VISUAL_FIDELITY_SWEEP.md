@@ -67,6 +67,7 @@ screenshots get read.
 | **The corrugation pitch on a cut roof** | **Fixed** — the rib scale was rounded to whole texture tiles and floored at one, so every piece narrower than 39 in got twelve corrugations squeezed into it. 48 of 108 pieces on a pyramid, 98 of 304 on a hip, 4 of 104 on a gable. |
 | Guard tower cab pyramid — wood showing through the roofing | **Checked, nothing wrong.** The warm band along one hip was my own harness's HOVER tint. See the note below. |
 | **The roof a share link hands in** | **Fixed** — three ways a pasted link broke the workbench: a shed with no `highSide` and a spec with no `roof` both THREW, leaving "Laying out the frame…" spinning forever with no canvas; an unknown roof kind framed a building with no roof and said nothing. |
+| **Every other section a share link hands in** | **Fixed** — deleting each top-level key of the shipped preset in turn: SIX of the eight threw. `family`, `dims`, `spacing`, `coverings`, `stories` and `foundation` all produced the same dead spinner. An unknown foundation kind silently poured piers. |
 
 ## The shed that had no walls above the plate
 
@@ -1265,3 +1266,64 @@ them by throwing.
 Unchecked, and the obvious next question: `foundation` is the other discriminated union on a
 building spec, with per-kind fields of its own (`crawlFt`, `depthFt`, `stairs`). Nothing here has
 looked at what a link does to it.
+
+> **Answered in the next pass, and it was much bigger than the foundation.** See below.
+
+## Six of eight
+
+The previous pass fixed the roof a share link hands in, and wrote down its own lesson: *"that fix
+was written for one value rather than for the set."* So this one started with the set. Delete each
+top-level key of the shipped GP-frame preset, one at a time, and generate:
+
+| key | before |
+|---|---|
+| `family` | **threw** — `Cannot destructure property 'spec' of 'normalizeSpec(...)'`: the switch had no default case and returned `undefined` |
+| `dims` | **threw** on `.lengthFt` |
+| `spacing` | **threw** on `.joistSpacingIn` |
+| `coverings` | **threw** on `.roofing` |
+| `stories` | **threw** on `.length` |
+| `roof` | fine — fixed last pass |
+| `foundation` | **threw** on `.kind` |
+| `bridging` | fine — genuinely optional |
+
+Six of eight. Every one of them the same dead page: the workbench chrome renders in full and the
+viewport sits on "Laying out the frame…" with no canvas, no members and nothing said. Rendered and
+confirmed before touching anything.
+
+And one silence to go with them: `generateBuilding` falls through its foundation switch to piers,
+so `{kind:'raft'}` came out **byte-identical to a pier foundation** — 42 members, zero issues. The
+user asked for one thing and got another with no way to tell.
+
+Everything else in `normalize.ts` repairs a FIELD. This repairs a missing SECTION, which is a
+different failure: `clampPath` on `undefined.crawlFt` never runs, because the generator reached the
+`undefined` first. `repairSections` fills any section that did not arrive, and reports **one**
+summary issue naming what was missing rather than one line per section — a link carrying nothing
+but `{family:'building'}` would otherwise bury its own headline.
+
+### The sections are not the same set for every family
+
+The first cut applied the building's six to everything, and an existing test caught it
+immediately: `sea-hut: a preset that needs clamping is a preset with a wrong number in it`. A
+`HutSpec` has **no `stories` key at all** — it carries `wallHeightFt` and derives the rest from its
+variant, and its `roof` and `foundation` are optional. So the shipped sea-hut card was being
+"repaired". A guard that fires on good input is a bug with a warning attached.
+
+Split accordingly: `SPEC_SECTIONS_COMMON` (the three every family extends `SpecCommon` for) is
+repaired for all of them, and the three only a `BuildingSpec` declares are repaired only for a
+building. Zero of the fourteen shipped cards trip any repair, and there is now a test that says so
+by walking the whole catalog rather than a hand-picked list.
+
+### Where the fallback lives, and why it cannot drift
+
+`normalize.ts` cannot import the catalog — catalog → families/hut → families/building → normalize
+is already a chain and importing back would close it into a cycle. So the fallback values are
+stated in `spec.ts`, beside the shapes they fill. That is a second set of numbers, which is exactly
+the hazard this codebase keeps finding, so it is pinned the only way that cannot drift: a test
+assembles a spec from `SPEC_SECTION_FALLBACK` alone and asserts it normalizes with **zero** issues.
+If any value ever falls outside the bounds `SPEC_PATH_DEFS` declares, that test fails.
+
+Five of the new cases fail on the old normalize, four of them by throwing.
+
+Still uncovered, and recorded rather than half-done: the per-family fields beyond `SpecCommon` — a
+tower's `platformHeightFt` and `cabPlanFt`, a bunker's cover depth, a platform's ramp. Same door,
+same shape, not yet probed.

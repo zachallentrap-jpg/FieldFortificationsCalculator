@@ -219,6 +219,47 @@ export interface SpecPathDef {
   cite?: string;
 }
 
+/**
+ * A well-formed value for every SECTION a building-shaped spec must have.
+ *
+ * Used for one thing only: repairing a spec that arrived without one. A share link is any JSON
+ * with a `family` key (see `decodeSpec`), so a spec can reach the generator missing a whole
+ * structural section, and a generator handed `undefined` where `dims` should be does not warn —
+ * it throws, and a thrown generator is a workbench that renders its chrome and then sits on
+ * "Laying out the frame…" forever with no canvas and nothing said.
+ *
+ * These are not a second catalog. They are the smallest description of a building this tool can
+ * draw: one 8-ft story with no openings, a gable, piers. The numbers sit inside the bounds
+ * declared below, and `timber2-shared-link` proves it the only way that cannot drift — by
+ * normalizing a spec built from them and asserting it raises no issues at all.
+ *
+ * It lives here rather than in `normalize.ts` because `normalize.ts` cannot reach the catalog:
+ * catalog → families/hut → families/building → normalize is already a chain, and importing back
+ * would close it into a cycle.
+ */
+export const SPEC_SECTION_FALLBACK = {
+  dims: { lengthFt: 24, widthFt: 16 } as Dims,
+  spacing: { studSpacingIn: 16, joistSpacingIn: 16, rafterSpacingIn: 16 } as SpacingSpec,
+  coverings: { wallSheathing: 'none', siding: 'plywood', roofDeck: 'plywood', roofing: 'roll' } as CoveringSpec,
+  stories: [{ wallHeightFt: 8, openings: {} }] as StorySpec[],
+  roof: { kind: 'gable', risePer12: 4, overhangFt: 1 } as RoofSpec,
+  foundation: { kind: 'piers', crawlFt: 1.5 } as FoundationSpec,
+} as const;
+
+/**
+ * Which sections a spec must actually have, by family — and they are NOT the same set.
+ *
+ * `SpecCommon` is the three every family extends. A `BuildingSpec` adds three more. A `HutSpec`
+ * adds none of them: it carries `wallHeightFt` and optional `roof`/`foundation`, and the hut
+ * generator derives the rest from its variant — which is why the shipped sea-hut preset has no
+ * `stories` key at all and is perfectly correct. Requiring the building's list of every family
+ * would "repair" a shipped card, which is a bug with a warning attached.
+ */
+export const SPEC_SECTIONS_COMMON = ['dims', 'spacing', 'coverings'] as const;
+export const SPEC_SECTIONS_BUILDING = [...SPEC_SECTIONS_COMMON, 'stories', 'roof', 'foundation'] as const;
+export const SPEC_SECTIONS = SPEC_SECTIONS_BUILDING;
+export type SpecSection = typeof SPEC_SECTIONS_BUILDING[number];
+
 export const SPEC_PATH_DEFS: readonly SpecPathDef[] = [
   { path: 'dims.lengthFt', label: 'Length', min: 4, max: 60, step: 0.5, cite: '4–60 ft — what this generator will lay out' },
   { path: 'dims.widthFt', label: 'Width', min: 4, max: 24, step: 0.5, cite: '4–24 ft — a wider span needs a second girder line, which is not built yet' },

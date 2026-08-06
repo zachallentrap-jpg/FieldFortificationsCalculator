@@ -16,9 +16,9 @@
 // issue the workbench renders. Silent correction is how a tool teaches the wrong number.
 
 import type {
-  BuildingSpec, HutSpec, OpeningSpec, StructureSpec, WallOpenings,
+  BuildingSpec, HutSpec, OpeningSpec, StructureSpec, StructureFamily, SpecSection, WallOpenings,
 } from './spec';
-import { SPEC_PATH_DEFS, WALL_ORDER, specPath } from './spec';
+import { SPEC_PATH_DEFS, SPEC_SECTION_FALLBACK, SPEC_SECTIONS_BUILDING, SPEC_SECTIONS_COMMON, WALL_ORDER, specPath } from './spec';
 import type { WallId } from './types';
 import { DRESSED } from './types';
 import { SPAN, LUMBER, ROOFING, IN_PER_FT } from './doctrine';
@@ -347,6 +347,21 @@ function normalizeBuilding(spec: BuildingSpec, issues: SpecIssue[]): BuildingSpe
   }
 
   let foundation = spec.foundation;
+  // WHAT IT STANDS ON, when the link named something this tool does not pour. `generateBuilding`
+  // falls through its foundation switch to piers, so an unrecognised kind came out as a perfectly
+  // ordinary pier foundation — 42 members, byte-identical to `{kind:'piers'}` — and said nothing.
+  // The user asked for one thing and got another with no way to tell. Piers is still the answer;
+  // the difference is that it is now an answer rather than an accident.
+  const FOUNDATION_KINDS = new Set(['piers', 'wall', 'basement', 'slab', 'skids', 'embedded']);
+  if (!FOUNDATION_KINDS.has(foundation?.kind)) {
+    issues.push({
+      path: 'foundation.kind',
+      kind: 'clamped',
+      message: `"${String(foundation?.kind)}" is not a foundation this tool builds — stood it on piers. It knows piers, a continuous wall, a basement, a slab, skids and embedded posts.`,
+      severity: 'warn',
+    });
+    foundation = structuredClone(SPEC_SECTION_FALLBACK.foundation);
+  }
   if (foundation.kind === 'piers' || foundation.kind === 'wall') {
     foundation = { ...foundation, crawlFt: clampPath(foundation.crawlFt, 'foundation.crawlFt', issues) };
   } else if (foundation.kind === 'basement') {
@@ -407,11 +422,99 @@ function normalizeHut(spec: HutSpec, issues: SpecIssue[]): HutSpec {
 }
 
 /**
+ * A section-shaped label for each thing a building-shaped spec must carry, for the message.
+ */
+const SECTION_NAMES: Record<SpecSection, string> = {
+  dims: 'how big the building is',
+  spacing: 'what the framing is spaced at',
+  coverings: 'what it is closed in with',
+  stories: 'its walls',
+  roof: 'its roof',
+  foundation: 'what it stands on',
+};
+
+/**
+ * FILL IN WHOLE SECTIONS THAT NEVER ARRIVED.
+ *
+ * Everything else in this file repairs a FIELD — a number out of bounds, an opening past the end
+ * of its wall. This repairs a spec that is missing a whole structural section, which is a
+ * different failure and a much worse one: `clampPath` on `undefined.crawlFt` never runs, because
+ * the generator reached `undefined` first and threw.
+ *
+ * That matters because `decodeSpec` accepts any JSON with a `family` key, so this is reachable by
+ * pasting a URL. Measured on the shipped preset, deleting each top-level key one at a time: SIX
+ * of the eight threw — `family`, `dims`, `spacing`, `coverings`, `stories` and `foundation`. Only
+ * `roof` survived, and only because the previous pass had just fixed it, one field at a time. The
+ * lesson from that pass was that a fix written for one value leaves the set; this is the set.
+ *
+ * A thrown generator is the worst outcome available here. The workbench shell renders — title
+ * bar, Copy link, Command packet, the whole menu row — and the viewport shows a spinner reading
+ * "Laying out the frame…" that never stops. No canvas, no members, no error. It does not look
+ * broken; it looks slow.
+ */
+function repairSections(spec: StructureSpec, issues: SpecIssue[], sections: readonly SpecSection[]): StructureSpec {
+  const s = spec as unknown as Record<string, unknown>;
+  const out: Record<string, unknown> = { ...s };
+  const missing: SpecSection[] = [];
+  for (const key of sections) {
+    const v = s[key];
+    const ok = key === 'stories'
+      ? Array.isArray(v) && v.length > 0 && typeof v[0] === 'object' && v[0] !== null
+      : typeof v === 'object' && v !== null && !Array.isArray(v);
+    if (ok) continue;
+    missing.push(key);
+    out[key] = structuredClone(SPEC_SECTION_FALLBACK[key]);
+  }
+  if (missing.length > 0) {
+    // ONE issue, not six. A link that arrived with nothing but a `family` key would otherwise
+    // bury its own headline under a stack of identical lines.
+    const named = missing.map((k) => SECTION_NAMES[k]).join(', ');
+    issues.push({
+      path: missing.length === 1 ? missing[0]! : 'spec',
+      kind: 'clamped',
+      message: `This build did not say ${named} — filled in with the standard values so there is something to look at. Check ${missing.length === 1 ? 'it' : 'them'} before building from this.`,
+      severity: 'warn',
+    });
+  }
+  return out as unknown as StructureSpec;
+}
+
+/**
  * Clamp and report. Never reorders (TD5). Idempotent: normalizing a normalized spec produces
  * the same spec and no new issues — asserted in `timber2-spec`.
  */
 export function normalizeSpec(spec: StructureSpec): NormalizeResult {
   const issues: SpecIssue[] = [];
+  // A spec that is not an object at all cannot name a family, and a family this tool does not
+  // build fell off the end of the switch and returned `undefined` — which the caller destructures.
+  const family = (spec as { family?: unknown } | null | undefined)?.family;
+  const KNOWN: readonly StructureFamily[] = ['building', 'hut', 'tower', 'bunker', 'tentFrame', 'platform'];
+  if (!KNOWN.includes(family as StructureFamily)) {
+    issues.push({
+      path: 'family',
+      kind: 'clamped',
+      message: family === undefined || family === null
+        ? 'This build did not say what kind of structure it is — read as a framed building.'
+        : `"${String(family)}" is not a structure this tool builds — read as a framed building.`,
+      severity: 'warn',
+    });
+    const base = (spec && typeof spec === 'object' ? spec : {}) as unknown as Record<string, unknown>;
+    return normalizeSpec2({ ...base, family: 'building' } as unknown as StructureSpec, issues);
+  }
+  return normalizeSpec2(spec, issues);
+}
+
+function normalizeSpec2(raw: StructureSpec, issues: SpecIssue[]): NormalizeResult {
+  // Every family extends `SpecCommon`, so dims/spacing/coverings are repaired for all of them.
+  // The three that only a BuildingSpec declares are repaired only for a building: a hut carries
+  // none of them by design and the hut generator derives them from its variant, so demanding
+  // them there would "repair" the shipped sea-hut card. Per-family fields beyond these — a
+  // tower's `cabPlanFt`, a bunker's cover depth — are NOT covered here; recorded, not half-done.
+  const spec = repairSections(
+    raw,
+    issues,
+    raw.family === 'building' ? SPEC_SECTIONS_BUILDING : SPEC_SECTIONS_COMMON,
+  );
   switch (spec.family) {
     case 'building':
       return { spec: normalizeBuilding(spec, issues), issues };
