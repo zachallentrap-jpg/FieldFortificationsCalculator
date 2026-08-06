@@ -34,7 +34,11 @@ export function drawPlan(result: Result): string {
   // with sectorsOfFire false — mortar/vehicle are excluded by shape/isVehicle above) has no
   // "enemy side" to face and stays open-ended in 3D too (scene3d.ts's closedRear); the ring,
   // ENEMY arrow, and FRONT/REAR framing all assume a facing direction that doesn't apply here.
-  const isOpenCorridor = !p.sectors.present && geo.shape !== 'circular' && !isVehicle;
+  // bunker_op_cp is ALSO sectorsOfFire: false (the app doesn't model a numeric sector angle for
+  // an OP/bunker) but it very much has a front/rear and a real parapet — unlike connecting_trench
+  // it is NOT a through-corridor, so its own distinct shape (rect_roofed, not rect) is excluded
+  // here too, restoring the exclusivity this comment already claims.
+  const isOpenCorridor = !p.sectors.present && geo.shape !== 'circular' && geo.shape !== 'rect_roofed' && !isVehicle;
   const halfL = p.outerL / 2;
   const halfW = p.outerW / 2;
   const enemyMargin = Math.max(3, halfW * 0.7);

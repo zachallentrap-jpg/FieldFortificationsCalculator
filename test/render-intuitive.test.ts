@@ -295,6 +295,27 @@ test('sectors of fire render for positions that have them, with the enemy arrow'
   assert.ok(sawSectors, 'at least one position renders sectors of fire');
 });
 
+test('bunker_op_cp gets a real parapet ring, ENEMY arrow, and FRONT/REAR labels — it is not a through-corridor', () => {
+  // isOpenCorridor's own comment claims connecting_trench is the ONLY rect-family position with
+  // sectorsOfFire: false (mortar_pit/vehicles are excluded by shape already) — but bunker_op_cp
+  // is ALSO sectorsOfFire: false (the app doesn't model a numeric sector angle for an OP/bunker),
+  // and its shape id wasn't excluded, so it silently got the same "no facing direction" treatment
+  // as connecting_trench: no parapet ring drawn in plan, no ENEMY arrow, no FRONT/REAR labels —
+  // even though a bunker/OP-CP plainly has a front and its own real sandbag walls, unlike a
+  // through-route trench with nothing to face.
+  const bunker = compute(defaultInputs({ positionType: 'bunker_op_cp' }));
+  const plan = drawPlan(bunker);
+  assert.ok(plan.includes('>ENEMY<'), 'bunker_op_cp gets the enemy-direction arrow');
+  assert.ok(plan.includes('>FRONT<') && plan.includes('>REAR<'), 'bunker_op_cp gets FRONT/REAR labels');
+  assert.ok(plan.includes('aria-label="Dirt wall up front (parapet)"'), 'bunker_op_cp draws its own parapet ring');
+
+  // Positive control: connecting_trench is the genuine through-corridor and must still get NONE
+  // of these — this fix must not have accidentally widened the exclusion the other direction.
+  const trench = drawPlan(compute(defaultInputs({ positionType: 'connecting_trench' })));
+  assert.ok(!trench.includes('>ENEMY<'), 'connecting_trench still has no facing direction');
+  assert.ok(!trench.includes('>FRONT<'), 'connecting_trench still has no FRONT/REAR labels');
+});
+
 test('elbow rests render for positions that define them, at the front lip not the rear', () => {
   const oneMan = compute(defaultInputs({ positionType: 'one_man' }));
   const oneManGeo = oneMan.geometry as GeometryModel;
