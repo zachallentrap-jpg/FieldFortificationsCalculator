@@ -126,10 +126,18 @@ export function drawSection(result: Result): string {
   }
 
   // ── Grenade sump notch at the bay floor ────────────────────────────────────────
+  // REAR of the bay (positive x here), matching the plan's own sump marks (sumpMarks in
+  // geometry.ts places them at "near the rear wall", yFt > 0) and the 3D model (scene3d.ts
+  // reads sump.yFt straight through). This used to sit at the FRONT (-halfBay * 0.85) —
+  // directly under the firing step/platform, which are correctly front-sited — so on a narrow
+  // position (two_man's 2 ft front-to-back) the sump notch visually collided with the firing
+  // step in the very same picture, and every position's section silently drew the sump on the
+  // opposite wall from where its own plan view and 3D model put it.
+  const sumpWFt = Math.min(0.9, s.holeW * 0.22);
   if (s.sump) {
-    const sW = proj.lenPx(Math.min(0.9, s.holeW * 0.22));
+    const sW = proj.lenPx(sumpWFt);
     const sH = proj.lenPx(0.7);
-    const sTL = px(-halfBay * 0.85, s.depthOfCut);
+    const sTL = px(halfBay * 0.85 - sumpWFt, s.depthOfCut);
     parts.push(el('rect', { x: sTL[0], y: sTL[1], width: sW, height: sH, fill: 'var(--draw-timber)', stroke: 'var(--draw-outline)', 'stroke-width': 1 }));
     used.add('sump');
     parts.push(callout('sump', sTL[0] + sW + 9, sTL[1] + 7, used));

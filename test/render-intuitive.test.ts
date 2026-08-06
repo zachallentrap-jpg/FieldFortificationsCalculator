@@ -102,6 +102,39 @@ test('section carries header, standing figure + scale, single-accent dims, cover
   assertNoDimCollision(section, 'section');
 });
 
+test('the section\'s grenade sump sits at the REAR, matching the plan\'s own sump marks and the 3D model', () => {
+  // geometry.ts's sumpMarks() places every sump "near the rear wall" (yFt > 0), and scene3d.ts
+  // reads that same yFt straight through for the 3D sump box — but drawSection.ts's sump notch
+  // used to be anchored at -halfBay*0.85 (the FRONT), directly under the front-sited firing
+  // step/platform. On a narrow position that put the sump notch visually on top of the firing
+  // step in the very same picture (two_man's 2 ft front-to-back caught it); on every position it
+  // silently drew the sump on the opposite wall from its own plan view and 3D model.
+  for (const positionType of ['one_man', 'two_man', 'mg_crew']) {
+    const r = compute(defaultInputs({ positionType, sump: true, firingStep: true, overheadCover: false }));
+    const geo = r.geometry as GeometryModel;
+    for (const s of geo.plan.sumps) assert.ok(s.yFt > 0, positionType + ": plan's own sump marks sit at the rear (yFt > 0)");
+
+    const section = drawSection(r);
+    // Positions with a structural firing PLATFORM (mg_crew) also draw a draw-timber rect for
+    // it, before the sump — so match by proximity to the sump's own callout label, not just
+    // "the first draw-timber rect", or a platform-carrying position would grab the wrong one.
+    const sumpLabelIdx = section.indexOf('aria-label="Grenade catch-pit (sump)"');
+    assert.ok(sumpLabelIdx > 0, positionType + ': sump callout label present');
+    const rectRe = /<rect x="([\d.]+)"[^>]*fill="var\(--draw-timber\)"/g;
+    let sumpMatch: RegExpExecArray | null = null;
+    for (let m = rectRe.exec(section); m; m = rectRe.exec(section)) {
+      if (m.index < sumpLabelIdx) sumpMatch = m;
+    }
+    assert.ok(sumpMatch, positionType + ': sump notch drawn');
+    const bayMatch = section.match(/<polygon points="([\d.,\- ]+)" fill="var\(--draw-bay\)"/);
+    assert.ok(bayMatch, positionType + ': bay polygon present');
+    const bayXs = bayMatch![1]!.split(' ').map((pt) => Number(pt.split(',')[0]));
+    const bayCenterX = (Math.min(...bayXs) + Math.max(...bayXs)) / 2;
+    const sumpX = Number(sumpMatch![1]);
+    assert.ok(sumpX > bayCenterX, positionType + ": sump notch sits right of the bay's own center (rear, since FRONT is drawn on the left)");
+  }
+});
+
 test('the section draws an unrevetted earth wall sloped per soil, and a revetted wall perfectly plumb', () => {
   // Doctrine (soils.<id>.wallSlopeRatio) says an unrevetted wall in loose soil battens outward —
   // the 3D model has drawn this for a while (scene3d.ts's pushBayBox), but the 2D section always
