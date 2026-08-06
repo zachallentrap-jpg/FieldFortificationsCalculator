@@ -52,6 +52,7 @@ screenshots get read.
 | **Hip roof — the common rafters' pitch** | **Fixed** — rotated to a rise measured from the plate over a run measured from the eave, so every common sat 1.84 in proud of the roof at the eave and 1.84 in below the ridge. The jacks and hips were right; only the commons dissented. |
 | **The ridge cap** | **Fixed** — the cap was laid at DECK level and every course of roofing stacked on top of it, so the 2x8 ridge board showed through the piece whose whole job is to be outermost. |
 | **Gable + roof deck "none" + roofing** | **Fixed** — the frozen gable decks itself whatever the spec says, but the roofing's lift was read off the spec, so "no deck" sank every course into the deck that was there and the plywood striped through the roof. |
+| **Hip + roof deck "none" + roofing** | **Checked; diagnosed, not fixed.** The roof is right. What shows is an UNBACKED HIP: measured below. |
 
 ## The shed that had no walls above the plate
 
@@ -788,6 +789,38 @@ The author knew the flag mattered in one place and missed it in the other.
 
 The fix is a `Math.max`, so it can only ever ADD lift — every case that was already right is
 untouched, and no golden moved.
+
+## The hip that was never backed
+
+A hip with **roof deck "none"** and corrugated roofing — both offered on the gp-frame card — comes
+out sprinkled with tiny tan specks along the hip creases, seen from overhead. The same building with
+roof deck "plywood", same build and same camera, is clean grey. So the difference is real and it is
+the deck.
+
+It is NOT a hole in the roofing, and it is not the roofing sitting too low. Measured perpendicular
+to the roof plane, on a 16 × 12 4-in-12 hip:
+
+| | above the roof plane |
+|---|---|
+| common rafter / jack, highest corner | 2.750 in — flush, the piece is centred on the plane |
+| **hip rafter, highest corner** | **2.848 in** |
+| roofing underside, plywood deck | 3.370 in — clears the hip by 0.522 in |
+| roofing underside, **no deck** | 2.870 in — clears the hip by **0.022 in** |
+
+A hip rafter is modelled as a plain rectangular stick lying under the fold between two slopes, so
+its top ARRISES stand 0.098 in proud of both of them. Real framing deals with this by BACKING the
+hip — beveling its top edge to the two planes — or by DROPPING it, setting it that much lower so the
+sheathing lies flat across it. Neither is modelled. With a deck the half inch of plywood buries the
+error; without one the roofing clears it by a forty-fifth of an inch, which is coplanar as far as a
+depth buffer is concerned, and the arrises z-fight through as specks.
+
+**Recorded rather than fixed, deliberately.** The fix is small and has a proper name — drop the hip
+by `0.098 in / cos(pitch)`, and say so on the cut list, because a framer needs to be told. But it
+moves a member position that three tests now pin, including the one asserting that commons, jacks
+and hips all land on a single eave line. Changing that assertion to expect a drop is legitimate
+ONLY if the drop is the deliberate subject of the change — done as a side effect of chasing specks,
+it is a test rewritten to agree with whatever the code now does. It wants its own pass, with the
+cut-list note as part of the deliverable.
 
 ## What is still open
 
