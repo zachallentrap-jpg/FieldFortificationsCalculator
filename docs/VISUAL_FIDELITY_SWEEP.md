@@ -64,6 +64,8 @@ screenshots get read.
 | **Roll roofing below its minimum slope** | **Fixed** — the two minimum-slope figures were cited on every course and checked nowhere, so a 1-in-12 roof under single-coverage roll came out clean. |
 | **The hip drop** | **Fixed** — a hip is canted to both slopes it lies under, so a plain stick stood its arrises 0.098 in proud of the roof. Dropped, and the figure is on the cut list. |
 | **Guard tower — the cab's cladding** | **Fixed** — every panel was centred on the corner posts' own centreline, so it ran 1¾ in into the post at each end and its outer face sat 1½ in inside the frame. All four posts stood proud of the wall they were meant to be behind. |
+| **The corrugation pitch on a cut roof** | **Fixed** — the rib scale was rounded to whole texture tiles and floored at one, so every piece narrower than 39 in got twelve corrugations squeezed into it. 48 of 108 pieces on a pyramid, 98 of 304 on a hip, 4 of 104 on a gable. |
+| Guard tower cab pyramid — wood showing through the roofing | **Checked, nothing wrong.** The warm band along one hip was my own harness's HOVER tint. See the note below. |
 
 ## The shed that had no walls above the plate
 
@@ -1141,3 +1143,69 @@ shared path's fixes.** Two earlier passes in this file corrected placement bugs 
 because the cab never asked. The cab roof is the counter-example in the same file: its framing is
 hand-rolled but its sheathing and roofing go through `generateRoofCovering`, and a comment there
 says why. The walls had no such comment because nobody had noticed they needed one.
+
+## A roof made of twelve different metals
+
+Looked at the tower cab's pyramid from directly overhead. The four planes were fine; everything
+near the four hips was a patchwork of small squares filled with chevrons and concentric squares,
+at obviously different rib scales from their neighbours and from each other.
+
+The corrugated texture is drawn 26 in wide — a sheet's coverage width — and holds exactly twelve
+corrugations at the 2 1/6-in pitch the doctrine figure names. So the number of tiles across a piece
+is the piece's own width divided by 26 in. The viewer asked for
+
+```ts
+Math.round(m.cutLength / 12 / tileFt)   // then Math.max(1, …) inside roofingSheet
+```
+
+which is a COUNT where the answer is a RATIO. Rounded and floored at one, every piece narrower than
+39 in got a whole tile: twelve corrugations, squeezed into whatever width the hip had left it.
+Measured on the shipped models:
+
+| roof | pieces at the wrong pitch | worst rendered pitch |
+|---|---|---|
+| guard tower cab pyramid | 48 of 108 | 0.274 in (true 2.167) |
+| building, hip + corrugated | 98 of 304 | 0.328 in |
+| building, gable + corrugated | 4 of 104 | 0.604 in |
+
+The gable row is the reason this survived. A gable's only clipped piece is the last strip on each
+plane, so the shape everyone looks at is very nearly clean, and the shapes that are not clean are
+the ones whose clipping was itself only fixed recently.
+
+The fix is to stop rounding — the texture wraps, so a fractional repeat is not a compromise, it is
+a cut sheet ending mid-rib exactly where the snips went through. Roll goods had the same bug in the
+other axis: a double-coverage course is 18 in of exposure against a 36-in tile, so `Math.round`
+gave it a whole tile and drew its granules at twice their size.
+
+**The arithmetic now lives in its own module, and that is the actual point.** It was three tokens
+inside `studio.ts`, which imports `../three-viewer`, which imports `?url` assets — so it cannot be
+loaded outside a Vite build, and for as long as the expression lived there **nothing but the eye
+could check it**. The eye had passed it for the whole life of the file. `tiling.ts` imports one
+type; the test drives it over every corrugated piece four real roofs actually cut, and four of the
+six assertions fail on the old expression.
+
+### The warm band that was mine, not the model's
+
+Worth writing down because it cost most of the iteration. Every render of this cab showed one hip
+in rust-orange while the other three were grey, and it looked exactly like a wood member standing
+proud of the roofing. It was not. Parking the pointer at the canvas centre — which the zoom step
+does, because the wheel needs a position — leaves the studio HOVERING whatever is under it, and the
+apex of a pyramid is where four hip caps meet. `HOVER_TINT` multiplies over the real material by
+design, so the corrugations still showed through and it read as a rusted sheet.
+
+Two things settled it, and neither was a screenshot: `studio().selected` was null, and the app's own
+raycaster said every warm pixel was `CP-ridgeCap-01`. Moving the pointer to (5, 5) before the shot
+took the warm pixel count from 18,374 to zero. **Harnesses must park the pointer off the canvas
+before they screenshot.**
+
+### Lead, not yet a finding: a shed roof with no `highSide`
+
+`RoofSpec` makes `highSide` required on a shed, and nothing supplies it if it is missing —
+`normalizeSpec` leaves the roof untouched, and `generateShed` does
+`walls.surfaces.find((s) => s.wall === highSide)!` on line 450, where the `!` is a lie: the build
+throws `Cannot read properties of undefined (reading 'runFt')`. Twenty lines earlier the same
+lookup is written with an `if (high)` guard, so the file already disagrees with itself.
+
+This is only a defect if such a spec can reach the engine — a shared `?c=` link or an import is the
+obvious candidate, and that has NOT been checked. Recorded here so the next pass starts from the
+question rather than from the crash.

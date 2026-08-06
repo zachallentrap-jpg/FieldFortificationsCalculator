@@ -28,6 +28,7 @@ import {
   type CutawayState, type Aabb,
 } from './cutaway';
 import { cameraRigsFor, memberAabb, type CameraRig } from './camera';
+import { roofingTiling } from './tiling';
 import { seatCutsFor, seatProfile, type SeatCut } from '../../timber/birdsMouth';
 import { riserLidOf, seatOpeningsFor, seatOpeningPath } from '../../timber/riserSeats';
 import { fmtFtIn } from '../../timber/units';
@@ -215,11 +216,10 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
       group.add(p);
     } else if (m.role === 'roofingCourse' || m.role === 'ridgeCap') {
       // Roll goods vs. corrugated metal — two different materials, told apart by the nominal the
-      // engine already wrote. `repeatAlong` keeps the granule/rib scale constant on any run
-      // length: a course is as long as the eave, so one stretched tile would be nonsense.
-      const corrugated = m.nominal.startsWith('corrugated');
-      const tileFt = corrugated ? 26 / 12 : 3;
-      p = roofingSheet(group, corrugated ? 'corrugated' : 'roll', Math.round(m.cutLength / 12 / tileFt), corrugated ? 1 : Math.round(m.actual.d / 36));
+      // engine already wrote. The tile counts keep the granule/rib scale constant on any piece,
+      // and they are RATIOS: see `tiling.ts` for what rounding them to whole tiles did.
+      const t = roofingTiling(m);
+      p = roofingSheet(group, t.kind, t.along, t.across);
       p.scale.set(m.cutLength / 12, m.actual.d / 12, Math.max(0.02, m.actual.w / 12));
     } else if (m.role === 'soilGhost') {
       // MASSING, not material. Translucent and unlit so it can never be mistaken for something

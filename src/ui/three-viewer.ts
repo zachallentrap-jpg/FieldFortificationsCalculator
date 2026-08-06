@@ -424,7 +424,11 @@ function roofingSheet(parent: THREE.Group, kind: 'roll' | 'corrugated', repeatAl
   const map = roofingTexture(kind).clone();
   map.needsUpdate = true;
   map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  map.repeat.set(Math.max(1, repeatAlong), Math.max(1, repeatAcross));
+  // FRACTIONS ARE THE POINT. These used to be clamped to at least one whole tile, which meant
+  // every piece narrower than one tile got the whole pattern squeezed into it — twelve
+  // corrugations across a three-inch sliver. The texture wraps, so a partial tile renders as a
+  // cut sheet, which is what the piece is. The floor is only a guard against zero or NaN.
+  map.repeat.set(Math.max(1e-4, repeatAlong), Math.max(1e-4, repeatAcross));
   sharedTextures.add(map);
   const mat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: toonGradient(), map });
   const edge = new THREE.MeshToonMaterial({ color: kind === 'roll' ? 0x23251f : 0x8e9298, gradientMap: toonGradient() });
