@@ -19,7 +19,7 @@ import { DRESSED } from '../types';
 import type { PlatformSpec, TentFrameSpec } from '../spec';
 import type { WallId } from '../types';
 import { makeEmitter } from '../emit';
-import { TENT, LUMBER, PANEL, RAMP, PLATFORM, IN_PER_FT, citeOf } from '../doctrine';
+import { TENT, LUMBER, PANEL, RAMP, PLATFORM, RAIL, IN_PER_FT, citeOf } from '../doctrine';
 import { stagePlan, requireOrdinal, type StagePlanEntry } from '../stagePlan';
 import { generateRailing, railRequired, type RailEdge } from '../subsystems/railings';
 import { generateStair } from '../subsystems/access';
@@ -181,6 +181,11 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
     }
   }
 
+  // Clear width of the step flight, and the edge it climbs to. Both the railing pass and the
+  // stair pass read them, and they have to agree: the rail opens exactly where the stair lands.
+  const stepWidthFt = 3;
+  const stepEdge: WallId = 'E';
+
   // ── Rails on the edges the operator names, minus wherever the ramp lands.
   if (railRequired(deckY) && spec.railEdges.length > 0) {
     const corner: Record<WallId, [[number, number], [number, number]]> = {
@@ -191,12 +196,32 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
     };
     const rampEdge: WallId = 'S';
     const rampW = spec.ramp?.widthFt ?? 0;
-    const edges: RailEdge[] = spec.railEdges.map((w) => ({
-      id: `edge-${w}`,
-      from: corner[w][0],
-      to: corner[w][1],
-      ...(spec.ramp && w === rampEdge ? { gaps: [[L / 2 - rampW / 2, L / 2 + rampW / 2] as [number, number]] } : {}),
-    }));
+    // WHERE THE WAY UP LANDS, THE RAIL OPENS. The ramp's gap has always been here. The steps'
+    // was missing, and could not have been noticed: until the flight was aimed at the deck edge
+    // it climbed to a head three and a half feet inside the footprint and never reached the rail
+    // at all. Gating a gap on one means of access and not the other is the tower's old fault
+    // ("a stair delivering people into a closed rail", tower.ts) on a different family.
+    //
+    // The step gap is a POST WIDER on each side than the flight, because the stair brings its
+    // own rail and its head posts stand on the flight's own edge lines. A gap cut to the bare
+    // stair width puts the deck rail's terminal post in the same hole as the stair's newel —
+    // two 4x4s in one place, the fault `railings.ts` fixed at the perimeter corners, recurring
+    // between two passes that cannot see each other. One post depth of margin lands the two
+    // face to face, which is the joint a newel actually makes.
+    const railPostDepth = DRESSED[RAIL.postNominal.value as string]!.d / IN_PER_FT;
+    const gapsOn = (w: WallId): [number, number][] => {
+      const out: [number, number][] = [];
+      if (spec.ramp && w === rampEdge) out.push([L / 2 - rampW / 2, L / 2 + rampW / 2]);
+      if (spec.steps && w === stepEdge) {
+        const half = stepWidthFt / 2 + railPostDepth;
+        out.push([W / 2 - half, W / 2 + half]);
+      }
+      return out;
+    };
+    const edges: RailEdge[] = spec.railEdges.map((w) => {
+      const gaps = gapsOn(w);
+      return { id: `edge-${w}`, from: corner[w][0], to: corner[w][1], ...(gaps.length > 0 ? { gaps } : {}) };
+    });
     emit.members.push(...generateRailing({ edges, deckY, stage: sRail }));
   }
 
@@ -302,15 +327,35 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
     }
   }
 
+  // ── Steps: A STAIR IS POSITIONED BY WHERE YOU STEP OFF IT, not by where its bottom tread
+  // happens to fall. The foot used to be planted a guessed foot beyond the deck — `[L + 1, W/2]`
+  // — and the flight aimed back at the platform. A 4-ft rise wants 4 ft 5 in of run, so the head
+  // finished three and a half feet INSIDE the footprint and the whole flight climbed under the
+  // deck: each of the three stringers cut 2⅜ in into the end joist and 1½ in into the decking,
+  // two of the stair's own rail posts speared up through the planks, and on a skid base the
+  // middle stringer ran 1¾ in through the middle runner as well. From outside, a stair that
+  // dead-ends into the underside of the platform.
+  //
+  // `arriveAt` states the constraint that actually matters — the top of the flight IS the deck
+  // edge — and lets the run fall where it falls, which is outside. It is the same fix, and the
+  // same reasoning, as the tower's stair (tower.ts).
+  //
+  // THE EDGE IS THE RIM JOIST'S FACE, not the grid line. The end joists are CENTRED on x = 0 and
+  // x = L, as every framing member on a grid line here is, so half of each stands proud of the
+  // decking, which is cut to L. A head landing on the line would therefore be sunk half a joist
+  // into the piece it hangs from. A stringer's plumb head bears on the OUTSIDE face of the rim,
+  // so that is where the flight arrives.
   if (spec.steps) {
     const sSteps = requireOrdinal(plan, 'stairs-access');
+    const arriveX = L + DRESSED[joistNominal]!.w / IN_PER_FT / 2;
     const stair = generateStair({
-      base: [L + 1, W / 2],
+      base: [arriveX, W / 2],
       up: [-1, 0],
       baseY: 0,
       topY: deckY,
-      widthFt: 3,
+      widthFt: stepWidthFt,
       stage: sSteps,
+      arriveAt: { at: [arriveX, W / 2], dir: [-1, 0] },
     });
     emit.members.push(...stair.members);
   }

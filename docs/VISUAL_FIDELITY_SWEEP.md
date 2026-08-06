@@ -2248,3 +2248,75 @@ against the posts it hangs on, so the cladding picks the stage now.
 
 Three regression tests, two failing on the old code; the third is the guard that the **pyramid cab
 is untouched** — no common rafters, four hips, and no high plate it should never have grown.
+
+## The loading platform's steps, which climbed under the deck
+
+The target was the platform on **skids** — a base nobody had rendered, on a different code path
+from the building's skid foundation. The runners themselves were fine: three of them on grade with
+the posts standing on their tops, no float and nothing buried. What the skid base *exposed* was
+somewhere else entirely.
+
+`platform.ts` positioned its entry stair by stating where the flight **departs**:
+
+```ts
+base: [L + 1, W / 2], up: [-1, 0]      // foot one guessed foot beyond the deck, climbing back
+```
+
+A 4-ft rise wants 4 ft 2 in of run, so the head finished **3 ft 6 in inside the footprint** and the
+whole flight climbed under the platform:
+
+```
+stair x span 16.25 → 21.33     deck edge x = 20
+  each of the 3 stringers   2⅜ in into PF-joist-14, 1½ in into the decking
+  2 of the stair's rail posts   1¾ in up through the deck planks
+  on skids: AC-stringer-02      1¾ in through FL-skid-02, the middle runner
+```
+
+The skid base is what made it visible: a pier base leaves nothing at grade for the descending
+stringer to hit, so the same aiming error had been sitting there since T6 showing only as a stair
+that dead-ends into the underside of the deck.
+
+`generateStair` has carried `arriveAt` since the tower's stair was fixed — *"a stair is positioned
+by where you step off it, not by where its bottom tread happens to fall"* — and the platform simply
+never used it. It does now.
+
+### Three things the fix had to get right
+
+1. **The edge is the rim joist's face, not the grid line.** Every framing member on a grid line
+   here is *centred* on it, so the end joists stand half a thickness proud of the decking, which is
+   cut to `L`. A head landing on the line is sunk ¾ in into the piece it hangs from. A stringer's
+   plumb head bears on the **outside face** of the rim, so that is where the flight arrives.
+2. **The rail has to open where the stair lands.** It never had to before, because the flight never
+   reached the rail — it stopped three and a half feet short of it, underneath. Gating the gap on
+   the ramp alone is the tower's old fault ("a stair delivering people into a closed rail") on a
+   different family.
+3. **And the gap is a post wider on each side than the flight.** The stair brings its own rail and
+   its head posts stand on the flight's own edge lines; a gap cut to the bare stair width puts the
+   deck rail's terminal post in the same hole as the newel — two 4x4s in one place, 3½ in of solid
+   overlap. One post depth of margin lands the two face to face, which is the joint a newel makes.
+
+### Measuring a cut piece
+
+A stair stringer's stock is square at both ends and the sawtooth is taken out of it, so its
+oriented box holds a head that was cut off — a face width times the sine of the pitch, **7 in**
+here. A box test therefore reports 7 in of stringer inside the deck whatever the generator does.
+`stairStringerProfile` is what the scene draws, so it is what the assertions read. The same trap
+runs the other way for the raked *rails*: a world box round one spans its whole climb and reported
+1.09 in of a rim joist the rail passes two feet above, so those keep the oriented box. Both are
+supersets of the real solid, so a positive gap from either is a proof — and only that direction is
+claimed.
+
+Six regression tests, all six failing on the old code, and the platform's two card goldens
+regenerated in the same commit.
+
+### Measured, not fixed
+
+- **The end posts hang half off the runners.** On a skid base the posts at `x = 0` and `x = L`
+  straddle their grid lines, and the runners are cut to exactly `L` — so 1¾ in of each end post's
+  3½ in of bearing is off the end of the timber it stands on. A pier base does not have this: the
+  16-in pad is centred on the same line and catches the whole post. The runner would have to run
+  past the frame by half a post, which is a change to `generateSkids` and therefore to the
+  building's skid foundation too.
+- **The end joists project ¾ in past the decking**, which is what makes "the deck edge" two
+  different planes. The stair now bears on the outer one. Bringing them together means insetting
+  the end joists by half a thickness — the whole joist grid moves.
