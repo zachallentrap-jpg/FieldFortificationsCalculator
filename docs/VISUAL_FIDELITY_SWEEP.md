@@ -73,6 +73,7 @@ screenshots get read.
 | **The ends of a stair stringer** | **Fixed** — every flight in the toolkit ended in two sharp wedges: the foot stabbing 4 in below the ground it stands on, the head the same distance above the landing, and half the board standing proud of the treads it carries. |
 | **The loading ramp's toe** | **Fixed** — the ramp's walking surface started AT grade, so everything holding it up was underground: the toe plank entirely, and the stringers 12.34 in deep for the last six feet of a twenty-four-foot run. |
 | **Crib bunker — the doorway itself** | **Fixed** — jambs, header and baffle all framed an opening that was then LAGGED SHUT: eleven full-width courses across it and two wall posts standing in the clear span. Every point sampled inside it came back solid. |
+| **Crib bunker — `wallType: 'crib'`** | **Fixed** — the crib topped out 5½ in below the cap beam, so the cap, the overhead stringers, the roof lagging and two feet of earth bore on air all the way round; and the stack ran straight through the doorway as well. |
 
 ## The shed that had no walls above the plate
 
@@ -1644,3 +1645,56 @@ the fixture, only two did.
 - **`wallType: 'crib'`** builds its walls through `generateCribWall`, an entirely separate emitter
   that also knows nothing about the doorway. The shipped preset is `post-plank`, so this pass
   fixed what ships; the crib option needs the same treatment and has not had it.
+  *(Done in the next pass — and the doorway turned out to be the smaller of two things wrong
+  with it. See below.)*
+
+## The crib that held up nothing
+
+Went after the recorded item — the doorway that `generateCribWall` knows nothing about — and found
+a bigger one on the way in.
+
+**A crib is stacked in whole courses and stops at the last one that fits.** There is no half a log.
+So a 6 ft 6 in wall of 7¼-in timbers tops out at 6 ft 0½ in. Nothing consumed that: `bunker.ts`
+set its cap beam at the height it ASKED for. On a crib bunker the cap — carrying the overhead
+stringers, the roof lagging and two feet of earth — bore on a **5½-in air gap the whole way round**,
+crossed only by the two door jambs, which are cut to the nominal height and do reach it.
+
+`cribWallTopFt` states where a crib actually comes up, `bunker.ts` puts the cap and the door frame
+there, and the build **says** what it did: *"A crib is built in whole courses and there is no half a
+log: 6.5 ft of wall comes out at 6.04 ft, ten courses of 6x8."* Silent correction is how a tool
+teaches the wrong number.
+
+The doorway was the recorded half: the entrance wall's stretcher courses now stop at the jambs and
+the ties that would land in the opening are not laid. 380 of 1995 sampled points were solid timber
+before; none are now. The cut list shows it — twenty 3'-11" logs appear and ten 12'-9" ones go.
+
+### Three wrong tests, in order
+
+Worth writing down as a sequence, because each was wrong in a different way and the third is the
+only one that says what the defect actually was.
+
+1. **Comparing the highest point of everything against the cap. PASSED on the broken model** — the
+   two door jambs are cut to the height asked for and do touch it. That is the *second pass running*
+   in which a pair of posts by a doorway made a test agree with a model that was wrong.
+2. **Probing for material under every station along the cap. FAILED on the FIXED model** — a crib's
+   top course is ties on a spacing, and a cap beam is a beam: it spans between bearings, exactly as
+   it does over the posts of a post-plank wall. The premise was an engineering mistake, not a
+   measurement one.
+3. **The wall must come up to the cap.** Simpler than either, true of both wall types, and it fails
+   on the old code with the number: *"the cap starts at 6.5000 and the wall stops at 6.0417 —
+   5.50 in of air under everything it carries."*
+
+A fourth, smaller one: the tie-log guard first compared tie CENTRES against the opening, so a tie
+centred on its edge still laid 2¾ in of timber across the way in. The test caught it.
+
+### Seen while measuring, not changed
+
+- **The cap beam is not centred on the wall it caps.** On a post-plank bunker it sits half a wall
+  thickness inboard, so its inner half overhangs the interior with nothing under it. Bearing is
+  real over the outer half; this is why the station probe above had to sample across the cap's
+  width rather than down its centreline.
+- **The top lagging course overshoots the posts by 1¾ in** on a post-plank wall and laps into the
+  cap beam, because the course loop runs `y < H` and the last course starts below it.
+- **The shipped card does not move.** `post-plank` walls are cut to the height asked for, so
+  `wallTopY` is exactly what it was and the goldens are byte-identical. Everything above was
+  reachable only through the non-default option — which is precisely why it lasted.

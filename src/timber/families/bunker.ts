@@ -31,7 +31,7 @@ import type { BunkerSpec } from '../spec';
 import { makeEmitter } from '../emit';
 import { BUNKER, LUMBER, TOLERANCE, IN_PER_FT, citeOf, COVER_DEPTH_NOTE } from '../doctrine';
 import { stagePlan, requireOrdinal, type StagePlanEntry } from '../stagePlan';
-import { generateCribWall } from '../subsystems/cribwork';
+import { generateCribWall, cribWallTopFt } from '../subsystems/cribwork';
 import type { FloorLevels } from '../floor';
 
 /**
@@ -50,6 +50,8 @@ export interface BunkerResult {
   deadLoadPsf: number;
   /** Set when the stated depth needs a span past the last reviewed table row. */
   pastReviewedTable: string | null;
+  /** Things the family had to decide that the operator should see. */
+  notes: { path: string; message: string }[];
 }
 
 export function bunkerStagePlan(wallType: BunkerSpec['wallType'], showSoil: boolean): StagePlanEntry[] {
@@ -138,14 +140,27 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
   const jambT = DRESSED[jambNominal]!.w / IN_PER_FT;
   /** What the wall must leave clear, in world z: the opening plus the jambs that frame it. */
   const doorClear: [number, number] = [doorZ0 - jambT, doorZ1 + jambT];
+
+  // HOW HIGH THE WALL ACTUALLY COMES. Posts are cut to the height asked for; a crib is stacked in
+  // whole courses and stops at the last one that fits. Everything above the wall used to be set
+  // at `H` regardless, so on a crib bunker the cap beam — carrying the overhead stringers, the
+  // roof lagging and two feet of earth — bore on a 5½-in air gap the whole way round, with only
+  // the two door jambs crossing it.
+  const wallTopY = spec.wallType === 'crib' ? cribWallTopFt(H) : H;
+  const shortByFt = H - wallTopY;
   if (spec.wallType === 'crib') {
     // ONE POST PER CORNER. Each side runs its posts inclusive of both ends, so every corner of
     // the crib got a 6x6 from the side arriving and another from the side leaving — four doubled
     // posts, 65 board feet of heavy timber on the cut list that does not exist.
-    const setPosts = new Set<string>();
     for (let i = 0; i < 4; i++) {
       const a = corners[i]!;
       const b = corners[(i + 1) % 4]!;
+      // The entrance is in the -X end wall, and a stack does not know about a door unless it is
+      // told. Its u axis runs from `a`, so the opening's world z maps straight onto it.
+      const onEntryWall = Math.abs(a[0]) < 1e-9 && Math.abs(b[0]) < 1e-9;
+      const uz = (b[1] - a[1]) / Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const uAt = (pz: number): number => (pz - a[1]) * uz;
+      const ends = onEntryWall ? [uAt(doorClear[0]), uAt(doorClear[1])].sort((p, q) => p - q) : null;
       emit.members.push(...generateCribWall({
         from: [a[0], a[1]],
         to: [b[0], b[1]],
@@ -154,6 +169,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
         depthFt: wallThick,
         stage: sWall,
         prefix: `BKC${i}`,
+        ...(ends ? { gap: [ends[0]!, ends[1]!] as [number, number] } : {}),
       }));
     }
   } else {
@@ -220,7 +236,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
 
   // ── Caps along the two long walls, carrying the stringers.
   const capD = DRESSED[capNominal]!.d / IN_PER_FT;
-  const capY = H + capD / 2;
+  const capY = wallTopY + capD / 2;
   for (const z of [wallThick / 2, outerW - wallThick / 2]) {
     emit('capBeam', capNominal, {
       cutLengthFt: outerL,
@@ -279,8 +295,8 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
   // for it to land on.
   for (const z of [doorZ0 - jambT / 2, doorZ1 + jambT / 2]) {
     emit('post', jambNominal, {
-      cutLengthFt: H,
-      position: [wallThick / 2, H / 2, z],
+      cutLengthFt: wallTopY,
+      position: [wallThick / 2, wallTopY / 2, z],
       rotation: [0, 0, Math.PI / 2],
       stage: sEntry,
       nailing: 'set against the end of the wall run; capped (PH)',
@@ -290,7 +306,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
   const headerNominal = LUMBER.headerNominal.value as string;
   emit('header', headerNominal, {
     cutLengthFt: doorWidth + 2 * jambT,
-    position: [wallThick / 2, H + DRESSED[headerNominal]!.d / IN_PER_FT / 2, outerW / 2],
+    position: [wallThick / 2, wallTopY + DRESSED[headerNominal]!.d / IN_PER_FT / 2, outerW / 2],
     rotation: [0, Math.PI / 2, 0],
     stage: sEntry,
     nailing: '3-16d ea end (PH)',
@@ -366,5 +382,13 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
     stagePlan: plan,
     deadLoadPsf: Math.round(deadLoadPsf),
     pastReviewedTable,
+    notes: shortByFt > 1e-6
+      ? [{
+        path: 'clearHeightFt',
+        message: `A crib is built in whole courses and there is no half a log: ${H} ft of wall comes out at `
+          + `${wallTopY.toFixed(2)} ft, ${Math.round(wallTopY / (DRESSED[BUNKER.cribLogNominal.value as string]!.d / IN_PER_FT))} `
+          + `courses of ${BUNKER.cribLogNominal.value}. The cap and everything it carries bear on that, not on the figure asked for.`,
+      }]
+      : [],
   };
 }

@@ -309,3 +309,134 @@ test('and the entrance still frames what it opens', () => {
   assert.ok(Math.abs(Math.max(...zs) - hb.z[1]!) < 1e-6, 'and of the other');
   for (const j of jambs) assert.ok(boxB(j).y[0]! < 1e-9, 'a jamb stands on the ground');
 });
+
+// ── The crib wall's own contract ─────────────────────────────────────────────
+//
+// `wallType: 'crib'` is not the shipped preset, which is how both of these survived. A crib is
+// stacked in whole courses and stops at the last one that fits — and nothing consumed that. The
+// bunker set its cap beam at the height it ASKED for, so on a crib the cap, the overhead
+// stringers, the roof lagging and two feet of earth bore on a 5½-in air gap the whole way round,
+// crossed only by the two door jambs. And the stack knew nothing about the doorway either: 380
+// of 1995 points sampled inside the clear opening came back solid timber.
+
+import { cribWallTopFt } from '../src/timber/subsystems/cribwork';
+
+const bunkerOf = (wallType: string) => {
+  const spec = preset();
+  spec.wallType = wallType;
+  return generateStructure(spec);
+};
+
+test('WHATEVER LANDS ON A WALL LANDS ON THE WALL, both ways of building one', () => {
+  // Measured before: a crib topped out at 6.042 ft and the cap beam started at 6.500, so the cap
+  // — with the overhead stringers, the roof lagging and two feet of earth on it — bore on 5½ in
+  // of air, all the way round.
+  //
+  // TWO WRONG VERSIONS OF THIS TEST CAME FIRST, and both are worth remembering. Comparing the
+  // highest point of everything against the cap PASSED on the broken model, because the two door
+  // jambs are cut to the height asked for and do reach it — the second time in two passes that a
+  // pair of posts by a doorway has made a test agree with a model that was wrong. Probing for
+  // material under every station along the cap then FAILED on the fixed model, because a crib's
+  // top course is ties on a spacing, and a cap beam is a beam: it spans between bearings, exactly
+  // as it does over the posts of a post-plank wall.
+  //
+  // What the defect actually violated is simpler than either: the wall must come UP TO the cap.
+  for (const wallType of ['post-plank', 'crib']) {
+    const m = bunkerOf(wallType);
+    const capBottom = Math.min(...m.members.filter((x) => x.role === 'capBeam').map((x) => boxB(x).y[0]!));
+    // The door frame is not the wall. Jambs are cut to the clear height and would report the wall
+    // as touching the cap while four walls' worth of it hung in space.
+    const hb = boxB(m.members.find((x) => x.role === 'header')!);
+    const isJamb = (x: { role: string }, b: ReturnType<typeof boxB>): boolean => x.role === 'post'
+      && b.x[0]! < 1 && (Math.abs(b.z[0]! - hb.z[0]!) < 1e-6 || Math.abs(b.z[1]! - hb.z[1]!) < 1e-6);
+    const wall = m.members.filter((x) => {
+      const b = boxB(x);
+      return (x.role === 'cribLog' || x.role === 'post') && !isJamb(x, b) && b.y[0]! < capBottom + 1e-9;
+    });
+    assert.ok(wall.length > 4, `${wallType}: no wall found`);
+    const top = Math.max(...wall.map((x) => boxB(x).y[1]!));
+    assert.ok(top >= capBottom - 1e-6,
+      `${wallType}: the cap starts at ${capBottom.toFixed(4)} and the wall stops at ${top.toFixed(4)} — `
+      + `${((capBottom - top) * 12).toFixed(2)} in of air under everything it carries`);
+  }
+});
+
+test('a crib comes up in whole courses, and the build says so', () => {
+  const H = preset().clearHeightFt as number;
+  const top = cribWallTopFt(H);
+  assert.ok(top <= H + 1e-9, 'a crib never overshoots the height asked for');
+  assert.ok(H - top > 1e-6, 'the premise: this preset does not divide evenly into courses');
+  const m = bunkerOf('crib');
+  const said = m.issues.find((i) => i.path === 'clearHeightFt');
+  assert.ok(said, `nothing said about losing ${((H - top) * 12).toFixed(2)} in of clear height`);
+  assert.match(said!.message, new RegExp(top.toFixed(2)), 'the message names the height it actually gives');
+  // And the post-plank wall, which IS cut to the height asked for, must not raise it.
+  assert.ok(!bunkerOf('post-plank').issues.some((i) => i.path === 'clearHeightFt'));
+});
+
+test('THE CRIB DOORWAY IS A HOLE TOO — the stack does not run through it', () => {
+  const m = bunkerOf('crib');
+  const hb = boxB(m.members.find((x) => x.role === 'header')!);
+  const jambs = m.members.filter((x) => x.role === 'post' && boxB(x).x[0]! < 1
+    && (Math.abs(boxB(x).z[0]! - hb.z[0]!) < 1e-6 || Math.abs(boxB(x).z[1]! - hb.z[1]!) < 1e-6));
+  assert.equal(jambs.length, 2);
+  const byZ = [...jambs].sort((p, q) => boxB(p).z[0]! - boxB(q).z[0]!);
+  const clear: [number, number] = [boxB(byZ[0]!).z[1]!, boxB(byZ[1]!).z[0]!];
+  let solid = 0, total = 0;
+  for (let y = 0.2; y < hb.y[0]! - 0.1; y += 0.2) {
+    for (let z = clear[0] + 0.1; z < clear[1] - 0.1; z += 0.15) {
+      for (let x = -0.3; x < 1.0; x += 0.15) {
+        total++;
+        for (const k of m.members) {
+          if (k.role === 'soilGhost') continue;
+          const b = boxB(k);
+          if (x > b.x[0]! && x < b.x[1]! && y > b.y[0]! && y < b.y[1]! && z > b.z[0]! && z < b.z[1]!) { solid++; break; }
+        }
+      }
+    }
+  }
+  assert.ok(total > 2000, 'the opening was actually sampled');
+  assert.equal(solid, 0, `${solid} of ${total} points inside the clear opening are solid`);
+});
+
+test('and the crib is still a crib either side of it', () => {
+  // Cutting a course must not cost the alternation or the corner — the two properties that make
+  // a stack cribwork rather than a pile.
+  const withGap = generateCribWall({
+    from: [0, 0], to: [0, 12], baseY: 0, heightFt: 6.5, depthFt: 2, stage: 1, prefix: 'TG', gap: [4, 8],
+  });
+  const plain = generateCribWall({
+    from: [0, 0], to: [0, 12], baseY: 0, heightFt: 6.5, depthFt: 2, stage: 1, prefix: 'TP',
+  });
+  assert.ok(withGap.length > 0 && plain.length > 0);
+  // Same courses, same heights — only the pieces within them changed.
+  const heights = (ms: typeof plain) => [...new Set(ms.map((x) => Math.round(x.position[1]! * 1e6)))].sort();
+  assert.deepEqual(heights(withGap), heights(plain), 'the same courses are still built');
+  // Nothing crosses the gap.
+  for (const x of withGap) {
+    const b = boxB(x);
+    const overlap = Math.min(b.z[1]!, 8) - Math.max(b.z[0]!, 4);
+    assert.ok(overlap <= 1e-9, `${x.id} crosses the opening by ${(overlap * 12).toFixed(2)} in`);
+  }
+  // And both ends of the wall are still built — the corner is the whole structural idea.
+  assert.ok(withGap.some((x) => boxB(x).z[0]! < 1e-6), 'the wall still reaches one corner');
+  assert.ok(withGap.some((x) => boxB(x).z[1]! > 12 - 1e-6), 'and the other');
+});
+
+test('the crib bunker\'s other three walls are unbroken', () => {
+  const m = bunkerOf('crib');
+  const hb = boxB(m.members.find((x) => x.role === 'header')!);
+  // Stretchers run along their wall; a cut one is shorter than the wall it is in.
+  const stretchers = m.members.filter((x) => x.role === 'cribLog' && x.cutLength > 4 * 12);
+  const runs = new Set(stretchers.map((x) => Math.round(x.cutLength * 1e3)));
+  assert.equal(runs.size, 2, `expected the two wall lengths, got ${[...runs].map((r) => (r / 12e3).toFixed(2)).join(',')}`);
+  // A CUT stretcher is longer than a tie and shorter than the wall it came from. Selecting by a
+  // flat length band caught the ties instead, which are 1 ft 4½ in and are not cut anything.
+  const tieLen = Math.min(...m.members.filter((x) => x.role === 'cribLog').map((x) => x.cutLength));
+  const shortestWall = Math.min(...runs);
+  const cut = m.members.filter((x) => x.role === 'cribLog'
+    && x.cutLength > tieLen + 1 && x.cutLength * 1e3 < shortestWall - 1);
+  assert.ok(cut.length > 0, 'the entrance wall has cut courses');
+  for (const c of cut) assert.ok(boxB(c).x[0]! < 1, `${c.id} was cut on a wall that has no doorway`);
+  void hb;
+});

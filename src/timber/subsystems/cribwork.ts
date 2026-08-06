@@ -30,6 +30,16 @@ export interface CribWallInput {
   stage: number;
   /** Prefix for member ids, so a bunker's four walls do not renumber each other. */
   prefix: string;
+  /**
+   * A stretch of the run to leave clear, in the wall's own coordinates (0 at `from`).
+   *
+   * A crib wall is built by stacking, and a stack does not know about a doorway unless it is
+   * told. The bunker's entrance was framed with jambs and a header and then had crib logs laid
+   * straight through it: 380 of 1995 points sampled inside the clear opening came back solid
+   * timber. Courses stop at the jambs now, and the header logs that would land in the opening
+   * are not laid.
+   */
+  gap?: [number, number];
 }
 
 /**
@@ -54,20 +64,33 @@ export function generateCribWall(input: CribWallInput): Member[] {
   const az = ux;
   const halfDepth = Math.max(logW, input.depthFt) / 2 - logW / 2;
 
-  const courses = Math.max(1, Math.floor(input.heightFt / logH));
+  // One course is one log unless the doorway interrupts it, in which case it is the two logs
+  // either side of the opening — which is what you would cut, and what leaves a hole.
+  const spans: [number, number][] = input.gap
+    ? ([[0, input.gap[0]], [input.gap[1], runFt]] as [number, number][]).filter((sp) => sp[1] - sp[0] > logW)
+    : [[0, runFt]];
+
+  const courses = cribCourseCount(input.heightFt);
   for (let c = 0; c < courses; c++) {
     const y = input.baseY + logH * (c + 0.5);
     if (c % 2 === 0) {
       // Stretchers: two runs, one at each face of the crib.
       for (const side of [-1, 1] as const) {
-        emit('cribLog', nominal, {
-          cutLengthFt: runFt,
-          position: [midX + ax * side * halfDepth, y, midZ + az * side * halfDepth],
-          rotation: [0, yaw, 0],
-          stage: input.stage,
-          nailing: 'drift-pinned to the course below at every crossing (PH)',
-          doctrineRef: citeOf(BUNKER.cribLogNominal),
-        });
+        for (const [u0, u1] of spans) {
+          const mid = (u0 + u1) / 2;
+          emit('cribLog', nominal, {
+            cutLengthFt: u1 - u0,
+            position: [
+              input.from[0] + ux * mid + ax * side * halfDepth,
+              y,
+              input.from[1] + uz * mid + az * side * halfDepth,
+            ],
+            rotation: [0, yaw, 0],
+            stage: input.stage,
+            nailing: 'drift-pinned to the course below at every crossing (PH)',
+            doctrineRef: citeOf(BUNKER.cribLogNominal),
+          });
+        }
       }
     } else {
       // Headers: laid across, spaced along the run, tying the two stretcher stacks. One at each
@@ -76,6 +99,10 @@ export function generateCribWall(input: CribWallInput): Member[] {
       const n = Math.max(2, Math.round(runFt / spacing) + 1);
       for (let i = 0; i < n; i++) {
         const d = (runFt * i) / (n - 1);
+        // A tie laid across the doorway is a tie laid across the doorway — and a tie CENTRED on
+        // the opening's edge still reaches half its own thickness into it, which is 2¾ in of
+        // timber across the way in. The test caught that; the first cut compared centres.
+        if (input.gap && d + logW / 2 > input.gap[0] + 1e-9 && d - logW / 2 < input.gap[1] - 1e-9) continue;
         emit('cribLog', nominal, {
           cutLengthFt: Math.max(logW, input.depthFt),
           position: [input.from[0] + ux * d, y, input.from[1] + uz * d],
@@ -94,4 +121,18 @@ export function generateCribWall(input: CribWallInput): Member[] {
 export function cribCourseCount(heightFt: number): number {
   const logH = DRESSED[BUNKER.cribLogNominal.value as string]!.d / IN_PER_FT;
   return Math.max(1, Math.floor(heightFt / logH));
+}
+
+/**
+ * How high the crib ACTUALLY comes, which is not the height it was asked for.
+ *
+ * A crib is built in whole courses and there is no half a log, so a 6 ft 6 in wall of 7¼-in
+ * timbers tops out at 6 ft 0½ in. Nothing consumed that: the bunker set its cap beam at the
+ * height it asked for, and the cap — with the overhead stringers, the roof lagging and two feet
+ * of earth on top of it — bore on a 5½-in air gap all the way round. Whatever lands on a crib
+ * lands HERE.
+ */
+export function cribWallTopFt(heightFt: number): number {
+  const logH = DRESSED[BUNKER.cribLogNominal.value as string]!.d / IN_PER_FT;
+  return cribCourseCount(heightFt) * logH;
 }
