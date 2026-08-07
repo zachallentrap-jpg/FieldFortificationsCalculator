@@ -28,7 +28,7 @@ export type MemberRole =
   | 'bentPost' | 'bentRafter' | 'bentCollar'            // T6 tent frames
   | 'screenFrame' | 'screenPanel'                       // T5 screen bands
   | 'doorBoard' | 'doorLedge' | 'doorBrace' | 'shutter' | 'riserBox' // T5 built openings
-  | 'cribLog' | 'lagging' | 'ohcStringer' | 'baffleWall' | 'soilGhost' // T7 bunker
+  | 'cribLog' | 'lagging' | 'ohcStringer' | 'ohcBlocking' | 'baffleWall' | 'soilGhost' // T7 bunker
   | 'hardware';                                          // T8 counted items
 
 export type WallId = 'N' | 'S' | 'E' | 'W';

@@ -50,6 +50,7 @@ screenshots get read.
 | **Flat / shed roof — the top of the slope** | **Fixed** — a single-slope roof has no ridge, and the cap laid on its top edge hung half its width past the roof; the same edge had no fascia over its rafter tails. |
 | **The tent frame's `endDoor`** | **Fixed** — a live "Framed end door" toggle on both tent cards, set `true` by both presets, read by no generator: turning it off produced a byte-identical model. |
 | **Crib bunker — the top of the end walls** | **Fixed** — capped on the two long walls only, so both end walls stopped 7¼ in below the overhead: a slot the width of the bunker at each end, under two feet of earth. |
+| **Crib bunker — the bays between the stringers** | **Fixed** — every bay was a hole in the long wall, a stringer deep, open at the face and leading straight down into the bunker. |
 | Guard shack (8×8, four openings) | **Checked, clean.** Nothing wrong. Its unbraced walls are a documented rule, now pinned by a test. |
 | Squad hut (50 ft — the longest building) | **Checked, clean.** Nothing wrong. Its fifty-foot runs are already handled, by a module I had not read. |
 | Weather barrier / building paper | **Already covered** — an earlier pass fixed it (row above). All that is left is a stale help string; see below. |
@@ -3120,3 +3121,48 @@ whole 17-ft length of each long wall, open in every bay between one stringer and
 leading straight down into the bunker. Closing it needs BLOCKING between the stringers over each
 cap: a piece the toolkit does not have, with no nominal and no citation of its own, which is a
 decision about the overhead system rather than a correction to this one. It is the next target.
+
+## Every bay between the stringers was a hole in the wall
+
+The residue the last pass recorded and did not close, and this one is the same defect one course
+higher. The stringers cross the side caps and the roof lagging goes over them, so between one
+stringer and the next there is a course as deep as a stringer — open at the wall face, and leading
+straight down into the bunker:
+
+```
+stringer soffit 7.1042    roof lagging 7.7083    7020 sight lines clean through, every bay
+```
+
+On screen it is a row of little dark notches all along the top of each long wall with daylight in
+them, which is what the first render of this card showed and what nobody had read as a hole.
+
+**The two ends were already closed, and by a rule worth stating**: the outermost stringers sit
+flush with the end walls, so there is no bay there to fill. That is why the sight-line walk found
+this band only along Z and never along X, and why blocking is a two-wall job. It is asserted as a
+measurement rather than assumed, because if the end stringers ever move inboard the ends grow a bay
+and this test has to notice.
+
+The blocking is cut from the **stringer's own stock**, so it fills the course exactly however the
+dead-load table sizes the stringer for the span — not from the cap's, which happens to be the same
+7¼ in on the shipped card and would quietly stop being so on a wider one.
+
+```
+after:  post-plank 5 caps + 18 blocks    crib 5 caps + 20 blocks
+        clear sight lines through the overhead: 0        interpenetrations: 0
+```
+
+A new role, `ohcBlocking`, with its plain name and its what-it-does line — the dictionary test
+requires both of every role a shipped card emits, which is the guard that stopped this being a raw
+enum on the card.
+
+### Measured, not fixed
+
+- **The wall lagging's top edge is exposed for the height of the cap course.** The cap bears on the
+  POSTS and is narrower than the wall, deliberately — *"a cap centred on the whole band would hang
+  a plank's width out over the lagging and miss as much of the post it is supposed to bear on"* —
+  so the outer 1½ in of the wall has nothing over it for 7¼ in. It is not a way in: the cap blocks
+  it inboard along its whole length, and the 266 sight lines that survive run ALONG that groove and
+  out the ends rather than into the bunker. What it looks like is a thin open line round the
+  building at cap height. The honest fix is to carry the lagging up to the cap's top rather than
+  the posts', which is a change to how tall a wall's planking is cut — a decision about the wall,
+  not about the cap.

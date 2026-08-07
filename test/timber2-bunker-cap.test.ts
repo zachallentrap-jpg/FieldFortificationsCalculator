@@ -178,3 +178,92 @@ test('and no cap runs into anything — they butt at the corners and bear on the
     }
   }
 });
+
+// ── One course higher: the bays between the stringers ────────────────────────
+//
+// THE BAY BETWEEN TWO STRINGERS IS A HOLE IN THE WALL. The stringers cross the side caps and the
+// roof lagging goes over them, so between one stringer and the next there was a course as deep as
+// a stringer, open at the wall face and leading straight down into the bunker:
+//
+//   stringer soffit 7.1042   roof lagging 7.7083   7020 sight lines clean through, every bay
+//
+// Exactly the same defect as the missing end cap, one course up, and found in the same walk. The
+// two ENDS were already closed and by a rule worth stating: the outermost stringers sit flush
+// with the end walls, so there is no bay there to fill.
+
+test('NO BAY IS OPEN — the stringer course used to be a hole in each long wall', () => {
+  for (const { wallType, entrance } of CASES) {
+    const { bs } = bunker(wallType, entrance);
+    const label = `${wallType}/${entrance}`;
+    const stringers = bs.filter((k) => k.m.role === 'ohcStringer');
+    const roof = bs.filter((k) => k.m.role === 'lagging' && k.b.y[0] > Math.max(...stringers.map((s) => s.b.y[0])));
+    assert.ok(roof.length > 0, `${label}: no roof lagging over the stringers`);
+    // The course between the stringers' soffit and the lagging over them.
+    const band: [number, number] = [
+      Math.min(...stringers.map((k) => k.b.y[0])),
+      Math.min(...roof.map((k) => k.b.y[0])),
+    ];
+    assert.ok(band[1] - band[0] > 0.4, `${label}: the stringer course is ${(band[1] - band[0]).toFixed(4)} ft`);
+    const y = (band[0] + band[1]) / 2;
+    // Straight through the building along its WIDTH, at every station down its length: anywhere a
+    // ray gets through is a bay open at both long walls.
+    const xs = [Math.min(...stringers.map((k) => k.b.x[0])), Math.max(...stringers.map((k) => k.b.x[1]))];
+    const open: number[] = [];
+    for (let i = 0; i < 400; i++) {
+      const x = xs[0]! + (xs[1]! - xs[0]!) * (i + 0.5) / 400;
+      if (!bs.some((k) => k.b.x[0] <= x && x <= k.b.x[1] && k.b.y[0] <= y && y <= k.b.y[1])) open.push(x);
+    }
+    assert.equal(open.length, 0, open.length
+      ? `${label}: ${open.length} of 400 stations see clean through the overhead at y=${y.toFixed(4)}, `
+        + `x ${Math.min(...open).toFixed(3)}..${Math.max(...open).toFixed(3)} — those are the bays `
+        + 'between the stringers, open at the wall and leading straight down inside'
+      : '');
+  }
+});
+
+test('and the blocking fills that course exactly, on the two long walls only', () => {
+  for (const { wallType, entrance } of CASES) {
+    const { bs } = bunker(wallType, entrance);
+    const label = `${wallType}/${entrance}`;
+    const stringers = bs.filter((k) => k.m.role === 'ohcStringer');
+    const blocks = bs.filter((k) => k.m.role === 'ohcBlocking');
+    assert.ok(blocks.length > 0, `${label}: no blocking at all`);
+    // Two per bay, one over each side cap — and the bays are the gaps BETWEEN the stringers, so
+    // there is one fewer bay than there are stringers.
+    assert.equal(blocks.length, 2 * (stringers.length - 1),
+      `${label}: ${blocks.length} blocks for ${stringers.length - 1} bays on two walls`);
+    const sy: [number, number] = [Math.min(...stringers.map((k) => k.b.y[0])), Math.max(...stringers.map((k) => k.b.y[1]))];
+    for (const b of blocks) {
+      assert.ok(Math.abs(b.b.y[0] - sy[0]) < 1e-9 && Math.abs(b.b.y[1] - sy[1]) < 1e-9,
+        `${label}: ${b.m.id} runs y ${b.b.y[0].toFixed(4)}..${b.b.y[1].toFixed(4)} where the stringers `
+        + `run ${sy[0].toFixed(4)}..${sy[1].toFixed(4)} — it does not fill the course it is in`);
+    }
+    // THE ENDS NEED NONE: the outermost stringers are flush with the end walls, so there is no
+    // bay there. Stated as a measurement, because it is the reason blocking is a two-wall job.
+    // From the SIDE CAPS, which run the building's length. Taken off every member instead, the
+    // baffle walls stand outside the entrance and move the answer several feet.
+    const side = bs.filter((k) => k.m.role === 'capBeam' && k.b.x[1] - k.b.x[0] > k.b.z[1] - k.b.z[0]);
+    const ends = [Math.min(...side.map((k) => k.b.x[0])), Math.max(...side.map((k) => k.b.x[1]))];
+    assert.ok(Math.abs(Math.min(...stringers.map((k) => k.b.x[0])) - ends[0]!) < 1e-9
+      && Math.abs(Math.max(...stringers.map((k) => k.b.x[1])) - ends[1]!) < 1e-9,
+    `${label}: the end stringers are not flush with the ends, so the end walls have bays too`);
+  }
+});
+
+test('and no block runs into the stringers it sits between, or the cap under it', () => {
+  const ov = (a: [number, number], b: [number, number]): number => Math.min(a[1], b[1]) - Math.max(a[0], b[0]);
+  for (const { wallType, entrance } of CASES) {
+    const { bs } = bunker(wallType, entrance);
+    const blocks = bs.filter((k) => k.m.role === 'ohcBlocking');
+    assert.ok(blocks.length > 0, `${wallType}/${entrance}: no blocking to check`);
+    for (const b of blocks) {
+      for (const o of bs) {
+        if (o.m.id === b.m.id) continue;
+        const d: V3 = [ov(b.b.x, o.b.x), ov(b.b.y, o.b.y), ov(b.b.z, o.b.z)];
+        assert.ok(!d.every((v) => v > 1e-9),
+          `${wallType}/${entrance}: ${b.m.id} and ${o.m.id} (${o.m.role}) share `
+          + `${d.map((v) => (v * IN_PER_FT).toFixed(3)).join(' x ')} in of wood`);
+      }
+    }
+  }
+});

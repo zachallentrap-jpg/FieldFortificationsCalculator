@@ -79,6 +79,7 @@ export const PLAIN: Record<MemberRole, string> = {
   cribLog: 'crib log',
   lagging: 'lagging',
   ohcStringer: 'overhead stringer',
+  ohcBlocking: 'overhead blocking',
   baffleWall: 'baffle wall',
   soilGhost: 'soil cover (stated, not computed)',
   // Built openings & hardware
@@ -153,6 +154,7 @@ export const WHAT: Record<MemberRole, string> = {
   cribLog: 'Log or timber laid in alternating courses to build a crib wall.',
   lagging: 'Boards spanning between posts to hold back earth.',
   ohcStringer: 'Overhead beam carrying the stated cover load.',
+  ohcBlocking: 'Short piece filling the bay between two overhead beams over a wall, so the cover cannot run in over the cap.',
   baffleWall: 'Short wall offsetting an entrance so nothing travels straight in.',
   soilGhost: 'The stated cover depth, drawn for reference. Protective sizing is a survivability decision, not computed here.',
   doorBoard: 'One board of a ledged door face.',

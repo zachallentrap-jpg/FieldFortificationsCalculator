@@ -364,6 +364,36 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       doctrineRef: citeOf(BUNKER.stringerBySpan),
     });
   }
+  // ── Blocking between the stringers, over each side cap.
+  //
+  // THE BAY BETWEEN TWO STRINGERS IS A HOLE IN THE WALL. The stringers cross the side caps and
+  // the lagging goes over them, so between one stringer and the next there is a course as deep as
+  // a stringer, open at the wall face and leading straight down into the bunker:
+  //
+  //   stringer soffit 7.1042   roof lagging 7.7083   7020 sight lines clean through, every bay
+  //
+  // The two ENDS are already closed, and by the same rule: the outermost stringers sit flush with
+  // the end walls, so there is no bay there to fill. It is only the two long walls that have one.
+  //
+  // Cut from the STRINGER'S own stock, so it fills the course exactly however the dead-load table
+  // sizes the stringer, and set with its outer face on the wall's — which also closes the strip
+  // above the wall lagging that the cap, being narrower than the wall, does not reach.
+  for (let i = 0; i < stringerBays; i++) {
+    const x0 = stringerW / 2 + (stringerRun * i) / stringerBays + stringerW / 2;
+    const x1 = stringerW / 2 + (stringerRun * (i + 1)) / stringerBays - stringerW / 2;
+    if (x1 - x0 <= TOLERANCE.minSliverFt) continue;
+    for (const z of [stringerW / 2, outerW - stringerW / 2]) {
+      emit('ohcBlocking', stringer.nominal, {
+        cutLengthFt: x1 - x0,
+        position: [(x0 + x1) / 2, stringerY, z],
+        rotation: [0, 0, 0],
+        stage: sStringer,
+        nailing: 'toenailed to the stringer each side; spiked to the cap (PH)',
+        doctrineRef: `${citeOf(BUNKER.stringerBySpan)} — blocking, cut from the stringer stock`,
+      });
+    }
+  }
+
   const lagW = DRESSED[lagNominal]!.d / IN_PER_FT;
   const lagT = DRESSED[lagNominal]!.w / IN_PER_FT;
   const lagY = stringerY + stringerD / 2 + lagT / 2;
