@@ -98,6 +98,7 @@ screenshots get read.
 | **The gable rake** | **Fixed** — the roof stopped at the FRAMING line while the finished wall stands a skin thickness outside it, so half an inch of siding (an inch and a half of board-and-batten) ran along both rakes of every gable, shed and flat roof with nothing over it. There was no barge board in the toolkit. |
 | **The bunker's build order** | **Fixed** — the doorway's two jamb posts and its header were stamped into the ENTRANCE stage, three after the caps they line up with and two after the overhead cover that bears on them: scrub to stage 4 and ten stringers span the opening on nothing. |
 | Build order, catalog-wide | **Checked, clean.** Nothing wrong. 2,777 borne members and 8,794 bearing pairs across all fourteen cards, none of them standing on something built later. Landed as a permanent guard, with its blind spot written down. |
+| **The ends of a tent frame** | **Fixed** — the bents and the floor joists were both laid out as `L·i/(n−1)`, which puts the first and last CENTRELINE on the deck's own ends: 1¾ in of every end post, and of every end-door jamb, standing over air, plus ¾ in of bare joist at each end. |
 
 ## The shed that had no walls above the plate
 
@@ -4290,3 +4291,51 @@ passing: at least sixteen borne members per card, and five thousand bearing pair
 everything else's plywood) on the guard shack: boards run vertically at their dressed width, the
 gable triangle is closed in with boards cut to the rake, the new barge board trims both rakes, the
 fascia closes the eave, and the openings read as openings. Nothing wrong.
+
+## A rank that runs out on the deck's edge
+
+The tent frames were last swept as *"Checked, clean. Bent posts stand exactly on the deck top"* —
+which was true, and was about the wrong axis. They stand on the deck top; the question nobody asked
+is whether they stand on the DECK.
+
+A rank laid out as `L · i / (n − 1)` puts its first and last centreline on the deck's own ends, and
+half of each end member is then over air:
+
+```
+  TEMPER 32 x 20, deck x 0.000 .. 32.000
+    end bent posts    x -0.146 .. 0.146     1¾ in of a 3½-in post past what carries it, both ends
+    end door jambs    x -0.146 .. 0.146     the same — the door is framed "in the end bent's plane"
+    end joists        x -0.063 .. 0.063     ¾ in of joist with no decking over it
+```
+
+**The generator already knew the rule and had applied it in the other two directions.** The bents
+are held in from the deck's SIDES by `PLATFORM.bentInsetFt`, whose own doctrine note says *"so the
+plate is not the last board"*; and the collar's lap is deliberately turned inward, in as many
+words, *"so the end bent's tie does not hang off the deck."* `floor.ts` states it for the whole
+toolkit: *sills, rims, and posts are inset so nothing overhangs the building line.* The LENGTH was
+the one direction nobody swept, on the one family whose length is a rank rather than a wall.
+
+One helper does both ranks — `rankAt(i, n, face)` steps the two end stations in by half the face
+that member presents along the length and leaves every interior station exactly where the even
+division put it. The end door travels with the bent it stands in, because that is what it is
+attached to.
+
+```
+  members reaching past the deck in plan     8 per card  ->  0
+  frame's outside vs the length on the card  32.29 ft  ->  32.00, which is what the card says
+  interior bent stations                     unchanged, to 1e-9
+```
+
+Four tests in `test/timber2-tent-ends.test.ts`; three fail on the old generator, quoting the
+0.750 in and the 1.750 in directly. The fourth is the one that passes both ways and is the guard
+that matters: **the end door still stands in the end bent's own plane.** There is no wall on a tent
+end to cut a hole in, so the door is framed rather than opened, and a fix that moved the bents and
+left the door behind would have made the jambs the thing hanging off the deck instead. Four
+thumbnails moved, both tent cards.
+
+### Checked this pass and NOT a defect
+
+**The sawtooth along the tent's near skid.** A close render of the floor edge shows a row of small
+triangular gaps running the length of the near runner, which reads at first like something broken.
+It is the joists: they sit ON the skid (`skid` y 0.000–0.458, `joist` y 0.458–1.063), and at a
+grazing angle you see the ground between them through each bay. Nothing wrong.

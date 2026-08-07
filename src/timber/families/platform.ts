@@ -439,12 +439,34 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
 
   emit.members.push(...generateSkids(L, W, sBase, 0));
 
+  /**
+   * A RANK OF ANYTHING, WITH ITS END MEMBERS ON THE DECK RATHER THAN HALF OFF IT.
+   *
+   * The bents and the joists were both laid out as `L * i / (n - 1)`, which puts the first and
+   * last CENTRELINE on the deck's own ends — so half of each end member stood over air. Measured
+   * on the shipped TEMPER: the end bents' posts reached x = -0.146 .. 0.146 against a deck of
+   * 0 .. 32, 1¾ in of a 3½-in post hanging past what carries it, at both ends, and the end joists
+   * did the same by ¾ in. The generator already knew the rule and applied it in the other two
+   * directions — the bents are held in from the deck's sides by `PLATFORM.bentInsetFt`, and the
+   * collar's lap is deliberately turned inward "so the end bent's tie does not hang off the deck"
+   * — and `floor.ts` states it outright for the whole toolkit: *sills, rims, and posts are inset
+   * so nothing overhangs the building line*. The length was the one direction nobody swept.
+   *
+   * Stepping the two ends in by half the member's own face keeps the outermost wood ON the deck
+   * and leaves every interior station exactly where the doctrine spacing put it.
+   */
+  const rankAt = (i: number, n: number, faceFt: number): number => {
+    const x = (L * i) / (n - 1);
+    return i === 0 ? x + faceFt / 2 : i === n - 1 ? x - faceFt / 2 : x;
+  };
+
   const spacing = spec.spacing.joistSpacingIn / IN_PER_FT;
   const joists = Math.max(2, Math.floor(L / spacing) + 1);
+  const joistT = DRESSED[joistNominal]!.w / IN_PER_FT;
   for (let i = 0; i < joists; i++) {
     emit('joist', joistNominal, {
       cutLengthFt: W,
-      position: [(L * i) / (joists - 1), skidTop + joistDepth / 2, W / 2],
+      position: [rankAt(i, joists, joistT), skidTop + joistDepth / 2, W / 2],
       rotation: [0, Math.PI / 2, 0],
       stage: sFloor,
       nailing: '3-16d toenail ea bearing (PH)',
@@ -489,8 +511,12 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
   // the post.
   const lapFt = (DRESSED[bentNominal]!.d + DRESSED[bentNominal]!.w) / 2 / IN_PER_FT;
   const ridgeHalfThick = DRESSED[bentNominal]!.w / 2 / IN_PER_FT;
+  /** The face a bent presents along the tent's length — its post's own width, standing in plane. */
+  const bentFaceFt = DRESSED[bentNominal]!.d / IN_PER_FT;
   for (let i = 0; i < bents; i++) {
-    const x = (L * i) / (bents - 1);
+    // The end bents step in by half their own face, so the frame's outside IS the stated length
+    // and no post stands half off the deck. See `rankAt`.
+    const x = rankAt(i, bents, bentFaceFt);
     const inset = PLATFORM.bentInsetFt.value as number;
     for (const z of [inset, W - inset]) {
       emit('bentPost', bentNominal, {
@@ -573,7 +599,9 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
     // The frame is cut from the bents' own stock: 3½ in through the opening, 1½ in along it,
     // which is a jamb the same way a stud is one.
     const jambT = DRESSED[bentNominal]!.w / IN_PER_FT;
-    for (const x of [0, L]) {
+    // IN THE END BENT'S PLANE — which is where the end bent now is, half a face in from the
+    // deck's end, not on it.
+    for (const x of [rankAt(0, bents, bentFaceFt), rankAt(bents - 1, bents, bentFaceFt)]) {
       for (const s of [-1, 1]) {
         emit('post', bentNominal, {
           cutLengthFt: doorH,
