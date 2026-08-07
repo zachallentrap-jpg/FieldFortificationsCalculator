@@ -196,9 +196,13 @@ test('and the platform is still the size and height the card asked for', () => {
     const label = JSON.stringify(opts);
     const deck = model.members.filter((m) => m.role === 'subfloor').map((m) => box(m));
     assert.ok(deck.length > 0, `${label}: no platform deck`);
+    // MEASURED AT THE SURFACE YOU STAND ON. `platformHeightFt` used to be the FRAME's top with
+    // the decking laid on it, so a tower asked for 16 ft walked at 16 ft 0¾ in; the frame now
+    // drops by the decking and the surface lands where it was asked for.
+    const walk = Math.max(...deck.map((b) => b.y[1]));
+    assert.ok(Math.abs(walk - spec.platformHeightFt) < 1e-9,
+      `${label}: the platform walks at ${walk.toFixed(4)}, not the stated ${spec.platformHeightFt}`);
     const frameTop = Math.max(...joists.map((m) => box(m).y[1]));
-    assert.ok(Math.abs(frameTop - spec.platformHeightFt) < 1e-9,
-      `${label}: the platform frame tops out at ${frameTop.toFixed(4)}, not the stated ${spec.platformHeightFt}`);
     const w = Math.max(...deck.map((b) => b.x[1])) - Math.min(...deck.map((b) => b.x[0]));
     const d = Math.max(...deck.map((b) => b.z[1])) - Math.min(...deck.map((b) => b.z[0]));
     assert.ok(Math.abs(w - spec.cabPlanFt) < 1e-9 && Math.abs(d - spec.cabPlanFt) < 1e-9,

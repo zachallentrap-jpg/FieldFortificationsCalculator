@@ -91,6 +91,7 @@ screenshots get read.
 | **The guard tower's stair** | **Fixed** — the well was struck off the DECK edge and a battered base is two feet wider, so the stair stood inside its own tower; it now stands clear of the frame and a railed landing bridges back to the deck. |
 | **Where a guardrail's pieces meet** | **Fixed** — every rail ran straight through every one of its own posts (59 pairs, to 2½ in) and two runs meeting at a corner each sat half a thickness inside the other (12 more). |
 | **The hut's girts at a corner** | **Fixed** — the ends were clipped against the perpendicular WALLS' faces, but a girt lies inboard of the studs, so both girts of every corner reached the same 1½-in square: 24 pairs across the six hut cards. |
+| **What `platformHeightFt` means** | **Fixed** — on a tower it was the platform FRAME's top with the decking laid on that, so a tower asked for 16 ft walked at 16 ft 0¾ in; the loading platform means the surface, and now both do. |
 
 ## The shed that had no walls above the plate
 
@@ -3836,3 +3837,41 @@ change is exactly the sort of edit that quietly undoes them. Twelve thumbnails m
   at a corner, and a partition is one more place it has to be cut. Both directions of the fix need
   something the modules do not have — `generateGirts` is handed only the wall contract, and
   `partitions.ts` is a building subsystem that knows nothing about a hut's girts.
+
+## Two families, one figure, two answers
+
+Not an overlap — a SIZE. The tower's `platformHeightFt` was the platform FRAME's top, and the
+decking was then laid on that, so a tower asked for 16 ft came out with its walking surface at
+16 ft 0¾ in. The loading platform had exactly this and an earlier pass fixed it the other way
+round — *"`deckHeightFt` IS the surface you walk on"* — so the two families disagreed about what
+the one figure an operator types actually means:
+
+```
+  tower, asked 16 / 24 / 32 ft      walked at 16.0625 / 24.0625 / 32.0625   ->  16 / 24 / 32
+  loading platform, asked 4 ft      walked at 4.0000 all along
+```
+
+The frame drops by the decking's thickness and the surface lands where it was asked for. What made
+this more than an arithmetic tidy is what else was reading the frame's line as though it were the
+deck: **the ladder's landing and the stair's top both took `deckY`**, which is the joists' top, so
+the way up delivered you to the frame with the decking ¾ in above it. Those, the cab's base and the
+guardrail's datum now all take `walkY`, and `levels.subfloorTop` — which is named for the decking —
+reports the decking rather than the joists.
+
+Four tests in `test/timber2-tower-height.test.ts`; one fails on the old generator and three are
+guards, which is the right shape for a change like this. Dropping the DECK instead of the frame
+would have put the surface right and left it hanging under the joists it is nailed to, so the
+decking's thickness and its bearing on the joists are both asserted; everything standing on the
+platform is asserted to start AT the surface; and the loading platform is asserted still to mean
+the same thing by its own figure, since agreement between the two is the whole point. Two
+thumbnails moved, the tower's.
+
+### Checked this pass and NOT a defect
+
+**The tent frame's bents at the ridge** — `bentRafter x ridge` 34 pairs at 1.56 in and
+`bentRafter x bentRafter` 17 at 1.50 across the two tent cards. A rafter meeting a ridge board is
+cut PLUMB, `ridgeHeadProfile` derives that cut off the piece, and `studio.ts` feeds it to
+`cutLumberPiece` — so the mesh is cut and the member's box is not. The generator's own comment
+already states the trade and says why there is no placement of a square-cut head that both bears on
+the board and stays out of it. Third documented approximation this sweep has re-found; recorded
+here with the two before it so a fourth pass does not open it again.

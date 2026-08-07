@@ -195,6 +195,16 @@ export function generateTower(spec: TowerSpec): TowerResult {
   const girtD = DRESSED[girtNominal]!.d / IN_PER_FT;
   /** Hoisted out of the platform block: the top girt is what the joists bear on. */
   const joistDepth = DRESSED[joistNominal]!.d / IN_PER_FT;
+  const deckThickFt = (PANEL.subfloorThickIn.value as number) / IN_PER_FT;
+  // `platformHeightFt` IS THE SURFACE YOU STAND ON. It was the platform FRAME's top, and the
+  // decking was then laid on that — so a tower asked for 16 ft came out with its walking surface
+  // at 16 ft 0¾ in, on every height the card offers. The loading platform had exactly this and an
+  // earlier pass fixed it the other way round, so the two families disagreed about what the one
+  // figure an operator types actually means. The frame drops by the decking's thickness and the
+  // surface lands where it was asked for; everything that stands ON the platform — the cab, the
+  // guardrail, the ladder's landing, the stair's top — takes `walkY`, not the frame.
+  const deckY = H - deckThickFt;
+  const walkY = H;
   /** The tower's centre in plan — `cornersAt` strikes the base square from the same figure. */
   const planCentre = spec.cabPlanFt / 2 + (TOWER.batterPerSideFt.value as number);
 
@@ -217,7 +227,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
   // piece. Stopped at the joists' undersides, which is where the top girt now tops out as well,
   // the whole platform frame sits ON the legs instead of inside them; and because the batter is
   // struck over the leg's own climb, the frame still opens out by exactly what the card locks.
-  const legTopY = H - joistDepth;
+  const legTopY = deckY - joistDepth;
   // The base square in PLAN is unchanged by this: the batter is measured over the leg's own
   // climb, so a leg's foot is `batterPerSideFt` wider than the cab wherever that foot sits.
   const base = cornersAt(spec, legBaseY, legBaseY, legTopY);
@@ -333,7 +343,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
       // cab posts, and the railing's posts and toe boards standing on the deck — 37 pairs of
       // solid members in the same space. It is the bearing line for the joists, so its top edge
       // belongs at their undersides.
-      const yGirt = b === bays ? H - joistDepth - girtD / 2 : yTop;
+      const yGirt = b === bays ? deckY - joistDepth - girtD / 2 : yTop;
       // A board is CUT SQUARE, and the gap it has to fit narrows as it goes up: the legs splay
       // downward, so the tightest place on a 5½-in-deep girt is its TOP arris, not its centre.
       // Struck at the centre, every girt still bit 0.27 in into both legs along its bottom edge —
@@ -412,7 +422,6 @@ export function generateTower(spec: TowerSpec): TowerResult {
   // ── Platform: joists across the leg square, decked.
   const deckHalf = spec.cabPlanFt / 2;
   const cx = planCentre;
-  const deckY = H;
   const joistY = deckY - joistDepth / 2;
   const joistSpacing = spec.spacing.joistSpacingIn / IN_PER_FT;
   const span = spec.cabPlanFt;
@@ -492,7 +501,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
       base: [cx, legBaseZ - clearance - legBaseY * lean],
       facing: [0, 1],
       baseY: 0,
-      landingY: deckY,
+      landingY: walkY,
       widthFt: accessWidth,
       stage: sAccess,
       leanPerFt: lean,
@@ -523,7 +532,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
       base: [cx, z],
       up: [0, 1],
       baseY: 0,
-      topY: deckY,
+      topY: walkY,
       widthFt: accessWidth,
       stage: sAccess,
       // Keep each flight to a bay; a straight run to 32 ft would need 40 ft.
@@ -558,10 +567,8 @@ export function generateTower(spec: TowerSpec): TowerResult {
         const cut = Math.min(plankW, cx - deckHalf - z);
         emit('deckPlank', plankNominal, {
           cutLengthFt: accessWidth,
-          // LEVEL WITH THE DECK YOU STEP ONTO, which is the platform's decking and not its frame:
-          // `deckY` is the joists' top and the subfloor lies on it, so planking the bridge to
-          // `deckY` would leave a ¾-in step at the threshold.
-          position: [cx, deckY + deckThick / IN_PER_FT - plankT / 2, z + cut / 2],
+          // LEVEL WITH THE DECK YOU STEP ONTO, which is the platform's decking and not its frame.
+          position: [cx, walkY - plankT / 2, z + cut / 2],
           rotation: [-Math.PI / 2, 0, 0],
           stage: sAccess,
           actual: { w: DRESSED[plankNominal]!.w, d: cut * IN_PER_FT },
@@ -600,7 +607,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
     // them, it leaves those holes alone and butts its rails on their faces.
     emit.members.push(...generateRailing({
       edges: [...edges, ...bridgeEdges],
-      deckY: deckY + deckThick / IN_PER_FT,
+      deckY: walkY,
       stage: sRail,
       standing: corners.map((at) => ({ at, widthFt: DRESSED[CAB_POST_NOMINAL]!.w / IN_PER_FT })),
     }));
@@ -643,7 +650,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
   const cabWallH = spec.cab.walls === 'open-rail'
     ? 0
     : spec.cab.walls === 'half-wall' ? (TOWER.cabHalfWallFt.value as number) : (TOWER.cabWallHeightFt.value as number);
-  const cabBaseY = deckY + deckThick / IN_PER_FT;
+  const cabBaseY = walkY;
   if (cabWallH > 0) {
     const halfW = spec.cab.walls === 'half-wall-screen' ? (TOWER.cabHalfWallFt.value as number) : cabWallH;
     const sidingT = (PANEL.sidingThickIn.value as number) / IN_PER_FT;
@@ -808,7 +815,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
 
   return {
     members: emit.members,
-    levels: { subfloorTop: deckY, joistTop: joistY, sillTop: 0, gradeY: 0 },
+    levels: { subfloorTop: walkY, joistTop: joistY, sillTop: 0, gradeY: 0 },
     stagePlan: plan,
   };
 }

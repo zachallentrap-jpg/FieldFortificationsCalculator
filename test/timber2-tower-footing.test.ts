@@ -186,11 +186,13 @@ test('THE BATTER THE CARD LOCKS IS THE BATTER THE LEGS HAVE, on either footing',
     // and reading the platform height off it would report a tower that shrank. The claim this
     // guard makes is about the walking surface, and that is what it measures.
     const { model } = tower({ footing });
-    const joists = model.members.filter((m) => m.role === 'joist');
-    assert.ok(joists.length > 0, `${footing}: no platform joists`);
-    const frameTop = Math.max(...joists.map((m) => m.position[1] + m.actual.d / 24));
-    assert.ok(Math.abs(frameTop - deckY) < TOL,
-      `${footing}: the platform frame tops out at ${frameTop.toFixed(4)}, not the stated ${deckY}`);
+    const deck = model.members.filter((m) => m.role === 'subfloor');
+    assert.ok(deck.length > 0, `${footing}: no platform decking`);
+    // AT THE SURFACE, not the frame: `platformHeightFt` is the height a person stands at, which
+    // is the decking's top. It used to be the frame's, with the decking ¾ in above it.
+    const walk = Math.max(...deck.map((m) => m.position[1] + m.actual.w / 24));
+    assert.ok(Math.abs(walk - deckY) < TOL,
+      `${footing}: the platform walks at ${walk.toFixed(4)}, not the stated ${deckY}`);
     const heads1 = Math.max(...heads.map((h) => h[1]));
     assert.ok(heads1 < deckY - TOL && deckY - heads1 < 1,
       `${footing}: the legs top out at ${heads1.toFixed(4)} and the deck is at ${deckY} — a leg carries the `
