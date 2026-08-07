@@ -54,7 +54,11 @@ export interface BunkerResult {
   notes: { path: string; message: string }[];
 }
 
-export function bunkerStagePlan(wallType: BunkerSpec['wallType'], showSoil: boolean): StagePlanEntry[] {
+export function bunkerStagePlan(
+  wallType: BunkerSpec['wallType'],
+  showSoil: boolean,
+  entrance: BunkerSpec['entrance'] = 'baffle',
+): StagePlanEntry[] {
   const rows: Parameters<typeof stagePlan>[0] = [
     // The hole itself is not modelled — staking its lines is real work that puts no member in
     // the model, which is what `noMembers` declares. Without it this row is indistinguishable
@@ -66,7 +70,20 @@ export function bunkerStagePlan(wallType: BunkerSpec['wallType'], showSoil: bool
     { key: 'plates', label: 'Caps', detail: 'Caps across the post tops, spreading the load off the stringers into the walls.' },
     { key: 'roof-frame', label: 'Overhead stringers', detail: 'Stringers across the clear span, sized for the stated depth of soil as a dead load.' },
     { key: 'roof-deck', label: 'Lagging over', detail: 'Lagging over the stringers, so nothing above falls between them.' },
-    { key: 'openings-built', label: 'Entrance', detail: 'Straight through, or offset so the way in is not a straight line.' },
+    // WHAT IS LEFT TO BUILD HERE once the opening is framed with the wall it is a hole in.
+    // The jambs are two of the wall's posts and the header is the cap continued across them, so
+    // both belong to the stages named for those pieces — they used to be stamped here, three
+    // stages after the cap they line up with and two after the overhead cover that bears on
+    // them. What remains is the baffle, and a straight entrance has none: the doorway is the gap
+    // left in the wall as it went up, which is a real stop on the scrubber and no material.
+    entrance === 'baffle'
+      ? { key: 'openings-built', label: 'Entrance', detail: 'The baffle: a short wall standing off the doorway and overlapping it, so the way in is not a straight line.' }
+      : {
+        key: 'openings-built',
+        label: 'Entrance',
+        detail: 'Open — straight in. The doorway was framed with the wall and capped with it, so what happens here is checking that the opening is where it should be.',
+        noMembers: true,
+      },
   ];
   if (showSoil) {
     rows.push({ key: 'soil-ghost', label: 'Cover (massing only)', detail: COVER_DEPTH_NOTE });
@@ -88,7 +105,7 @@ export function stringerFor(clearSpanFt: number): { nominal: string; reviewed: b
 
 export function generateBunker(spec: BunkerSpec): BunkerResult {
   const emit = makeEmitter('BK');
-  const plan = bunkerStagePlan(spec.wallType, spec.showSoilCover !== false);
+  const plan = bunkerStagePlan(spec.wallType, spec.showSoilCover !== false, spec.entrance);
   const sLayout = requireOrdinal(plan, 'layout');
   const sWall = spec.wallType === 'crib' ? requireOrdinal(plan, 'cribwork') : requireOrdinal(plan, 'walls');
   const sCap = requireOrdinal(plan, 'plates');
@@ -434,7 +451,12 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       cutLengthFt: wallTopY,
       position: [postInset, wallTopY / 2, z],
       rotation: [0, 0, Math.PI / 2],
-      stage: sEntry,
+      // WITH THE WALL, not with the entrance. A jamb IS one of the wall's posts — the comment
+      // above says it replaces the post that would have stood in the doorway — and it carries the
+      // header the overhead cover bears on. Stamped into the entrance stage it appeared three
+      // stages after the caps it lines up with and two after that cover, so the scrubber ran the
+      // stringers across the opening on nothing at all.
+      stage: sWall,
       nailing: 'set against the end of the wall run; capped (PH)',
       doctrineRef: citeOf(BUNKER.postNominal),
     });
@@ -454,7 +476,9 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
     cutLengthFt: doorWidth + 2 * jambT,
     position: [postInset, wallTopY + DRESSED[headerNominal]!.d / IN_PER_FT / 2, outerW / 2],
     rotation: [0, Math.PI / 2, 0],
-    stage: sEntry,
+    // And WITH THE CAPS, for the same reason: this piece is that course, and the two cap beams
+    // on either side of the doorway stop dead at the jambs waiting for it.
+    stage: sCap,
     nailing: 'drift-pinned to each jamb; carries the cover over the opening (PH)',
     doctrineRef: citeOf(BUNKER.capNominal),
   });

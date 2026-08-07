@@ -96,6 +96,7 @@ screenshots get read.
 | **Floor cross-bridging** | **Fixed** — recorded once as "it cannot be fixed". Both floor generators pitched the board's CENTRELINE across the whole joist depth, so all 698 pieces on eight cards stood 0.78 in outside the joists at both ends: a sawtooth along the underside and a corner out the top of the finished floor. |
 | **The tower brace's foot** | **Fixed** — struck corner to corner and left square, the board's low corner hung 2.21 in below the corner it was struck from, so every bottom-bay brace drove into the footing: 1.93 in of the mudsill, 1.92 of the concrete pad. Nothing cuts a `towerBrace`, so this one was on screen. |
 | **The gable rake** | **Fixed** — the roof stopped at the FRAMING line while the finished wall stands a skin thickness outside it, so half an inch of siding (an inch and a half of board-and-batten) ran along both rakes of every gable, shed and flat roof with nothing over it. There was no barge board in the toolkit. |
+| **The bunker's build order** | **Fixed** — the doorway's two jamb posts and its header were stamped into the ENTRANCE stage, three after the caps they line up with and two after the overhead cover that bears on them: scrub to stage 4 and ten stringers span the opening on nothing. |
 
 ## The shed that had no walls above the plate
 
@@ -4160,3 +4161,70 @@ lands ON the skin and past the roof's own edge, the board runs eave to ridge at 
 pitch with its thickness horizontal, and it buries itself in nothing while still bearing on
 something. No frame or compat golden moved: they carry no coverings. Eighteen thumbnails did —
 every skinned card with a rake.
+
+## Ten stringers over a hole
+
+A measurement axis this sweep had not used: not WHERE a member is, but WHEN. `Member.stage` is a
+1-based ordinal into the family's own plan and the scrubber plays it in order, so a piece whose
+stage is earlier than the thing it stands on is a piece that hangs in the air on screen — for as
+many stages as the gap is wide. The scan is one rule: for every pair whose undersides and tops meet
+and which actually touch, the upper one's stage must not be less than the lower one's.
+
+**The crib bunker fails it, and the doorway is why.**
+
+```
+  stage 2  posts & lagging        the wall, with a gap where the doorway is
+  stage 3  caps                   five cap beams — two of them stopping dead at the jambs
+  stage 4  overhead stringers     ten of them, running across the doorway
+  stage 5  lagging over
+  stage 6  entrance               the jambs and the header finally arrive
+```
+
+Rendered at stage 4 it is exactly that: the end wall notched for the doorway, the cap line broken
+across it, and the overhead cover spanning a five-foot hole with nothing under it for two stages.
+
+**The generator already knew.** Its own comments say *"Jambs first: the header has to land on
+something, and on a crib bunker there is no end wall for it to land on"*, *"THE HEADER IS THE CAP
+CONTINUED ACROSS THE DOORWAY"*, and, of the jambs, *"A post that would stand in the doorway is not
+built; the jamb is its replacement."* Three statements that these are wall and cap members — and
+one stage key that said they were entrance members. It is the same defect as the hip roof's
+*"members stamped into the ceiling stage"*, one family along.
+
+So the jambs go up with the wall and the header with the caps, and the entrance stage keeps what is
+actually built there: the baffle.
+
+**Which leaves an OPEN entrance with an empty stage, and that has to be declared.** `noMembers` is
+the difference this repo already draws between a real stop on the scrubber and a row nothing
+happens to generate for — *"what is NOT allowed is a stage that merely happens to be empty because
+nothing generates for it, which is how a 'pyramid' building came to advertise Ceiling joists and
+Rafters and build neither."* An open entrance is the first kind: the doorway was framed with the
+wall and capped with the caps, and what happens at that stop is checking that the opening is where
+it should be. `bunkerStagePlan` now takes the entrance kind and says so in the row's own detail.
+
+```
+  bearing pairs checked, crib bunker    378
+  out of order                            2  ->  0      (both wall types, both entrances)
+```
+
+Four tests in `test/timber2-bunker-stages.test.ts`; three fail on the old generator. The fourth is
+the geometry guard — a stage key is a number on a member and nothing stops it being changed
+alongside the piece by accident, so the header is still asserted to top out ON the cap line and to
+land on both jambs. No goldens moved: not one member changed position, size or rotation.
+
+### Checked this pass and NOT a defect
+
+**The scan's other hits are its own blind spot, and worth writing down before someone re-finds
+them.** "A's underside is level with B's top and they touch" is not the same as "A stands on B":
+
+```
+  joist(7) on siding(11)       70 pairs, gp-frame   a ceiling joist bearing on the CAP PLATE,
+                                                    level with the wall siding's top and beside it
+  stud(8) on siding(11)        30                   the same, for the gable studs
+  jackStud(5) on siding(11)     4                   the same at the sole plate
+  deckPlank(3) on stringer(5)   4, platform         the deck bears on JOISTS; the ramp's stringer
+                                                    is merely butted under its edge
+```
+
+Every one is two members that happen to share a level and touch sideways. A stricter relation — the
+supporting member has to be under the supported one in plan, not merely adjacent to it — is what
+would make the scan catalog-wide, and until it is, the rule is stated where it was measured.
