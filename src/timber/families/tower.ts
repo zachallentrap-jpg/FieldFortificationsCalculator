@@ -50,18 +50,26 @@ export function towerStagePlan(): StagePlanEntry[] {
   ]);
 }
 
-/** Plan half-width of the leg square at a given height, from the batter. */
-function halfAt(spec: TowerSpec, y: number): number {
+/**
+ * Plan half-width of the leg square at a given height, from the batter.
+ *
+ * `baseY` is where the LEGS start, which is not always grade: a timber mudsill is a footing that
+ * lies ON the ground, so the legs it carries begin at its top. The batter is a property of the
+ * legs — "the base is wider than the cab by this much per side", and the base of a leg is its
+ * foot — so it is measured over the leg's own climb. Left at 0 this is the old formula exactly,
+ * which is what a concrete pad wants: the pad is poured below grade, the legs start on grade.
+ */
+function halfAt(spec: TowerSpec, y: number, baseY = 0): number {
   const top = spec.cabPlanFt / 2;
   const batter = TOWER.batterPerSideFt.value as number;
-  const h = Math.max(EPS_FT, spec.platformHeightFt);
-  // Linear batter: widest at grade, narrowing to the cab plan at the platform.
-  return top + batter * (1 - Math.min(1, Math.max(0, y / h)));
+  const h = Math.max(EPS_FT, spec.platformHeightFt - baseY);
+  // Linear batter: widest at the leg's foot, narrowing to the cab plan at the platform.
+  return top + batter * (1 - Math.min(1, Math.max(0, (y - baseY) / h)));
 }
 
 /** The four legs' plan positions at a height, in a fixed corner order. */
-function cornersAt(spec: TowerSpec, y: number): [number, number][] {
-  const h = halfAt(spec, y);
+function cornersAt(spec: TowerSpec, y: number, baseY = 0): [number, number][] {
+  const h = halfAt(spec, y, baseY);
   const c = spec.cabPlanFt / 2 + (TOWER.batterPerSideFt.value as number);
   // Origin at the base square's front-left corner keeps the tower in the same +X/+Z quadrant
   // every other family uses, so one camera rig frames all of them.
@@ -91,7 +99,21 @@ export function generateTower(spec: TowerSpec): TowerResult {
   const bay = TOWER.bayHeightFt.value as number;
 
   // ── Footings
-  const base = cornersAt(spec, 0);
+  //
+  // A LEG STANDS ON ITS FOOTING; IT IS NOT DRIVEN THROUGH IT. The two footings this family offers
+  // put their bearing surface in different places, and the legs only ever knew about one of them.
+  // A concrete pad is poured BELOW grade, so its top is grade and a leg starting at y = 0 lands on
+  // it. A timber mudsill is bedded ON the ground — that is what a mudsill is for, spreading the
+  // load over tamped fill rather than a hole — so its top is a 6x8's thickness up. Starting the
+  // legs at grade regardless put 5 7/8 in of every leg inside the sill it was supposed to bear on,
+  // with the tower standing on the earth between four timbers it passed straight through.
+  //
+  // The same fault, and the same fix, as the loading platform's posts on skids.
+  const mudNominal = TOWER.mudsillNominal.value as string;
+  const legBaseY = spec.footing === 'concrete-pad' ? 0 : DRESSED[mudNominal]!.w / IN_PER_FT;
+  // The base square in PLAN is unchanged by this: the batter is measured over the leg's own
+  // climb, so a leg's foot is `batterPerSideFt` wider than the cab wherever that foot sits.
+  const base = cornersAt(spec, legBaseY, legBaseY);
   if (spec.footing === 'concrete-pad') {
     for (const [x, z] of base) {
       const side = (TOWER.padSideIn.value as number) / IN_PER_FT;
@@ -108,14 +130,13 @@ export function generateTower(spec: TowerSpec): TowerResult {
       });
     }
   } else {
-    const mudNominal = TOWER.mudsillNominal.value as string;
     const mudLen = TOWER.mudsillLengthFt.value as number;
     for (const [x, z] of base) {
       emit('sill', mudNominal, {
         cutLengthFt: mudLen,
         // A mudsill spreads load, so it lies on its BROAD face — the whole point of the piece.
         // On edge it was a 7 1/4-in fin under each leg, bearing on 1 1/2 in of dirt.
-        position: [x, DRESSED[mudNominal]!.w / IN_PER_FT / 2, z],
+        position: [x, legBaseY / 2, z],
         rotation: [-Math.PI / 2, 0, 0],
         stage: sLayout,
         nailing: 'bedded on tamped fill; leg drift-pinned (PH)',
@@ -127,20 +148,25 @@ export function generateTower(spec: TowerSpec): TowerResult {
   // ── Legs. Battered, so each is a raked member: length is the hypotenuse and the tilt is
   // toward the tower's centre.
   const legTopY = H;
-  const topCorners = cornersAt(spec, legTopY);
+  // The legs' own climb, which is the platform height less whatever the footing holds them up
+  // by. Everything framed BETWEEN the legs — the girts, the braces, the bays they divide — is
+  // measured over this, not over the height above grade. Left on grade, the bottom bay's girt
+  // and both its diagonals ended 5 7/8 in below the feet they were supposed to be bolted to.
+  const climb = legTopY - legBaseY;
+  const topCorners = cornersAt(spec, legTopY, legBaseY);
   for (let i = 0; i < 4; i++) {
     const [x0, z0] = base[i]!;
     const [x1, z1] = topCorners[i]!;
     const dx = x1 - x0;
     const dz = z1 - z0;
     const runFt = Math.hypot(dx, dz);
-    const lenFt = Math.hypot(runFt, legTopY);
+    const lenFt = Math.hypot(runFt, climb);
     // Yaw the member onto the lean direction, then pitch it up by the rake.
     const yaw = runFt < 1e-6 ? 0 : Math.atan2(-dz, dx);
-    const pitch = Math.atan2(legTopY, Math.max(1e-6, runFt));
+    const pitch = Math.atan2(climb, Math.max(1e-6, runFt));
     emit('towerLeg', legNominal, {
       cutLengthFt: lenFt,
-      position: [(x0 + x1) / 2, legTopY / 2, (z0 + z1) / 2],
+      position: [(x0 + x1) / 2, (legBaseY + legTopY) / 2, (z0 + z1) / 2],
       rotation: [0, yaw, pitch],
       stage: sLegs,
       nailing: 'drift-pinned at the sill; bolted at every girt (PH)',
@@ -149,12 +175,12 @@ export function generateTower(spec: TowerSpec): TowerResult {
   }
 
   // ── Girts and X-braces, bay by bay, on all four faces.
-  const bays = Math.max(1, Math.round(H / bay));
+  const bays = Math.max(1, Math.round(climb / bay));
   for (let b = 1; b <= bays; b++) {
-    const yTop = (H * b) / bays;
-    const yBot = (H * (b - 1)) / bays;
-    const top = cornersAt(spec, yTop);
-    const bot = cornersAt(spec, yBot);
+    const yTop = legBaseY + (climb * b) / bays;
+    const yBot = legBaseY + (climb * (b - 1)) / bays;
+    const top = cornersAt(spec, yTop, legBaseY);
+    const bot = cornersAt(spec, yBot, legBaseY);
     for (let f = 0; f < 4; f++) {
       const a = top[f]!;
       const c = top[(f + 1) % 4]!;
@@ -250,15 +276,21 @@ export function generateTower(spec: TowerSpec): TowerResult {
     const batter = TOWER.batterPerSideFt.value as number;
     // `halfAt` is the frame's own batter curve; reading the base off it means the ladder cannot
     // drift from the legs if the batter ever changes.
-    const legBaseZ = cx - halfAt(spec, 0);
+    const legBaseZ = cx - halfAt(spec, legBaseY, legBaseY);
+    // The rake is the LEGS' rake, which is the batter over their own climb — and the ladder's
+    // foot is on the GROUND while theirs is on the footing, so its base is set back by the lean
+    // it would have picked up over that difference. Both halves matter: take the rake off the
+    // height above grade and the gap opens with height; skip the setback and it closes to
+    // 6 5/8 in at the bottom, under the figure this whole block exists to hold.
+    const lean = climb > 0 ? batter / climb : 0;
     const { members } = generateLadder({
-      base: [cx, legBaseZ - clearance],
+      base: [cx, legBaseZ - clearance - legBaseY * lean],
       facing: [0, 1],
       baseY: 0,
       landingY: deckY,
       widthFt: accessWidth,
       stage: sAccess,
-      leanPerFt: deckY > 0 ? batter / deckY : 0,
+      leanPerFt: lean,
     });
     emit.members.push(...members);
   } else {

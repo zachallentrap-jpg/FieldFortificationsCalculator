@@ -2320,3 +2320,71 @@ regenerated in the same commit.
 - **The end joists project ¾ in past the decking**, which is what makes "the deck edge" two
   different planes. The stair now bears on the outer one. Bringing them together means insetting
   the end joists by half a thickness — the whole joist grid moves.
+
+## The tower's legs, driven through their mudsills
+
+`footing: 'timber-mudsill'` is the guard tower's shipped preset, so this is the tower everyone
+sees. The family offers two footings and they put their bearing surface in different places:
+
+```
+concrete-pad    poured BELOW grade      y -1.000 → 0.000     top IS grade
+timber-mudsill  bedded ON the ground    y  0.000 → 0.458     top is a 6x8's thickness up
+```
+
+The legs started at `y = 0` either way. Measured on the preset:
+
+```
+TW-towerLeg-01 into TW-sill-01 ... 5.86 in
+```
+
+— every leg driven through the timber it was supposed to bear on, the tower standing on the earth
+between four planks it passed straight through. The render shows the leg continuing past the sill's
+top face to the ground plane with the sill spread out around it like something it was hammered into.
+It is the same fault, and the same fix, as the loading platform's posts on skids.
+
+### Moving the legs, not the sills
+
+Burying the sill would also stop the leg being inside it, and a mudsill bedded 5½ in under the
+earth is not a mudsill. So the legs come up and the sills stay on the ground — which pulls three
+more things with it, each of which would have been a new defect on its own:
+
+1. **The bays are divided over the legs' CLIMB**, not over the height above grade. Left alone, the
+   bottom bay's girt and both its diagonals still finished at `y = 0`, 5⅞ in below the feet they
+   are bolted to. There is a regression test for exactly this half-done state, and it was run
+   against it.
+2. **The batter is measured over the legs' own climb.** `TOWER.batterPerSideFt` is on the card's
+   lock list and is stated as a property of the legs — *"the base is wider than the cab by this
+   much per side"* — and the base of a leg is its foot. Measured from grade with the foot 5½ in up,
+   the legs would have spread 1 ft 5½ in per side against a locked 1 ft 6 in. The plan footprint is
+   unchanged by this: a foot is `batterPerSideFt` outside the cab wherever that foot sits.
+3. **The ladder's rake is the legs' rake**, `batter / climb` — and its foot is on the GROUND while
+   theirs is on the footing, so its base is set back by the lean it would have picked up over that
+   difference. Take the rake off the height above grade and the gap opens with height; skip the
+   setback and it closes to 6⅝ in at the bottom, under the 7.2 in this whole block exists to hold.
+   It is 7.200 in at every rung on both footings now.
+
+### And a test that had become a copy of the generator
+
+`timber2-tower-ladder` measured its clearance against `cx - (half + batter·(1 − y/h))` — the batter
+formula, restated in a second place. It goes stale the moment the datum moves, and it did. It now
+interpolates the emitted leg instead, so it measures the frame the generator actually built, and it
+runs on both footings.
+
+Six regression tests here, two failing on the old code (the other four are the guards: the sill
+still lies on the ground, nothing starts below the leg feet, the locked batter still holds, the
+footprint does not move), plus the tower's two card goldens.
+
+### Measured, not fixed
+
+- **The square end cuts.** A leg is raked and cut square to its rake, so the low corner of its foot
+  face sits `½·faceWidth·cos(pitch)` = **0.37 in** below the bearing plane. A battered leg's foot
+  wants a LEVEL cut, the way a stair stringer's does. The braces are worse for the same reason:
+  square-cut on a steeper rake, `TW-towerBrace-01`'s low corner overhangs its own end point by
+  **2.19 in**, which now lands inside a mudsill instead of in the dirt. Both want the
+  `stringerCuts.ts` treatment — a derived profile, no generator change, no golden moves.
+- **The legs are set diamond-wise in plan.** `yaw = atan2(-dz, dx)` aims the member at its lean
+  direction, which for a corner leg is the diagonal — and yaw spins the SECTION as well as the
+  lean. The 6x6's foot corners come out at (±0.323, ∓0.001) ft, so its 7¾-in diagonal faces along
+  the tower's own axes while the girts, at `yaw = 0`, are square to the frame. A girt bolted to a
+  leg therefore meets an arris, not a face. Fixing it means giving the leg a two-axis tilt instead
+  of yaw-then-pitch, which moves the girt and brace bearings and every tower golden.
