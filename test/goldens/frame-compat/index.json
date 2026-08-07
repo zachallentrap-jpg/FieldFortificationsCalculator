@@ -6,435 +6,435 @@
       "name": "demo",
       "note": "The TIMBER-1 demo building — the spec woodframe-scene.ts boots with.",
       "members": 310,
-      "sha256": "79f571c1e1b2ab39e41d5761a6c8390099460863caa93b1c56d549561704eab2"
+      "sha256": "e451e80f600e9a8811b791e7dc1321b58d9123fc9dd43e1fec32ddf8609e45cc"
     },
     {
       "name": "demo-basement",
       "note": "Basement foundation: slab, columns, framed stairwell, stair.",
       "members": 311,
-      "sha256": "fcb272afd682db1ddedc7cbe87744c327948ae9cb4659887474d53d23335b8f0"
+      "sha256": "8dbe83eae4f164e13b8016c3c5992d3746e8c2cf3a8f67938c61c11b8e79bd41"
     },
     {
       "name": "demo-wall-foundation",
       "note": "Continuous wall foundation: stem walls, strip footings, sills all four sides.",
       "members": 300,
-      "sha256": "4b1fbf84c16b7298321acf7c3fbf8cc2217f29918b6eb9a653cbb3179adcb58a"
+      "sha256": "15b4e1593e323165e3870c5c53c3525b7ac4656caa974342778f2fda47f94c3b"
     },
     {
       "name": "demo-solid-bridging",
       "note": "Solid full-depth blocking instead of the cross-bridging default.",
       "members": 280,
-      "sha256": "38a654d658aa83ac5095fddade3dc26be54fc499d4136af8ec0cad0774663b5f"
+      "sha256": "f4666563b579a97a04a032a5a4ddb94a854cb07bd2f0f47994b44301e7872bf1"
     },
     {
       "name": "demo-braced-attic",
       "note": "Let-in corner bracing (stage 6) + the framed attic scuttle (stage 7).",
       "members": 328,
-      "sha256": "0bd986056401d3b2293df62183d37b0b6fda1888c31a5843e2687d420bb0f338"
+      "sha256": "a3dcc09006df6520fa2325025a252c3c94da4f9cfcdf80d78aa3ff5af24c2b97"
     },
     {
       "name": "small-12x8",
       "note": "Small plan: half-span under the bridging threshold, short wall runs.",
       "members": 142,
-      "sha256": "c56174c97f67e0a77b154ed2bf9e1d13019a17b6201150a60f35c0f6405a5b91"
+      "sha256": "fac8833f1107954468a9ae3bde41e4354c47d74f3a0840ea134b0d105be4b66f"
     },
     {
       "name": "large-40x24",
       "note": "Large plan: multiple post bays, many subfloor courses and rafter pairs.",
       "members": 522,
-      "sha256": "f310187a69dede29e7befcdbfc3d90d8326355f5d636414b8eb740e0cf5f0bb3"
+      "sha256": "49047c374d7ccde80ccb0b21db5560775f5941e7b4bc990b0896d18568da9474"
     },
     {
       "name": "openings-unsorted",
       "note": "TD5: same-wall openings supplied OUT of offset order — emission order must follow the input array, never a normalized sort (per-role id counters bake the order in).",
       "members": 311,
-      "sha256": "959b420fc45d3d42b818fcb619ff9cb117646752a01c0143bd5f7accd611fc53"
+      "sha256": "d99d57895fb67b6d8718b65a527160127330545f1fd0d1355937e2b009114f8a"
     },
     {
       "name": "openings-equal-offset",
       "note": "TD5: two openings at the SAME offset on one wall — a total sort with no tie-break would be unstable here; the compat path must not sort at all.",
       "members": 306,
-      "sha256": "98f6fa62d562c0a08b575757c6521ff1bda2df7314f4868d36e14320c16ca8c5"
+      "sha256": "e9c36bd6a03d34b30af5afa07a1648063071bf71a14882f626d9b69c335546ae"
     },
     {
       "name": "spacing-24",
       "note": "24 in OC studs/joists/rafters — the other legal spacing on every grid.",
       "members": 241,
-      "sha256": "073bf3bf14bf4983d713b7b119bf61b8724e9bfccc8d05f007193780feff76bf"
+      "sha256": "b364429a4ecc6929833c5af8d82b29ef8f649b9aa00af46fe5c0f5fae98af9d1"
     },
     {
       "name": "steep-12-12",
       "note": "12:12 pitch — the top of the pitch envelope; gable studs and course tiling stress.",
       "members": 316,
-      "sha256": "9395f38b4b2cfb1fcd75675f9d7c4dcc2f9938d06c450b1b0cb6b959bccaee78"
+      "sha256": "ecef9ae0045c27fd21743d58fde086cad6d61a10ab180c1c75741ae21538908c"
     },
     {
       "name": "shallow-2-12-no-overhang",
       "note": "2:12 pitch with zero overhang — the eave collapses onto the plate line.",
       "members": 306,
-      "sha256": "4cb7315e8a7074089d7c1eff934312812446efa1803d193cba6f939b99ad22ee"
+      "sha256": "a11d838072b2f7dd436b9b3db95f1ccb2a329f8c909fd9944507f25816c46884"
     }
   ],
   "matrix": [
     {
       "name": "matrix-piers-cross-b0-a0-20x16",
       "members": 288,
-      "sha256": "0c6392b8517c251a1233f9095f5f754f82b369b2bca389e4223a8c0ec0682fcc"
+      "sha256": "f6502b0076150467f7e2c53764fa37743b76093a62de27cbb81e396e21e57853"
     },
     {
       "name": "matrix-piers-cross-b0-a0-12x8",
       "members": 142,
-      "sha256": "c56174c97f67e0a77b154ed2bf9e1d13019a17b6201150a60f35c0f6405a5b91"
+      "sha256": "fac8833f1107954468a9ae3bde41e4354c47d74f3a0840ea134b0d105be4b66f"
     },
     {
       "name": "matrix-piers-cross-b0-a0-40x24",
       "members": 522,
-      "sha256": "f310187a69dede29e7befcdbfc3d90d8326355f5d636414b8eb740e0cf5f0bb3"
+      "sha256": "49047c374d7ccde80ccb0b21db5560775f5941e7b4bc990b0896d18568da9474"
     },
     {
       "name": "matrix-piers-cross-b0-a1-20x16",
       "members": 298,
-      "sha256": "35359fbbc0c488dc71ae6a093c60d6047954630a6befe42fbeb4dcae2fa64a0a"
+      "sha256": "815a6bda5fe0b5660df9c398e3e7c91963f57d5b722e093a78736e94f6438e2e"
     },
     {
       "name": "matrix-piers-cross-b0-a1-12x8",
       "members": 152,
-      "sha256": "64b7fa1f4f61347e6fcb4f9a70f2d5936be86e4a8978b1a1ebc848354695f7f1"
+      "sha256": "736c8b4ab09bf233e96fcee7d68cc447f192a0779273aab8c4b25a0d377d58cb"
     },
     {
       "name": "matrix-piers-cross-b0-a1-40x24",
       "members": 529,
-      "sha256": "e63f51f68bb995cfe1bcdafaeb6ea0d67cb0671fcde7e9b632dcbc6b2b61582e"
+      "sha256": "440f26cfc9d116c639b759362152d843fc69bec25725ee5ae8f06bf513fb69da"
     },
     {
       "name": "matrix-piers-cross-b1-a0-20x16",
       "members": 296,
-      "sha256": "f3f56f3d9ba494de576a6d15e7247bb459eca7a1d110472e3a6097aeccf6aaa8"
+      "sha256": "fee90db17e31bba78d0d8f51cf1edb1469123e2a06ead8737257fd3f23abd8de"
     },
     {
       "name": "matrix-piers-cross-b1-a0-12x8",
       "members": 150,
-      "sha256": "288c687665bc5e0e8deb92bf8496f381a17801a9a1354ef787c127f692f59bd8"
+      "sha256": "e727b05d7649e0b57fca2d69c048442636978411b23b5ee09c0eb83cf59898c7"
     },
     {
       "name": "matrix-piers-cross-b1-a0-40x24",
       "members": 530,
-      "sha256": "081cd0a17dd3c9cce1ed27d0fc603d66c5afd6b8617a4262df80511a9436506b"
+      "sha256": "f4913b18b10df7645d61edcc1a1955d40b39bcb832b733d3f5618e1e1081ff5d"
     },
     {
       "name": "matrix-piers-cross-b1-a1-20x16",
       "members": 306,
-      "sha256": "fd9153d4962492e9b05ab4557db3557240e612df72d50c97b12c28f9950890d5"
+      "sha256": "d9b053cb812e13efc06e6e00491afd5994e49ee14de88aae8c61166517b24ab7"
     },
     {
       "name": "matrix-piers-cross-b1-a1-12x8",
       "members": 160,
-      "sha256": "b2bc92c4f8926a54e7b6a65703d6cc5ed5ac9fa6c45a8c08c90e380d7d8b4e6b"
+      "sha256": "83233681e7c0a308c288e19f56798038cf7fd8cbabd458684a4be0160ca106cd"
     },
     {
       "name": "matrix-piers-cross-b1-a1-40x24",
       "members": 537,
-      "sha256": "43fc83fbbd72f61960ad51070b3b0768a90f591d61bd5ac93a4c8ccc34bf6f14"
+      "sha256": "773dcf83606562d3660b897ff2a02431c72f137a34119550490179cbc6a12f55"
     },
     {
       "name": "matrix-piers-solid-b0-a0-20x16",
       "members": 258,
-      "sha256": "82a6e809d6910dbcbed8f1e7f8713d2015cf3dc90525fc785e91081a582034a0"
+      "sha256": "6eb3d9cc6d6f5673f768ea324b8ae2ce101abe2bcd457ea3782df80eb5c9cf50"
     },
     {
       "name": "matrix-piers-solid-b0-a0-12x8",
       "members": 142,
-      "sha256": "c56174c97f67e0a77b154ed2bf9e1d13019a17b6201150a60f35c0f6405a5b91"
+      "sha256": "fac8833f1107954468a9ae3bde41e4354c47d74f3a0840ea134b0d105be4b66f"
     },
     {
       "name": "matrix-piers-solid-b0-a0-40x24",
       "members": 462,
-      "sha256": "ae126d95507461407abe9d656e3a571e6eb5c45e9d7800df4d1baa5f8fbf21c8"
+      "sha256": "461e0f24413bbf5b530c4fb35f6336f6c9ebcaa98be6fcba52d164d713954362"
     },
     {
       "name": "matrix-piers-solid-b0-a1-20x16",
       "members": 268,
-      "sha256": "e57a3917c56abb6c9f8e50c4109df1ac0ed73319f2534197181d3026bb29ab91"
+      "sha256": "e81a62826a3721603ad5aa93813d26dc661726c253094e216013d11ebfe00228"
     },
     {
       "name": "matrix-piers-solid-b0-a1-12x8",
       "members": 152,
-      "sha256": "64b7fa1f4f61347e6fcb4f9a70f2d5936be86e4a8978b1a1ebc848354695f7f1"
+      "sha256": "736c8b4ab09bf233e96fcee7d68cc447f192a0779273aab8c4b25a0d377d58cb"
     },
     {
       "name": "matrix-piers-solid-b0-a1-40x24",
       "members": 469,
-      "sha256": "2fa415cc519cbea20f36d929a97a0d665c35d1d16aee921f821972e321e7d530"
+      "sha256": "7c7f422d8d114db9d9d09d24460bee99a0e8a3dd54f1a7c3020269889de4be7e"
     },
     {
       "name": "matrix-piers-solid-b1-a0-20x16",
       "members": 266,
-      "sha256": "7465233e16805cbc4e0a72360a0a2ada122a1e7894f4da831a5f3167c0f9cd2b"
+      "sha256": "c18d6dd94817adb33a009f511201ab14fdf91de98f47916035a2c4a3016011b7"
     },
     {
       "name": "matrix-piers-solid-b1-a0-12x8",
       "members": 150,
-      "sha256": "288c687665bc5e0e8deb92bf8496f381a17801a9a1354ef787c127f692f59bd8"
+      "sha256": "e727b05d7649e0b57fca2d69c048442636978411b23b5ee09c0eb83cf59898c7"
     },
     {
       "name": "matrix-piers-solid-b1-a0-40x24",
       "members": 470,
-      "sha256": "bb2b8306e7a330d3711606c1ad87854c3317a20ec0bcf1dfd33c79ef905fa540"
+      "sha256": "971c9dab53a2763f3bf01269c1453ddc3c59979e53880939f78e7f1458a9446b"
     },
     {
       "name": "matrix-piers-solid-b1-a1-20x16",
       "members": 276,
-      "sha256": "45da05192ea55aeb90843cb04b3d39a3e627eebaee3a574db74cdcf7ba158e2a"
+      "sha256": "b2edad94dd1e058db3a20f0316afba66f2416c4dbc36f221692710ae16e5fb08"
     },
     {
       "name": "matrix-piers-solid-b1-a1-12x8",
       "members": 160,
-      "sha256": "b2bc92c4f8926a54e7b6a65703d6cc5ed5ac9fa6c45a8c08c90e380d7d8b4e6b"
+      "sha256": "83233681e7c0a308c288e19f56798038cf7fd8cbabd458684a4be0160ca106cd"
     },
     {
       "name": "matrix-piers-solid-b1-a1-40x24",
       "members": 477,
-      "sha256": "48df0f79d75354899294142a2790440890c8722b5ff2affcef88862408f7c1e5"
+      "sha256": "9018d2d87b469a950582c016257aa4235384586d908c409dfcc472a3707da066"
     },
     {
       "name": "matrix-wall-cross-b0-a0-20x16",
       "members": 278,
-      "sha256": "13d10eb5585c760b13fedc19c28b06b81a4488fe7077845d3dd8265db6b18305"
+      "sha256": "a3da6063d3f05a9afcff9d3160fe60751e6859aaa524ddebe62ebd4efe9ea994"
     },
     {
       "name": "matrix-wall-cross-b0-a0-12x8",
       "members": 136,
-      "sha256": "9b596c47228c3d8301e20053e7a07ec1cc4ed4910c743727c590e25ac957a2e3"
+      "sha256": "3d02b0d2b9ce14c631b58aac3f39c22b31048471a9c58ddd12f1b848b2000552"
     },
     {
       "name": "matrix-wall-cross-b0-a0-40x24",
       "members": 504,
-      "sha256": "510f20201030c75b70e9e5f5f98f66bd8e4a6f463ccca1447e625fe4758f3ba1"
+      "sha256": "dd17ee86d2968bee1d7bbf45d492110e3634adb07ccdf89df9df0305307edc70"
     },
     {
       "name": "matrix-wall-cross-b0-a1-20x16",
       "members": 288,
-      "sha256": "b4e26d8ea60e02ee0ecfafdf8209949f127edc15b2e91cfc3eedb875d96f86f0"
+      "sha256": "0285980cf4e5c59fa26ce76059112413f12450f5ffe2a036ffecb05ec32c559f"
     },
     {
       "name": "matrix-wall-cross-b0-a1-12x8",
       "members": 146,
-      "sha256": "3ecaeb058bb03e50fc5253171b560f758e0a2906b8ff8ef3b2dbc7168da2263f"
+      "sha256": "631ed49240ae51f45e662954bdaad495a65b8134addb392970355a18cc978e34"
     },
     {
       "name": "matrix-wall-cross-b0-a1-40x24",
       "members": 511,
-      "sha256": "78a7eaffbf0fc9038c20080a14af99f442a3b462ff83cbbc90cc345eb3fb925d"
+      "sha256": "0f0d4608005165b47bee9bba6cb4c4062629aaea178a2763dca4ea9ab31acc00"
     },
     {
       "name": "matrix-wall-cross-b1-a0-20x16",
       "members": 286,
-      "sha256": "52c5de54286f5fa82e44674854f8045845fca6313126777f0099f315fa7719c1"
+      "sha256": "49ef4489c8d668652904d010e9a2794abe49afa3c379c60b6bfdd0369985df14"
     },
     {
       "name": "matrix-wall-cross-b1-a0-12x8",
       "members": 144,
-      "sha256": "15f1699bd08d0d568ac2cd66fba277b2efff47f38c1dea66fe772a31700ba8b0"
+      "sha256": "4048fa8ae9b1d03c232e48dbac2192716b37f7fd308e34d0629aa2a65638a613"
     },
     {
       "name": "matrix-wall-cross-b1-a0-40x24",
       "members": 512,
-      "sha256": "a398e7327624b62d1ba1bd88443e4da8ae6a5ce38dc2c6671a70f86cdd115f05"
+      "sha256": "1bca23d43e0082e7c108d03166572f521eccd367d8adcf40a0efe972db4dc863"
     },
     {
       "name": "matrix-wall-cross-b1-a1-20x16",
       "members": 296,
-      "sha256": "a2d9ace24998901f45052a72d98317c1e28a87fef7b058d04b08806a4e847268"
+      "sha256": "dcb356de0237b9b86ec59e50dad1d67bd4eef35ea86ad80d9f479eb3abc49393"
     },
     {
       "name": "matrix-wall-cross-b1-a1-12x8",
       "members": 154,
-      "sha256": "5d65cb62e66b9fdc397d2eae8dda5f18334e7d896ecfc7e7dca8240d08cb7b0e"
+      "sha256": "0e9f9f77e0c50d5872f5e6f833b95ae818f8cccc0bfa9cec68daa6796cc4eca9"
     },
     {
       "name": "matrix-wall-cross-b1-a1-40x24",
       "members": 519,
-      "sha256": "38bbe895e363a9827fed03566193d2486f942dc15f97adc5fba741d7b99a441d"
+      "sha256": "9a6cd508c3a987625700de933344126b6d7566054eb4cdf62b0c4021d24b5923"
     },
     {
       "name": "matrix-wall-solid-b0-a0-20x16",
       "members": 248,
-      "sha256": "da3fd855ed2958e5f5e2c2ee3fb8996b6f69bb78f2d06bb103a5f8814c76654a"
+      "sha256": "420b7b724b13ae0ea99efff726f21cd7c51e1311f6e4f534e035455867fbdea8"
     },
     {
       "name": "matrix-wall-solid-b0-a0-12x8",
       "members": 136,
-      "sha256": "9b596c47228c3d8301e20053e7a07ec1cc4ed4910c743727c590e25ac957a2e3"
+      "sha256": "3d02b0d2b9ce14c631b58aac3f39c22b31048471a9c58ddd12f1b848b2000552"
     },
     {
       "name": "matrix-wall-solid-b0-a0-40x24",
       "members": 444,
-      "sha256": "bc2ccf2d40f1ef45799e28d379da7b1eef806f9cba26724ab2ee859f9b6415b5"
+      "sha256": "2255e2a9be6b065b1e4a56a0d0a97d20433e3128b8ae17af64c04cf0b26dd1dc"
     },
     {
       "name": "matrix-wall-solid-b0-a1-20x16",
       "members": 258,
-      "sha256": "bc93bc08959875226f12ee7ed531ecc3cce088ee7a92931e5f17b7dc59722f51"
+      "sha256": "f965df8836cca573fb7198bbe2efc9fb33d0d5c4bc5598dac3ea8cdd5f5c4b13"
     },
     {
       "name": "matrix-wall-solid-b0-a1-12x8",
       "members": 146,
-      "sha256": "3ecaeb058bb03e50fc5253171b560f758e0a2906b8ff8ef3b2dbc7168da2263f"
+      "sha256": "631ed49240ae51f45e662954bdaad495a65b8134addb392970355a18cc978e34"
     },
     {
       "name": "matrix-wall-solid-b0-a1-40x24",
       "members": 451,
-      "sha256": "bf51009178d6f67e4d11ea38e9b962e03f02e5bf8a2b3497260be5acb88d09d0"
+      "sha256": "f93e8047723d8b02a047ef4d4911ad58a148c0fe87ef0d9a3ca3d585d1796ee1"
     },
     {
       "name": "matrix-wall-solid-b1-a0-20x16",
       "members": 256,
-      "sha256": "5e5c068ed473f050efd8ef886c119da36c566148ea23ad47144224ee6bd6ec27"
+      "sha256": "4690b2ab4d5ff8a10286e21e686152594d88a7a96b4c8e5eff7b1e7a02517438"
     },
     {
       "name": "matrix-wall-solid-b1-a0-12x8",
       "members": 144,
-      "sha256": "15f1699bd08d0d568ac2cd66fba277b2efff47f38c1dea66fe772a31700ba8b0"
+      "sha256": "4048fa8ae9b1d03c232e48dbac2192716b37f7fd308e34d0629aa2a65638a613"
     },
     {
       "name": "matrix-wall-solid-b1-a0-40x24",
       "members": 452,
-      "sha256": "6f0ea4ce4e5bb997bff4ca566c6d42a4cb55826cd9c4201f1b52613ad7a92d0e"
+      "sha256": "576266b318ebe6a879d9afed402ca6fca170d8811d41c6a303ff5210c30d09c6"
     },
     {
       "name": "matrix-wall-solid-b1-a1-20x16",
       "members": 266,
-      "sha256": "cd6169730f58c75a7c2f6d6b2bf5eb748f52c12787fc968ec394da28eb5b3d15"
+      "sha256": "5121cc6ad6e16397b864bd23cd99ce92c138a49db253f200131b47eeb962a791"
     },
     {
       "name": "matrix-wall-solid-b1-a1-12x8",
       "members": 154,
-      "sha256": "5d65cb62e66b9fdc397d2eae8dda5f18334e7d896ecfc7e7dca8240d08cb7b0e"
+      "sha256": "0e9f9f77e0c50d5872f5e6f833b95ae818f8cccc0bfa9cec68daa6796cc4eca9"
     },
     {
       "name": "matrix-wall-solid-b1-a1-40x24",
       "members": 459,
-      "sha256": "6cb560e0603dde48a55dec89032e8298567c4b4fae276f7ed9784e7e9ac6e1fd"
+      "sha256": "379d51412d7334bf81080baf01cf8cc7405d315bef4c168943d2f36667fe37ce"
     },
     {
       "name": "matrix-basement-cross-b0-a0-20x16",
       "members": 289,
-      "sha256": "29a218550104d67bd8bd37649cfadc64f5d50460794f17fbd0c414a69f4c8b9f"
+      "sha256": "863fd3cb1b5983570e136e543d57b5e34103850adcac6bb35558a94464ee81c3"
     },
     {
       "name": "matrix-basement-cross-b0-a0-12x8",
       "members": 136,
-      "sha256": "ee3ca5e6e4d60d0c169c56267a908ad594f0ac9958120d27289609b2f801a935"
+      "sha256": "fa18fa185812e905ce36531bff97b7f9e321eb047368f7a58c08f0ff2e2b33a2"
     },
     {
       "name": "matrix-basement-cross-b0-a0-40x24",
       "members": 527,
-      "sha256": "60dd08b527817326eabc2117453ac7cbf4b5d39610f65e8198f1901b66c8304e"
+      "sha256": "dab71be15a6fc3d2472ea6d0d15f513ebff0d11cb2aa40d5f94bd135b3dae361"
     },
     {
       "name": "matrix-basement-cross-b0-a1-20x16",
       "members": 299,
-      "sha256": "0817d52b705e0078e2abe6f1fdab66f5a68a102dd61886fc0ceccc8e6bf6670a"
+      "sha256": "46414c92730e7cbe254c40776c6f82f2e96e4478016092ae4165ae49635d4864"
     },
     {
       "name": "matrix-basement-cross-b0-a1-12x8",
       "members": 146,
-      "sha256": "e4136498f6bc58da57133a871487b100c7a3c6c588946a34aa265d04adc76234"
+      "sha256": "f973a292421b08399961492d8871a2e3068ee2af30ded1752a567a57ae9e21e5"
     },
     {
       "name": "matrix-basement-cross-b0-a1-40x24",
       "members": 534,
-      "sha256": "8af6a76e9e60259f930da407271f172daea560edf6f59b17f60990cc1db9641b"
+      "sha256": "a38c02703bd5055bea2a9b1fa9864f9c8d4d90211d16d0fbbe2bde376e7e4423"
     },
     {
       "name": "matrix-basement-cross-b1-a0-20x16",
       "members": 297,
-      "sha256": "8de33c2ce9221563da0ea716544ca2d790c9f099dc19d0990e712f9704464543"
+      "sha256": "a59cd199398735f034f9a11d7751e3991bed1b404234b7fac997dc8b04c6fc40"
     },
     {
       "name": "matrix-basement-cross-b1-a0-12x8",
       "members": 144,
-      "sha256": "ac51b2c482dae2c20bb5a0343306e80ce115b6a542498cd0f50aecce6aad65a4"
+      "sha256": "0b1067f3041096daea834c9304798b1a7754280d61d50063ad1b68d8a614fb56"
     },
     {
       "name": "matrix-basement-cross-b1-a0-40x24",
       "members": 535,
-      "sha256": "80ff23e51d6e5ae20d94d6efd021c33b1ab3a62f2657e097d098eae9de26e070"
+      "sha256": "455ff32b3566669a11b2a12ab7f1b72d9868f64215651e3258cdec8198e7f2b3"
     },
     {
       "name": "matrix-basement-cross-b1-a1-20x16",
       "members": 307,
-      "sha256": "f2d1a81488fab97a954a60ea9880e26188a5d2d4c5767c98b5eb69b9bc5e29df"
+      "sha256": "37c6be41e99dc3569a93f67d101032ea85c4306703a449d03766f27bd9a27164"
     },
     {
       "name": "matrix-basement-cross-b1-a1-12x8",
       "members": 154,
-      "sha256": "eed5015ef690622e110c54fbe2f05f939856c25dcdba11e98c5ef449634595d9"
+      "sha256": "a9cc6a4db8ab4d60f2933e37cc662a0ae9308062d0463b72acaf5cc22bfe74e3"
     },
     {
       "name": "matrix-basement-cross-b1-a1-40x24",
       "members": 542,
-      "sha256": "b9676d3d51c522c51d10bdc46ee2d6a0216ef232887ad500b54f48f56f38e386"
+      "sha256": "fa7f7ff97ddd68e00d92aa6821464b4553fd033f29066472821e74f1ea20465d"
     },
     {
       "name": "matrix-basement-solid-b0-a0-20x16",
       "members": 266,
-      "sha256": "879806c37295d3956c6cc9e50e721a400f727687078af4ad9bfe83dafcb92d39"
+      "sha256": "b20e75cb8ba3a08f88b1c2d718b5629f0522b4208b32fe0c31466e4af3a30681"
     },
     {
       "name": "matrix-basement-solid-b0-a0-12x8",
       "members": 136,
-      "sha256": "ee3ca5e6e4d60d0c169c56267a908ad594f0ac9958120d27289609b2f801a935"
+      "sha256": "fa18fa185812e905ce36531bff97b7f9e321eb047368f7a58c08f0ff2e2b33a2"
     },
     {
       "name": "matrix-basement-solid-b0-a0-40x24",
       "members": 467,
-      "sha256": "06bc03d1b9895d5ee809531ac544453087e20b13c64857f8c3b4965750c0196f"
+      "sha256": "b80a6cc30562d01110e6528b8731220133d78859615e6c588f09228820c1ca72"
     },
     {
       "name": "matrix-basement-solid-b0-a1-20x16",
       "members": 276,
-      "sha256": "284d053fc4150b60420d90600a5e5a3ffc22365382ff6a78523e9d1f111e5f68"
+      "sha256": "8f57f83e44e7f530112e883d7ed5396e08eaedd40bfde8aae2c017a1b1502797"
     },
     {
       "name": "matrix-basement-solid-b0-a1-12x8",
       "members": 146,
-      "sha256": "e4136498f6bc58da57133a871487b100c7a3c6c588946a34aa265d04adc76234"
+      "sha256": "f973a292421b08399961492d8871a2e3068ee2af30ded1752a567a57ae9e21e5"
     },
     {
       "name": "matrix-basement-solid-b0-a1-40x24",
       "members": 474,
-      "sha256": "cc9452a388c6e66679bb5a6e4bfb08178ac06a7b60d5ec75a5e30b52bf3f1de6"
+      "sha256": "4f25c59cbf8db1435e1a51dbfb395e902796e028370daafd0f8e992636d2cad7"
     },
     {
       "name": "matrix-basement-solid-b1-a0-20x16",
       "members": 274,
-      "sha256": "cc0e406d83923c97184bf89d40b06acc008116156fd6454d2fe97e1b773698ba"
+      "sha256": "ac2a1d7f4e1bcd960126c0083830dbde8c057537460f6b9fdf1272201518dffa"
     },
     {
       "name": "matrix-basement-solid-b1-a0-12x8",
       "members": 144,
-      "sha256": "ac51b2c482dae2c20bb5a0343306e80ce115b6a542498cd0f50aecce6aad65a4"
+      "sha256": "0b1067f3041096daea834c9304798b1a7754280d61d50063ad1b68d8a614fb56"
     },
     {
       "name": "matrix-basement-solid-b1-a0-40x24",
       "members": 475,
-      "sha256": "6ed20be40c252f29f8847c2094e247aed4b59cfcd381106e4126a217b838a509"
+      "sha256": "af16e11ee083f33816f6758e666ab4a535aee0d35d2a86ed352dc164095ae69e"
     },
     {
       "name": "matrix-basement-solid-b1-a1-20x16",
       "members": 284,
-      "sha256": "752aaa680043005a03bd7d66a8765df1f61e9ae21596cc59340363dc4beeac2a"
+      "sha256": "308b182f2b980ca658f8155a2423b929d902d9d7e859b3b2e65d4f6f9f94df86"
     },
     {
       "name": "matrix-basement-solid-b1-a1-12x8",
       "members": 154,
-      "sha256": "eed5015ef690622e110c54fbe2f05f939856c25dcdba11e98c5ef449634595d9"
+      "sha256": "a9cc6a4db8ab4d60f2933e37cc662a0ae9308062d0463b72acaf5cc22bfe74e3"
     },
     {
       "name": "matrix-basement-solid-b1-a1-40x24",
       "members": 482,
-      "sha256": "24fa034c7f846f40fab56adffc8d23dc3a4ea9166a5e181bb476f0d856657bd6"
+      "sha256": "b739e04954666e2ac7865dcd64a34b85c731bc7480b1ad30d3a47f04d306cb96"
     }
   ]
 }

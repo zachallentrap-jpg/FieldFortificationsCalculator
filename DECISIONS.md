@@ -992,3 +992,52 @@ built yet), so the matrix's 32-ft row is clamped to 24 and its stair sits four f
 the unclamped math puts it: the check was looking for bridging in an empty band. It now reads the
 opening back off the doubled trimmers and headers the model actually framed. A test that derives
 its expectation from an input the engine discarded cannot fail when the engine is wrong.
+
+## 2026-08-07 — Four nailing schedules that were corrected once and never shipped (a compat-lock event)
+
+The same branch audit turned up one commit sitting past PR #9 on
+`claude/survivability-app-audit-h0yyt9`: a wood-frame values pass carrying owner direction that
+TIMBER may ship loaded values so long as there is a way to get at them and type them in. It did
+two things, and only one of them still applies.
+
+**What no longer applies.** Its `src/timber/data.ts` centralized 31 fastening specs, three labor
+rates and the lumber grade into one editable table, because at the time those values were inline
+string literals across `floor.ts` / `walls.ts` / `roof.ts` and the only way to change a nailing
+schedule was to edit TypeScript. TIMBER-2 has since built its own values layer — `doctrine.ts`
+with `doc(value, cite)`, `spans.ts`, `fasteners.ts` — so importing a second, parallel table would
+put two sources of truth in a tree whose whole discipline is that there is one. **It is not
+ported, and the requirement it was answering is still open**: nailing schedules remain inline
+literals with no editor behind them. `doctrine.ts` is where they belong when someone builds it.
+
+**What still applies.** Four of those specs were not merely uncentralized, they were wrong, and
+all four survived into the shipped engine. Three have live emission sites and are corrected here:
+
+| Spec | Was | Now | Why |
+|---|---|---|---|
+| cap plate, at laps | `2-16d at laps` | `8-16d in the lap, joints offset 24" min` | The lap **is** the splice — it carries the plate in tension. Two nails does not. |
+| collar tie to rafter | `4-8d ea end` | `3-10d face nail ea end` | Collar ties resist ridge separation and are specified as a 10d connection. |
+| sill anchorage | `1/2" anchor bolts @ ~6 ft` | adds `min 2 per plate, within 12" of each end` | The end distance and the two-per-piece minimum are the parts that actually get missed. |
+
+The fourth — a 16d ceiling-joist toenail, which splits the plate where the schedule calls for 8d
+— **has no live site**: this engine emits no `ceilingJoist` member at all. Nothing to correct, and
+correcting it in a table nobody reads would have looked like progress.
+
+**The `(PH)` marker comes off these three, and that is the point.** `(PH)` means *pending page
+verification*, and it had been flattening two different situations into one shrug: specs that
+need somebody to open a manual, and specs anyone can check against a published fastening
+schedule. Each corrected string now names its own source — IRC Table R602.3(1), R802.3.1,
+R403.1.6 — which is checkable by a reader who has never seen this repository. No page numbers
+were invented, and no FM 5-426 citation was overwritten: `doctrineRef` still carries the
+dimensional doctrine (collar tie every third rafter, ≤ 5 ft) untouched.
+
+**Blast radius, both golden sets: 114 members, `nailing` the only field that moved, nothing added
+and nothing removed.** Exactly four roles — capPlate (48), collarTie (50), foundationWall (8),
+sill (8). No geometry shifted, which is what a schedule correction should look like.
+
+**The hardware bill follows, and was checked rather than assumed.** `fasteners.ts` reads these
+strings to bill nails by the pound, so a reworded schedule can silently fall out of the takeoff
+into the `unparsed` list. All four were run through `fastenersForMember` before the goldens were
+touched: the cap plate goes from 10 to 14 16d on a 96-inch run (the lap billed once at 8, not
+twice at 2), the collar tie from 8 8d to 6 10d, and the sill bolts still bill one drift each. The
+phrasing is deliberate on one of them — "in the lap" rather than "in the lapped area", because
+the tail rule reads `ea\b` and *area* ends in one, which would have doubled the lap to 16 nails.

@@ -195,7 +195,7 @@ export function generateRoof(input: RoofInput): Member[] {
   const tieHalf = halfSpan / 3;
   for (let i = 3; i < gridXs.length - 1; i += 3) {
     emit('collarTie', '2x4', 2 * tieHalf, [gridXs[i]! + t, tieY, W / 2], [0, -Math.PI / 2, 0], 8, {
-      nailing: '4-8d ea end (PH)',
+      nailing: '3-10d face nail ea end (IRC R802.3.1)',
       doctrineRef: 'FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)',
     });
   }

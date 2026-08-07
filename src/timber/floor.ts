@@ -218,7 +218,7 @@ export function generateFloor(input: FloorInput): Member[] {
     for (const wr of wallRuns) {
       emit('foundationWall', `conc wall ${CONC_WALL_T}"`, wr.len, wr.pos, wr.rot, 1, {
         actual: { w: CONC_WALL_T, d: wallH * FT },
-        nailing: '1/2" anchor bolts @ ~6 ft into sill (PH)',
+        nailing: '1/2" anchor bolts @ 6 ft max o.c. into sill, min 2 per plate, within 12" of each end (IRC R403.1.6)',
         doctrineRef: 'FM 5-426 continuous-wall foundation (PH ch./page)',
       });
       emit('footing', `conc footing ${FOOTING_W}x${FOOTING_H}`, wr.len, [wr.pos[0], wallBottom - FOOTING_H / FT / 2, wr.pos[2]], wr.rot, 1, {
@@ -253,7 +253,12 @@ export function generateFloor(input: FloorInput): Member[] {
 
   // ── Stage 2: sills (2x6 flat, outside face flush with the frame line) + center girder
   // (built-up 3-2x10 on edge, top flush with the sills so joists bear level everywhere).
-  const sillAnchor = foundation === 'piers' ? 'anchor/drift per post cap (PH)' : '1/2" anchor bolts @ ~6 ft (PH)';
+  // The end distance and the two-per-piece minimum are the parts that actually get missed in
+  // the field, so the schedule says them rather than leaving the spacing to imply them.
+  const sillAnchor =
+    foundation === 'piers'
+      ? 'anchor/drift per post cap (PH)'
+      : '1/2" anchor bolts @ 6 ft max o.c., min 2 per plate, within 12" of each end (IRC R403.1.6)';
   for (const z of [sillCtr, W - sillCtr]) {
     emit('sill', '2x6', L, [L / 2, lv.sillTop - sillT / 2, z], [-Math.PI / 2, 0, 0], 2, { nailing: sillAnchor });
   }
