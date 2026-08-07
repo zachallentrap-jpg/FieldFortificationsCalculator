@@ -2388,3 +2388,71 @@ footprint does not move), plus the tower's two card goldens.
   the tower's own axes while the girts, at `yaw = 0`, are square to the frame. A girt bolted to a
   leg therefore meets an arris, not a face. Fixing it means giving the leg a two-axis tilt instead
   of yaw-then-pitch, which moves the girt and brace bearings and every tower golden.
+
+## The tent bent, which was a stick diagram
+
+Neither tent family had been rendered. The floor is clean — the runners carry the joists, the joists
+carry the deck, nothing floats. The BENTS were a node-and-stick drawing: every member's centreline
+ran corner to corner, so at each node all of them occupied the same wood. On the shipped GP Small:
+
+```
+rafter into the opposite rafter    1.45 in     at the peak
+rafter into the ridge board        0.75 in     the board its nailing note says it is nailed to
+collar into the rafter             1.50 in     its whole thickness
+collar into the post               0.75 in
+rafter into the post               0.66 in     the square foot's corner
+```
+
+The house's own roof is the control: `roof.ts` lands its studs and its collar ties on the pieces they
+meet at **−0.00 in** — face to face, to the last thousandth — and sets its collar ties one board
+thickness off the rafter grid line, *"nailed beside their rafters"*. The tent bent was the outlier.
+
+### The lap is across the face the post presents
+
+Copying `roof.ts`'s one-board-thickness offset gives the wrong number here, and the first attempt
+did exactly that. A bent post stands with its **3½-in face** in the bent's plane — `[0, 0, PI/2]`
+puts the face width along world X — while the collar runs across the bent and shows its 1½-in edge
+there. Face to face is half of each, **2½ in**; at 1½ in the collar was still a quarter of the way
+into the post, and the probe missed it because the probe was still selecting the bent by exact x.
+
+### There is no placement of a square-cut rafter head
+
+The head is cut square to the rake, so its low corner reaches half a face width times the sine of
+the pitch — **0.82 in** — further along the run than its centreline, and its top corner falls the
+same distance short. Land the low corner on the ridge's face and the piece hangs **0.29 in off** the
+board; centre it on the face and the low corner is inside both the ridge and its opposite number.
+Making the ridge deeper does not help either: the corner is still 0.82 in past the face, just past
+more of it. The joint is only placeable once the head is **cut plumb**, which is what a rafter
+meeting a ridge actually gets.
+
+So `ridgeHeadProfile` joins `stringerEndProfile` in `stringerCuts.ts` — the head alone, foot left
+square, because the level foot that module also cuts lifts a piece by half a face width times the
+cosine of the pitch and this rafter's foot is bearing on a post top. With the cut derived, the
+centreline runs 0.82 in PAST the ridge face so that the cut lands on it:
+
+```
+rafter to ridge   0.0000 in   both sides, both presets — bearing, not biting, not floating
+rafter to rafter  clear       the ridge's own thickness between them
+collar to post    0.0000 in   face to face
+collar to rafter  1.00 in     clear
+```
+
+Four regression tests, three failing on the old code; the fourth is the guard that must pass both
+ways — **the eave and ridge lines are the doctrine lines**, so every rafter's centreline still
+starts on its post's top and still arrives at the tent's own ridge height when produced to it. The
+rafters got shorter; the frame did not change shape. Both tent card goldens regenerated.
+
+### Measured, not fixed
+
+- **The rafter's foot, 0.66 in into the post top** (0.69 in on the TEMPER). Square to the rake, like
+  the tower's legs and braces — the same family of defect, and the same answer: a derived level cut.
+  It is not a one-liner here, because a level foot cut lifts the piece 1.55 in and the post's top is
+  `TENT.gpSmall.eaveFt` above the deck, so closing it means deciding whether that doctrine figure is
+  the canvas line or the frame's centreline.
+- **`endDoor` is a dead field.** `spec.ts` carries it, BOTH tent presets set it `true`, the planning
+  card shows a live toggle labelled "Framed end door" (`config.ts`), and **no generator reads it**.
+  Toggle it and not one member changes. A GP tent's end wall is framed round a door and there is
+  nothing there at all — the recurring class "a field the spec carries and no generator consumes".
+- **The ridge is the same size as the rafters.** `roof.ts` cites *"FM 5-426: ridge one size deeper
+  than rafters, tops flush"*; the tent's ridge is a 2x4 like everything else in the bent, so the
+  plumb-cut heads stand about a fifth of an inch proud above and below the board they bear on.

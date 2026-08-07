@@ -56,6 +56,30 @@ export function stringerEndProfile(m: Pick<Member, 'cutLength' | 'actual' | 'rot
 }
 
 /**
+ * A raked rafter's HEAD ONLY, cut plumb against the board it lands on.
+ *
+ * The tent bent's rafters run up to a ridge, and a rafter meeting a ridge is cut plumb — the
+ * whole of its face bears on the board's side. Left square to the rake, the head is a wedge: its
+ * low corner reaches half a face width times the sine of the pitch further along the run than its
+ * centreline, its top corner falls the same distance short, and there is NO position for it that
+ * both bears on the board and stays out of it. Measured on the shipped GP Small, the two rafters
+ * of a bent were 1.45 in inside each other and 0.75 in inside the ridge.
+ *
+ * The foot is deliberately left square. `stringerEndProfile` cuts a level one, which is right for
+ * a stringer standing on the ground and wrong here: it lifts the piece's underside half a face
+ * width times the cosine of the pitch, and this rafter's foot is bearing on a post top.
+ */
+export function ridgeHeadProfile(m: Pick<Member, 'cutLength' | 'actual' | 'rotation'>): [number, number][] | null {
+  const hx = m.cutLength / IN_PER_FT / 2;
+  const hy = m.actual.d / IN_PER_FT / 2;
+  const pitch = Math.abs(m.rotation[2] ?? 0);
+  if (pitch < 1e-6 || pitch > Math.PI / 2 - 1e-6) return null;
+  // The head is at +X — the end the member climbs toward, since world y = pos.y + lx·sin(pitch).
+  const head = Math.min(2 * hy * Math.tan(pitch), 2 * hx * MAX_BITE);
+  return [[-hx, -hy], [hx - head, -hy], [hx, hy], [-hx, hy]];
+}
+
+/**
  * Where the stringer's centre goes, given the point its TOP EDGE has to pass through.
  *
  * Half the board belongs below the nosings and none of it above, so the centre sits half a face

@@ -439,10 +439,26 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
   }
 
   // ── Bents: a pair of posts, a pair of rafters to the ridge, and a collar tie.
+  //
+  // A BENT IS FRAMED, NOT DRAWN AS A STICK DIAGRAM. Every member's centreline ran corner to
+  // corner, so at each node all of them occupied the same wood: on the shipped GP Small the two
+  // rafters of a bent crossed each other by 1.45 in at the peak, each was 0.75 in inside the ridge
+  // board it is nailed to, and the collar shared 1.50 in with the rafter and 0.75 in with the post
+  // at the eave. The house's own roof shows what these joints look like when they are framed —
+  // `roof.ts` lands its studs and its collar ties face to face on the pieces they meet, to the
+  // last thousandth — and the tent bent is the outlier.
   const bentSpacing = TENT.bentSpacingFt.value as number;
   const bents = Math.max(2, Math.round(L / bentSpacing) + 1);
   const eaveY = deckY + d.eaveFt;
   const ridgeY = deckY + d.ridgeFt;
+  // THE LAP IS ACROSS THE FACE THE POST PRESENTS, which is not the same as the collar's own
+  // thickness. A bent post stands with its 3½-in face IN the bent's plane (`[0, 0, PI/2]` puts the
+  // face width along world X); the collar runs across the bent (`[0, PI/2, 0]`) and shows its
+  // 1½-in edge there. Face to face is therefore half of each — 2½ in, not the 1½ in that "one
+  // board thickness" would suggest, and at 1½ in the collar was still a quarter of the way into
+  // the post.
+  const lapFt = (DRESSED[bentNominal]!.d + DRESSED[bentNominal]!.w) / 2 / IN_PER_FT;
+  const ridgeHalfThick = DRESSED[bentNominal]!.w / 2 / IN_PER_FT;
   for (let i = 0; i < bents; i++) {
     const x = (L * i) / (bents - 1);
     const inset = PLATFORM.bentInsetFt.value as number;
@@ -455,20 +471,40 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
         nailing: 'toenail 4-8d to the deck; braced to the sill (PH)',
         doctrineRef: citeOf(TENT.bentNominal),
       });
-      const run = W / 2 - z;
-      const rise = ridgeY - eaveY;
+      // A RAFTER BEARS ON THE RIDGE BOARD; it does not run to the ridge LINE. Carried to the
+      // line, the last half-thickness of each rafter was inside the ridge and the pair were
+      // inside each other. The pitch and the eave point are the doctrine — the tent's own eave
+      // and ridge heights — so neither moves; the rafter just stops sooner.
+      //
+      // WHERE IT STOPS IS SET BY THE CUT, NOT BY THE CENTRELINE. A rafter meeting a ridge board is
+      // cut PLUMB, and `ridgeHeadProfile` derives that cut off the piece; the resulting vertical
+      // face sits half a face width times the sine of the pitch BACK from where the centreline
+      // ends — 0.82 in here. Stopping the centreline on the board's face would therefore leave the
+      // wood a fifth of an inch short of it, so the centreline runs that much past and the CUT
+      // lands on the face. There is no placement of a square-cut head that both bears on the board
+      // and stays out of it: the head would touch on one arris and either bite or gape.
+      const toPeak = W / 2 - z;
+      const pitch = Math.atan2(ridgeY - eaveY, Math.abs(toPeak));
+      const halfFace = DRESSED[bentNominal]!.d / IN_PER_FT / 2;
+      const head = W / 2 - Math.sign(toPeak) * (ridgeHalfThick - halfFace * Math.sin(pitch));
+      const run = head - z;
+      const rise = Math.abs(run) * Math.tan(pitch);
       emit('bentRafter', bentNominal, {
         cutLengthFt: Math.hypot(Math.abs(run), rise),
-        position: [x, (eaveY + ridgeY) / 2, (z + W / 2) / 2],
-        rotation: [0, run > 0 ? -Math.PI / 2 : Math.PI / 2, Math.atan2(rise, Math.abs(run))],
+        position: [x, eaveY + rise / 2, (z + head) / 2],
+        rotation: [0, run > 0 ? -Math.PI / 2 : Math.PI / 2, pitch],
         stage: sBent,
         nailing: '3-8d at the ridge, 3-8d at the post (PH)',
         doctrineRef: citeOf(TENT.bentNominal),
       });
     }
+    // THE COLLAR IS NAILED BESIDE THE BENT, not into it — the same joint `roof.ts` makes when it
+    // sets its collar ties one board thickness off their rafters' grid line. In the bent's own
+    // plane it shared wood with both the post and the rafter at each eave. The lap goes on the
+    // face that is INSIDE the tent, so the end bent's tie does not hang off the deck.
     emit('bentCollar', bentNominal, {
-      cutLengthFt: W - 0.5,
-      position: [x, eaveY, W / 2],
+      cutLengthFt: W - 2 * inset,
+      position: [x + (i === bents - 1 ? -lapFt : lapFt), eaveY, W / 2],
       rotation: [0, Math.PI / 2, 0],
       stage: sBent,
       nailing: '4-8d ea end (PH)',
