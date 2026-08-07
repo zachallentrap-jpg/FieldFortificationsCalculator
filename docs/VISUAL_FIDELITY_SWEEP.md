@@ -99,6 +99,7 @@ screenshots get read.
 | **The bunker's build order** | **Fixed** — the doorway's two jamb posts and its header were stamped into the ENTRANCE stage, three after the caps they line up with and two after the overhead cover that bears on them: scrub to stage 4 and ten stringers span the opening on nothing. |
 | Build order, catalog-wide | **Checked, clean.** Nothing wrong. 2,777 borne members and 8,794 bearing pairs across all fourteen cards, none of them standing on something built later. Landed as a permanent guard, with its blind spot written down. |
 | **The ends of a tent frame** | **Fixed** — the bents and the floor joists were both laid out as `L·i/(n−1)`, which puts the first and last CENTRELINE on the deck's own ends: 1¾ in of every end post, and of every end-door jamb, standing over air, plus ¾ in of bare joist at each end. |
+| Standing on a deck and reaching past it, catalog-wide | **Checked, nothing wrong.** The tent's was the only real one. The tower cab's posts DO overhang the decking by 1¾ in and it is a joint, not a defect — they land on the leg heads with an inch to spare. Pinned. |
 
 ## The shed that had no walls above the plate
 
@@ -4339,3 +4340,52 @@ thumbnails moved, both tent cards.
 triangular gaps running the length of the near runner, which reads at first like something broken.
 It is the joists: they sit ON the skid (`skid` y 0.000–0.458, `joist` y 0.458–1.063), and at a
 grazing angle you see the ground between them through each bay. Nothing wrong.
+
+## The same question asked of every deck, and the answer was no
+
+The tent frame's defect last pass — a rank whose end members' centrelines sat on the deck's own
+edge, so half of each stood over air — is a shape that could be anywhere. So it was asked of every
+card: take each floor or deck, find every member whose UNDERSIDE sits at that deck's top, and check
+its plan footprint against the deck's.
+
+**Nothing else in the catalog has it.** Three classes came back and all three are explained:
+
+```
+  siding / sidingBoard / batten   0.50 / 0.75 / 1.50 in past the subfloor, every clad card
+        the cladding hangs OUTBOARD of the frame and laps down past the floor's edge, which is
+        where it belongs and how every wall in the toolkit is built
+  platform railPost, tread        up to 27 ft "past the deck"
+        members of the RAMP, whose undersides happen to sit at deck level a long way from it
+  tower cab post                  1.75 in, all four corners, both plan directions
+        see below
+```
+
+### The tower cab's corner posts — measured, and NOT a defect
+
+This one is worth writing up because it reads exactly like the tent's and is not.
+
+```
+  deck        x 1.5000 .. 9.5000        the platform, struck at `cabPlanFt`
+  cab post    x 1.3542 .. 1.6458        centred on the deck's own corner
+  cladding    x 1.3125 .. 9.6875        2¼ in past the decking all round
+```
+
+**The post lands on the leg.** A battered leg's head is nearly two feet across at the platform, and
+the post's whole footprint sits inside it with **0.99 in to spare on every side** — on all three
+cab sizes the card offers, both footings, and all three heights. What stops at the deck's edge
+under the post is ¾ in of plywood; what carries it is the strongest bearing point in the structure.
+
+And the position is load-bearing in a second sense. `tower.ts` hands those same four corners to
+`generateRailing` as `standing` posts — *"the cab's four corner posts stand on these same corners…
+told about them, it leaves those holes alone and butts its rails on their faces"* — and a test
+already pins it: *"the corners are still posted — by the cab, which was always going to post
+them."* Stepping the cab in was tried and measured: it unposts the deck's corners, and the
+railing's own corner post (which steps back 2½ in off both runs) then lands inside the cab post.
+The overhang is the shape of a deliberate joint.
+
+So the change was reverted and the REASON pinned instead, in
+`test/timber2-cab-bearing.test.ts` — because nothing in the suite said it and all three of the
+figures it rests on can move. Two tests: every cab post lands inside a leg's head, on every
+variant; and it does overhang the decking, by exactly half its own width, which is the honest half
+and the one that has to be re-checked if the cab plan and the leg square ever stop being struck
+from one figure. A test that asserted only the good news would have hidden that.
