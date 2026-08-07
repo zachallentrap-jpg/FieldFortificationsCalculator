@@ -102,17 +102,60 @@ test('THE BAND IS FRAMED BETWEEN THE WALL, not through it', () => {
   }
 });
 
-test('and it has a HEAD as well as a sill — the band carries its own cutout', () => {
-  // `cutouts` lists the band itself with a negative `openingIndex`, so the siding is cut away over
-  // it. Treated as an opening, it told the band not to frame its own head: every wall of every
-  // screened hut lost the whole top row and the screen had nothing along its upper edge.
+test('THE BAND FILLS ITS OWN HOLE — the screen used to sit 1 1/2 in below it', () => {
+  // `wallContract` OWNS the datum and says so: a band is "measured from the sole-plate TOP, like
+  // an opening's sill", and it adds the plate thickness itself when it turns the band into the
+  // cutout the siding is laid around. The band's own members were placed at the raw figure, which
+  // is the sole-plate BOTTOM — so the siding lapped the screen by 1½ in along the bottom, and
+  // along the top there was a 1½-in strip with neither siding nor screen on it. An open slot right
+  // round the hut under the eave: 96 ft of it on a sea hut.
+  //
+  // The hole is the authority here, read off the contract, and the screen has to fill it exactly.
   for (const id of SCREENED) {
-    const { frame, heights, walls } = screened(id);
+    const { model, walls } = screened(id);
     for (const s of walls.surfaces) {
-      for (const v of heights) {
-        const row = frame.filter((f) => f.wall === s.wall && Math.abs(f.position[1] - v) < 1e-6);
-        assert.ok(row.length > 0,
-          `${id}: the ${s.wall} wall has no band framing at v=${v} — the row is missing entirely`);
+      const hole = s.cutouts.find((c) => c.openingIndex < 0);
+      assert.ok(hole, `${id}: the ${s.wall} wall has no band cutout`);
+      const screen = model.members.find((m) => m.role === 'screenPanel' && m.wall === s.wall);
+      assert.ok(screen, `${id}: the ${s.wall} wall has no screen`);
+      const y = box(screen!).y;
+      assert.ok(Math.abs(y[0] - hole!.v0) < 1e-9 && Math.abs(y[1] - hole!.v1) < 1e-9,
+        `${id}: the ${s.wall} screen spans ${y[0].toFixed(4)}..${y[1].toFixed(4)} and the hole cut `
+        + `for it is ${hole!.v0.toFixed(4)}..${hole!.v1.toFixed(4)} — `
+        + `${((hole!.v0 - y[0]) * IN_PER_FT).toFixed(2)} in out at the bottom, `
+        + `${((hole!.v1 - y[1]) * IN_PER_FT).toFixed(2)} in at the top`);
+      // And no siding strictly inside the hole, so there is nothing lapping over the screen.
+      for (const sid of model.members.filter((m) => m.role === 'siding' && m.wall === s.wall)) {
+        const b = box(sid).y;
+        const bite = Math.min(b[1], hole!.v1) - Math.max(b[0], hole!.v0);
+        assert.ok(bite <= 1e-9,
+          `${id}: ${sid.id} laps ${(bite * IN_PER_FT).toFixed(2)} in over the ${s.wall} band`);
+      }
+    }
+  }
+});
+
+test('and it has a HEAD as well as a sill, both inside the hole', () => {
+  // `cutouts` lists the band itself with a negative `openingIndex`. Treated as an opening, it told
+  // the band not to frame its own head and every wall lost its top row. Then, with the band raised
+  // onto the right datum, a head CENTRED on the band's top reached 7.771 where the top plate starts
+  // at 7.750 — 1/8 in of interference, which made a 32-ft plate an obstruction and took the row out
+  // again. There is only 1½ in of wall above the band, which is no room for a 3½-in member: the
+  // sill sits on the band's bottom and the head under its top, inside the light they frame.
+  for (const id of SCREENED) {
+    const { frame, walls } = screened(id);
+    for (const s of walls.surfaces) {
+      const hole = s.cutouts.find((c) => c.openingIndex < 0)!;
+      const rows = [...new Set(frame.filter((f) => f.wall === s.wall)
+        .map((f) => Math.round(f.position[1] * 1e6) / 1e6))].sort((a, b) => a - b);
+      assert.equal(rows.length, 2,
+        `${id}: the ${s.wall} wall has ${rows.length} rows of band framing, not a sill and a head`
+        + ` (${rows.map((r) => r.toFixed(4)).join(', ')})`);
+      for (const f of frame.filter((x) => x.wall === s.wall)) {
+        const b = box(f).y;
+        assert.ok(b[0] >= hole.v0 - 1e-9 && b[1] <= hole.v1 + 1e-9,
+          `${id}: ${f.id} spans ${b[0].toFixed(4)}..${b[1].toFixed(4)}, outside the band's own `
+          + `${hole.v0.toFixed(4)}..${hole.v1.toFixed(4)}`);
       }
     }
   }
@@ -126,11 +169,14 @@ test('nothing is framed across a doorway, and nothing is left unframed where the
   // This one passes on the old code too, and says so: a ribbon run the whole wall covers
   // everything. It is the guard on the fix — that cutting the band into bays did not drop one.
   for (const id of SCREENED) {
-    const { model, frame, heights, walls } = screened(id);
+    const { model, frame, walls } = screened(id);
     const wallPieces = model.members.filter((m) => m.wall !== undefined && m.role !== 'siding'
       && m.role !== 'screenPanel' && m.role !== 'brace');
     for (const s of walls.surfaces) {
       const here = [...wallPieces, ...frame].filter((m) => m.wall === s.wall);
+      // The rows the model actually has, not a pair of numbers restated here.
+      const heights = [...new Set(frame.filter((f) => f.wall === s.wall)
+        .map((f) => Math.round(f.position[1] * 1e6) / 1e6))];
       for (const v of heights) {
         const open = s.cutouts.filter((c) => c.openingIndex >= 0 && c.v0 - 1e-9 <= v && v <= c.v1 + 1e-9);
         for (let u = 0.05; u < s.runFt; u += 0.05) {

@@ -2740,3 +2740,66 @@ goldens regenerated.
 - **The screen panel's own plane.** It sits on the wall's outer face, so it crosses the let-in braces
   (67 × 18 × 0.06 in — its own thickness) and grazes the studs by 0.03 in. The frame it is stapled to
   is now in the stud plane, 1¾ in behind it.
+
+## The band did not fill the hole cut for it
+
+The target recorded last iteration: *"the siding's hole is 1½ in above the frame."* It is worth
+saying what a datum mismatch of one plate thickness looks like from outside the hut, because that is
+where it was found — walking the outer skin of the S wall of a sea hut from the sole plate to the
+eave and printing what covers each strip:
+
+```
+siding y bands:  0.0000..3.6250   0.0000..6.1250   7.6250..8.0000
+screen y:                         6.0000..7.5000
+```
+
+The siding stops at 6.125 and the screen starts at 6.000, so along the bottom the boards lap 1½ in
+over the screen. Along the top the siding does not start again until 7.625 and the screen has ended
+at 7.500 — **a 1½-in strip with neither siding nor screen on it**, an open slot right round the
+building under the eave. On a sea hut that is 96 running feet of it.
+
+`wallContract` owns this datum and says so in as many words: a band is *"measured from the sole-plate
+TOP, like an opening's sill, so callers use one convention"*, and it adds `PLATE_THICK_FT` itself
+when it turns the band into the cutout the siding is laid around. `generateScreenBand` placed its own
+members at the raw figure, which is the sole-plate BOTTOM. Both readings are defensible in isolation;
+only one of them is the contract's.
+
+### Raising it broke the head row a second time
+
+Putting the sill at `plateThicknessFt + sillFt` and CENTRING the head on `sill + heightFt` sent the
+head's top face to 7.771 where the top plate's underside is 7.750. An eighth of an inch of
+interference — enough that the obstruction pass from last iteration correctly saw a 32-ft plate
+lying in the head's way and cut the row out of existence again. There is only 1½ in of wall between
+the band and the plate, which is no room for a 3½-in member. The framing belongs INSIDE the light it
+frames, so both rows are inset by half a face:
+
+```ts
+const heads = [sill + halfFace, sill + band.heightFt - halfFace];
+```
+
+which is also how a window is built: the sill sits on the bottom of the opening and the head hangs
+under its top, and the glass is the distance between them.
+
+```
+after:  screenFrame by height  6.2708:60  7.4792:68      NOTHING rows in the skin walk: 0
+        screen 6.1250..7.6250 = the hole exactly         screenFrame into wall framing: 0
+```
+
+The `screened` gate moved onto the same datum, so a band that would now be pushed through the top
+plate is declined rather than drawn through it.
+
+Two of last iteration's own tests had to be retargeted, having been written against the wrong datum —
+they asserted rows at `sillFt` and `sillFt + heightFt`. They now read the hole off
+`walls.surfaces[].cutouts` (the contract is the authority for where the hole is) and the rows off the
+model, and assert the two agree: the screen spans the hole exactly, no siding laps into it, and every
+frame piece lies inside it. Both fail on the pre-iteration generator, quoting the 1.50-in gap.
+
+### Measured, not fixed
+
+- **The 0.38-in rafter graze** on the gable walls. Raised onto its proper datum the head row is
+  0.38 in into the raking rafters where they cross the E and W walls, against 0.63 in before. Same
+  gable-rake family already in this sweep, same frozen `roof.ts`.
+- **The screen panel's plane** is unchanged: it is still on the wall's outer face, 1¾ in in front of
+  the frame it is stapled to. Filling the hole exactly is what this iteration was for; which face of
+  the wall the cloth hangs on is the covering-plane question the vertical-siding entry already
+  raises, and it should be answered once for all the coverings rather than twice.

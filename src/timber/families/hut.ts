@@ -207,12 +207,27 @@ function generateScreenBand(
 ): Member[] {
   const emit = makeEmitter('HT');
   const nominal = HUT.girtNominal.value as string;
-  const heads = [band.sillFt, band.sillFt + band.heightFt];
+  // THE BAND AND ITS HOLE ARE MEASURED FROM THE SAME PLACE. `wallContract` owns the convention and
+  // says so — "measured from the sole-plate TOP, like an opening's sill, so callers use one
+  // convention" — and adds the plate thickness itself when it turns the band into the cutout the
+  // siding is laid around. The band's own members were placed at the raw figure, which is the
+  // sole-plate BOTTOM, so the frame and the screen sat 1½ in BELOW their own hole: the siding
+  // lapped the screen by 1½ in along the bottom, and along the top there was a 1½-in strip with
+  // no siding and no screen on it — an open slot right round the hut under the eave, 96 ft of it
+  // on a sea hut.
+  const sill = walls.plateThicknessFt + band.sillFt;
+  // AND THE FRAME IS INSIDE THE BAND, not centred on its edges. Centred, the head's top reached
+  // 7.771 on an 8-ft wall where the top plate starts at 7.750 — an 8th of an inch of interference
+  // that made the plate an obstruction running the whole 32 ft, and the entire head row went
+  // missing. There is only 1½ in of wall between the band's top and the plate, which is no room
+  // for a 3½-in member above it. Sill bottom on the band's bottom, head top on its top: both fit,
+  // both are what the screen is stapled to, and the clear light is between them.
+  const halfFace = DRESSED[nominal]!.d / IN_PER_FT / 2;
+  const heads = [sill + halfFace, sill + band.heightFt - halfFace];
   for (const s of walls.surfaces) {
     const uMid = s.runFt / 2;
     const along3: [number, number, number] = [s.along[0], 0, s.along[1]];
     const norm3: [number, number, number] = [s.normal[0], 0, s.normal[1]];
-    const halfFace = DRESSED[nominal]!.d / IN_PER_FT / 2;
     const halfThick = DRESSED[nominal]!.w / IN_PER_FT / 2;
     for (const v of heads) {
       // WHAT IS ALREADY IN THE WAY AT THIS HEIGHT, on this wall, in this plane. Not "the studs":
@@ -283,7 +298,7 @@ function generateScreenBand(
       cutLengthFt: s.runFt,
       position: [
         s.origin[0] + s.along[0] * uMid + s.normal[0] * s.faceOffsetFt,
-        band.sillFt + band.heightFt / 2,
+        sill + band.heightFt / 2,
         s.origin[1] + s.along[1] * uMid + s.normal[1] * s.faceOffsetFt,
       ],
       rotation: [0, surfaceYaw(s), 0],
@@ -387,7 +402,10 @@ export function generateHut(spec: HutSpec): HutResult {
   // scrubber that could never contain anything. It is the LAST row, so leaving it off moves no
   // ordinal — which is the only reason this is safe to do at all.
   const band = bandFor(spec);
-  const screened = band !== null && band.sillFt + band.heightFt <= wallHeightFt;
+  // Against the same datum the band is set out on — the plate thickness is part of the height it
+  // has to fit under, not a rounding.
+  const screened = band !== null
+    && base.walls.plateThicknessFt + band.sillFt + band.heightFt <= wallHeightFt;
   const hasRiser = spec.variant === 'latrine';
   const stagePlan: StagePlanEntry[] = screened || hasRiser
     ? [
