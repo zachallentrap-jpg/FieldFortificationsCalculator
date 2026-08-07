@@ -45,6 +45,7 @@ screenshots get read.
 | **Members emitted twice in the same place** | **Fixed** — 12 duplicate posts across three families. **Invisible in the render**; 96.5 board feet of phantom stock on the cut list. |
 | **Latrine — the riser box** | **Fixed** — the one feature that makes the building a latrine was a solid bench. `seats` sized the dividers and cut no seats. |
 | **Crib bunker — the entrance baffle** | **Fixed** — it started at the doorway's CENTRE, leaving two feet of a five-foot opening with a clear straight line in. |
+| **GP framed building** (48×20, piers, plywood, roll) | **Checked, clean.** Nothing wrong. Four measurements with negative controls: piers, walls, roof covering, gable rake. |
 | Guard shack (8×8, four openings) | **Checked, clean.** Nothing wrong. Its unbraced walls are a documented rule, now pinned by a test. |
 | Squad hut (50 ft — the longest building) | **Checked, clean.** Nothing wrong. Its fifty-foot runs are already handled, by a module I had not read. |
 | Weather barrier / building paper | **Already covered** — an earlier pass fixed it (row above). All that is left is a stale help string; see below. |
@@ -2803,3 +2804,66 @@ frame piece lies inside it. Both fail on the pre-iteration generator, quoting th
   the frame it is stapled to. Filling the hole exactly is what this iteration was for; which face of
   the wall the cloth hangs on is the covering-plane question the vertical-siding entry already
   raises, and it should be answered once for all the coverings rather than twice.
+
+## The GP framed building, which was fine
+
+The workhorse card — `gp-frame`, 48 × 20 on piers, plywood siding, plywood deck, roll roofing,
+gable at 4 in 12 with a 1-ft eave, eight shuttered windows, a ledged door in each end, cross
+bridging — and the last shipped family never rendered. **Nothing was wrong with it.** That is the
+whole finding, and it is written up at this length because a clean verdict is the easiest thing in
+this sweep to get wrong: the loop's failure mode is inventing a defect to justify a commit, and its
+second failure mode is a check too blunt to fail.
+
+Six things were suspected off a screenshot and every one of them came back explained:
+
+- **The rake has no overhang.** The deck stops dead at x = 0 and x = 48 while the eaves run 1.086 ft
+  past the walls. That is the documented shape, already in this sweep at the hip entry: *a gable is
+  flush at its two rakes, a hip overhangs there too.*
+- **A white slot over each door.** 0.25 in, top and bottom and both jambs — `OPENING.leafClearanceIn`.
+  A door hung in a rough opening has to have it, and it reads as light because the wall behind is
+  back-faced.
+- **The gable infill looked like 4-ft panels with 16-in steps.** It is 25 strips a foot wide
+  stepping 3¼ in; the "steps" were the plywood texture's own 4-ft panel lines.
+- **The girder looked unsupported** — its underside is 7¾ in below every pier post's top. The centre
+  piers are a different length: posts 15–21 stop at −1.4375, which is exactly the girder's soffit,
+  and the edge posts stop at −0.7917, which is exactly the sill's.
+- **The roofing floats above the deck** — 0.121 in, which is `TOLERANCE.surfaceLiftFt` (0.01 ft), the
+  anti-z-fighting standoff every covering in the toolkit carries.
+- **Tan flecks along the eaves in plan.** No geometry under them: the courses lap in sequence
+  (each 0.0207 ft = one covering thickness above the one below), the cap spans the ridge gap, and a
+  perpendicular walk of every deck panel finds zero uncovered samples.
+
+Also measured and correct: 36 floor-joist bays, every one bridged in both rows and no stray piece
+outside a bay; 21 piers, each on its own footing to 0.0000 and each carrying the sill or the girder
+to 0.0000; ceiling joists lapped beside their rafters rather than into them; shutter pairs lapping
+each opening by the doctrine inch; collar ties landing inside the rafters' own depth.
+
+### Four tests, each with a negative control
+
+The reason this is a commit rather than a line in the table is that "checked, clean" is worth
+exactly as much as the sampler behind it, and three of my four first attempts were too blunt to
+see anything:
+
+- a skin walk sampled on the wall CENTRELINE, where the siding is not, and reported every station
+  on every wall as uncovered;
+- an OBB ray 0.004 ft long, which cannot reach a covering that sits 0.104 ft off the deck because
+  five courses are stacked under it;
+- and a negative control that removed the RIDGE CAP, whose strip is 0.12 in wide — narrower than
+  the grid, so the sampler passed the control by failing to see the hole.
+
+So each test now proves itself on the same model, broken on purpose: strip every door and shutter
+and the wall walk must find the ten openings; drop one roofing course and the bare band must come
+back **inside that course's own footprint**. The rake test needs no control because it is a fit —
+least squares over the strip tops on each side of the peak, which must come out at the roof's own
+4 in 12 with no strip more than a step off the line. A staircase, a kink, or a rake at the wrong
+pitch all fail it.
+
+### Measured, not fixed
+
+- **One let-in brace on each 48-ft wall.** `walls.ts` skips a corner brace where the clear run to
+  the first opening is under 3 ft, and the GP building's end windows leave 2.5 ft at one end of the
+  S wall and the other end of the N wall. So each long wall is braced at one corner only. The rule
+  is documented and `walls.ts` is C-10 frozen legacy; noted here rather than changed.
+- **The two end doors are 5 in out of line with each other.** Both are `offsetFt: 8` on their own
+  wall, and `u` runs the same rotational sense on all four walls — so on facing walls it runs
+  opposite ways. The convention is consistent; it is the preset that is not symmetric.
