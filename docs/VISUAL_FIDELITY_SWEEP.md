@@ -85,6 +85,7 @@ screenshots get read.
 | **Crib bunker — `wallType: 'crib'`** | **Fixed** — the crib topped out 5½ in below the cap beam, so the cap, the overhead stringers, the roof lagging and two feet of earth bore on air all the way round; and the stack ran straight through the doorway as well. |
 | **The B-hut's partitions** | **Fixed** — every upright was a quarter turn out, so a partition was 1½ in of wood in its own 3½-in plate; and the doorway was struck off the WALL's thickness instead of the STUD's, which put the king where the jack goes and left the jack standing in the doorway. |
 | **The gable end studs** | **Fixed** — the same quarter turn, in `roof.ts`: 186 gable studs across nine cards stood 1½ in across a 3½-in wall, ½ in off the plate's centre and 3½ in off the stud below, and the one at the peak ran 1.45 in into the ridge board. |
+| **The guard tower's X-braces** | **Fixed** — both diagonals of every X were drawn on the legs' own centre plane, so each was inside the two legs it braces and inside its twin at the crossing: 162 overlapping pairs, down to 6. |
 
 ## The shed that had no walls above the plate
 
@@ -3496,3 +3497,79 @@ any width that does, and a test that only exercised the shipped cards would not 
 - **A partition's end stud stands in the hut's girt**, 3½ × 3½ × 1½ in, six times on the b-hut.
   Carried over from the last pass, unchanged: the girt has to be cut at each partition, which is a
   change to `hut.ts`'s girt run.
+
+## The tower's X-braces, which were inside everything they braced
+
+The girt that a partition's end stud runs into was the residue on the list, so the pass started by
+running SAT over every `girt` in the catalog against everything else. Four of the five hut girts
+came back clean and the b-hut came back with the six known pairs — but the **guard tower's girts
+came back with 101**, and a full audit of the tower found 733 overlapping pairs in one structure.
+Most of that is roofing courses and panels stacked a tenth of an inch apart, which is how the
+covering layers are lifted and is a different question. The frame is not:
+
+```
+  towerBrace x towerBrace   40  worst 2.67 in      girt x towerLeg   16  worst 3.02 in
+  towerBrace x towerLeg     32        3.85         girt x joist      16        1.50
+  towerBrace x girt         48        1.50         girt x girt        8        0.75
+```
+
+**A brace is bolted to the FACE of the frame, so it cannot be in it.** Both diagonals of every X
+were drawn on the legs' own centre plane, corner centre to corner centre — inside the two legs each
+one braces, and, since the pair shared that plane, inside each other at the crossing. The render is
+unambiguous: the X in every bay is two sticks fighting for the same pixels down the middle, on all
+four faces of every bay of the tower.
+
+Two things had to be right, and the second is the one that matters.
+
+**Standing off the leg is not half its width.** A battered leg is a raked box, so how far its
+section reaches from its own axis along a given direction is the support of that box —
+`(w/2)(|e_y·n| + |e_z·n|)` over the section axes its own rotation gives it. `legReach` reads it off
+the leg's `[rx, 0, rz]`, so the two stay together if the batter ever changes.
+
+**And the board has to LIE FLAT on the face.** The rotation was built from the plan run and the
+rise alone, which leaves it on edge in a VERTICAL plane. The face leans with the legs, and the two
+diagonals of one X lean opposite ways in plan, so their two vertical planes cross at about 10° —
+and no amount of offsetting separates two planes that cross. Offsetting alone got brace-vs-brace
+from 2.67 in down to 0.69 and no further, which is what sent me back to the rotation. Built from
+the face's own frame — length along the true 3D run, thickness along the face normal — the second
+diagonal then stacks on the first at exactly one board thickness. The Euler triple for `R = Ry·Rx·Rz`
+with the third column equal to `n` and the first equal to the unit run is
+`rx = asin(−n_y)`, `ry = atan2(n_x, n_z)`, `rz = atan2(t_y, b_y)` with `b = n × t`; with no batter
+`n` is horizontal and it collapses to the old `[0, yaw, rake]` exactly, which is the check that it
+is the same construction generalised rather than a different one.
+
+**Outside, not inside.** Both were tried and measured. Inside the legs is worse in every direction
+— 70 pairs against 6 — because the braces of adjacent faces then meet at the inside corners and
+cross each other (24 pairs, 4.87 in), and because the girts still run to the leg centres and stick
+out into exactly that space.
+
+```
+  brace overlaps, by card option        before    after
+  shipped preset (ladder, mudsill)        162        6
+  concrete-pad footing                    162        8
+  stair access                            162       10
+  24-ft platform                          241       12
+```
+
+Four tests in `test/timber2-tower-brace.test.ts` over those four options; three fail on the old
+generator and the fourth is the guard — that a brace still spans its bay corner to corner and lands
+on the legs, which is what standing it off the frame could have broken. Two thumbnails moved, the
+tower's; no other golden set has a tower in it.
+
+### Measured, not fixed
+
+- **A brace's square-cut LOWER END dips into the footing beside it** — 6 pairs at 1.91 in on the
+  mudsill, 8 at 1.90 in on a concrete pad. The board is raked and its end is cut square, so its
+  low corner reaches below the corner point it is struck from. Same shape as the stair stringer's
+  ends, which were fixed by placing the board off its two real corners rather than its centreline.
+- **With `access: 'stair'` the stair well is inside the frame's sweep, and this change makes it
+  worse**, which is worth stating plainly rather than burying: stringer 1.87 → 3.46 in, railMid
+  1.07 → 2.66, plus a tread at 0.80 and a rail top at 1.03 that did not touch before. The frame
+  already swept into the well — the ladder had the same defect and was fixed by raking it at the
+  frame's own batter — and pushing the braces out to where they can be bolted moves the frame's
+  outer face 4¼ in further into it. The stair needs the ladder's fix: its clearance struck off the
+  frame's widest point, not off the deck edge.
+- **The tower's girts are still centre to centre**, 16 pairs at 3.02 in into the legs, 8 where two
+  girts meet at a corner, and the top one is at deck level and so runs through 16 joists, the deck,
+  8 cab posts, the rail posts and the toe boards. That is the platform's bearing line and a bigger
+  question than the bracing: a girt at the top of the legs is what the joists should sit ON.

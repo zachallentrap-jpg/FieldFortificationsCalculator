@@ -84,6 +84,43 @@ function cornersAt(spec: TowerSpec, y: number, baseY = 0): [number, number][] {
   ];
 }
 
+type V3 = [number, number, number];
+
+const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const dot3 = (a: V3, b: V3): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const unit = (v: V3): V3 => {
+  const l = Math.hypot(v[0], v[1], v[2]) || 1;
+  return [v[0] / l, v[1] / l, v[2] / l];
+};
+
+/**
+ * The outward unit normal of one FACE of a battered frame — the plane through the two legs that
+ * bound it. It is not horizontal: the legs rake, so the face leans in with them, and a member laid
+ * on that face has to be offset along this rather than along the horizontal. Offsetting sideways
+ * instead leaves `cos(batter)` of the intended clearance, which on this tower is 0.39 in of a
+ * brace still inside its leg.
+ */
+function faceNormal(bot: readonly [number, number], botB: readonly [number, number],
+  top: readonly [number, number], climb: number, centre: number): V3 {
+  const along: V3 = [botB[0] - bot[0], 0, botB[1] - bot[1]];
+  const up: V3 = [top[0] - bot[0], climb, top[1] - bot[1]];
+  const n = unit(cross(along, up));
+  const mid: V3 = [(bot[0] + botB[0]) / 2 - centre, 0, (bot[1] + botB[1]) / 2 - centre];
+  return dot3(n, mid) < 0 ? [-n[0], -n[1], -n[2]] : n;
+}
+
+/**
+ * How far a leg's section reaches from its own axis along a direction — half its width only when
+ * the two are square to each other. A battered leg carries rotation `[rx, 0, rz]`, which tilts the
+ * section with it, so the reach is the support of the rotated box along `n`: with `ry = 0` the
+ * section's own axes are `Rx·Rz·(0,1,0)` and `Rx·Rz·(0,0,1)`.
+ */
+function legReach([rx, rz]: readonly [number, number], n: V3, widthFt: number): number {
+  const eY: V3 = [-Math.sin(rz), Math.cos(rz) * Math.cos(rx), Math.cos(rz) * Math.sin(rx)];
+  const eZ: V3 = [0, -Math.sin(rx), Math.cos(rx)];
+  return (widthFt / 2) * (Math.abs(dot3(eY, n)) + Math.abs(dot3(eZ, n)));
+}
+
 export function generateTower(spec: TowerSpec): TowerResult {
   const emit = makeEmitter('TW');
   const plan = towerStagePlan();
@@ -103,6 +140,9 @@ export function generateTower(spec: TowerSpec): TowerResult {
   const braceNominal = TOWER.braceNominal.value as string;
   const joistNominal = TOWER.platformJoistNominal.value as string;
   const bay = TOWER.bayHeightFt.value as number;
+  const legW = DRESSED[legNominal]!.d / IN_PER_FT;
+  /** The tower's centre in plan — `cornersAt` strikes the base square from the same figure. */
+  const planCentre = spec.cabPlanFt / 2 + (TOWER.batterPerSideFt.value as number);
 
   // ── Footings
   //
@@ -160,6 +200,8 @@ export function generateTower(spec: TowerSpec): TowerResult {
   // and both its diagonals ended 5 7/8 in below the feet they were supposed to be bolted to.
   const climb = legTopY - legBaseY;
   const topCorners = cornersAt(spec, legTopY, legBaseY);
+  /** Each leg's [rx, rz], kept so the bracing knows where the face of the leg it lands on is. */
+  const legRot: [number, number][] = [];
   for (let i = 0; i < 4; i++) {
     const [x0, z0] = base[i]!;
     const [x1, z1] = topCorners[i]!;
@@ -186,6 +228,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
     // [0, 0, PI/2], a plumb post, which is what it should be.
     const rx = Math.atan2(dz, climb);
     const rz = Math.atan2(Math.hypot(climb, dz), dx);
+    legRot.push([rx, rz]);
     emit('towerLeg', legNominal, {
       cutLengthFt: lenFt,
       position: [(x0 + x1) / 2, (legBaseY + legTopY) / 2, (z0 + z1) / 2],
@@ -217,15 +260,46 @@ export function generateTower(spec: TowerSpec): TowerResult {
         doctrineRef: citeOf(TOWER.girtNominal),
       });
       // The X: two diagonals per face, corner to opposite corner of the bay.
+      //
+      // A BRACE IS BOLTED TO THE FACE OF THE FRAME, so it cannot be IN the frame. Both diagonals
+      // were drawn on the legs' own centre plane, corner centre to corner centre, which put every
+      // one of them inside the two legs it braces — 3.85 in of a 5½-in leg at the worst corner,
+      // 32 pairs — and, since the two of them share that plane, inside EACH OTHER at the crossing:
+      // 40 pairs, 2.67 in. The render shows the X as two sticks fighting for the same pixels in
+      // the middle of every bay, on all four faces of every bay of the tower.
+      //
+      // Laid on the face: the first diagonal's inner face lands on the legs' outer faces and the
+      // second lies on the first, which is what bolting two 2x6 diagonals over a leg actually
+      // makes. `legReach` is what settles it — a BATTERED leg's section is tilted, so how far it
+      // stands out from its own axis is not half its width but the support of a raked box along
+      // the face normal, and reading it off the leg's own rotation keeps the two together if the
+      // batter ever changes.
+      const braceT = DRESSED[braceNominal]!.w / IN_PER_FT;
       const aB = bot[f]!;
       const cB = bot[(f + 1) % 4]!;
-      for (const [p, q] of [[aB, c], [cB, a]] as const) {
-        const dRun = Math.hypot(q[0] - p[0], q[1] - p[1]);
+      const n = faceNormal(aB, cB, a, yTop - yBot, planCentre);
+      const stand = Math.max(legReach(legRot[f]!, n, legW), legReach(legRot[(f + 1) % 4]!, n, legW));
+      for (const [k, [p, q]] of ([[aB, c], [cB, a]] as const).entries()) {
         const dRise = yTop - yBot;
+        const off = stand + braceT / 2 + k * braceT;
+        // AND IT LIES FLAT ON THE FACE. The rotation was built from the PLAN run and the rise
+        // alone, which leaves the board on edge in a VERTICAL plane; the face it is bolted to
+        // leans with the legs, and the two diagonals of one X lean opposite ways in plan, so
+        // their two vertical planes cross at about 10° and no amount of offsetting separates
+        // them. Built from the face's own frame — length along the true 3D run, thickness along
+        // the face normal — the board is where a bolted brace is, and stacking the second one on
+        // the first is then just one thickness along that normal.
+        //
+        // The Euler triple that does it, for R = Ry·Rx·Rz with the third column equal to `n` and
+        // the first equal to the unit run: rx = asin(-n_y), ry = atan2(n_x, n_z), and
+        // rz = atan2(t_y, b_y) where b = n x t. With no batter n is horizontal and it collapses
+        // to the old [0, yaw, rake] exactly.
+        const t = unit([q[0] - p[0], dRise, q[1] - p[1]]);
+        const b3 = unit(cross(n, t));
         emit('towerBrace', braceNominal, {
-          cutLengthFt: Math.hypot(dRun, dRise),
-          position: [(p[0] + q[0]) / 2, (yBot + yTop) / 2, (p[1] + q[1]) / 2],
-          rotation: [0, Math.atan2(-(q[1] - p[1]), q[0] - p[0]), Math.atan2(dRise, Math.max(1e-6, dRun))],
+          cutLengthFt: Math.hypot(Math.hypot(q[0] - p[0], q[1] - p[1]), dRise),
+          position: [(p[0] + q[0]) / 2 + n[0] * off, (yBot + yTop) / 2 + n[1] * off, (p[1] + q[1]) / 2 + n[2] * off],
+          rotation: [Math.asin(-n[1]), Math.atan2(n[0], n[2]), Math.atan2(t[1], b3[1])],
           stage: sBrace,
           nailing: 'bolted at both ends and where the diagonals cross (PH)',
           doctrineRef: citeOf(TOWER.braceNominal),
@@ -236,7 +310,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
 
   // ── Platform: joists across the leg square, decked.
   const deckHalf = spec.cabPlanFt / 2;
-  const cx = spec.cabPlanFt / 2 + (TOWER.batterPerSideFt.value as number);
+  const cx = planCentre;
   const joistDepth = DRESSED[joistNominal]!.d / IN_PER_FT;
   const deckY = H;
   const joistY = deckY - joistDepth / 2;
