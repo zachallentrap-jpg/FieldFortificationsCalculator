@@ -369,7 +369,12 @@ export function generateStair(input: StairInput): StairResult {
       const railYaw = Math.atan2(-dir[1], dir[0]);
       const railLen = (sol.risers - 1) * Math.hypot(T, R);
       const bays = Math.max(1, Math.ceil(sol.runFt / (RAIL.postSpacingMaxFt.value as number)));
-      const postDepth = DRESSED[railPostNominal]!.d / IN_PER_FT;
+      // A POST STANDS ON THE WALKING LINE AND FINISHES FLUSH WITH THE TOP RAIL — the same slip
+      // as `railings.ts`, copied here. Length `railTopH + the POST's face`, centred on
+      // `railTopH / 2`, is right at the top only because a 4x4 and a 2x4 are both 3½ in, and
+      // wrong at the bottom: the other half of that extra put the foot 1¾ in below the nosing
+      // line, into the treads and, at the head of a flight, into the deck it lands on.
+      const proud = DRESSED[railMemberNominal]!.d / IN_PER_FT / 2;
       for (const side of [-1, 1] as const) {
         const off = (side * widthFt) / 2;
         const px = (d: number): number => at[0] + dir[0] * d + across[0] * off;
@@ -381,8 +386,8 @@ export function generateStair(input: StairInput): StairResult {
         for (let i = 0; i <= bays; i++) {
           const d = (sol.runFt * i) / bays;
           emit('railPost', railPostNominal, {
-            cutLengthFt: railTopH + postDepth,
-            position: [px(d), walkY(d) + railTopH / 2, pz(d)],
+            cutLengthFt: railTopH + proud,
+            position: [px(d), walkY(d) + (railTopH + proud) / 2, pz(d)],
             rotation: [0, 0, Math.PI / 2],
             stage,
             nailing: 'bolted to the stringer (PH)',

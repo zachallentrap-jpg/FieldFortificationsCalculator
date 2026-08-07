@@ -128,9 +128,22 @@ export function generateRailing(input: RailingInput): Member[] {
       for (let i = 0; i <= bays; i++) {
         const [x, z] = at(a + (span * i) / bays);
         if (standingHalf(x, z) !== null || spotTaken(x, z)) continue;
+        // A POST STANDS ON THE DECK AND FINISHES FLUSH WITH THE TOP RAIL. Both ends were set by
+        // one arithmetic slip: the length was `topH + the POST's own face`, centred on `topH / 2`,
+        // which is right at the top by coincidence — a 4x4 and a 2x4 are both 3½ in, so half of
+        // the post's face happens to equal half the RAIL's depth — and wrong at the bottom, where
+        // the other half of that extra put the foot 1¾ in BELOW the walking surface. There it ran
+        // through the edge board of every deck and stopped in mid-air, landing on neither the deck
+        // nor the frame it is nailed to:
+        //
+        //   platform 34 pairs (worst 3½ x 1½ x 1¾ in)      guard tower 4
+        //
+        // What the post has to clear above the rail is half the RAIL's depth, so that is what it
+        // is measured from — the coincidence is not a reason to keep asking the wrong piece.
+        const proud = DRESSED[memberNominal]!.d / IN_PER_FT / 2;
         emit('railPost', postNominal, {
-          cutLengthFt: topH + DRESSED[postNominal]!.d / IN_PER_FT,
-          position: [x, deckY + topH / 2, z],
+          cutLengthFt: topH + proud,
+          position: [x, deckY + (topH + proud) / 2, z],
           rotation: [0, 0, Math.PI / 2],
           stage,
           nailing: 'bolted or 4-16d to the deck frame (PH)',

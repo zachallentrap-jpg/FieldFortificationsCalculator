@@ -53,6 +53,7 @@ screenshots get read.
 | **Crib bunker — the bays between the stringers** | **Fixed** — every bay was a hole in the long wall, a stringer deep, open at the face and leading straight down into the bunker. |
 | **The attic hatch** (`atticAccess`) | **Fixed** — the "absorbed by trimmers" test used half the joist SPACING, so it deleted two ceiling joists at the hatch and put nothing in their place; one of them was inside the opening. |
 | **The loading platform's deck** | **Fixed** — the decking was laid INTO the top of every joist, and the last board was clamped instead of ripped, leaving an inch of open deck along the whole edge. |
+| **Where a guardrail post's foot is** | **Fixed** — one arithmetic slip, written in `railings.ts` and copied into `access.ts`, put every rail post's foot 1¾ in below the surface it guards, through the deck's edge board. |
 | Guard shack (8×8, four openings) | **Checked, clean.** Nothing wrong. Its unbraced walls are a documented rule, now pinned by a test. |
 | Squad hut (50 ft — the longest building) | **Checked, clean.** Nothing wrong. Its fifty-foot runs are already handled, by a module I had not read. |
 | Weather barrier / building paper | **Already covered** — an earlier pass fixed it (row above). All that is left is a stale help string; see below. |
@@ -3271,3 +3272,53 @@ moved; no compat golden did, because neither family is on the frozen path.
   `railings.ts` and so belongs to every railed structure, not just this one.
 - **The rail heights themselves are exact**, measured from the deck surface after the drop: top rail
   42.00 in, midrail 21.00 in, toe board sitting 0.25 in clear — against EM 385-1-1's 42, 21 and 4.
+
+## A guardrail post stood 1¾ inches under the deck it guards
+
+The residue the platform pass recorded, and it turned out not to be the platform's at all.
+
+**A POST STANDS ON THE SURFACE IT GUARDS AND FINISHES FLUSH WITH THE TOP RAIL.** Both ends were set
+by one expression — length `topH + the POST's own face`, centred on `deckY + topH / 2` — and it is
+right at the TOP **by coincidence**: a 4x4 and a 2x4 are both 3½ in, so half the post's face happens
+to equal half the RAIL's depth, which is what the post must clear to finish flush. The other half of
+that same extra went the other way, and put the foot 1¾ in below the walking surface, through the
+edge board of every deck, stopping in mid-air — landing on neither the deck nor the frame its own
+nailing note says it is bolted to.
+
+**Written once and copied.** `access.ts` frames the stair rails with the identical arithmetic, so a
+stair post's foot sat 1¾ in below the nosing line, into the treads, and at the head of a flight into
+the deck it lands on. Both now measure the overhang from the RAIL's depth, because that is the piece
+the question is about; the coincidence is not a reason to keep asking the wrong one.
+
+```
+                     real SAT overlaps on the rail posts        worst
+guard tower  before  6 on 2 posts                               2.50 in
+             after   2                                          2.00
+loading platform before 42 on 15 posts                          2.46 in
+             after   2                                          1.09
+```
+
+Measured with SAT throughout, because a stair stringer is raked: an AABB round one spans its whole
+climb and calls every post on the flight a collision. The box test said 34 pairs where SAT says 42
+real ones and a different set — neither number is the other's.
+
+**The rails did not move**, which is the guard on the fix and its own test: top rail 42.00 in over
+the deck, midrail 21.00, toe board clear of it, against EM 385-1-1's 42 and 21. Raising a post's
+foot is only right if the thing bolted to it stays where doctrine puts it, and a post is easy to
+move by changing the wrong end. Four tests; three fail on the old generator and the fourth is that
+guard. Four thumbnails moved — the platform's and the tower's — and no compat golden, because
+neither family is on the frozen path.
+
+### Measured, not fixed
+
+Two overlaps survive on each structure, and they are a different question — where a post sits **in
+plan**, not how far its foot drops:
+
+- **The stair's lowest rail post is coincident with its own stringer**, 1.09 in. The post is at the
+  flight's half-width and so is the stringer, and the nailing note says "bolted to the stringer" —
+  which means beside it, on its face, not in its plane.
+- **The tower cab's rail posts cross a girt**, 2.00 in. Same shape: the rail line and the frame line
+  are the same line, and two 3½-in members cannot both be on it.
+
+Both are smaller than they were, and both are about lateral placement — the fix for either is to
+decide which side of the frame the rail line belongs on, for every railed structure at once.
