@@ -30,6 +30,19 @@ export interface RailEdge {
 
 export interface RailingInput {
   edges: RailEdge[];
+  /**
+   * POSTS THE FRAME ALREADY STANDS AT THESE SPOTS, which are not the railing's to emit.
+   *
+   * The de-duplication below only sees inside this pass. A guard tower's cab carries four 4x4
+   * corner posts at the deck's own corners, emitted by `tower.ts` after the railing has run, and
+   * the railing put its own 4x4 in every one of those holes: two posts entirely inside each other
+   * over 3 ft 8 in of height, on every cab option including the shipped one, with each edge's top
+   * rail, mid rail and toe board running 1 3/4 in into the post at both of its ends — 28 pairs.
+   *
+   * Told what is already standing, the railing puts no post there and lands its rails on the
+   * faces of what is, which is the joint a rail nailed to a corner post actually makes.
+   */
+  standing?: { at: [x: number, z: number]; widthFt: number }[];
   /** Walking surface elevation, feet. Posts stand on it. */
   deckY: number;
   stage: number;
@@ -83,6 +96,12 @@ export function generateRailing(input: RailingInput): Member[] {
     placed.add(k);
     return false;
   };
+  const standing = input.standing ?? [];
+  /** Half the plan width of a frame post already standing here, or null if none is. */
+  const standingHalf = (x: number, z: number): number | null => {
+    const hit = standing.find((s) => Math.hypot(s.at[0] - x, s.at[1] - z) < 1e-6);
+    return hit ? hit.widthFt / 2 : null;
+  };
   const { edges, deckY, stage } = input;
   const postNominal = RAIL.postNominal.value as string;
   const memberNominal = RAIL.memberNominal.value as string;
@@ -108,7 +127,7 @@ export function generateRailing(input: RailingInput): Member[] {
       const bays = Math.max(1, Math.ceil(span / maxSpacing));
       for (let i = 0; i <= bays; i++) {
         const [x, z] = at(a + (span * i) / bays);
-        if (spotTaken(x, z)) continue;
+        if (standingHalf(x, z) !== null || spotTaken(x, z)) continue;
         emit('railPost', postNominal, {
           cutLengthFt: topH + DRESSED[postNominal]!.d / IN_PER_FT,
           position: [x, deckY + topH / 2, z],
@@ -118,9 +137,15 @@ export function generateRailing(input: RailingInput): Member[] {
           doctrineRef: citeOf(RAIL.postSpacingMaxFt),
         });
       }
-      const [mx, mz] = at((a + b) / 2);
+      // The rails stop on the faces of anything the frame already stands at this span's ends.
+      // Run to the centreline instead and the rail is half a post deep inside it.
+      const ra = a + (standingHalf(...at(a)) ?? 0);
+      const rb = b - (standingHalf(...at(b)) ?? 0);
+      const rSpan = rb - ra;
+      if (rSpan < MIN_RUN_FT) continue;
+      const [mx, mz] = at((ra + rb) / 2);
       const run = (h: number, role: 'railTop' | 'railMid' | 'toeBoard', cite: string) => emit(role, memberNominal, {
-        cutLengthFt: span,
+        cutLengthFt: rSpan,
         position: [mx, deckY + h, mz],
         rotation: [0, yaw, 0],
         stage,

@@ -2495,3 +2495,50 @@ header moves with the piece it is in line with. The crib-bunker card goldens reg
 `entrance: 'open'` and `entrance: 'baffle'` differ only by the baffle wall; the jambs, the header
 and the doorway itself are common to both and are now checked in both. Nothing else was wrong with
 the open entrance.
+
+## Checked clean: the loading platform's panel deck
+
+`deck: 'panel'` had never been rendered. It is right. The nine sheets tile the 20×12 deck with no
+gap and no overlap (every sampled point covered, no subfloor-to-subfloor collision); the ramp's six
+sheets run their 8-ft length ACROSS the ramp and their 4-ft width up the slope, so the joints land
+square across the stringers exactly as the comment claims; and the ramp's surface still arrives at
+the deck's own top because `toeY` follows the decking thickness.
+
+Two things were measured and are **below the visual threshold**, and they are in BOTH decking
+materials, so they are not a panel-deck defect: the ramp's topmost course overruns the deck's first
+board by **0.224 in** on planks and **0.123 in** on sheets (a raked course's up-slope edge crossing
+z = 0), and a ramp stringer bites the sill by **0.096 in**. Written down rather than fixed.
+
+## Four posts in four holes: the cab and the deck's guardrail
+
+The next target was `cab.walls: 'open-rail'` — never rendered, and the concrete question was whether
+an open cab at 16 ft has anything to stop a fall. It does: the platform's guardrail is there,
+railTop and railMid and a toe board. What it also has is the guardrail standing INSIDE the cab.
+
+`railings.ts` has de-duplicated its own posts by position since two edges meeting at a corner were
+each found setting one there — *"where two posts land on the same spot, there is one post."* That set
+only sees inside the railing pass. The cab's four 4x4 corner posts stand on the deck's own corners
+and are emitted by `tower.ts` AFTER the railing runs:
+
+```
+RL-railPost-01 into TW-post-01     3.50 in    two 4x4s entirely inside each other,
+                                              over 3 ft 8 in of height, at all four corners
+railTop / railMid / toeBoard       1.75 in    into the post at each end of each edge
+                                              — 28 pairs in all
+```
+
+On every cab option, including the shipped one. The doubled corner is visible as a thickened post
+in any orbit of the cab.
+
+The fix is not to move the railing off the corner — the corner is where a guardrail post belongs.
+It is to tell the railing what the frame has already stood there. `RailingInput.standing` takes the
+plan spots and widths of posts that are not the railing's to emit; the pass skips those holes and
+lands its rails on the faces of what is standing, which is the joint a rail nailed to a corner post
+actually makes. The tower passes its cab corners; the deck now carries two rail posts (the access
+gap's ends) instead of six, and every run touches the post it is nailed to at **0.000 in**.
+
+Four regression tests, three failing on the old code. The fourth is the one that matters for blast
+radius: **`standing` is opt-in** — a railing told nothing posts its corners and runs its rails
+corner to corner exactly as before, which is what the loading platform relies on. Told about one
+post, it skips that hole, shortens the two rails meeting there by half its width, and leaves the
+other two alone. Only the tower's card goldens moved, which is the same claim from the other side.

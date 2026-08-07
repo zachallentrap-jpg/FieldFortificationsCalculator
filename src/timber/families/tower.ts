@@ -30,6 +30,12 @@ import type { FloorLevels } from '../floor';
 /** Guard against a divide-by-zero on a degenerate height. Arithmetic, not doctrine. */
 const EPS_FT = 1e-6;
 
+/**
+ * The cab's corner posts. Named because TWO passes have to agree on them: the guardrail is told
+ * they are standing so it does not put its own post in the same hole, and the cab emits them.
+ */
+const CAB_POST_NOMINAL = '4x4';
+
 export interface TowerResult {
   members: Member[];
   levels: FloorLevels;
@@ -329,7 +335,15 @@ export function generateTower(spec: TowerSpec): TowerResult {
       // either way. Gating this on 'ladder' left a stair delivering people into a closed rail.
       ...(i === 0 ? { gaps: [accessEdgeGap] } : {}),
     }));
-    emit.members.push(...generateRailing({ edges, deckY: deckY + deckThick / IN_PER_FT, stage: sRail }));
+    // The cab's four corner posts stand on these same corners — `tower.ts` emits them below,
+    // after this pass has run, so the railing's own de-duplication cannot see them. Told about
+    // them, it leaves those holes alone and butts its rails on their faces.
+    emit.members.push(...generateRailing({
+      edges,
+      deckY: deckY + deckThick / IN_PER_FT,
+      stage: sRail,
+      standing: corners.map((at) => ({ at, widthFt: DRESSED[CAB_POST_NOMINAL]!.w / IN_PER_FT })),
+    }));
   }
 
   // ── Cab.
@@ -407,7 +421,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
     [cx - deckHalf, cx - deckHalf], [cx + deckHalf, cx - deckHalf],
     [cx + deckHalf, cx + deckHalf], [cx - deckHalf, cx + deckHalf],
   ] as [number, number][]) {
-    emit('post', '4x4', {
+    emit('post', CAB_POST_NOMINAL, {
       cutLengthFt: TOWER.cabWallHeightFt.value as number,
       position: [x, (cabBaseY + postTopY) / 2, z],
       rotation: [0, 0, Math.PI / 2],
