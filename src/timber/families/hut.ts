@@ -177,7 +177,9 @@ function generateScreenBand(
  * seat. The PIT itself is not a member — nothing is built out of it — so it is not emitted; the
  * depth travels on the spec and prints on the sheet, which is where a digging task belongs.
  */
-function generateRiserBox(lengthFt: number, widthFt: number, seats: 2 | 4, stage: number): Member[] {
+function generateRiserBox(
+  lengthFt: number, widthFt: number, seats: 2 | 4, stage: number, wallThickFt: number,
+): Member[] {
   const emit = makeEmitter('HT');
   const nominal = LATRINE.boxNominal.value as string;
   const h = LATRINE.riserBoxHeightFt.value as number;
@@ -191,8 +193,13 @@ function generateRiserBox(lengthFt: number, widthFt: number, seats: 2 | 4, stage
   // floated four inches above its own dividers and eight inches behind its own front board.
   // One datum fixes it: `h` is the SEAT HEIGHT — the top of the lid — and everything hangs off
   // that, which is also the only number on this bench a person interacts with.
-  const zFront = widthFt - depth - 0.5;
-  const zBack = widthFt - 0.5;
+  // AND IT HAS TO CLOSE AGAINST THE WALL. `widthFt - 0.5` is a guessed half-foot, and the wall's
+  // inner face is not there: on the shipped latrine the framing stops at 7.7083 and the bench's
+  // back stood at 7.5000, so a 2½-in slot ran the whole 10-ft length of the bench, straight down
+  // into the pit — under a comment that has said "spanning the full depth from the front board to
+  // the wall" since the box was written. The wall contract knows where its face is.
+  const zBack = widthFt - wallThickFt;
+  const zFront = zBack - depth;
   const lidY = h - thick / 2;
   // The lid, flat, spanning the full depth from the front board to the wall.
   emit('riserBox', nominal, {
@@ -214,12 +221,16 @@ function generateRiserBox(lengthFt: number, widthFt: number, seats: 2 | 4, stage
     nailing: '3-8d ea stud (PH)',
     doctrineRef: citeOf(LATRINE.riserBoxHeightFt),
   });
-  // Ends and seat dividers, crossing front to back, full height under the lid.
+  // Ends and seat dividers, crossing front to back, full height under the lid — and landing on the
+  // BACK of the front board, not inside it. Run to the front FACE and every divider shares its
+  // whole thickness with the board it is nailed to: 1½ × 15¼ × 1½ in, five times over on the
+  // shipped four-seat bench. A divider butts the board; the board is the face of the box.
+  const zDivider = zFront + thick;
   for (let i = 0; i <= seats; i++) {
     const x = lengthFt / 2 - runFt / 2 + (runFt * i) / seats;
     emit('riserBox', nominal, {
-      cutLengthFt: depth,
-      position: [x, (h - thick) / 2, (zFront + zBack) / 2],
+      cutLengthFt: zBack - zDivider,
+      position: [x, (h - thick) / 2, (zDivider + zBack) / 2],
       rotation: [0, Math.PI / 2, 0],
       stage,
       actual: { w: DRESSED[nominal]!.w, d: (h - thick) * IN_PER_FT },
@@ -272,7 +283,9 @@ export function generateHut(spec: HutSpec): HutResult {
     if (screened) members.push(...generateScreenBand(base.walls, band!, finishStage));
     if (hasRiser) {
       const seats = spec.latrine?.seats ?? 4;
-      members.push(...generateRiserBox(buildingSpec.dims.lengthFt, buildingSpec.dims.widthFt, seats, finishStage));
+      members.push(...generateRiserBox(
+        buildingSpec.dims.lengthFt, buildingSpec.dims.widthFt, seats, finishStage, base.walls.thicknessFt,
+      ));
     }
   }
 

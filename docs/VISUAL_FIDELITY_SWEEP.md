@@ -2591,3 +2591,35 @@ square cut on a doubly-tilted member drops more of its corner. It is the same re
 battered leg's foot wants a LEVEL cut, like a stair stringer's), now slightly larger, and it is
 still the right trade: the section being square to the frame is a defect you can see from across
 the room, and this one is a sixth of an inch under a mudsill.
+
+## The latrine's bench did not close
+
+The latrine had never been rendered in this sweep. Its riser box carries a comment headed *"THE BOX
+HAS TO CLOSE"* from an earlier fix that pulled its three parts onto one datum. Two joints in it
+still did not.
+
+**THE DIVIDERS RAN INTO THE FRONT BOARD.** Each divider spanned the full depth from the front FACE
+to the back, and the front board occupies the first 1½ in of that, so every divider's leading
+thickness was inside the board it is nailed to:
+
+```
+HT-riserBox-02 + HT-riserBox-03 … 07     1.50 x 15.30 x 1.50 in
+                                          five times over on the shipped four-seat bench
+```
+
+**AND THE BACK STOPPED SHORT OF THE WALL.** `zBack = widthFt - 0.5` is a guessed half-foot; the
+framing's inner face is at `widthFt - wallThickness`, which on this latrine is 7.7083 against the
+bench's 7.5000 — a **2½-in slot the whole 10-ft length of the bench**, straight down into the pit,
+under a comment that has read *"spanning the full depth from the front board to the wall"* since the
+box was written. `BuildingResult.walls` is a `WallsContract` and it has known its own
+`thicknessFt` all along.
+
+Both are fixed off the same two lines: the back lands on the wall contract's face, and the dividers
+run from the BACK of the front board. The bench keeps its doctrine depth and seat spacing — 2.5 ft
+on centre, unchanged — and the seat openings, which are DERIVED from the lid and the dividers,
+still land one per bay without touching `riserSeats.ts`.
+
+Three regression tests, two failing on the old code. The third passes both ways on purpose: **it is
+still a box** — the lid reaches the front face and the wall, everything under it comes up to the
+lid's underside, and everything reaches the floor. That is the guard that closing two joints did not
+open a third. The latrine's card goldens regenerated.
