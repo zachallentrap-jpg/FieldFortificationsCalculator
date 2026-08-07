@@ -163,32 +163,122 @@ function generateGirts(walls: WallsContract, stage: number, wallHeightFt: number
   return emit.members;
 }
 
+/** Half-extent of a member along a unit world direction — exact for any rotation. */
+function halfExtentAlong(m: Member, n: [number, number, number]): number {
+  const [rx, ry, rz] = m.rotation;
+  const axis = (v: [number, number, number]): [number, number, number] => {
+    let [x, y, z] = v;
+    let a = x * Math.cos(rz) - y * Math.sin(rz);
+    const b = x * Math.sin(rz) + y * Math.cos(rz);
+    x = a; y = b;
+    a = y * Math.cos(rx) - z * Math.sin(rx);
+    z = y * Math.sin(rx) + z * Math.cos(rx);
+    y = a;
+    return [x * Math.cos(ry) + z * Math.sin(ry), y, -x * Math.sin(ry) + z * Math.cos(ry)];
+  };
+  const h = [m.cutLength / IN_PER_FT / 2, m.actual.d / IN_PER_FT / 2, m.actual.w / IN_PER_FT / 2];
+  return ([[1, 0, 0], [0, 1, 0], [0, 0, 1]] as [number, number, number][])
+    .reduce((sum, v, i) => {
+      const p = axis(v);
+      return sum + h[i]! * Math.abs(p[0] * n[0] + p[1] * n[1] + p[2] * n[2]);
+    }, 0);
+}
+
 /**
- * The screened band: a framed sill and head across every wall, with screen between the studs.
- * The panel is emitted as one member per wall rather than one per stud bay — screen comes off a
- * roll and is cut to the opening, so a bay-by-bay count would bill a seam that nobody cuts.
+ * The screened band: a framed sill and head BETWEEN the studs, with screen across them. The panel
+ * is emitted as one member per wall rather than one per stud bay — screen comes off a roll and is
+ * cut to the opening, so a bay-by-bay count would bill a seam that nobody cuts.
+ *
+ * THE SILL AND THE HEAD ARE FRAMING, AND FRAMING GOES BETWEEN. They were emitted as one piece the
+ * full run of the wall, on the wall's CENTRELINE — so each ran clean through every stud it crossed,
+ * sharing the whole 1½ × 3½ × 1½-in block at each one: 190 pairs on a sea hut, 88 on a latrine,
+ * plus a door header (39 × 2¾ × ¾ in) and the rafters over the plate. The comment above has said
+ * "between the studs" since the band was written and the nailing note has said `2-16d ea end`,
+ * which is a piece with two ends — neither describes a ribbon run past them.
+ *
+ * The girt next door is the opposite case and got the opposite fix: a girt IS continuous, so it
+ * moved onto a face. A sill is not.
  */
 function generateScreenBand(
   walls: WallsContract,
   band: { sillFt: number; heightFt: number },
   stage: number,
+  framing: readonly Member[],
 ): Member[] {
   const emit = makeEmitter('HT');
   const nominal = HUT.girtNominal.value as string;
+  const heads = [band.sillFt, band.sillFt + band.heightFt];
   for (const s of walls.surfaces) {
     const uMid = s.runFt / 2;
-    const at = (v: number, role: MemberRole, extra: Record<string, unknown>) => emit(role, nominal, {
-      cutLengthFt: s.runFt,
-      position: [s.origin[0] + s.along[0] * uMid, v, s.origin[1] + s.along[1] * uMid],
-      rotation: [0, surfaceYaw(s), 0],
-      stage,
-      wall: s.wall,
-      nailing: '2-16d ea end (PH)',
-      doctrineRef: citeOf(HUT.screenBandSillFt),
-      ...extra,
-    });
-    at(band.sillFt, 'screenFrame', {});
-    at(band.sillFt + band.heightFt, 'screenFrame', {});
+    const along3: [number, number, number] = [s.along[0], 0, s.along[1]];
+    const norm3: [number, number, number] = [s.normal[0], 0, s.normal[1]];
+    const halfFace = DRESSED[nominal]!.d / IN_PER_FT / 2;
+    const halfThick = DRESSED[nominal]!.w / IN_PER_FT / 2;
+    for (const v of heads) {
+      // WHAT IS ALREADY IN THE WAY AT THIS HEIGHT, on this wall, in this plane. Not "the studs":
+      // the head row runs at the top of the band, where the CRIPPLES over an opening's header
+      // stand and where the header itself is, and a bay list built from studs alone put the band
+      // through both — 14 pairs and a 36 × 2¾ × ¾-in bite out of a door header on a sea hut.
+      // Anything of this wall that shares both the band member's height and its plane is an
+      // obstruction, and the piece is cut to the clear space between them. A let-in brace shares
+      // neither plane nor height, which is why it is not in the way and does not appear here.
+      const obstacles = framing
+        .filter((m) => {
+          if (m.wall !== s.wall || m.role === 'screenFrame' || m.role === 'screenPanel') return false;
+          const dy = halfExtentAlong(m, [0, 1, 0]);
+          if (Math.abs(m.position[1] - v) >= dy + halfFace - TOLERANCE.epsFt) return false;
+          const w = (m.position[0] - s.origin[0]) * s.normal[0] + (m.position[2] - s.origin[1]) * s.normal[1];
+          return Math.abs(w) < halfExtentAlong(m, norm3) + halfThick - TOLERANCE.epsFt;
+        })
+        .map((m) => {
+          const u = (m.position[0] - s.origin[0]) * s.along[0] + (m.position[2] - s.origin[1]) * s.along[1];
+          const h = halfExtentAlong(m, along3);
+          return [u - h, u + h] as [number, number];
+        })
+        .sort((a, b) => a[0] - b[0]);
+      // MERGED, because obstructions overlap each other. A header spans several bays and contains
+      // the king studs, the jacks and the cripples over it; walking a sorted list in pairs finds a
+      // "gap" between one of them and the next INSIDE that header, and the band was framed across
+      // it — 14½ in of blocking buried in a door header on the sea hut, after the header itself
+      // was already being counted as in the way.
+      const clear: [number, number][] = [];
+      for (const iv of obstacles) {
+        const last = clear[clear.length - 1];
+        if (last && iv[0] <= last[1] + TOLERANCE.epsFt) last[1] = Math.max(last[1], iv[1]);
+        else clear.push([iv[0], iv[1]]);
+      }
+      // A bay that falls inside an OPENING is not framed here — nothing is in the way there
+      // because nothing is THERE, and a piece run across it would bar the doorway.
+      //
+      // An opening, and not the band itself. `cutouts` also carries the band with a NEGATIVE
+      // `openingIndex`, so that the siding is cut away over it — and matching that one told the
+      // band not to frame its own head: the whole 7½-ft row went missing on every wall of every
+      // screened hut, leaving the screen with nothing along its top.
+      const blocked = (a: number, b: number): boolean => s.cutouts.some(
+        (c) => c.openingIndex >= 0 && c.v0 - 1e-9 <= v && v <= c.v1 + 1e-9
+          && Math.min(c.u1, b) - Math.max(c.u0, a) > 1e-9);
+      for (let i = 0; i + 1 < clear.length; i++) {
+        const a = clear[i]![1];
+        const b = clear[i + 1]![0];
+        // A quarter-inch offcut is not a member. Two obstructions that all but touch — a cripple
+        // beside a jack stud — leave a hair of clear space, and eight of those came out of a sea
+        // hut as 0.25-in pieces before this guard.
+        if (b - a <= TOLERANCE.minSliverFt || blocked(a, b)) continue;
+        emit('screenFrame', nominal, {
+          cutLengthFt: b - a,
+          position: [
+            s.origin[0] + s.along[0] * ((a + b) / 2),
+            v,
+            s.origin[1] + s.along[1] * ((a + b) / 2),
+          ],
+          rotation: [0, surfaceYaw(s), 0],
+          stage,
+          wall: s.wall,
+          nailing: '2-16d ea end (PH)',
+          doctrineRef: citeOf(HUT.screenBandSillFt),
+        });
+      }
+    }
     emit('screenPanel', 'screen cloth', {
       cutLengthFt: s.runFt,
       position: [
@@ -315,7 +405,7 @@ export function generateHut(spec: HutSpec): HutResult {
 
   if (screened || hasRiser) {
     const finishStage = requireOrdinal(stagePlan, 'finish');
-    if (screened) members.push(...generateScreenBand(base.walls, band!, finishStage));
+    if (screened) members.push(...generateScreenBand(base.walls, band!, finishStage, base.members));
     if (hasRiser) {
       const seats = spec.latrine?.seats ?? 4;
       members.push(...generateRiserBox(

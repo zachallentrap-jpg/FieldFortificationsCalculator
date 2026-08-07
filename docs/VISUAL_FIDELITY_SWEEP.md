@@ -2682,3 +2682,61 @@ thickness. Six card goldens regenerated.
   puts it OUTBOARD with the siding standing off by its thickness — which is how a SEA hut with
   vertical siding is really built. It is a covering-system change across six families, so it is
   written down rather than guessed at.
+
+## The screened band was a ribbon through the studs
+
+The target recorded last iteration. The band's sill and head were emitted as one piece the full run
+of the wall, on the wall's CENTRELINE — so each ran clean through every stud it crossed, sharing the
+whole 1½ × 3½ × 1½-in block at each one:
+
+```
+sea hut 190 pairs      latrine 88 pairs      + 39 × 2¾ × ¾ in out of a door header
+```
+
+and the sill ran straight across the doorway at 6 ft, a bar where the door is. The comment on the
+band has said *"between the studs"* since it was written and the nailing note has said `2-16d ea
+end`, which is a piece with two ends — neither describes a ribbon run past them. **The girt next
+door is the opposite case and got the opposite fix**: a girt IS continuous, so it moved onto a face.
+A sill is not, so it is cut into the bays.
+
+### Three things had to be true at once, and each was wrong on the first attempt
+
+1. **The band must not frame its own head out of existence.** `WallSurface.cutouts` carries the BAND
+   as a cutout with a NEGATIVE `openingIndex`, so the siding is cut away over it. Matching it as an
+   opening dropped the whole 7½-ft row on every wall of every screened hut — the screen left with
+   nothing along its top.
+2. **What is in the way at the head is not "the studs."** The head row runs where the CRIPPLES over
+   each opening stand and where the header itself is. A bay list built from studs alone put the band
+   through both. The rule now is: anything of this wall that shares the band member's height AND its
+   plane is an obstruction, and the piece is cut to what is left between them. (A let-in brace shares
+   neither, which is why it is not in the way.)
+3. **And those obstructions overlap.** A header spans several bays and contains the king studs, the
+   jacks and the cripples over it; walking a sorted list in pairs finds a "gap" between one of them
+   and the next INSIDE that header. 14½ in of blocking was framed into a door header before the
+   intervals were merged.
+
+```
+screenFrame into wall framing, after:   sea hut 0      latrine 0
+```
+
+Two existing guardrails caught the rest, which is what they are for: the number-free gate rejected a
+bare `/ 24` in the new half-extent helper, and the plausibility gate found **eight 0.25-in pieces**
+on a sea hut — slivers where a cripple all but touches a jack stud. Bays under `TOLERANCE.minSliverFt`
+are not cut.
+
+Three regression tests, two failing on the old code. The third — nothing framed across a doorway,
+nothing left unframed where the wall is solid — passes both ways and says so: a ribbon run the whole
+wall covers everything. It is the guard on the fix, that cutting the band into bays did not drop one,
+and it is sampled along every wall at both band heights rather than restating the algorithm. Two card
+goldens regenerated.
+
+### Measured, not fixed
+
+- **The band's head meets the raking rafters** on the gable walls — 0.63 in of vertical overlap over
+  half an inch of length. That is the gable-rake family already in this sweep, and `roof.ts` is frozen.
+- **The siding's hole is 1½ in above the frame.** `wallBands` is measured from the sole plate TOP and
+  the band's members are placed at absolute height, so the cutout comes out at v[6.13, 7.63] against
+  members at 6.00 and 7.50. It shows as the siding lapping the screen by 1.50 in along the bottom.
+- **The screen panel's own plane.** It sits on the wall's outer face, so it crosses the let-in braces
+  (67 × 18 × 0.06 in — its own thickness) and grazes the studs by 0.03 in. The frame it is stapled to
+  is now in the stud plane, 1¾ in behind it.
