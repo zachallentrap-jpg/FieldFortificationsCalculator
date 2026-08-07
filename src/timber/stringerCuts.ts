@@ -198,3 +198,61 @@ export function stairStringerProfile(m: Pick<Member, 'cutLength' | 'actual' | 'r
   const under = (d: number): number => R + (R / T) * d - Fw / cos;
   return [...top, at(seats * T, under(seats * T)), at(footFt, 0)];
 }
+
+/**
+ * A raked member's LOW END, cut LEVEL at the corner the member was struck from.
+ *
+ * The guard tower's X-braces are bolted flat to a BATTERED face and struck corner to corner of
+ * each bay. A board has width, so the low end's low corner hangs 2.21 in below the corner the
+ * diagonal was struck from — and the bottom bay's corner is the top of the footing the legs stand
+ * on. Every bottom-bay brace therefore had its foot buried in that footing, on all four faces, on
+ * both footings the card offers:
+ *
+ *   timber mudsill   6 pairs, 1.93 in       concrete pad   8 pairs, 1.92 in
+ *
+ * Nothing cuts a `towerBrace`, so unlike a bird's mouth or a plumb ridge cut this was never a
+ * box-versus-mesh approximation. It is what the viewer actually drew.
+ *
+ * The cut is level through the CENTRELINE'S END — the bay corner itself — which is where a
+ * carpenter's saw goes and is the one datum the piece carries on its own. Cutting level through
+ * the end's TOP corner instead, which is what `stringerEndProfile` does at a stringer's foot, is
+ * right for a board standing on the ground and wrong here: it eats the whole end face and leaves
+ * the foot 2½ in in the air.
+ *
+ * Unlike the stringer's, this cut cannot be read off `rotation[2]`. A stringer stands in a
+ * VERTICAL plane, so its pitch is its z-euler; a brace laid on a battered face is tilted out of
+ * that plane, and the direction that is level in the WORLD is a direction in the member's own
+ * frame that depends on more than one angle. Both axes' world-Y parts settle it — the yaw cannot
+ * enter, since turning a member in plan cannot change a height.
+ *
+ * Returns null when there is nothing to cut: a level board has no low end, and a board whose face
+ * width runs horizontally has no corner hanging below its centreline.
+ */
+export function levelFootProfile(m: Pick<Member, 'cutLength' | 'actual' | 'rotation'>): [number, number][] | null {
+  const hx = m.cutLength / IN_PER_FT / 2;
+  const hy = m.actual.d / IN_PER_FT / 2;
+  const [rx, , rz] = m.rotation;
+  // World Y of the member's own length and face-width axes, for R = Ry·Rx·Rz.
+  const climb = Math.sin(rz) * Math.cos(rx);
+  const across = Math.cos(rz) * Math.cos(rx);
+  if (Math.abs(climb) < 1e-6 || Math.abs(across) < 1e-6) return null;
+  /** Which end hangs low, and which edge of the face hangs below the centreline. */
+  const lowEnd = climb > 0 ? -1 : 1;
+  const lowEdge = across > 0 ? -1 : 1;
+  // How far back along the board the level line reaches in falling one half face width: the run
+  // whose rise exactly cancels it. Clamped, because past that it is a different piece.
+  const bite = Math.min((hy * Math.abs(across)) / Math.abs(climb), 2 * hx * MAX_BITE);
+  if (bite < 1e-6) return null;
+  const rect: [-1 | 1, -1 | 1][] = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+  const out: [number, number][] = [];
+  for (let i = 0; i < rect.length; i++) {
+    const [sx, sy] = rect[i]!;
+    if (sx !== lowEnd || sy !== lowEdge) { out.push([sx * hx, sy * hy]); continue; }
+    // The corner is gone; the two points the level line leaves in its place go on in the order
+    // the walk arrives at them, so the outline keeps its winding.
+    const onEdge: [number, number] = [lowEnd * (hx - bite), lowEdge * hy];
+    const onEnd: [number, number] = [lowEnd * hx, 0];
+    out.push(...(rect[(i + 3) % 4]![1] === sy ? [onEdge, onEnd] : [onEnd, onEdge]));
+  }
+  return out;
+}

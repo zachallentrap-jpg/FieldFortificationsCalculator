@@ -94,6 +94,7 @@ screenshots get read.
 | **What `platformHeightFt` means** | **Fixed** — on a tower it was the platform FRAME's top with the decking laid on that, so a tower asked for 16 ft walked at 16 ft 0¾ in; the loading platform means the surface, and now both do. |
 | **The tower ladder's rails** | **Fixed** — the rails raked the OPPOSITE way to the rungs, so 14 of the 16 rungs floated free of both, the bottom one 17.90 in clear; and once they raked right they leaned into the bracing and the siding. |
 | **Floor cross-bridging** | **Fixed** — recorded once as "it cannot be fixed". Both floor generators pitched the board's CENTRELINE across the whole joist depth, so all 698 pieces on eight cards stood 0.78 in outside the joists at both ends: a sawtooth along the underside and a corner out the top of the finished floor. |
+| **The tower brace's foot** | **Fixed** — struck corner to corner and left square, the board's low corner hung 2.21 in below the corner it was struck from, so every bottom-bay brace drove into the footing: 1.93 in of the mudsill, 1.92 of the concrete pad. Nothing cuts a `towerBrace`, so this one was on screen. |
 
 ## The shed that had no walls above the plate
 
@@ -4031,3 +4032,67 @@ pins for `towerLeg × sill`: a real bridging board is bevel-cut so its end face 
 joist, a box member's ends are square to its length, and the centreline is placed to BEAR on the
 joist rather than to keep its corners out of it. Fifth documented approximation this sweep has
 re-found.
+
+## The audit re-run, and the one thing left in it
+
+Two passes of fixes later, the whole-catalog SAT audit of the structural frame was re-run as the
+target in its own right — the question being whether anything real was still in it or whether it
+had saturated on joinery the sweep has already documented five times.
+
+**The stringers are settled, and this pass settled them by measuring instead of assuming.** They
+are the audit's biggest numbers by a distance:
+
+```
+  stringer x tread     114 pairs  6.95 in    joist x stringer      33  5.47 in   (platform)
+  rimJoist x stringer    3        5.17 in    sill x stringer        7  3.27 in   (latrine)
+  stringer x subfloor   33        0.92 in    post x stringer        1  1.46 in
+```
+
+Every previous pass has called these the box-versus-mesh approximation and moved on. Taking the
+CUT outline — `stairStringerProfile ?? stringerEndProfile`, the same one `studio.ts` extrudes —
+and putting it in world for the first time says so outright:
+
+```
+  gp-frame entry stair    BOX x 47.491 .. 50.829      CUT x 48.042 .. 50.829     building line 48.000
+  platform ramp stair     BOX x 19.477 .. 24.554      CUT x 20.063 .. 24.554     deck edge     20.063
+```
+
+The box reaches 6.1 in inside the building; the piece that is actually drawn stops half an inch
+OUTSIDE it, and on the platform it stops exactly on the deck edge. Recorded as a measurement now
+rather than an inference, so the next audit can skip the whole family.
+
+**And one thing in the list was not that.** `sill x towerBrace`, 6 pairs at 1.93 in, and the same
+defect on the other footing — `footing x towerBrace`, 8 pairs at 1.92. What makes it different from
+everything above it is one line in `studio.ts`: **nothing cuts a `towerBrace`.** A bird's mouth, a
+plumb ridge cut and a stringer's ends are all mesh cuts whose member box deliberately does not
+follow; a brace is drawn as the plain box it is emitted as. So this was not an approximation
+anyone had accepted — it was a brace point through the top of the mudsill, at every leg of every
+tower, in the render.
+
+The cause is the one the bridging pass just finished on, one family along: **a board has width.**
+The brace is bolted flat to a battered face and struck corner to corner of the bay, so its low
+end's low corner hangs `(d/2)·|across|` — 2.21 in — below the corner the diagonal was struck from,
+and the bottom bay's corner is the top of the footing.
+
+`levelFootProfile` cuts it level, and WHERE it cuts is the whole of the decision:
+
+```
+  level through the end's TOP corner    what stringerEndProfile does   foot ends 2.49 in in the air
+  level through the CENTRELINE's end    the bay corner, where the saw goes    foot 0.28 in clear
+```
+
+The first eats the entire end face and 7.5 in of board — and with it the wood the bolts through
+the leg go through. The second takes a sliver off one corner, leaves the lap intact, and lands the
+foot a quarter inch over the footing, which is where a brace that hangs off a leg belongs.
+
+The cut also cannot be read off `rotation[2]`, which is what every other end cut in the module
+uses. A stringer stands in a VERTICAL plane, so its pitch is its z-euler; a brace laid on a
+battered face is tilted out of that plane, and the direction that is level in the WORLD is a
+direction in the member's own frame that depends on more than one angle. Both axes' world-Y parts
+settle it — the yaw cannot enter, since turning a member in plan cannot change a height.
+
+Four tests in `test/timber2-tower-brace-foot.test.ts`; three fail against the plain box. The fourth
+is the containment guard: a level board and a plumb one both get no cut, a board rolled until its
+face width is horizontal gets no cut, every brace in the catalog gets one, and the stringer's own
+profile still keeps its top corner at the very end. No goldens moved — the members are untouched,
+exactly as the bird's mouth pass was.

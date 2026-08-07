@@ -30,7 +30,7 @@ import {
 import { cameraRigsFor, memberAabb, type CameraRig } from './camera';
 import { roofingTiling } from './tiling';
 import { seatCutsFor, seatProfile, type SeatCut } from '../../timber/birdsMouth';
-import { stringerEndProfile, stairStringerProfile, ridgeHeadProfile } from '../../timber/stringerCuts';
+import { stringerEndProfile, stairStringerProfile, ridgeHeadProfile, levelFootProfile } from '../../timber/stringerCuts';
 import { riserLidOf, seatOpeningsFor, seatOpeningPath } from '../../timber/riserSeats';
 import { fmtFtIn } from '../../timber/units';
 
@@ -262,6 +262,12 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
       // A RAMP's stringer carries the same role and has no steps to cut, so it falls back to the
       // end cuts alone. `stairStringerProfile` says which is which off the piece itself.
       p = cutLumberPiece(group, stairStringerProfile(m) ?? stringerEndProfile(m), m.actual.w / 12);
+    } else if (m.role === 'towerBrace' && levelFootProfile(m)) {
+      // A TOWER X-BRACE lands on the footing its legs stand on, and a diagonal meeting a level
+      // thing is cut level. Struck corner to corner and left square, the board's low corner
+      // reaches 2.21 in below the corner it was struck from, which put every bottom-bay brace's
+      // foot inside the mudsill (1.93 in) or the concrete pad (1.92) on all four faces.
+      p = cutLumberPiece(group, levelFootProfile(m)!, m.actual.w / 12);
     } else if (m.role === 'bentRafter' && ridgeHeadProfile(m)) {
       // A TENT BENT'S RAFTER lands on a ridge board, and a rafter meeting a ridge is cut plumb.
       // Square to the rake it is a wedge that cannot be placed: bear its low corner on the board
