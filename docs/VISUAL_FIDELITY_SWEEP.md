@@ -92,6 +92,7 @@ screenshots get read.
 | **Where a guardrail's pieces meet** | **Fixed** — every rail ran straight through every one of its own posts (59 pairs, to 2½ in) and two runs meeting at a corner each sat half a thickness inside the other (12 more). |
 | **The hut's girts at a corner** | **Fixed** — the ends were clipped against the perpendicular WALLS' faces, but a girt lies inboard of the studs, so both girts of every corner reached the same 1½-in square: 24 pairs across the six hut cards. |
 | **What `platformHeightFt` means** | **Fixed** — on a tower it was the platform FRAME's top with the decking laid on that, so a tower asked for 16 ft walked at 16 ft 0¾ in; the loading platform means the surface, and now both do. |
+| **The tower ladder's rails** | **Fixed** — the rails raked the OPPOSITE way to the rungs, so 14 of the 16 rungs floated free of both, the bottom one 17.90 in clear; and once they raked right they leaned into the bracing and the siding. |
 
 ## The shed that had no walls above the plate
 
@@ -3875,3 +3876,69 @@ cut PLUMB, `ridgeHeadProfile` derives that cut off the piece, and `studio.ts` fe
 already states the trade and says why there is no placement of a square-cut head that both bears on
 the board and stays out of it. Third documented approximation this sweep has re-found; recorded
 here with the two before it so a fourth pass does not open it again.
+
+## A ladder of floating sticks
+
+Four passes running, the catalog-wide overlap audit came back with nothing but joinery — the same
+bird's mouth, the same let-in tread, the same plumb cut. An audit that keeps re-finding its own
+documented approximations has stopped being a measurement, so this pass changed the AXIS: instead
+of asking which members are inside each other, ask which members touch **nothing at all**.
+
+```
+  members whose SAT gap to every other member is positive, whole catalog     14
+  every one of them on the guard tower, every one of them a ladder rung
+```
+
+A ladder is one piece of geometry. The rungs climb a line and the two rails ARE that line, moved
+half the ladder's width to either side; rake the rungs and the rails have to rake with them.
+`generateLadder` learned the rake for the tower — whose legs are battered, so a plumb ladder is a
+collision, not a near-miss — and it leaned the rungs one way and the rails the other:
+
+```
+  rotation: [0, Math.atan2(facing[0], -facing[1]) - Math.PI / 2, Math.atan2(1, lean)]
+```
+
+which reduces to `atan2(facing[1], facing[0])`. That puts the rake ALONG `facing` in X and AGAINST
+it in Z, and the tower's ladder faces −Z, so the whole rake was mirrored. The pair crossed once
+near mid-height and opened symmetrically from there:
+
+```
+  before   rungs reaching neither rail   14 of 16      bottom rung 17.90 in clear, top 13.08
+  after    rungs reaching neither rail    0 of 16      let into both, 0.75 in, at every height
+```
+
+Solving `R·(1,0,0) = (facing[0]·lean, 1, facing[1]·lean)/rake` for the yaw gives
+`atan2(-facing[1], facing[0])` — the rung line's own lean. Plumb takes its own branch, so a wall
+ladder comes out byte-for-byte.
+
+This is the kind of defect a still render hides. From the front the rails are behind the rungs;
+from the side they are behind the frame; and a ladder of sticks floating in the right places still
+reads as a ladder. It took a measurement that asks a different question to see it at all.
+
+**And the second half only appeared once the first was fixed.** The ladder's base was struck off
+`legBaseZ`, the leg's own line — but the X-bracing is bolted to the OUTSIDE of the legs, 4¼ in of
+it, and the cab's siding hangs past that again. While the rails leaned backwards they leaned AWAY
+from all of it and nothing touched; leaning them the right way put 0.34 in of rail into the bottom
+bay's diagonals and 1.23 in into the siding. The base now reads the frame's outermost line off the
+members ACTUALLY EMITTED — `planReach` over `FRAME_ROLES`, the same datum the stair has used since
+its own pass — and the whole ladder stands clear on both footings, tightest 5.58 in.
+
+Four tests in `test/timber2-tower-ladder-rungs.test.ts`, and the split matters: the first two fail
+on the old `access.ts` and the third fails on the old `tower.ts` **with the rake already fixed**, so
+each half of the change is guarded by the half of the test the other half exposes. The fourth pins
+the plumb branch, since `generateLadder` also serves a wall that does not lean. Two thumbnails
+moved, the tower's.
+
+```
+  members touching nothing, whole catalog (6247 members, 14 cards)     14 -> 0
+```
+
+### Checked this pass and NOT a defect
+
+**Siding over a rafter tail** — 469 pairs at 1.25–1.34 in across the nine clad cards, `siding` on
+eight of them and `sidingBoard`/`batten` on the storage shed.
+It is the bird's mouth again, seen half an inch further out: the notch that seats the rafter on the
+cap plate also passes the wall's outer face, and the siding runs up to that face. `cutLumberPiece`
+cuts the mesh and the member's box keeps its full section, so the pair reads as an overlap and
+renders as a seated rafter. Fourth documented approximation this sweep has re-found; recorded with
+the three before it.

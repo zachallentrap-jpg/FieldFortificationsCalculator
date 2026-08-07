@@ -497,8 +497,14 @@ export function generateTower(spec: TowerSpec): TowerResult {
     // height above grade and the gap opens with height; skip the setback and it closes to
     // 6 5/8 in at the bottom, under the figure this whole block exists to hold.
     const lean = climb > 0 ? batter / climb : 0;
+    // OFF THE FRAME AS BUILT, NOT OFF THE LEG LINE. `legBaseZ` is where the leg's own base sits,
+    // and the X-bracing is bolted to the OUTSIDE of that — 4¼ in of it — so a clearance struck
+    // from the leg leaves the rails a quarter inch inside the bottom bay's diagonals once they
+    // lean the way the rungs do. The stair reads the same datum for the same reason.
+    const ladderFace = Math.min(legBaseZ, ...emit.members.filter((m) => FRAME_ROLES.includes(m.role))
+      .map((m) => planReach(m, -1)));
     const { members } = generateLadder({
-      base: [cx, legBaseZ - clearance - legBaseY * lean],
+      base: [cx, ladderFace - clearance - legBaseY * lean],
       facing: [0, 1],
       baseY: 0,
       landingY: walkY,

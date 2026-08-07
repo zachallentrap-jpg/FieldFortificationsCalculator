@@ -82,12 +82,21 @@ export function generateLadder(input: LadderInput): { members: Member[]; overCag
     emit('ladderRail', railNominal, {
       cutLengthFt: railLen,
       position: [midX + ax * side * (widthFt / 2), midY, midZ + az * side * (widthFt / 2)],
-      // Plumb keeps the rotation it always had, so a wall ladder comes out byte-for-byte. A
-      // leaning one swings its length onto the rake: `atan2(1, lean)` is the pitch off
-      // horizontal, and the yaw puts that lean along `facing`.
+      // A leaning rail swings its length onto the rake: `atan2(1, lean)` is the pitch off
+      // horizontal, and the yaw puts that lean along `facing` — AND IT MUST BE THE SAME `facing`
+      // THE RUNGS CLIMB. `atan2(facing[0], -facing[1]) - PI/2` reduces to
+      // `atan2(facing[1], facing[0])`, which rakes along facing in X and AGAINST it in Z, so on
+      // the guard tower — whose ladder faces -Z — the two rails leaned backwards while every rung
+      // leaned forwards. The pair crossed once near mid-height and opened symmetrically from
+      // there: 14 of the 16 rungs touched neither rail, the bottom one hanging 17.90 in clear of
+      // both and the top one 13.08.
+      //
+      // Solving R·(1,0,0) = (facing[0]·lean, 1, facing[1]·lean)/rake for ry gives
+      // `atan2(-facing[1], facing[0])` — the rung line's own lean. Plumb takes the branch it
+      // always had, so a wall ladder comes out byte-for-byte.
       rotation: lean === 0
         ? [0, 0, Math.PI / 2]
-        : [0, Math.atan2(facing[0], -facing[1]) - Math.PI / 2, Math.atan2(1, lean)],
+        : [0, Math.atan2(-facing[1], facing[0]), Math.atan2(1, lean)],
       stage,
       nailing: 'bolted to the frame at every bay (PH)',
       doctrineRef: citeOf(LADDER.topExtensionIn),
