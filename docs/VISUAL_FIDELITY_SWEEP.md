@@ -2456,3 +2456,42 @@ rafters got shorter; the frame did not change shape. Both tent card goldens rege
 - **The ridge is the same size as the rafters.** `roof.ts` cites *"FM 5-426: ridge one size deeper
   than rafters, tops flush"*; the tent's ridge is a 2x4 like everything else in the bent, so the
   plumb-cut heads stand about a fifth of an inch proud above and below the board they bear on.
+
+## The slot over the bunker's doorway
+
+`entrance: 'open'` had never been rendered, and this sweep has carried an unverified note about a
+slot along the top of the bunker's entrance wall since the wall was rebuilt. Re-measured, it is
+real, it is the same figure in both wall types, and its cause is a member sized out of the wrong
+table.
+
+Everything holding this structure up is 6x6 and 6x8 from ATP 3-37.34's dead-load member table. The
+header over the doorway came from `LUMBER.headerNominal` — the 2x6 a stud wall puts over a window:
+
+```
+                    post-lagging          crib
+wall top / jamb top    6.500              6.042
+cap beam (6x8)         6.500 → 7.104      6.042 → 6.646
+header  (2x6)          6.500 → 6.958      6.042 → 6.500
+overhead cover starts  7.104              6.646
+                       -------------      -------------
+slot over the doorway  1.750 in           1.750 in
+```
+
+The cap and the header both start at the wall top and the cap is 1¾ in deeper, so the head of the
+doorway finished that far below the line the overhead cover bears on — a slot the full 5-ft width
+of the opening, running clean through the end wall into the bunker. And separately: a 2x6 spanning
+five feet under a foot and a half of soil is not a header, it is a shim.
+
+The header is the cap continued across the opening, so it is made of the cap stock. Its top lands
+on the cap's top and the stringers come down onto a continuous bearing line — **0.000 in** over the
+doorway in all four wall-type × entrance combinations, and the piece collides with nothing.
+
+Two regression tests, both failing on the old code, and both stated against the cap beam the model
+actually emits rather than against a nominal written in the test — if the dead-load table moves, the
+header moves with the piece it is in line with. The crib-bunker card goldens regenerated.
+
+### Also noted
+
+`entrance: 'open'` and `entrance: 'baffle'` differ only by the baffle wall; the jambs, the header
+and the doorway itself are common to both and are now checked in both. Nothing else was wrong with
+the open entrance.

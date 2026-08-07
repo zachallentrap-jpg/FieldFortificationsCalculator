@@ -29,7 +29,7 @@ import type { Member } from '../types';
 import { DRESSED } from '../types';
 import type { BunkerSpec } from '../spec';
 import { makeEmitter } from '../emit';
-import { BUNKER, LUMBER, TOLERANCE, IN_PER_FT, citeOf, COVER_DEPTH_NOTE } from '../doctrine';
+import { BUNKER, TOLERANCE, IN_PER_FT, citeOf, COVER_DEPTH_NOTE } from '../doctrine';
 import { stagePlan, requireOrdinal, type StagePlanEntry } from '../stagePlan';
 import { generateCribWall, cribWallTopFt } from '../subsystems/cribwork';
 import type { FloorLevels } from '../floor';
@@ -371,14 +371,24 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       doctrineRef: citeOf(BUNKER.postNominal),
     });
   }
-  const headerNominal = LUMBER.headerNominal.value as string;
+  // THE HEADER IS THE CAP CONTINUED ACROSS THE DOORWAY. It was sized from `LUMBER.headerNominal`
+  // — the 2x6 a stud wall puts over a window — while everything else holding this structure up is
+  // 6x6 and 6x8 out of the ATP 3-37.34 dead-load table. Two things followed from that. The wall's
+  // cap beam is 7¼ in deep and the header was 5½, both starting at the wall top, so the doorway
+  // finished 1¾ in BELOW the line the overhead cover bears on: a slot the full 5-ft width of the
+  // opening, running clean through the end wall into the bunker, in both wall types. And a 2x6
+  // spanning five feet under a foot and a half of soil is not a header, it is a shim.
+  //
+  // Made of the cap stock it is in line with, its top lands on the cap's top and the stringers
+  // come down onto a continuous bearing line.
+  const headerNominal = capNominal;
   emit('header', headerNominal, {
     cutLengthFt: doorWidth + 2 * jambT,
     position: [postInset, wallTopY + DRESSED[headerNominal]!.d / IN_PER_FT / 2, outerW / 2],
     rotation: [0, Math.PI / 2, 0],
     stage: sEntry,
-    nailing: '3-16d ea end (PH)',
-    doctrineRef: 'FM 5-426 header table by span (PH)',
+    nailing: 'drift-pinned to each jamb; carries the cover over the opening (PH)',
+    doctrineRef: citeOf(BUNKER.capNominal),
   });
 
   if (spec.entrance === 'baffle') {

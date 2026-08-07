@@ -311,6 +311,62 @@ test('and the entrance still frames what it opens', () => {
   for (const j of jambs) assert.ok(boxB(j).y[0]! < 1e-9, 'a jamb stands on the ground');
 });
 
+// ── The head of the doorway ──────────────────────────────────────────────────
+//
+// THE HEADER WAS SIZED OUT OF THE WRONG TABLE. Everything holding this structure up is 6x6 and
+// 6x8 from ATP 3-37.34's dead-load member table; the header over the doorway came from
+// `LUMBER.headerNominal`, which is the 2x6 a stud wall puts over a window. Two things followed.
+// The wall's cap beam is 7 1/4 in deep and the header was 5 1/2, both starting at the wall top,
+// so the head of the doorway finished 1 3/4 in BELOW the line the overhead cover bears on — a
+// slot the full width of the opening, straight through the end wall into the bunker, in both
+// wall types. And a 2x6 spanning five feet under a foot and a half of soil is not a header.
+
+const doorHead = (wallType: string, entrance: string) => {
+  const { model, header, hb } = bunkerWithDoor({ wallType, entrance });
+  const cap = model.members.find((x) => x.role === 'capBeam')!;
+  // Whatever is directly over the opening — overlapping the header in plan and starting at or
+  // above its top. The overhead cover has to land on the header, not a fraction of a foot clear.
+  const above = model.members
+    .filter((x) => x !== header && x.role !== 'soilGhost')
+    .map((x) => ({ x, b: boxB(x) }))
+    .filter((o) => Math.min(o.b.x[1]!, hb.x[1]!) - Math.max(o.b.x[0]!, hb.x[0]!) > 1e-9
+      && Math.min(o.b.z[1]!, hb.z[1]!) - Math.max(o.b.z[0]!, hb.z[0]!) > 1e-9
+      && o.b.y[0]! >= hb.y[1]! - 1e-9)
+    .sort((a, b) => a.b.y[0]! - b.b.y[0]!);
+  return { header, hb, cap, capTop: boxB(cap).y[1]!, above };
+};
+
+test('THE HEAD OF THE DOORWAY IS THE LINE THE COVER BEARS ON — it used to be 1 3/4 in below it', () => {
+  for (const wallType of ['post-lagging', 'crib']) {
+    for (const entrance of ['open', 'baffle']) {
+      const { hb, capTop, above } = doorHead(wallType, entrance);
+      const where = `${wallType}/${entrance}`;
+      assert.ok(Math.abs(hb.y[1]! - capTop) < 1e-9,
+        `${where}: the header tops out ${((capTop - hb.y[1]!) * 12).toFixed(3)} in below the cap beam `
+        + 'it continues, so the doorway head is not the wall top');
+      assert.ok(above.length > 0, `${where}: nothing at all bears over the doorway`);
+      const gapIn = (above[0]!.b.y[0]! - hb.y[1]!) * 12;
+      assert.ok(Math.abs(gapIn) < 1e-6,
+        `${where}: ${above[0]!.x.id} (${above[0]!.x.role}) starts ${gapIn.toFixed(3)} in above the header — `
+        + 'that is a slot the width of the doorway, through the end wall');
+    }
+  }
+});
+
+test('and it is the CAP STOCK, because it is the cap continued across the opening', () => {
+  // Compared to the cap beam the model actually emits, not to a nominal written here: if the
+  // dead-load table ever moves, the header moves with the piece it is in line with.
+  for (const wallType of ['post-lagging', 'crib']) {
+    const { header, cap, hb } = doorHead(wallType, 'open');
+    assert.equal(header.nominal, cap.nominal,
+      `${wallType}: the header is a ${header.nominal} where the cap it continues is a ${cap.nominal}`);
+    assert.ok(Math.abs(header.actual.d - cap.actual.d) < 1e-9 && Math.abs(header.actual.w - cap.actual.w) < 1e-9,
+      `${wallType}: the header does not have the cap's section`);
+    // And it still spans the opening it is over, jamb face to jamb face.
+    assert.ok(hb.z[1]! - hb.z[0]! > 4, `${wallType}: the header spans only ${(hb.z[1]! - hb.z[0]!).toFixed(2)} ft`);
+  }
+});
+
 // ── The crib wall's own contract ─────────────────────────────────────────────
 //
 // `wallType: 'crib'` is not the shipped preset, which is how both of these survived. A crib is
