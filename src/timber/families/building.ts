@@ -24,7 +24,7 @@ import { generateWalls, type Opening } from '../walls';
 import { generateRoof } from '../roof';
 import { wallContract, type WallsContract, type WallSurface } from '../subsystems/wallSystem';
 import { roofPlanes, generateShed, generatePurlins, generateHip, wallInfillProfiles } from '../subsystems/roofFamilies';
-import { generateRoofCovering, generateWallCovering, generateInfillCovering, generateSkids, generateSlabOnGrade, wallLayerThicknessFt, type InfillSurface } from '../subsystems/coverings';
+import { generateRoofCovering, generateWallCovering, generateInfillCovering, generateSkids, generateSlabOnGrade, wallLayerThicknessFt, finishedWallThicknessFt, type InfillSurface } from '../subsystems/coverings';
 import { generateFloorOnBearings, joistNominalFor } from '../subsystems/floorSystem';
 import { generatePartitions } from '../subsystems/partitions';
 import { generateOpenFront, removeClosedWall } from '../subsystems/openFront';
@@ -295,6 +295,8 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
         // emits no course for `roofing: 'none'`. The deck's ordinal keeps it a real number.
         stageRoofing: ordinalOf(stagePlan, 'roofing') ?? requireOrdinal(stagePlan, 'roof-deck'),
         rafterHalfFt: rafterHalf,
+        // So the rake's barge board lands ON the finished gable end rather than behind it.
+        wallSkinFt: finishedWallThicknessFt(spec.coverings.wallSheathing, spec.coverings.siding),
       }),
     );
   }

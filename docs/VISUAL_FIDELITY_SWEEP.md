@@ -95,6 +95,7 @@ screenshots get read.
 | **The tower ladder's rails** | **Fixed** — the rails raked the OPPOSITE way to the rungs, so 14 of the 16 rungs floated free of both, the bottom one 17.90 in clear; and once they raked right they leaned into the bracing and the siding. |
 | **Floor cross-bridging** | **Fixed** — recorded once as "it cannot be fixed". Both floor generators pitched the board's CENTRELINE across the whole joist depth, so all 698 pieces on eight cards stood 0.78 in outside the joists at both ends: a sawtooth along the underside and a corner out the top of the finished floor. |
 | **The tower brace's foot** | **Fixed** — struck corner to corner and left square, the board's low corner hung 2.21 in below the corner it was struck from, so every bottom-bay brace drove into the footing: 1.93 in of the mudsill, 1.92 of the concrete pad. Nothing cuts a `towerBrace`, so this one was on screen. |
+| **The gable rake** | **Fixed** — the roof stopped at the FRAMING line while the finished wall stands a skin thickness outside it, so half an inch of siding (an inch and a half of board-and-batten) ran along both rakes of every gable, shed and flat roof with nothing over it. There was no barge board in the toolkit. |
 
 ## The shed that had no walls above the plate
 
@@ -4096,3 +4097,66 @@ is the containment guard: a level board and a plumb one both get no cut, a board
 face width is horizontal gets no cut, every brace in the catalog gets one, and the stringer's own
 profile still keeps its top corner at the very end. No goldens moved — the members are untouched,
 exactly as the bird's mouth pass was.
+
+## The rake had no board
+
+Target this pass: the gable rake, which this sweep has referred to three times — *"a gable is flush
+at its two rakes"*, *"a shed and a flat roof have no rake overhang and no barge board, the same as
+a gable… one decision for all three"* — and never measured. Measuring it first:
+
+```
+  gp-frame 48x20        skin  X -0.0417 .. 48.0417       roof  X 0.0000 .. 48.0000
+  storage-shed 20x12    skin  X -0.1250 .. 20.1250       roof  X 0.0000 .. 20.0000
+
+  eave   the roof reaches 12.64 in past the skin
+  rake   the roof stops 0.50 in SHORT of it — 1.50 on board-and-batten
+```
+
+Flush is a defensible way to finish a gable. **Flush with the STUDS is not.** The deck, the
+roofing, the ridge and the fascia all stop at x = 0 and x = L, the framing line, and the wall's
+finished face is outside that — so a strip of siding as wide as the skin is thick ran the whole
+length of both rakes on every gable, shed and flat roof in the catalog, with nothing over it. A
+close render of the guard shack's gable shows what that looks like: the stepped tops of the raked
+infill standing in the open beside a raw deck edge.
+
+**The missing piece is named in the source.** `generateRidgeCaps` skips a rectangle plane's side
+edges and says why: they *"are the rake of a gable, WHICH IS TRIMMED WITH A BARGE BOARD and not
+capped."* Nothing emitted one. It is the eave's own defect one edge round — *"every roof in the
+toolkit ended in a row of raw square-cut rafter ends"* was the fascia's entry in this sweep, and
+the rake never got the same treatment.
+
+So the rake gets the board the caps already assume: same stock as the fascia, running the slope,
+face vertical, thickness horizontal. The rotation is the fascia's with the pitch put back in —
+`[0, atan2(-up.z, up.x), asin(up.y)]`, which collapses to exactly the fascia's own triple at zero
+pitch — and it stands off the plane's side edge by the FINISHED wall's thickness plus half its own,
+so its inner face lands on the wall rather than behind it.
+
+**That standoff needed a figure the roof pass did not have.** `wallLayerThicknessFt` answers "how
+thick is one layer", which is the standoff the layer OVER it needs — and a batten has nothing over
+it, so it is correctly absent from that answer and just as correctly present here.
+`finishedWallThicknessFt` is the whole stack, and it is what makes the storage shed's board and
+batten come out right where the board alone would have left the battens proud of their own trim.
+
+**Two boards meet at a ridge and are mitred.** Both slopes' barges lie in the same vertical plane —
+the gable end — and run to the same point, so square heads cross: 0.75 in, the first thing the new
+regression test caught. A vertical cut at the ridge takes `halfDepth · tan(pitch)` off each, and
+shortening the board by that much butts them on the ridge line instead. A shed's or flat roof's top
+edge is a free eave, not a ridge, and its board runs the whole way — `freeTopEdges` already knows
+which is which.
+
+```
+  gable families        4 boards each (two slopes, two rakes)      gp-frame, both huts, b-hut,
+                                                                   squad hut, guard shack,
+                                                                   storage shed, latrine
+  shed / flat           2                                          one plane, two rakes
+  hip / pyramid         0                                          all four sides are eaves
+  overlaps, whole catalog                                          0; every board bears on something
+```
+
+Five tests in `test/timber2-barge-board.test.ts`. Two fail with the emit removed — the board exists
+at all, and it clears the storage shed's battens — and the other three are the placement guards,
+each with an explicit non-empty check so none of them can quietly loop over nothing: the inner face
+lands ON the skin and past the roof's own edge, the board runs eave to ridge at the rake's own
+pitch with its thickness horizontal, and it buries itself in nothing while still bearing on
+something. No frame or compat golden moved: they carry no coverings. Eighteen thumbnails did —
+every skinned card with a rake.

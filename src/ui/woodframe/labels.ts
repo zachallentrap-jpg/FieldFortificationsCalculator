@@ -53,6 +53,7 @@ export const PLAIN: Record<MemberRole, string> = {
   ridgeCap: 'ridge cap',
   felt: 'felt underlayment',
   fascia: 'fascia board',
+  bargeBoard: 'barge board',
   // Skin
   sheathingPanel: 'wall sheathing panel',
   siding: 'siding panel',
@@ -131,6 +132,7 @@ export const WHAT: Record<MemberRole, string> = {
   ridgeCap: 'The bent piece that closes the joint where two slopes meet — over the ridge, and down every hip. Courses are cut ON those lines, so without a cap the cut edges are the roof.',
   felt: 'Underlayment between deck and roofing.',
   fascia: 'Board across the rafter tails that closes the eave.',
+  bargeBoard: 'The same board up a gable rake, closing the end of the roof over the wall below it.',
   sheathingPanel: 'Panel closing the wall frame and bracing it against racking.',
   siding: 'Exterior panel that keeps weather off the frame.',
   sidingBoard: 'Vertical siding board; battens cover the joints between boards.',

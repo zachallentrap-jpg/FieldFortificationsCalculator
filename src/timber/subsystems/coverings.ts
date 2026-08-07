@@ -366,6 +366,27 @@ export function wallLayerThicknessFt(kind: 'plywood' | 'boards' | 'boardAndBatte
     : DRESSED[SIDING.boardNominal.value as string]!.w / IN_PER_FT;
 }
 
+/**
+ * How far a FINISHED wall stands outside the framing line — every layer on it, batten included.
+ *
+ * `wallLayerThicknessFt` answers a different question: how thick is ONE layer, which is the
+ * standoff the layer over it needs. A batten has nothing over it, so it is correctly absent from
+ * that answer and just as correctly present in this one. The rake's barge board is the piece that
+ * needs the whole stack: it is nailed over the finished gable end, not over the studs.
+ */
+export function finishedWallThicknessFt(
+  sheathing: 'none' | 'plywood' | 'boards',
+  siding: 'none' | 'plywood' | 'boards' | 'boardAndBatten',
+): number {
+  const sheath = sheathing === 'none' ? 0 : wallLayerThicknessFt(sheathing === 'boards' ? 'boards' : 'plywood');
+  if (siding === 'none') return sheath;
+  const skin = wallLayerThicknessFt(
+    siding === 'boardAndBatten' ? 'boardAndBatten' : siding === 'boards' ? 'boards' : 'plywood');
+  const batten = siding === 'boardAndBatten'
+    ? DRESSED[SIDING.battenNominal.value as string]!.w / IN_PER_FT : 0;
+  return sheath + skin + batten;
+}
+
 export function generateWallCovering(input: WallCoveringInput): Member[] {
   const emit = makeEmitter('CV');
   const { surfaces, kind, role, stage, standoffFt } = input;
@@ -490,11 +511,18 @@ export interface RoofCoveringInput {
    * course half an inch INTO the deck, and the deck showed through along both eaves.
    */
   deckLaidElsewhere?: boolean;
+  /**
+   * How far the finished wall stands outside the framing line, so the RAKE's barge board can be
+   * nailed over it instead of behind it. Zero — a bare frame — leaves the board on the deck's own
+   * edge, which is still what it is there to cover.
+   */
+  wallSkinFt?: number;
 }
 
 export function generateRoofCovering(input: RoofCoveringInput): Member[] {
   const emit = makeEmitter('CV');
   const { planes, deck, roofing, stageDeck, stageRoofing, rafterHalfFt, deckLaidElsewhere, buildingPaper } = input;
+  const wallSkinFt = Math.max(0, input.wallSkinFt ?? 0);
   // What is UNDER the roofing, regardless of who put it there. Purlins are emitted by
   // `generatePurlins`, not here — but they are still a deck, and their flat thickness is what
   // holds the roofing off the rafters. Ignoring it left the corrugated sheets at rafter
@@ -617,6 +645,57 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
           rotation: [0, Math.atan2(-plane.alongEave[2]!, plane.alongEave[0]!), 0],
           stage: stageDeck,
           nailing: '2-8d into each rafter tail (PH)',
+          doctrineRef: citeOf(LUMBER.fasciaNominal),
+        });
+      }
+    }
+  }
+
+  // ── Barge board: what trims a RAKE, the way the fascia trims an eave.
+  //
+  // `generateRidgeCaps` already named the missing piece — a rectangle plane's side edges "are the
+  // rake of a gable, WHICH IS TRIMMED WITH A BARGE BOARD and not capped" — and nothing ever
+  // emitted one. So a gable ended where the DECK ended, at the framing line, while the siding's
+  // outer face stands a skin thickness outside that:
+  //
+  //   gp-frame 48x20   eave: the roof reaches 12.64 in past the skin
+  //                    rake: the roof stops 0.50 in SHORT of it (1.50 on board-and-batten)
+  //
+  // Half an inch of siding along both rakes of every gable, shed and flat roof in the toolkit,
+  // with nothing over it — and the stepped tops of the raked infill standing in the open next to
+  // a raw deck edge, which is what the render shows.
+  //
+  // The board runs UP the rake with its face vertical, which is the fascia's own rotation with
+  // the pitch put back into it, and stands off the plane's side edge by half its thickness so it
+  // covers that edge rather than sharing it. A plane that TAPERS has hips on its sides, not
+  // rakes, and is skipped — the same test the caps use, and the reason a hip roof and the tower's
+  // pyramid cab get none.
+  {
+    const bargeNominal = LUMBER.fasciaNominal.value as string;
+    const bargeT = DRESSED[bargeNominal]!.w / IN_PER_FT;
+    const bargeD = DRESSED[bargeNominal]!.d / IN_PER_FT;
+    const freeTop = freeTopEdges(planes);
+    for (const [i, plane] of planes.entries()) {
+      if (plane.topLengthFt !== undefined || plane.slopeLengthFt <= EPS) continue;
+      const up = plane.upSlope;
+      const pitch = Math.asin(Math.max(-1, Math.min(1, up[1])));
+      // `asin(up.y)` is the pitch; the yaw is the fascia's, struck from the direction the board
+      // runs rather than from the eave. At zero pitch the two are the same rotation.
+      const rot: [number, number, number] = [0, Math.atan2(-up[2], up[0]), pitch];
+      // AT A RIDGE THE TWO BOARDS ARE MITRED. Both slopes' barges lie in the same vertical plane
+      // — the gable end — and run up to the same point, so square heads cross each other there.
+      // A vertical cut at the ridge takes `halfDepth · tan(pitch)` off each: shortening the board
+      // by that much butts them on the ridge line instead. A SHED or FLAT roof's top edge is a
+      // free eave, not a ridge, and its board runs the whole way.
+      const mitre = freeTop[i] ? 0 : (bargeD / 2) * Math.abs(Math.tan(pitch));
+      const runFt = Math.max(EPS, plane.slopeLengthFt - mitre);
+      for (const [edge, out] of [[0, -1], [plane.eaveLengthFt, 1]] as [number, number][]) {
+        emit('bargeBoard', bargeNominal, {
+          cutLengthFt: runFt,
+          position: atUV(plane, edge + out * (wallSkinFt + bargeT / 2), runFt / 2),
+          rotation: rot,
+          stage: stageDeck,
+          nailing: '2-8d into the rake at every rafter; mitred at the ridge (PH)',
           doctrineRef: citeOf(LUMBER.fasciaNominal),
         });
       }
