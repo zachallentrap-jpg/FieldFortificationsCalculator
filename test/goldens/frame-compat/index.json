@@ -6,19 +6,19 @@
       "name": "demo",
       "note": "The TIMBER-1 demo building — the spec woodframe-scene.ts boots with.",
       "members": 310,
-      "sha256": "af1207719b4af07c319897ae28e60ebe0b7a67cae46dc8dee172f0648dde1e7e"
+      "sha256": "fc2be4cfa9ba7b6e5951ab71d07303d405431729907ef061103a36f1ca5eabd0"
     },
     {
       "name": "demo-basement",
       "note": "Basement foundation: slab, columns, framed stairwell, stair.",
       "members": 317,
-      "sha256": "d1939616eb17b978ce789eb74ab2ef6d818267025015064999602847e37de9bc"
+      "sha256": "f2471da3ba560c0e0536f5963ee5c8511c92b5da755ee9aee2587081e31066b6"
     },
     {
       "name": "demo-wall-foundation",
       "note": "Continuous wall foundation: stem walls, strip footings, sills all four sides.",
       "members": 300,
-      "sha256": "e836047941d1da01db590c10221ff4e697c2d778b31154e81b913d9158492b86"
+      "sha256": "f54cabd7fbb84996fcf3372d60eecafe9cffca9c40b80ad587be0c3235611dd6"
     },
     {
       "name": "demo-solid-bridging",
@@ -30,7 +30,7 @@
       "name": "demo-braced-attic",
       "note": "Let-in corner bracing (stage 6) + the framed attic scuttle (stage 7).",
       "members": 328,
-      "sha256": "e000b93c4ca9cb700b20905aab8822c0adde99bcab373c01ef0b6916df16004a"
+      "sha256": "8251fdabe50e306da5a7003da1814cef387f9403958f42877f9fddedf7ada7a6"
     },
     {
       "name": "small-12x8",
@@ -42,44 +42,44 @@
       "name": "large-40x24",
       "note": "Large plan: multiple post bays, many subfloor courses and rafter pairs.",
       "members": 522,
-      "sha256": "ad9fd39bed1fa263133f524d7fb66208d14709ad8266fb3216ec69253b135b4c"
+      "sha256": "3d312dffc18cf2f88024ef8ed5fd4ed93d2c1c381785afbd67d4463dc92d8ec4"
     },
     {
       "name": "openings-unsorted",
       "note": "TD5: same-wall openings supplied OUT of offset order — emission order must follow the input array, never a normalized sort (per-role id counters bake the order in).",
       "members": 311,
-      "sha256": "7b359c01142f2603c8b026cc978bff32b100b3b006f62b0b28cb8a52c3f31a34"
+      "sha256": "9de526fe3b60fe5d01f80c09b55a36ac8ed82cb0abdb39f17f4ef8fe4c197bf5"
     },
     {
       "name": "openings-equal-offset",
       "note": "TD5: two openings at the SAME offset on one wall — a total sort with no tie-break would be unstable here; the compat path must not sort at all.",
       "members": 306,
-      "sha256": "d9d6711758c63a6dd328ce0c361fd6c3e4f514cdc6d6bed66dc79aba2f83e519"
+      "sha256": "07d55a0febc73d989e44076ebfe58a4398e1bbdb094d840016857144b0a2cd10"
     },
     {
       "name": "spacing-24",
       "note": "24 in OC studs/joists/rafters — the other legal spacing on every grid.",
       "members": 241,
-      "sha256": "9ab22247c23a23f7875298cca4b94a2d4dc2b316a346f6ec3b4337e7663b0caa"
+      "sha256": "b2c5d4cf64f20c18719fe2f5526e4e57a332da632d9a33b109fffa83ea1f5c82"
     },
     {
       "name": "steep-12-12",
       "note": "12:12 pitch — the top of the pitch envelope; gable studs and course tiling stress.",
       "members": 316,
-      "sha256": "9bc8cfcee79952d5399fb128c079627265aa030d3b281434cd8444eab6f3bfec"
+      "sha256": "352143a6cd9a98d9a6b2f638e8eb4f57f18a13fe0c7a0f7e5e0c38691427371a"
     },
     {
       "name": "shallow-2-12-no-overhang",
       "note": "2:12 pitch with zero overhang — the eave collapses onto the plate line.",
       "members": 308,
-      "sha256": "43655279a72248264eff257e67ac8da1164d141b6034e29ee4028b56d61fb387"
+      "sha256": "9fa92c2c438c48382305a0165b201d58d9436d471fa655d40882e7d733860978"
     }
   ],
   "matrix": [
     {
       "name": "matrix-piers-cross-b0-a0-20x16",
       "members": 288,
-      "sha256": "a2416ccce96d72efa394aec652b42509ca4d89d6909c8277b93b85722f652b3f"
+      "sha256": "4f3b7b4bedef8804031ac282c1c15d0692c740a1551886b5ff22bf4943e6d9ea"
     },
     {
       "name": "matrix-piers-cross-b0-a0-12x8",
@@ -89,12 +89,12 @@
     {
       "name": "matrix-piers-cross-b0-a0-40x24",
       "members": 522,
-      "sha256": "ad9fd39bed1fa263133f524d7fb66208d14709ad8266fb3216ec69253b135b4c"
+      "sha256": "3d312dffc18cf2f88024ef8ed5fd4ed93d2c1c381785afbd67d4463dc92d8ec4"
     },
     {
       "name": "matrix-piers-cross-b0-a1-20x16",
       "members": 298,
-      "sha256": "c85093bfe109d4f2cc77715673430a97766159ea9309b3c7871a8a994d8fa0c6"
+      "sha256": "3a3a4d69fbac2c3a766a92ee1a7b05b63bf18c882d827f0849f6d6e0d62fa50a"
     },
     {
       "name": "matrix-piers-cross-b0-a1-12x8",
@@ -104,12 +104,12 @@
     {
       "name": "matrix-piers-cross-b0-a1-40x24",
       "members": 529,
-      "sha256": "7bd6e9a59983a9aa39fe70c318a68e5afca3b2961a458c6d12963462c80a5f50"
+      "sha256": "47f03ecfff9050f6dda1f7cb4aad75f178c6568a043dd1b43589132971fb20ef"
     },
     {
       "name": "matrix-piers-cross-b1-a0-20x16",
       "members": 296,
-      "sha256": "025ead335edcd0e81ce063709f07e507b6b9a00db37ec580d6b10f9b636a20a4"
+      "sha256": "ede0dd630f8d731f1aeb5c6030e0192df4a3ff0be737bb301409c712095dd277"
     },
     {
       "name": "matrix-piers-cross-b1-a0-12x8",
@@ -119,12 +119,12 @@
     {
       "name": "matrix-piers-cross-b1-a0-40x24",
       "members": 530,
-      "sha256": "48525e398308d39266e06c7d4f7d78ea4f1c0e1057f38343e298525b4f812647"
+      "sha256": "21af4496c27713df782b59b1549e152fc553f60d9d3d47d5d6a0d6660b96e815"
     },
     {
       "name": "matrix-piers-cross-b1-a1-20x16",
       "members": 306,
-      "sha256": "0352a633e05aba8a05955bd85415a711d1eb5fc9fd4b55afa2ddb979dead77c9"
+      "sha256": "b3f4fdc067666bfe7c2683a96d0902e42cbd8d0d26cc5c3ad0a6370c13967b04"
     },
     {
       "name": "matrix-piers-cross-b1-a1-12x8",
@@ -134,7 +134,7 @@
     {
       "name": "matrix-piers-cross-b1-a1-40x24",
       "members": 537,
-      "sha256": "0f3f3071e7d6a4a7c1de669e6dd3bef5eafb2fbc420a9bdb836708160a18a66f"
+      "sha256": "7c9c3420d48b0b74e86aa68e0691ce7d478ed1b64d0bb498e00aa7cfbd5700f4"
     },
     {
       "name": "matrix-piers-solid-b0-a0-20x16",
@@ -199,7 +199,7 @@
     {
       "name": "matrix-wall-cross-b0-a0-20x16",
       "members": 278,
-      "sha256": "f2de117400d8d2fb83e3dbacec2a857fff75228ca3a2e04e7f237ddaf676f533"
+      "sha256": "7bfdb107c39340ff1af143fe5c692438bbad84ecb393464e2dd7b7386abb4f4f"
     },
     {
       "name": "matrix-wall-cross-b0-a0-12x8",
@@ -209,12 +209,12 @@
     {
       "name": "matrix-wall-cross-b0-a0-40x24",
       "members": 504,
-      "sha256": "b144b57bbb689fad0797a457a03bd247f6efabb8d98f234839b511fe68cd4a85"
+      "sha256": "ec50814e85a81d365f64ca8ac23e9d2001912d90ff305edb73fde673442d4534"
     },
     {
       "name": "matrix-wall-cross-b0-a1-20x16",
       "members": 288,
-      "sha256": "3e9dc3aa59b32c0e4e95febadf30182830448229d613d4fd377b92593bde0e45"
+      "sha256": "65c7b534cfc30b079a63134b9c5c3f163cb4ab9f96c3276d436238cdab0e68db"
     },
     {
       "name": "matrix-wall-cross-b0-a1-12x8",
@@ -224,12 +224,12 @@
     {
       "name": "matrix-wall-cross-b0-a1-40x24",
       "members": 511,
-      "sha256": "a7a590f800925d0cccd1675e210daa67813d44370e98c97cab02d27dc2a87828"
+      "sha256": "1967f3b2f265b40e6b7725bd240f633deec5cfb8cfa0d56b2cbb0a8756e5f737"
     },
     {
       "name": "matrix-wall-cross-b1-a0-20x16",
       "members": 286,
-      "sha256": "2610344f3b5193a185d69e02fa4cd66e7f1b4d11b148f66d8a4908091673a86b"
+      "sha256": "0d27a242c5a83d442ff5bdc85b9eefaf5e7dabecf3f2902bb3619063c1504b89"
     },
     {
       "name": "matrix-wall-cross-b1-a0-12x8",
@@ -239,12 +239,12 @@
     {
       "name": "matrix-wall-cross-b1-a0-40x24",
       "members": 512,
-      "sha256": "cf77bd62bd2d941d17c88a704ed1e7e9a159921f3e2b300a316acf348665dbc4"
+      "sha256": "7c39b3dd1a0211e247a159b86bd3628af56ce81dcebbcac5374143db293a7be9"
     },
     {
       "name": "matrix-wall-cross-b1-a1-20x16",
       "members": 296,
-      "sha256": "f77d84775d25a11985a5136c1da1e52a84903b752e34f69d2f728844c446a7d5"
+      "sha256": "e16b4319ccd6666b8d399c2277bde2406050669871bebb7af9be87216b74679b"
     },
     {
       "name": "matrix-wall-cross-b1-a1-12x8",
@@ -254,7 +254,7 @@
     {
       "name": "matrix-wall-cross-b1-a1-40x24",
       "members": 519,
-      "sha256": "34fa6d038715c54ec4413667e12743957834c03a4fb8eebeeebfab473c4f901a"
+      "sha256": "38c71817c5d530fa0f480a6a50a3b7165103b9204300f1ac05d9d6c975408c17"
     },
     {
       "name": "matrix-wall-solid-b0-a0-20x16",
@@ -319,7 +319,7 @@
     {
       "name": "matrix-basement-cross-b0-a0-20x16",
       "members": 295,
-      "sha256": "72f56dc8f4e12b2aafa27309af87ba538e273b3893ad1ce65692faa23786b9cd"
+      "sha256": "98693ae5d4ee4cede9e42d6b946373c28c51790526e1b29cbf9589ce879be32a"
     },
     {
       "name": "matrix-basement-cross-b0-a0-12x8",
@@ -329,12 +329,12 @@
     {
       "name": "matrix-basement-cross-b0-a0-40x24",
       "members": 519,
-      "sha256": "f64ea180e24cdae05a488cdff2bfb08c7022cb2dfd1b1c9e39adc56f433f7a7a"
+      "sha256": "0ddb939e8342523422ddc1d13279d87fe23901b0ee91f16d1f91d4fa9b34b600"
     },
     {
       "name": "matrix-basement-cross-b0-a1-20x16",
       "members": 305,
-      "sha256": "798e0047a15142c9bdb7c959284f57536d36d05617298f5ee68721a02ec34e39"
+      "sha256": "88d4c821f8abda83b7c0cfdad3c9dfd85d49a71f864113ee141d7bba8d76fc6d"
     },
     {
       "name": "matrix-basement-cross-b0-a1-12x8",
@@ -344,12 +344,12 @@
     {
       "name": "matrix-basement-cross-b0-a1-40x24",
       "members": 526,
-      "sha256": "a38d468bda5fa24789e72a7d1f83becbb9b7ab95a294b158f455608f97127981"
+      "sha256": "ebb8b78d9837b301bffab933f0e16f678f76c32268c792358f9cf492d2bb0b57"
     },
     {
       "name": "matrix-basement-cross-b1-a0-20x16",
       "members": 303,
-      "sha256": "68598dfe26ddf6d7b9d0911a03a9a8b082aa0da82693e7c62fb7104273083cbc"
+      "sha256": "3680eab06cf72bcc05ed9bc3029ed5dd3d77c05a144b7548ece060e5f0f38611"
     },
     {
       "name": "matrix-basement-cross-b1-a0-12x8",
@@ -359,12 +359,12 @@
     {
       "name": "matrix-basement-cross-b1-a0-40x24",
       "members": 527,
-      "sha256": "36f56ee70ba66cbc95752c37977029ba378904fe8cd60c2caadcfeaf2e8508c9"
+      "sha256": "131019eb0e030e835cdb4a10d037f13e3ed709e18688b05e5c6444104ec6df14"
     },
     {
       "name": "matrix-basement-cross-b1-a1-20x16",
       "members": 313,
-      "sha256": "8e991317fd7a7d9efae88a2ea904f721f6c90d95b2a905acdd0eb4b98032a965"
+      "sha256": "630f4706772c87d472dea98c34aa585ea7add310222aeef915929849fad892dd"
     },
     {
       "name": "matrix-basement-cross-b1-a1-12x8",
@@ -374,7 +374,7 @@
     {
       "name": "matrix-basement-cross-b1-a1-40x24",
       "members": 534,
-      "sha256": "225e0b635dc4a7b067e67de6becd11ae4ab0b06ee0a685d03c8808446dec9c3c"
+      "sha256": "1cb00691a9500e37bc02284877e73adfc5712cf314523d68ed4b54f76b76cd3c"
     },
     {
       "name": "matrix-basement-solid-b0-a0-20x16",

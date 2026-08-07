@@ -21,6 +21,7 @@
 
 import type { Member, MemberRole, StageId } from './types';
 import { DRESSED } from './types';
+import { crossBridgingRise } from './bridgingRise';
 
 const FT = 12;
 
@@ -354,7 +355,11 @@ export function generateFloor(input: FloorInput): Member[] {
         if (gap < 0.15) continue;
         const xc = (xa + xb) / 2;
         if (bridging === 'cross') {
-          const rise = joistD - 0.06;
+          // The rise is what fits the BOARD between the joists, not just its centreline — see
+          // `bridgingRise.ts`. Pitching the centreline across the whole depth hung every piece
+          // 0.78 in below the soffit and drove it through the subfloor above.
+          const rise = crossBridgingRise(gap, DRESSED['1x3']!.d / FT, joistD - 0.06);
+          if (rise <= 0) continue;
           const len = Math.hypot(gap, rise);
           const ang = Math.atan2(rise, gap);
           for (const s of [-1, 1] as const) {

@@ -169,7 +169,19 @@ test('bridging: cross pairs by default once a half-span reaches ~8 ft; solid blo
   assert.equal(cross.length % 2, 0, 'cross bridging comes in pairs');
   for (const b of cross) {
     assert.equal(b.nominal, '1x3');
-    assert.ok(Math.abs(b.rotation[2]) > 0.3, `${b.id}: diagonal`);
+    // This read `> 0.3` rad, which was calibrated against a pitch that no longer exists: the
+    // boards were drawn with their CENTRELINE spanning the whole joist depth, which stood the
+    // board's own corners 0.78 in outside the joists at both ends. Fitting the BOARD between them
+    // makes the piece shallower — 24.24° became 15.2° — so the threshold started failing a
+    // correct model. What the line means is "diagonal, not flat blocking", which is the
+    // difference between this branch and the `solid` one below, so it says that instead of
+    // pinning a number. The pitch itself is asserted in `timber2-bridging.test.ts`.
+    assert.notEqual(b.rotation[2], 0, `${b.id}: diagonal, not flat blocking`);
+  }
+  // And a pair opposes: two boards crossing in one bay, equal and opposite.
+  for (let i = 0; i < cross.length; i += 2) {
+    assert.ok(Math.abs(cross[i]!.rotation[2] + cross[i + 1]!.rotation[2]) < 1e-12,
+      `${cross[i]!.id}/${cross[i + 1]!.id}: a crossed pair pitches both ways`);
   }
   const solid = generateFrame({ ...golden, bridging: 'solid' }).members.filter((m) => m.role === 'bridging');
   assert.ok(solid.length > 0);

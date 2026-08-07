@@ -93,6 +93,7 @@ screenshots get read.
 | **The hut's girts at a corner** | **Fixed** — the ends were clipped against the perpendicular WALLS' faces, but a girt lies inboard of the studs, so both girts of every corner reached the same 1½-in square: 24 pairs across the six hut cards. |
 | **What `platformHeightFt` means** | **Fixed** — on a tower it was the platform FRAME's top with the decking laid on that, so a tower asked for 16 ft walked at 16 ft 0¾ in; the loading platform means the surface, and now both do. |
 | **The tower ladder's rails** | **Fixed** — the rails raked the OPPOSITE way to the rungs, so 14 of the 16 rungs floated free of both, the bottom one 17.90 in clear; and once they raked right they leaned into the bracing and the siding. |
+| **Floor cross-bridging** | **Fixed** — recorded once as "it cannot be fixed". Both floor generators pitched the board's CENTRELINE across the whole joist depth, so all 698 pieces on eight cards stood 0.78 in outside the joists at both ends: a sawtooth along the underside and a corner out the top of the finished floor. |
 
 ## The shed that had no walls above the plate
 
@@ -2153,6 +2154,11 @@ untouched. A half-fix that leaves the visible half is not worth the machinery.
 which is the generator, which is frozen. Recorded here so the next person to unfreeze `floor.ts`
 has the number.
 
+> **Superseded — it was fixed.** "It cannot be fixed" was a statement about a rule, not about the
+> geometry, and the rule has a door in it: a compat-lock event, which two later passes went
+> through for `roof.ts`. The measurement above also undercounted, by a lot — it is eight cards and
+> 698 pieces, not one card and 144. See **A board has width** at the end of this file.
+
 ## The roof deck option, which had three faults
 
 `coverings.roofDeck` is a five-value enum and only two of the five meant anything.
@@ -3942,3 +3948,86 @@ cap plate also passes the wall's outer face, and the siding runs up to that face
 cuts the mesh and the member's box keeps its full section, so the pair reads as an overlap and
 renders as a seated rafter. Fourth documented approximation this sweep has re-found; recorded with
 the three before it.
+
+## A board has width
+
+The sweep's own record said of floor cross-bridging: *"It cannot be fixed."* That was a statement
+about a rule — `floor.ts` is the frozen legacy and `timber2-compat.test.ts` forbids updating a
+golden to make a test pass — and the rule has a door in it. Two earlier passes went through it for
+`roof.ts`. A compat-lock event is allowed; what is not allowed is going through the door without
+being able to say exactly what came out the other side.
+
+**And the original measurement undercounted.** It was recorded against one card. Re-measuring
+first, before touching anything:
+
+```
+  gp-frame 144   sea-hut 96   swa-hut 96   b-hut 108   squad-hut 152
+  guard-shack 12   storage-shed 30   custom 60          = 698 pieces on 8 of 14 cards
+
+  1396 corners   0.780 in below the joist soffit  — a sawtooth the whole length of the underside
+   698 pairs     through the SUBFLOOR, the corner passing out the top of the finished floor
+  1396 pairs     0.536 in into the joist beside them (0.938 on the squad hut's short bay)
+```
+
+A cutaway elevation of the floor band shows it directly: pointed tips above the joist line and a
+serrated edge below it, in every bay of every row, on every one of those eight cards.
+
+**The cause is one line, and it is in both floor generators.** `const rise = joistD - inset` pitches
+the board's CENTRELINE across the joist depth. A board of face width `d` pitched at `a` stands
+`d / cos a` taller than its centreline — 2.5 in of 1x3 at 24.24° is 2.74 in of extra height, half
+of it out each end. `floorSystem.ts`, the un-frozen sibling, had the identical line; no shipped
+preset reaches its bridging today, so it was a defect waiting rather than a defect showing.
+
+The pitch that fits the BOARD rather than its centreline solves
+
+```
+  R + d · hypot(G, R) / G = T          R rise, G clear bay, d board width, T the band it must fit
+```
+
+which is a quadratic in `R` whose smaller root is the answer (the other puts `T − R` negative — the
+artefact of squaring). `bridgingRise.ts` holds it, one copy, because both generators need it and
+one of them must not grow a second. The pieces do not move and do not change in number; they get
+shallower and shorter:
+
+```
+  1x3 between 2x8 joists at 16 in oc      24.24° -> 15.20°     15.903 in -> 15.026
+  corners outside the joists          1396 -> 0
+  pairs through the subfloor           698 -> 0
+```
+
+**The blast radius, stated exactly**, which is the part a compat-lock event exists to make you do:
+
+```
+  34 of 84 frame fixtures touched
+  2728 members changed          0 added, 0 removed
+  every one of them role `bridging`
+  fields that moved             cutLength and rotation, and nothing else
+  worst deltas                  0.921 in of length, 9.453° of pitch
+```
+
+Nothing else in any model moved — not a joist, not a panel, not an id. Three golden sets
+regenerated in the same commit: 17 frame cases, 12 compat fixtures plus 72 hashed matrix rows, and
+16 of the 28 thumbnails.
+
+**One test was pinning the old pitch**, and it is worth naming because it was not pinning the bug.
+`timber-features.test.ts` asserted `Math.abs(rotation[2]) > 0.3` rad on every cross piece. What the
+line means is "diagonal, not flat blocking" — the difference between this branch and the `solid`
+one two lines below — and 0.3 rad is a threshold that happened to sit between the buggy 24.24° and
+nothing in particular. Correcting the pitch to 15.2° put a correct model under it. Restated as
+`!== 0`, plus the claim it was really reaching for: a crossed pair pitches equally, both ways.
+
+Four tests in `test/timber2-bridging.test.ts`; two fail on the old generators. The other two are
+the guards. **The boards still REACH both joists** — shortening them until they cleared everything
+would pass a "nothing sticks out" check and leave a row of loose sticks bracing nothing — and the
+derivation itself is asserted to land ON the band rather than merely inside it, at the bay widths
+and board sizes the catalog uses, plus the degenerate cases where no diagonal fits at all.
+
+### Checked this pass and NOT a defect
+
+**The square end of a bridging board.** The old measurement's third line — corners inside the joist
+beside them — survives the fix at 0.344 in (0.661 on the squad hut's short bay), down from 0.536
+and 0.938. It is the same square-end-on-a-raked-member approximation this repo already owns and
+pins for `towerLeg × sill`: a real bridging board is bevel-cut so its end face lies flat on the
+joist, a box member's ends are square to its length, and the centreline is placed to BEAR on the
+joist rather than to keep its corners out of it. Fifth documented approximation this sweep has
+re-found.

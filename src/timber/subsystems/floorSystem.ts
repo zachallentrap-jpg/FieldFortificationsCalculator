@@ -15,6 +15,7 @@ import type { Member } from '../types';
 import { DRESSED } from '../types';
 import { makeEmitter } from '../emit';
 import { LUMBER, LAYOUT, PANEL, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
+import { crossBridgingRise } from '../bridgingRise';
 import type { BearingLine } from './wallSystem';
 
 export interface FloorSystemInput {
@@ -102,7 +103,11 @@ export function generateFloorOnBearings(input: FloorSystemInput): Member[] {
       for (let k = 0; k < centers.length - 1; k++) {
         const gap = centers[k + 1]! - centers[k]! - t;
         if (gap < TOLERANCE.minBayFt) continue;
-        const rise = joistD - TOLERANCE.bridgingInsetFt;
+        // The rise that fits the BOARD between the joists, not just its centreline — the board's
+        // own width is what used to push every piece out past the soffit and the deck. See
+        // `bridgingRise.ts`.
+        const rise = crossBridgingRise(gap, DRESSED[nominal]!.d / IN_PER_FT, joistD - TOLERANCE.bridgingInsetFt);
+        if (rise <= 0) continue;
         const len = Math.hypot(gap, rise);
         const ang = Math.atan2(rise, gap);
         for (const s of [-1, 1] as const) {
