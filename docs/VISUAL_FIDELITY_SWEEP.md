@@ -88,6 +88,7 @@ screenshots get read.
 | **The guard tower's X-braces** | **Fixed** — both diagonals of every X were drawn on the legs' own centre plane, so each was inside the two legs it braces and inside its twin at the crossing: 162 overlapping pairs, down to 6. |
 | **The guard tower's girts** | **Fixed** — every girt ran centre to centre and so was buried in both legs, and the top one sat at DECK level, through all sixteen joists, the deck, the cab posts and the railing's feet: 61 overlapping pairs, down to 8 at 0.007 in. |
 | **The guard tower's platform frame** | **Fixed** — the legs ran to the DECK line, so the two outermost joists ran through two corner legs each (2.74 in); and every joist was cut to the cab plan, stopping 0.05 in inside the girt it bears on. |
+| **The guard tower's stair** | **Fixed** — the well was struck off the DECK edge and a battered base is two feet wider, so the stair stood inside its own tower; it now stands clear of the frame and a railed landing bridges back to the deck. |
 
 ## The shed that had no walls above the plate
 
@@ -3689,3 +3690,60 @@ moved, the tower's.
   girt/stringer 6.28 in, brace/stringer 3.46 in. The well is struck off the deck edge while the
   frame flares out below it. The ladder had exactly this and was fixed by raking it at the frame's
   own batter; the stair needs the same datum and a landing to bridge back to the deck edge.
+
+## The stair that stood inside its own tower
+
+Third time on the "measured, not fixed" list, and the reason it stayed there is that moving the
+stair is only half of it. Both halves are here.
+
+**Clear of the FRAME, which is not the deck edge.** The well was struck off the platform's front
+edge. A battered tower's base is two feet wider than its deck on every side, so the lowest flight's
+foot sat on the deck-edge line at ground level — 23.94 in inside the frame's outermost line — and
+the run crossed the front face's bracing on the way down:
+
+```
+  stringer x brace 3.46 in    stringer x mudsill 1.19    tread x brace 0.80    railMid x brace 2.66
+  the top flight through the platform's own edge girt 6.28 and its rim joist 4.91
+```
+
+This is the LADDER's lesson applied to the other way up. That fix reads the frame's own batter curve
+rather than the deck edge and holds the clearance at every rung; the stair's datum is now read off
+the frame **as built** — the members already emitted — so the batter, the legs' section and the
+bracing's standoff cannot drift away from it.
+
+**Two passes, because a switchback is deeper than its arrival.** Every landing runs forward from
+where its two flights meet by at least the stair's own width, so on a three-flight run — a 24-ft
+tower — the first turn reaches back under the tower even when the arrival is clear: 3.75 in of its
+toe board inside the bay-1 girt, which a first attempt shipped without noticing because the probe
+filtered on `AC-` and the landing rails carry `ACL1-`. The run is now laid out once, measured
+against the frame's widest line, and moved back by whatever still reaches past it.
+
+**And a landing bridges back to the deck**, because a stair that stops short of what it serves is
+not one: 3 ft 2 in of it on a 16-ft tower, 5 ft 3 in on a 24-ft one, decked in the stair's own
+planks and railed on both open sides by the platform's own pass. It is planked to the platform's
+DECKING and not to `platformHeightFt` — that figure is the joists' top, so decking the bridge to it
+leaves a ¾-in step at the threshold.
+
+```
+  stair members sharing wood with the frame   16 ft: 14 -> 0    24 ft: 18 -> 0
+```
+
+Four tests in `test/timber2-tower-stair.test.ts`; all four fail on the old generator. Two existing
+tests in `timber2-stair-rail` were restated rather than pinned: both counted every decked level in
+the model as a switchback turn, which read three once the tower decked a landing at the top, so
+they now take the stair's own landings by id prefix. Two thumbnails moved, the tower's.
+
+### Checked this pass and NOT a defect
+
+**The hip and pyramid roof decks lap each other** — 64 pairs of 72 on the tower's cab, 98 of 164 on
+a hip building, worst 1.08 in, while gable, shed and flat are clean. That is not an oversight: it
+is the documented `'average'` taper clip, and `tileSurface` carries a long comment weighing it
+against `'cover'` — a rectangle cannot be cut on a diagonal, so a hip's deck either overhangs into
+the next slope or leaves thin triangular gaps along the hip, and the deck averages while the
+roofing covers. The residue is the taper left inside a band once `TOLERANCE.maxTaperBands` caps the
+subdivision. Recording it so the next sweep does not re-find it as new.
+
+### Measured, not fixed
+
+- **The tower's `platformHeightFt` is the FRAME's top, not the walking surface** — carried over
+  from the platform pass, and the bridge landing had to work around it.

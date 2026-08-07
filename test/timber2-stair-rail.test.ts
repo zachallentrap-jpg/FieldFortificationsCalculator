@@ -127,7 +127,12 @@ test('THE LANDINGS ARE RAILED TOO — on every side but the way on and the way o
   const m = modelOf('tower', { platformHeightFt: 24 });
   // Grouped by HEIGHT, not by piece: a landing is decked in planks like any other floor, so the
   // member count is its area and not the number of turns.
-  const levels = [...new Set(m.members.filter((x) => x.role === 'deckPlank')
+  //
+  // THE STAIR'S OWN LANDINGS, by id prefix. The tower now decks a landing at the TOP as well —
+  // the run stands outside a battered frame's base, so something has to bridge back to the deck —
+  // and that one is the tower's piece, railed by the platform's pass. It is not a turn, and
+  // counting every decked level as one made this read three.
+  const levels = [...new Set(m.members.filter((x) => x.role === 'deckPlank' && x.id.startsWith('AC'))
     .map((x) => Math.round((x.position[1] + x.actual.w / 24) * 1e6) / 1e6))];
   assert.equal(levels.length, 2, 'a 24-ft switchback turns twice');
   for (const y of levels) {
@@ -179,7 +184,8 @@ test('A LANDING CARRIES BOTH FLIGHTS — all of both, not the gap between them',
   // centred between their two centrelines: measured on the 24-ft tower, each 30-in tread met it
   // over exactly 15 in, and half the width of every flight stepped off onto air.
   const m = modelOf('tower', { platformHeightFt: 24 });
-  const deck = m.members.filter((x) => x.role === 'deckPlank');
+  // The stair's own turns; the tower's bridge landing at the top is not one of them (above).
+  const deck = m.members.filter((x) => x.role === 'deckPlank' && x.id.startsWith('AC'));
   assert.ok(deck.length > 0, 'the switchback has landings at all');
   const treads = m.members.filter((x) => x.role === 'tread');
   const plan = (k: Member) => {

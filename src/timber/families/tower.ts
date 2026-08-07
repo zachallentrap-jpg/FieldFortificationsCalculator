@@ -19,7 +19,7 @@ import type { Member } from '../types';
 import { DRESSED } from '../types';
 import type { TowerSpec } from '../spec';
 import { makeEmitter } from '../emit';
-import { TOWER, RAIL, PANEL, HUT, LUMBER, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
+import { TOWER, RAIL, PANEL, HUT, LUMBER, STAIR, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
 import { stagePlan, requireOrdinal, type StagePlanEntry } from '../stagePlan';
 import { generateRailing, railRequired, type RailEdge } from '../subsystems/railings';
 import { generateLadder, generateStair } from '../subsystems/access';
@@ -142,6 +142,34 @@ function legFaceAlong([rx, rz]: readonly [number, number], dir: V3, widthFt: num
   const eZ: V3 = [0, -Math.sin(rx), Math.cos(rx)];
   const face = Math.max(Math.abs(dot3(eY, dir)), Math.abs(dot3(eZ, dir)), EPS_FT);
   return widthFt / 2 / face;
+}
+
+/** Everything that makes up the tower's own frame — what an access route has to stand clear of. */
+const FRAME_ROLES: string[] = ['towerLeg', 'girt', 'towerBrace', 'sill', 'footing'];
+
+/**
+ * How far a member reaches along world Z, `dir` being -1 for its nearest face and +1 for its
+ * farthest. Used to read the frame's outermost line off the members ACTUALLY EMITTED rather than
+ * re-deriving it from the batter — the bracing's standoff and the legs' own section are part of
+ * that line, and a second derivation of it is a second thing to keep in step.
+ */
+function planReach(m: Member, dir: -1 | 1): number {
+  const [rx, ry, rz] = m.rotation;
+  const half: V3 = [m.cutLength / IN_PER_FT / 2, m.actual.d / IN_PER_FT / 2, m.actual.w / IN_PER_FT / 2];
+  let reach = 0;
+  for (const [i, h] of half.entries()) {
+    const v: V3 = [i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0];
+    // Rotate the unit axis by the scene's YXZ euler and take its Z part.
+    let [x, y, z] = v;
+    let a = x * Math.cos(rz) - y * Math.sin(rz);
+    let b = x * Math.sin(rz) + y * Math.cos(rz);
+    x = a; y = b;
+    a = y * Math.cos(rx) - z * Math.sin(rx);
+    b = y * Math.sin(rx) + z * Math.cos(rx);
+    y = a; z = b;
+    reach += h * Math.abs(-x * Math.sin(ry) + z * Math.cos(ry));
+  }
+  return m.position[2] + dir * reach;
 }
 
 export function generateTower(spec: TowerSpec): TowerResult {
@@ -431,6 +459,8 @@ export function generateTower(spec: TowerSpec): TowerResult {
     }
   }
 
+  /** Open edges of the stair's top landing, railed with the platform's own pass. */
+  const bridgeEdges: RailEdge[] = [];
   // ── Access. Which edge it lands on is fixed (the front, -Z), so the railing knows where the
   // gap goes without a second convention to keep in sync.
   const accessWidth = TOWER.accessWidthFt.value as number;
@@ -475,8 +505,22 @@ export function generateTower(spec: TowerSpec): TowerResult {
     // two faces of the tower and finished four feet PAST the back corner at deck height, over
     // open ground. Stating the arrival instead of the departure is what fixes that, and 180°
     // landings keep the whole run two stair-widths wide instead of marching around the building.
-    const stair = generateStair({
-      base: [cx, cx - deckHalf],
+    // CLEAR OF THE FRAME, WHICH IS NOT THE DECK EDGE — the ladder's lesson, applied to the other
+    // way up. The well was struck off the platform's front edge, and a battered tower's base is
+    // two feet wider than its deck on every side, so the stair stood INSIDE its own tower: on
+    // this preset the lowest flight's foot sat at the deck-edge line at ground level, where the
+    // frame reaches 23.94 in further out, and the run crossed the front face's bracing on the way
+    // down. Measured: stringer through a brace 3.46 in, through the mudsill 1.19, and the top
+    // flight through the platform's own edge girt 6.28 and its rim joist 4.91.
+    //
+    // The datum is read off the FRAME AS BUILT rather than re-derived, so the batter, the leg
+    // section and the bracing's standoff cannot drift away from it — the same reason the ladder
+    // reads its own base off `halfAt`.
+    const frameFace = Math.min(...emit.members.filter((m) => FRAME_ROLES.includes(m.role))
+      .map((m) => planReach(m, -1)));
+    const clear = TOWER.ladderClearanceFt.value as number;
+    const runAt = (z: number) => generateStair({
+      base: [cx, z],
       up: [0, 1],
       baseY: 0,
       topY: deckY,
@@ -485,9 +529,51 @@ export function generateTower(spec: TowerSpec): TowerResult {
       // Keep each flight to a bay; a straight run to 32 ft would need 40 ft.
       maxFlightRiseFt: bay,
       turn: 'switchback',
-      arriveAt: { at: [cx, cx - deckHalf], dir: [0, 1] },
+      arriveAt: { at: [cx, z], dir: [0, 1] },
     });
+    // TWO PASSES, because a switchback is deeper than its arrival. Every landing runs FORWARD
+    // from where its two flights meet by at least the stair's own width, so on a three-flight
+    // run — a 24-ft tower — the first turn reaches back under the tower even when the arrival
+    // is clear: 3.75 in of its toe board inside the bay-1 girt. Laid out once, measured against
+    // the frame's own widest line, and moved back by whatever still reaches past it.
+    let arriveZ = Math.min(cx - deckHalf, frameFace - clear);
+    let stair = runAt(arriveZ);
+    const intrude = Math.max(...stair.members.map((m) => planReach(m, 1))) - (frameFace - clear);
+    if (intrude > TOLERANCE.minSliverFt) {
+      arriveZ -= intrude;
+      stair = runAt(arriveZ);
+    }
+    const bridge = cx - deckHalf - arriveZ;
     emit.members.push(...stair.members);
+    // AND A LANDING BRIDGES BACK TO THE DECK. Standing the well outside the frame leaves that
+    // much air between the top nosing and the platform, and a stair that stops short of what it
+    // serves is not one. Decked in the same planks the stair's own landings use, and railed on
+    // its two open sides by the pass below — a walking surface at height is railed whatever
+    // carries it (EM 385-1-1).
+    if (bridge > TOLERANCE.minSliverFt) {
+      const plankNominal = STAIR.treadNominal.value as string;
+      const plankW = DRESSED[plankNominal]!.d / IN_PER_FT;
+      const plankT = DRESSED[plankNominal]!.w / IN_PER_FT;
+      for (let z = arriveZ; z < cx - deckHalf - EPS_FT; z += plankW) {
+        const cut = Math.min(plankW, cx - deckHalf - z);
+        emit('deckPlank', plankNominal, {
+          cutLengthFt: accessWidth,
+          // LEVEL WITH THE DECK YOU STEP ONTO, which is the platform's decking and not its frame:
+          // `deckY` is the joists' top and the subfloor lies on it, so planking the bridge to
+          // `deckY` would leave a ¾-in step at the threshold.
+          position: [cx, deckY + deckThick / IN_PER_FT - plankT / 2, z + cut / 2],
+          rotation: [-Math.PI / 2, 0, 0],
+          stage: sAccess,
+          actual: { w: DRESSED[plankNominal]!.w, d: cut * IN_PER_FT },
+          nailing: '2-16d ea bearer (PH)',
+          doctrineRef: citeOf(STAIR.treadNominal),
+        });
+      }
+      bridgeEdges.push(
+        { id: 'bridge-w', from: [cx - accessWidth / 2, cx - deckHalf], to: [cx - accessWidth / 2, arriveZ] },
+        { id: 'bridge-e', from: [cx + accessWidth / 2, arriveZ], to: [cx + accessWidth / 2, cx - deckHalf] },
+      );
+    }
   }
 
   // ── Guardrails on every open platform edge, minus the access gap.
@@ -508,7 +594,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
     // after this pass has run, so the railing's own de-duplication cannot see them. Told about
     // them, it leaves those holes alone and butts its rails on their faces.
     emit.members.push(...generateRailing({
-      edges,
+      edges: [...edges, ...bridgeEdges],
       deckY: deckY + deckThick / IN_PER_FT,
       stage: sRail,
       standing: corners.map((at) => ({ at, widthFt: DRESSED[CAB_POST_NOMINAL]!.w / IN_PER_FT })),
