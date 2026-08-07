@@ -65,17 +65,22 @@ export function towerStagePlan(): StagePlanEntry[] {
  * foot — so it is measured over the leg's own climb. Left at 0 this is the old formula exactly,
  * which is what a concrete pad wants: the pad is poured below grade, the legs start on grade.
  */
-function halfAt(spec: TowerSpec, y: number, baseY = 0): number {
+function halfAt(spec: TowerSpec, y: number, baseY = 0, topY: number = spec.platformHeightFt): number {
   const top = spec.cabPlanFt / 2;
   const batter = TOWER.batterPerSideFt.value as number;
-  const h = Math.max(EPS_FT, spec.platformHeightFt - baseY);
+  // OVER THE LEG'S OWN CLIMB, top AND bottom. `baseY` moved the bottom of that span when a mudsill
+  // raised the feet; `topY` moves the top now that a leg stops under the platform frame rather
+  // than at the deck. Left at the platform height it is the old formula exactly. Measure it over
+  // the wrong span and the leg simply does not batter what the card locks: 1.4417 ft per side
+  // against the doctrinal 1.5, which the LS register's own test catches.
+  const h = Math.max(EPS_FT, topY - baseY);
   // Linear batter: widest at the leg's foot, narrowing to the cab plan at the platform.
   return top + batter * (1 - Math.min(1, Math.max(0, (y - baseY) / h)));
 }
 
 /** The four legs' plan positions at a height, in a fixed corner order. */
-function cornersAt(spec: TowerSpec, y: number, baseY = 0): [number, number][] {
-  const h = halfAt(spec, y, baseY);
+function cornersAt(spec: TowerSpec, y: number, baseY = 0, topY: number = spec.platformHeightFt): [number, number][] {
+  const h = halfAt(spec, y, baseY, topY);
   const c = spec.cabPlanFt / 2 + (TOWER.batterPerSideFt.value as number);
   // Origin at the base square's front-left corner keeps the tower in the same +X/+Z quadrant
   // every other family uses, so one camera rig frames all of them.
@@ -178,9 +183,16 @@ export function generateTower(spec: TowerSpec): TowerResult {
   // The same fault, and the same fix, as the loading platform's posts on skids.
   const mudNominal = TOWER.mudsillNominal.value as string;
   const legBaseY = spec.footing === 'concrete-pad' ? 0 : DRESSED[mudNominal]!.w / IN_PER_FT;
+  // A LEG STOPS UNDER THE PLATFORM IT CARRIES. It was run to `H`, which is the DECK SURFACE, so
+  // the top 7¼ in of every leg stood in the same space as the platform joists — the two outermost
+  // joists sit on the leg lines by construction and each ran through two corner legs, 2.74 in a
+  // piece. Stopped at the joists' undersides, which is where the top girt now tops out as well,
+  // the whole platform frame sits ON the legs instead of inside them; and because the batter is
+  // struck over the leg's own climb, the frame still opens out by exactly what the card locks.
+  const legTopY = H - joistDepth;
   // The base square in PLAN is unchanged by this: the batter is measured over the leg's own
   // climb, so a leg's foot is `batterPerSideFt` wider than the cab wherever that foot sits.
-  const base = cornersAt(spec, legBaseY, legBaseY);
+  const base = cornersAt(spec, legBaseY, legBaseY, legTopY);
   if (spec.footing === 'concrete-pad') {
     for (const [x, z] of base) {
       const side = (TOWER.padSideIn.value as number) / IN_PER_FT;
@@ -214,13 +226,12 @@ export function generateTower(spec: TowerSpec): TowerResult {
 
   // ── Legs. Battered, so each is a raked member: length is the hypotenuse and the tilt is
   // toward the tower's centre.
-  const legTopY = H;
   // The legs' own climb, which is the platform height less whatever the footing holds them up
   // by. Everything framed BETWEEN the legs — the girts, the braces, the bays they divide — is
   // measured over this, not over the height above grade. Left on grade, the bottom bay's girt
   // and both its diagonals ended 5 7/8 in below the feet they were supposed to be bolted to.
   const climb = legTopY - legBaseY;
-  const topCorners = cornersAt(spec, legTopY, legBaseY);
+  const topCorners = cornersAt(spec, legTopY, legBaseY, legTopY);
   /** Each leg's [rx, rz], kept so the bracing knows where the face of the leg it lands on is. */
   const legRot: [number, number][] = [];
   for (let i = 0; i < 4; i++) {
@@ -250,6 +261,13 @@ export function generateTower(spec: TowerSpec): TowerResult {
     const rx = Math.atan2(dz, climb);
     const rz = Math.atan2(Math.hypot(climb, dz), dx);
     legRot.push([rx, rz]);
+    // A LEG'S AXIS RUNS CORNER TO CORNER, and its square end cut is an artifact this file already
+    // owns: `timber2-tower-footing` states in so many words that the axis starts on the bearing
+    // plane and that a square cut at this pitch leaves 0.547 in below it. The same 0.547 in stands
+    // proud at the HEAD, where it clips the two outermost joists by 0.149 in once they run out to
+    // the girts. Trimming either end was tried and is wrong twice over: the batter the card locks
+    // is measured between the axis ENDS, so a trimmed leg batters 1.4954 ft per side instead of
+    // 1.5, and the foot then floats over the sill it is supposed to stand on.
     emit('towerLeg', legNominal, {
       cutLengthFt: lenFt,
       position: [(x0 + x1) / 2, (legBaseY + legTopY) / 2, (z0 + z1) / 2],
@@ -265,8 +283,8 @@ export function generateTower(spec: TowerSpec): TowerResult {
   for (let b = 1; b <= bays; b++) {
     const yTop = legBaseY + (climb * b) / bays;
     const yBot = legBaseY + (climb * (b - 1)) / bays;
-    const top = cornersAt(spec, yTop, legBaseY);
-    const bot = cornersAt(spec, yBot, legBaseY);
+    const top = cornersAt(spec, yTop, legBaseY, legTopY);
+    const bot = cornersAt(spec, yBot, legBaseY, legTopY);
     for (let f = 0; f < 4; f++) {
       const a = top[f]!;
       const c = top[(f + 1) % 4]!;
@@ -292,7 +310,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
       // downward, so the tightest place on a 5½-in-deep girt is its TOP arris, not its centre.
       // Struck at the centre, every girt still bit 0.27 in into both legs along its bottom edge —
       // the same shape of mistake as a rafter's plumb cut measured to the centre line.
-      const tight = cornersAt(spec, yGirt + girtD / 2, legBaseY);
+      const tight = cornersAt(spec, yGirt + girtD / 2, legBaseY, legTopY);
       const tA = tight[f]!;
       const tC = tight[(f + 1) % 4]!;
       const tRun = Math.hypot(tC[0] - tA[0], tC[1] - tA[1]);
@@ -370,11 +388,18 @@ export function generateTower(spec: TowerSpec): TowerResult {
   const joistY = deckY - joistDepth / 2;
   const joistSpacing = spec.spacing.joistSpacingIn / IN_PER_FT;
   const span = spec.cabPlanFt;
+  // A JOIST IS AS LONG AS THE THING IT BEARS ON. Cut to the cab plan, which is the leg square at
+  // the DECK, every joist stopped 0.05 in inside the girt beneath it — the girts are struck a
+  // joist's depth lower, where the batter has already carried the frame 0.7 in further out, so a
+  // joist's end kissed the girt's inner arris instead of sitting on it. Run to the girts' outer
+  // faces it has the full 1½ in.
+  const girtT = DRESSED[girtNominal]!.w / IN_PER_FT;
+  const joistLen = 2 * (halfAt(spec, legTopY, legBaseY, legTopY) + girtT / 2);
   const nJoists = Math.max(2, Math.floor(span / joistSpacing) + 1);
   for (let i = 0; i < nJoists; i++) {
     const z = cx - deckHalf + (span * i) / (nJoists - 1);
     emit('joist', joistNominal, {
-      cutLengthFt: span,
+      cutLengthFt: joistLen,
       position: [cx, joistY, z],
       rotation: [0, 0, 0],
       stage: sPlatform,
@@ -426,7 +451,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
     const batter = TOWER.batterPerSideFt.value as number;
     // `halfAt` is the frame's own batter curve; reading the base off it means the ladder cannot
     // drift from the legs if the batter ever changes.
-    const legBaseZ = cx - halfAt(spec, legBaseY, legBaseY);
+    const legBaseZ = cx - halfAt(spec, legBaseY, legBaseY, legTopY);
     // The rake is the LEGS' rake, which is the batter over their own climb — and the ladder's
     // foot is on the GROUND while theirs is on the footing, so its base is set back by the lean
     // it would have picked up over that difference. Both halves matter: take the rake off the

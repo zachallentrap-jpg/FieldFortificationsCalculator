@@ -87,6 +87,7 @@ screenshots get read.
 | **The gable end studs** | **Fixed** — the same quarter turn, in `roof.ts`: 186 gable studs across nine cards stood 1½ in across a 3½-in wall, ½ in off the plate's centre and 3½ in off the stud below, and the one at the peak ran 1.45 in into the ridge board. |
 | **The guard tower's X-braces** | **Fixed** — both diagonals of every X were drawn on the legs' own centre plane, so each was inside the two legs it braces and inside its twin at the crossing: 162 overlapping pairs, down to 6. |
 | **The guard tower's girts** | **Fixed** — every girt ran centre to centre and so was buried in both legs, and the top one sat at DECK level, through all sixteen joists, the deck, the cab posts and the railing's feet: 61 overlapping pairs, down to 8 at 0.007 in. |
+| **The guard tower's platform frame** | **Fixed** — the legs ran to the DECK line, so the two outermost joists ran through two corner legs each (2.74 in); and every joist was cut to the cab plan, stopping 0.05 in inside the girt it bears on. |
 
 ## The shed that had no walls above the plate
 
@@ -3632,3 +3633,59 @@ thumbnails moved, the tower's.
   pre-existing defect the bracing pass ran into from the other side, and it is now the loudest
   thing on the tower: the stair needs the ladder's fix — clearance struck off the frame's widest
   point rather than off the deck edge.
+
+## The platform that was inside the legs instead of on them
+
+The girt pass left two figures on the list and this is both of them.
+
+**A leg stops under the platform it carries.** Every leg was run to `platformHeightFt`, which is the
+DECK's own line, so the top 7¼ in of each one stood in the joists' band. The two outermost joists
+sit on the leg lines by construction, so each ran through two corner legs — 4 pairs, 2.74 in a
+piece.
+
+**A joist is as long as the thing it bears on.** Cut to the cab plan — the leg square at the DECK —
+every joist stopped 0.05 in inside the girt beneath it, because the girts are struck a joist's depth
+lower, where the batter has already carried the frame 0.7 in further out. A joist's end kissed the
+girt's inner arris instead of sitting on it.
+
+```
+  joist x towerLeg                          4 / 2.74 in   ->   0
+  a joist's bearing on the girt under it         0.05 in  ->   1.50  (the girt's full thickness)
+```
+
+**And the batter had to be re-datumed, which the life-safety register caught before I did.**
+`halfAt` measured the batter from the foot to `platformHeightFt`; a leg that now stops a joist below
+that only realises part of it. `timber2-tower-footing`'s own test failed with *"the legs batter
+1.4417 ft per side; the card locks 1.5"* — a locked LS figure, silently 5/8 in short. `topY` now
+moves the top of that span the way `baseY` already moved the bottom for a mudsill; left at the
+platform height it is the old formula exactly.
+
+**Trimming the legs' square ends was tried and is wrong, twice over.** A box end is square to its own
+AXIS, so on a raked leg the arris stands 0.526 in past the point the axis stops — which is what
+clips the outermost joists by 0.149 in now that they run out to the girts. Trimming it back breaks
+the batter, because the batter the card locks is measured BETWEEN THE AXIS ENDS: a trimmed leg
+comes out at 1.4954 ft per side. And trimming the foot floats the leg 0.55 in over the sill it is
+supposed to stand on — which `timber2-tower-footing` also states in so many words, naming the
+0.547 in a square cut at this pitch leaves below the bearing plane. The protrusion is a modelling
+artifact this file already owns; the new test bounds the joist overlap by it rather than by zero.
+
+One existing test needed restating rather than pinning. The footing suite's *"the platform is still
+where the operator asked for it"* guard read the platform's height off the LEGS' HEADS — the same
+figure only because the legs ran to the deck surface, which is exactly the defect. It now measures
+the platform FRAME's top, which is the claim it was making.
+
+Four tests in `test/timber2-tower-platform.test.ts` over four card options; two fail on the old
+generator and two are guards — the locked batter, and the deck's size and height. Two thumbnails
+moved, the tower's.
+
+### Measured, not fixed
+
+- **The tower's `platformHeightFt` is the FRAME's top, not the walking surface.** The deck is laid
+  ON the joists, so the surface a person stands on is ¾ in above the stated height. That is the
+  opposite of the loading platform's convention, which an earlier pass fixed precisely so that
+  "`deckHeightFt` IS the surface you walk on". Found while restating the guard above, and left
+  alone because moving it moves the railing, the cab and the access with it.
+- **The tower stair is still inside the frame's sweep**, and is now the oldest thing on this list:
+  girt/stringer 6.28 in, brace/stringer 3.46 in. The well is struck off the deck edge while the
+  frame flares out below it. The ladder had exactly this and was fixed by raking it at the frame's
+  own batter; the stair needs the same datum and a landing to bridge back to the deck edge.

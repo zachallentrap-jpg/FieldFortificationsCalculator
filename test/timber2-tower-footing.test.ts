@@ -179,8 +179,22 @@ test('THE BATTER THE CARD LOCKS IS THE BATTER THE LEGS HAVE, on either footing',
     }
     // And the platform is still where the operator asked for it — the legs got shorter, the
     // tower did not get taller.
-    assert.ok(Math.abs(Math.max(...heads.map((h) => h[1])) - deckY) < TOL,
-      `${footing}: the legs top out at ${Math.max(...heads.map((h) => h[1])).toFixed(4)}, not the stated ${deckY}`);
+    //
+    // MEASURED AT THE DECK, not at the legs' heads. It used to be the same figure because the
+    // legs ran all the way to the deck SURFACE — which is why the platform joists ran through
+    // them. A leg now stops under the frame it carries, so its head is one joist below the deck
+    // and reading the platform height off it would report a tower that shrank. The claim this
+    // guard makes is about the walking surface, and that is what it measures.
+    const { model } = tower({ footing });
+    const joists = model.members.filter((m) => m.role === 'joist');
+    assert.ok(joists.length > 0, `${footing}: no platform joists`);
+    const frameTop = Math.max(...joists.map((m) => m.position[1] + m.actual.d / 24));
+    assert.ok(Math.abs(frameTop - deckY) < TOL,
+      `${footing}: the platform frame tops out at ${frameTop.toFixed(4)}, not the stated ${deckY}`);
+    const heads1 = Math.max(...heads.map((h) => h[1]));
+    assert.ok(heads1 < deckY - TOL && deckY - heads1 < 1,
+      `${footing}: the legs top out at ${heads1.toFixed(4)} and the deck is at ${deckY} — a leg carries the `
+      + 'platform frame, so its head belongs just under the deck, not at it and not a foot below');
   }
 });
 
