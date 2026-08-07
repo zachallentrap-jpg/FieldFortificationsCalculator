@@ -2542,3 +2542,52 @@ radius: **`standing` is opt-in** — a railing told nothing posts its corners an
 corner to corner exactly as before, which is what the loading platform relies on. Told about one
 post, it skips that hole, shortens the two rails meeting there by half its width, and leaves the
 other two alone. Only the tower's card goldens moved, which is the same claim from the other side.
+
+## The tower's legs were set diamond-wise
+
+Recorded two iterations ago from the numbers; now rendered, confirmed and fixed. The legs were
+yawed onto their lean direction and then pitched up, which puts the AXIS exactly where it belongs
+and takes the SECTION with it. A corner leg leans diagonally, so `yaw` came out at 45°:
+
+```
+foot corners of a 6x6 leg   (±0.323, ∓0.001) ft     — its 7¾-in DIAGONAL along the tower's axes
+plan footprint              7.742 in of x            where the stock's face is 5.5
+girt meets the leg at       45.00° off square        and every girt is bolted to a leg
+```
+
+On screen it is a post with a line down its middle — the arris facing the camera — and a step where
+each girt lands on it. Both are visible at any zoom that shows a bay.
+
+Under YXZ the yaw is the term that spins the section, so the lean has to be done with the other
+two. Solving R·(1,0,0) = (dx, climb, dz)/len with **ry = 0** gives one answer:
+
+```
+rx = atan2(dz, climb)                  the lean across
+rz = atan2(hypot(climb, dz), dx)       the lean along, and the rake
+```
+
+which sends local Z to (0, −sin rx, cos rx) and local Y to (−sin rz, …) — both faces square to the
+frame, tilted only by the lean itself. With no batter it degenerates to `[0, 0, PI/2]`, a plumb
+post. The plan footprint is now 5.475 × 5.525 in on a 5½-in section, the girt runs straight at a
+face, and the joints got shallower with it (girt 3.28 → 3.02 in, brace 4.50 → 3.85 in).
+
+The assertions are the CONSEQUENCE, not the arithmetic: the section may be tilted by the leg's own
+lean — 5½° here — and by nothing else. Four tests, three failing on the old code; the fourth is the
+guard that the rotation changed and the LINE did not, so the tower still stands where it stood.
+
+### Two tests that had become copies of the convention
+
+- `timber2-tower-ladder` computed a leg's axis as `[cos rz·cos ry, sin rz, −cos rz·sin ry]`, which
+  is the axis only while rx is zero. It reported the ladder 6.31 in from a leg that had not moved.
+  It uses the full YXZ rotation now.
+- `timber2-tower-footing` bounded the square foot's dip at `½·faceWidth·cos(rz)`, true while the
+  whole lean lived in one angle. Both tilts contribute, and the same claim restated for the frame
+  the legs are actually in gives 0.526 in where it used to give 0.361.
+
+### Measured, not fixed
+
+The square foot got **0.165 in deeper** — 0.361 → 0.526 in below the bearing plane — because a
+square cut on a doubly-tilted member drops more of its corner. It is the same recorded defect (a
+battered leg's foot wants a LEVEL cut, like a stair stringer's), now slightly larger, and it is
+still the right trade: the section being square to the frame is a defect you can see from across
+the room, and this one is a sixth of an inch under a mudsill.

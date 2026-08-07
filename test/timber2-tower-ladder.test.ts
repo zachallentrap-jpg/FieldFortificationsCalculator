@@ -32,9 +32,18 @@ function frontLeg(model: { members: Member[] }) {
   assert.ok(legs.length === 4, 'a tower has four legs');
   // Front-left: smallest x, then smallest z. Its length axis is local X under YXZ.
   const leg = legs.slice().sort((a, b) => (a.position[0] - b.position[0]) || (a.position[2] - b.position[2]))[0]!;
-  const [, ry, rz] = leg.rotation;
   const half = leg.cutLength / IN_PER_FT / 2;
-  const ax: [number, number, number] = [Math.cos(rz) * Math.cos(ry), Math.sin(rz), -Math.cos(rz) * Math.sin(ry)];
+  // The FULL YXZ rotation, not a two-angle shortcut. This used to inline
+  // `[cos rz·cos ry, sin rz, −cos rz·sin ry]`, which is the axis only while rx is zero — true of
+  // a leg yawed onto its lean, and false the moment the lean moved into rx so the leg's section
+  // could stay square to the frame. A shortcut that is right for one rotation convention is a
+  // copy of that convention living in a test.
+  const [rx, ry, rz] = leg.rotation;
+  const ax: [number, number, number] = [
+    Math.cos(rz) * Math.cos(ry) + Math.sin(rz) * Math.sin(rx) * Math.sin(ry),
+    Math.sin(rz) * Math.cos(rx),
+    -Math.cos(rz) * Math.sin(ry) + Math.sin(rz) * Math.sin(rx) * Math.cos(ry),
+  ];
   const foot: [number, number, number] = [
     leg.position[0] - ax[0] * half, leg.position[1] - ax[1] * half, leg.position[2] - ax[2] * half];
   const head: [number, number, number] = [

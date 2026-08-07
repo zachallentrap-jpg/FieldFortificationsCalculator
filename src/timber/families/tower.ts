@@ -165,15 +165,31 @@ export function generateTower(spec: TowerSpec): TowerResult {
     const [x1, z1] = topCorners[i]!;
     const dx = x1 - x0;
     const dz = z1 - z0;
-    const runFt = Math.hypot(dx, dz);
-    const lenFt = Math.hypot(runFt, climb);
-    // Yaw the member onto the lean direction, then pitch it up by the rake.
-    const yaw = runFt < 1e-6 ? 0 : Math.atan2(-dz, dx);
-    const pitch = Math.atan2(climb, Math.max(1e-6, runFt));
+    const lenFt = Math.hypot(Math.hypot(dx, dz), climb);
+    // A LEG'S SECTION IS SQUARE TO THE FRAME. It used to be yawed onto the lean direction and
+    // then pitched up, which puts the axis in the right place and takes the SECTION with it: a
+    // corner leg leans diagonally, so its 6x6 came out turned 45° in plan, presenting its 7¾-in
+    // diagonal along the tower's own axes with an arris facing every girt. The girts and braces
+    // are square to the frame (`yaw` 0 or a right angle) and are bolted to the legs, and you
+    // cannot bolt a flat 2x6 to an edge. It reads as a diamond post with a line down its middle
+    // and a step where every girt lands.
+    //
+    // Under YXZ the yaw is the term that spins the section, so the fix is to do the lean with
+    // the OTHER two and leave the yaw at zero. Solving R·(1,0,0) = (dx, climb, dz)/len for
+    // ry = 0 gives one answer:
+    //
+    //     rx = atan2(dz, climb)                     — the lean across
+    //     rz = atan2(hypot(climb, dz), dx)          — the lean along, and the rake
+    //
+    // which sends local Z to (0, −sin rx, cos rx) and local Y to (−sin rz, …) — both faces
+    // square to the frame, tilted only by the lean itself. With no batter it degenerates to
+    // [0, 0, PI/2], a plumb post, which is what it should be.
+    const rx = Math.atan2(dz, climb);
+    const rz = Math.atan2(Math.hypot(climb, dz), dx);
     emit('towerLeg', legNominal, {
       cutLengthFt: lenFt,
       position: [(x0 + x1) / 2, (legBaseY + legTopY) / 2, (z0 + z1) / 2],
-      rotation: [0, yaw, pitch],
+      rotation: [rx, 0, rz],
       stage: sLegs,
       nailing: 'drift-pinned at the sill; bolted at every girt (PH)',
       doctrineRef: citeOf(TOWER.legNominal),

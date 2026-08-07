@@ -105,7 +105,14 @@ test('and ALL that is left below the bearing plane is the square end cut', () =>
     const { legs, footings } = tower({ footing });
     const bearing = Math.max(...footings.flatMap((f) => corners(f).map((p) => p[1])));
     for (const leg of legs) {
-      const want = (leg.actual.d / 24) * Math.cos(leg.rotation[2]);
+      // BOTH tilts contribute. This was `½·faceWidth·cos(rz)` while the whole lean lived in rz;
+      // a leg whose section is square to the frame carries the across-lean in rx as well, and the
+      // deepest corner of its square foot is then the sum of what each axis drops. Same claim —
+      // "what is below the bearing plane is the cut and nothing else" — restated for the frame
+      // the legs are actually in, and it grew from 0.361 in to 0.526 in when they moved.
+      const [rx, , rz] = leg.rotation;
+      const want = (leg.actual.d / 24) * Math.abs(Math.cos(rz) * Math.cos(rx))
+        + (leg.actual.w / 24) * Math.abs(Math.sin(rx));
       const dip = bearing - Math.min(...corners(leg).map((p) => p[1]));
       assert.ok(Math.abs(dip - want) < 1e-9,
         `${footing}: ${leg.id} reaches ${(dip * IN_PER_FT).toFixed(3)} in below its bearing; a square `
