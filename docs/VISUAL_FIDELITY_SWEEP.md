@@ -86,6 +86,7 @@ screenshots get read.
 | **The B-hut's partitions** | **Fixed** — every upright was a quarter turn out, so a partition was 1½ in of wood in its own 3½-in plate; and the doorway was struck off the WALL's thickness instead of the STUD's, which put the king where the jack goes and left the jack standing in the doorway. |
 | **The gable end studs** | **Fixed** — the same quarter turn, in `roof.ts`: 186 gable studs across nine cards stood 1½ in across a 3½-in wall, ½ in off the plate's centre and 3½ in off the stud below, and the one at the peak ran 1.45 in into the ridge board. |
 | **The guard tower's X-braces** | **Fixed** — both diagonals of every X were drawn on the legs' own centre plane, so each was inside the two legs it braces and inside its twin at the crossing: 162 overlapping pairs, down to 6. |
+| **The guard tower's girts** | **Fixed** — every girt ran centre to centre and so was buried in both legs, and the top one sat at DECK level, through all sixteen joists, the deck, the cab posts and the railing's feet: 61 overlapping pairs, down to 8 at 0.007 in. |
 
 ## The shed that had no walls above the plate
 
@@ -3573,3 +3574,61 @@ tower's; no other golden set has a tower in it.
   girts meet at a corner, and the top one is at deck level and so runs through 16 joists, the deck,
   8 cab posts, the rail posts and the toe boards. That is the platform's bearing line and a bigger
   question than the bracing: a girt at the top of the legs is what the joists should sit ON.
+
+## The tower's girts, and the one holding the platform up ten inches too high
+
+The bracing pass left the girts on the list with their numbers already taken, so this is them.
+
+**A girt is framed BETWEEN the legs.** Every one was cut to the distance between the two leg
+CENTRES and centred on that line, so both of its ends were buried in a leg — and the girts of two
+adjacent faces, both running to the same corner, were inside each other there as well.
+
+**And the top one carries the platform.** It sat at the leg tops, which is the DECK SURFACE. The
+joists hang under that surface, so the girt meant to carry them was a joist's depth plus its own —
+ten inches — above where it belongs, and passed through all sixteen joists, the decking over them,
+the four cab posts and the railing's posts and toe boards standing on the deck.
+
+```
+  girt overlaps, shipped preset          before   after
+    towerLeg                             16 / 3.019 in     8 / 0.007 in
+    girt (two faces at one corner)        8 / 0.750        0
+    joist 16, subfloor 6, post 8,
+    railPost 2, toeBoard 5               37                0
+                                         61                8
+
+  top girt's top edge vs joist underside     -10.0000 in   ->   0.0000
+```
+
+Two corrections on the way, both about a battered frame and both measured rather than guessed.
+
+**The stop is not half a leg's width.** A horizontal girt runs into a RAKED leg, so its direction
+has a component along the leg's own length and it leaves through a side face that is tilted to it.
+The exit distance is `(w/2) / max(|u·e_y|, |u·e_z|)` — `legFaceAlong`, which is the box's support
+again whenever the two are square and larger whenever they are not. Cutting to the support left
+0.29 in.
+
+**And a board is cut SQUARE while the gap it fits narrows going up.** The legs splay downward, so
+the tightest place on a 5½-in-deep girt is its TOP arris, not its centre; struck at the centre
+every girt still bit 0.27 in into both legs along its bottom edge. Struck at the top arris the
+residue is 0.007 in — the girt's own corner against a raked prism, a hundredth of an inch on stock
+quoted to sixteenths, and the tests bound it at a sixty-fourth.
+
+Four tests in `test/timber2-tower-girt.test.ts` over four card options; three fail on the old
+generator and the fourth is the guard — one girt per face per bay, level round the tower, none cut
+to nothing — which a change that deleted a girt would otherwise pass by not having one. Two
+thumbnails moved, the tower's.
+
+### Measured, not fixed
+
+- **The platform joists only lap the top girt by 0.05 in.** They are cut to the cab plan, which is
+  the leg square at the DECK, while the girt sits lower where the legs are already wider — so a
+  joist's end kisses the girt's inner arris rather than bearing on it. The joists want to run to
+  the girts' far faces, which is the same question as the next one.
+- **The two outermost joists still run through the corner legs**, 4 pairs at 2.74 in. They sit on
+  the leg lines by construction, so the platform's own framing — how long a joist is and where the
+  edge ones go — is the target that follows this.
+- **With `access: 'stair'` the girt/stringer clash gets worse**, 2.24 → 6.28 in, because the top
+  girt drops ten inches into a stair well that the frame already swept into. That is the same
+  pre-existing defect the bracing pass ran into from the other side, and it is now the loudest
+  thing on the tower: the stair needs the ladder's fix — clearance struck off the frame's widest
+  point rather than off the deck edge.

@@ -19,7 +19,7 @@ import type { Member } from '../types';
 import { DRESSED } from '../types';
 import type { TowerSpec } from '../spec';
 import { makeEmitter } from '../emit';
-import { TOWER, RAIL, PANEL, HUT, LUMBER, IN_PER_FT, citeOf } from '../doctrine';
+import { TOWER, RAIL, PANEL, HUT, LUMBER, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
 import { stagePlan, requireOrdinal, type StagePlanEntry } from '../stagePlan';
 import { generateRailing, railRequired, type RailEdge } from '../subsystems/railings';
 import { generateLadder, generateStair } from '../subsystems/access';
@@ -121,6 +121,24 @@ function legReach([rx, rz]: readonly [number, number], n: V3, widthFt: number): 
   return (widthFt / 2) * (Math.abs(dot3(eY, n)) + Math.abs(dot3(eZ, n)));
 }
 
+/**
+ * How far along `dir` a ray leaving a leg's own axis travels before it comes out through the side
+ * of the leg — which is where a member BUTTING that leg has to stop.
+ *
+ * Not the same figure as `legReach`, and the difference is the whole reason a shortened girt was
+ * still 0.29 in inside its leg. `legReach` is the support of the box, which is the right answer for
+ * standing something OFF a face square to it; a girt runs horizontally into a RAKED leg, so its
+ * direction has a component along the leg's own length, and the ray leaves through a side face that
+ * is tilted to it. For a square section the exit is `(w/2) / max(|dir·e_y|, |dir·e_z|)`, which is
+ * the support again whenever `dir` is square to the leg and larger whenever it is not.
+ */
+function legFaceAlong([rx, rz]: readonly [number, number], dir: V3, widthFt: number): number {
+  const eY: V3 = [-Math.sin(rz), Math.cos(rz) * Math.cos(rx), Math.cos(rz) * Math.sin(rx)];
+  const eZ: V3 = [0, -Math.sin(rx), Math.cos(rx)];
+  const face = Math.max(Math.abs(dot3(eY, dir)), Math.abs(dot3(eZ, dir)), EPS_FT);
+  return widthFt / 2 / face;
+}
+
 export function generateTower(spec: TowerSpec): TowerResult {
   const emit = makeEmitter('TW');
   const plan = towerStagePlan();
@@ -141,6 +159,9 @@ export function generateTower(spec: TowerSpec): TowerResult {
   const joistNominal = TOWER.platformJoistNominal.value as string;
   const bay = TOWER.bayHeightFt.value as number;
   const legW = DRESSED[legNominal]!.d / IN_PER_FT;
+  const girtD = DRESSED[girtNominal]!.d / IN_PER_FT;
+  /** Hoisted out of the platform block: the top girt is what the joists bear on. */
+  const joistDepth = DRESSED[joistNominal]!.d / IN_PER_FT;
   /** The tower's centre in plan — `cornersAt` strikes the base square from the same figure. */
   const planCentre = spec.cabPlanFt / 2 + (TOWER.batterPerSideFt.value as number);
 
@@ -251,14 +272,48 @@ export function generateTower(spec: TowerSpec): TowerResult {
       const c = top[(f + 1) % 4]!;
       const run = Math.hypot(c[0] - a[0], c[1] - a[1]);
       const yaw = Math.atan2(-(c[1] - a[1]), c[0] - a[0]);
-      emit('girt', girtNominal, {
-        cutLengthFt: run,
-        position: [(a[0] + c[0]) / 2, yTop, (a[1] + c[1]) / 2],
-        rotation: [0, yaw, 0],
-        stage: sBrace,
-        nailing: 'bolted to each leg (PH)',
-        doctrineRef: citeOf(TOWER.girtNominal),
-      });
+      // A GIRT IS FRAMED BETWEEN THE LEGS. It was cut to the distance between the two leg
+      // CENTRES and centred on that line, so both of its ends were buried in a leg — 3.02 in
+      // of a 5½-in leg — and the girts of two adjacent faces, both running to the same corner,
+      // were inside each other there as well. The bracing is what goes ON the face; the girt is
+      // the piece it is applied over, so it stops at the wood.
+      //
+      // The stop is the LEG's reach along the girt's own run, not half the leg's width: the legs
+      // are battered, so their sections are tilted and the inner face is further along the run
+      // than a plumb post's would be.
+      //
+      // AND THE TOP ONE CARRIES THE PLATFORM. It sat at the leg tops, which is the DECK SURFACE,
+      // so on every tower it ran through all 16 platform joists, the decking over them, the four
+      // cab posts, and the railing's posts and toe boards standing on the deck — 37 pairs of
+      // solid members in the same space. It is the bearing line for the joists, so its top edge
+      // belongs at their undersides.
+      const yGirt = b === bays ? H - joistDepth - girtD / 2 : yTop;
+      // A board is CUT SQUARE, and the gap it has to fit narrows as it goes up: the legs splay
+      // downward, so the tightest place on a 5½-in-deep girt is its TOP arris, not its centre.
+      // Struck at the centre, every girt still bit 0.27 in into both legs along its bottom edge —
+      // the same shape of mistake as a rafter's plumb cut measured to the centre line.
+      const tight = cornersAt(spec, yGirt + girtD / 2, legBaseY);
+      const tA = tight[f]!;
+      const tC = tight[(f + 1) % 4]!;
+      const tRun = Math.hypot(tC[0] - tA[0], tC[1] - tA[1]);
+      const u: V3 = [(tC[0] - tA[0]) / (tRun || 1), 0, (tC[1] - tA[1]) / (tRun || 1)];
+      const cutA = legFaceAlong(legRot[f]!, u, legW);
+      const cutC = legFaceAlong(legRot[(f + 1) % 4]!, u, legW);
+      const clear = tRun - cutA - cutC;
+      if (clear > TOLERANCE.minSliverFt) {
+        emit('girt', girtNominal, {
+          cutLengthFt: clear,
+          position: [
+            (tA[0] + tC[0]) / 2 + (u[0] * (cutA - cutC)) / 2,
+            yGirt,
+            (tA[1] + tC[1]) / 2 + (u[2] * (cutA - cutC)) / 2,
+          ],
+          rotation: [0, yaw, 0],
+          stage: sBrace,
+          nailing: 'bolted to each leg (PH)',
+          doctrineRef: citeOf(TOWER.girtNominal),
+        });
+      }
       // The X: two diagonals per face, corner to opposite corner of the bay.
       //
       // A BRACE IS BOLTED TO THE FACE OF THE FRAME, so it cannot be IN the frame. Both diagonals
@@ -311,7 +366,6 @@ export function generateTower(spec: TowerSpec): TowerResult {
   // ── Platform: joists across the leg square, decked.
   const deckHalf = spec.cabPlanFt / 2;
   const cx = planCentre;
-  const joistDepth = DRESSED[joistNominal]!.d / IN_PER_FT;
   const deckY = H;
   const joistY = deckY - joistDepth / 2;
   const joistSpacing = spec.spacing.joistSpacingIn / IN_PER_FT;
