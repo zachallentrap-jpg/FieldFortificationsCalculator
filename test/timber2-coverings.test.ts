@@ -87,36 +87,60 @@ test('cutouts that miss, touch, straddle an edge, or swallow the sheet all behav
   assert.equal(subtractCutouts(tile, [{ u0: -1, u1: 5, v0: -1, v1: 9 }]).length, 0, 'a sheet fully inside a hole vanishes');
 });
 
-test('C-5 on real walls: siding + openings = wall area, to 1e-6 sf', () => {
+// C-5 ON REAL WALLS. Stated per wall against `runFt` this passed for months with a 3½-in strip
+// of bare framing standing in every corner of every building, sole plate to cap plate. `runFt`
+// is a butting wall's CLEAR STRUCTURAL SPAN — a rectangle is framed with one pair of walls
+// running through and the other pair between them, so the butting pair's run stops at the
+// through walls' INNER faces. The tiler covered exactly what it was told to and the corners were
+// nobody's job.
+//
+// THE PERIMETER IS THE CLAIM THAT CANNOT BE SATISFIED WITH THE CORNERS OPEN. A skin covers the
+// face a building presents to the weather, and that face is 2(L + W) round the outside — a
+// figure no per-wall run adds up to unless every corner is closed.
+const skinArea = (model: ReturnType<typeof generateStructure>, roles: readonly string[]): number =>
+  model.members
+    .filter((m) => roles.includes(m.role) && m.wall !== undefined && m.id.startsWith('CV-'))
+    .reduce((a, m) => a + (m.cutLength / 12) * (m.actual.d / 12), 0);
+
+const openingArea = (walls: ReturnType<typeof wallContract>): number =>
+  walls.surfaces.reduce((a, s) => a + s.cutouts.reduce((b, c) => b + (c.u1 - c.u0) * (c.v1 - c.v0), 0), 0);
+
+test('C-5 on real walls: the skin covers the whole outside face — perimeter, not four clear runs', () => {
   const spec = withCoverings({ siding: 'plywood' });
   const model = generateStructure(spec);
   const walls = wallContract(spec.dims.lengthFt, spec.dims.widthFt, spec.stories[0]!.wallHeightFt, spec.stories[0]!.openings);
-  for (const s of walls.surfaces) {
-    // The wall PROPER — pieces from the wall pass ('CV'), not the raked infill above the
-    // plate ('RK'), which closes in a different region and is conserved by its own test.
-    const covered = model.members
-      .filter((m) => m.role === 'siding' && m.wall === s.wall && m.id.startsWith('CV-'))
-      .reduce((a, m) => a + (m.cutLength / 12) * (m.actual.d / 12), 0);
-    const cut = s.cutouts.reduce((a, c) => a + (c.u1 - c.u0) * (c.v1 - c.v0), 0);
-    const surface = s.runFt * s.heightFt;
-    assert.ok(
-      Math.abs(covered + cut - surface) < 1e-6,
-      `${s.wall}: covered ${covered.toFixed(6)} + cut ${cut.toFixed(6)} != ${surface.toFixed(6)} sf`,
-    );
+  // The wall PROPER — pieces from the wall pass ('CV'), not the raked infill above the plate
+  // ('RK'), which closes in a different region and is conserved by its own test.
+  const covered = skinArea(model, ['siding']);
+  const face = 2 * (spec.dims.lengthFt + spec.dims.widthFt) * spec.stories[0]!.wallHeightFt;
+  assert.ok(Math.abs(covered + openingArea(walls) - face) < 1e-6,
+    `covered ${covered.toFixed(6)} + openings ${openingArea(walls).toFixed(6)} != the building's `
+    + `${face.toFixed(6)} sf of outside face`);
+  // And nothing is doubled up: two skins meeting at a corner arris touch, they do not overlap.
+  // Area alone cannot tell an overlap from a gap of the same size.
+  for (const wall of ['E', 'W'] as const) {
+    const s = walls.surfaces.find((q) => q.wall === wall)!;
+    const mine = model.members.filter((m) => m.role === 'siding' && m.wall === wall && m.id.startsWith('CV-'));
+    const ends = mine.flatMap((m) => {
+      const halfU = (m.cutLength / 12) / 2;
+      const along = (m.position[0] - s.origin[0]) * s.along[0] + (m.position[2] - s.origin[1]) * s.along[1];
+      return [along - halfU, along + halfU];
+    });
+    const thick = walls.thicknessFt;
+    assert.ok(Math.abs(Math.min(...ends) - -thick) < 1e-9 && Math.abs(Math.max(...ends) - (s.runFt + thick)) < 1e-9,
+      `${wall}: the skin runs ${Math.min(...ends).toFixed(4)}..${Math.max(...ends).toFixed(4)} where the `
+      + `wall's FACE runs ${(-thick).toFixed(4)}..${(s.runFt + thick).toFixed(4)}`);
   }
 });
 
-test('board-and-batten covers the same area and adds battens over the joints', () => {
+test('board-and-batten covers the same face and adds battens over the joints', () => {
   const spec = withCoverings({ siding: 'boardAndBatten' });
   const model = generateStructure(spec);
   const walls = wallContract(20, 16, 8, spec.stories[0]!.openings);
-  for (const s of walls.surfaces) {
-    const covered = model.members
-      .filter((m) => m.role === 'sidingBoard' && m.wall === s.wall && m.id.startsWith('CV-'))
-      .reduce((a, m) => a + (m.cutLength / 12) * (m.actual.d / 12), 0);
-    const cut = s.cutouts.reduce((a, c) => a + (c.u1 - c.u0) * (c.v1 - c.v0), 0);
-    assert.ok(Math.abs(covered + cut - s.runFt * s.heightFt) < 1e-6, `${s.wall}: board coverage`);
-  }
+  const covered = skinArea(model, ['sidingBoard']);
+  const face = 2 * (20 + 16) * 8;
+  assert.ok(Math.abs(covered + openingArea(walls) - face) < 1e-6,
+    `boards cover ${covered.toFixed(6)} + openings ${openingArea(walls).toFixed(6)} != ${face} sf`);
   const battens = model.members.filter((m) => m.role === 'batten');
   assert.ok(battens.length > 10, 'battens cover the board joints');
   assert.equal(battens[0]!.nominal, '1x2');
@@ -304,10 +328,11 @@ test('a shed closes in its pony wall and both rakes; a hip has nothing to close 
   // High wall: a pony wall of constant height over a wall that runs the full length.
   const lift = rafterSeatLiftFt(DRESSED['2x6']!.d, DRESSED['2x4']!.d, slope);
   assert.ok(Math.abs(infillArea(shed, 'N') - L * (W * slope + lift)) < 1e-6, 'pony wall over the high plate');
-  // The two walls parallel to the slope: a right triangle rising to the high side, over the
-  // clear run between the through walls. The profile is linear, so the strips are EXACT.
-  const t = DRESSED['2x4']!.d / 12;
-  const rake = (slope * ((W - t) ** 2 - t ** 2)) / 2 + lift * (W - 2 * t);
+  // The two walls parallel to the slope: a right triangle rising to the high side over the FULL
+  // WIDTH, corner to corner — not over the clear run between the through walls, which is where
+  // this used to stop and is how a 3½-in strip of open rake stood in each corner. The profile is
+  // linear and the strips are cut to the middle of what each spans, so the area is EXACT.
+  const rake = (slope * W * W) / 2 + lift * W;
   for (const wall of ['E', 'W'] as const) {
     assert.ok(Math.abs(infillArea(shed, wall) - rake) < 1e-6, `${wall}: rake infill ${infillArea(shed, wall)} vs ${rake}`);
   }

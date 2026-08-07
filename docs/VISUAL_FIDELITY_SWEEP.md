@@ -46,6 +46,7 @@ screenshots get read.
 | **Latrine — the riser box** | **Fixed** — the one feature that makes the building a latrine was a solid bench. `seats` sized the dividers and cut no seats. |
 | **Crib bunker — the entrance baffle** | **Fixed** — it started at the doorway's CENTRE, leaving two feet of a five-foot opening with a clear straight line in. |
 | **GP framed building** (48×20, piers, plywood, roll) | **Checked, clean.** Nothing wrong. Four measurements with negative controls: piers, walls, roof covering, gable rake. |
+| **The corners, where two skins meet** | **Fixed** — the siding stopped one wall thickness short at each end of the two butting walls, leaving a 3½-in strip of bare framing in every corner of every building, sole plate to cap plate. |
 | Guard shack (8×8, four openings) | **Checked, clean.** Nothing wrong. Its unbraced walls are a documented rule, now pinned by a test. |
 | Squad hut (50 ft — the longest building) | **Checked, clean.** Nothing wrong. Its fifty-foot runs are already handled, by a module I had not read. |
 | Weather barrier / building paper | **Already covered** — an earlier pass fixed it (row above). All that is left is a stale help string; see below. |
@@ -2867,3 +2868,75 @@ pitch all fail it.
 - **The two end doors are 5 in out of line with each other.** Both are `offsetFt: 8` on their own
   wall, and `u` runs the same rotational sense on all four walls — so on facing walls it runs
   opposite ways. The convention is consistent; it is the preset that is not symmetric.
+
+## The corners, where two skins meet
+
+Found on the storage shed with a **shed roof, purlins and corrugated roofing** — a combination
+nothing had rendered. The roof was fine. What the screenshot showed was a thin white line running
+down the corner of the building, from just under the eave to about three feet above the floor,
+where the two walls' siding meet.
+
+**A wall's skin covers the face it presents to the weather, and on a butting wall that face runs
+corner to corner.** `WallSurface.runFt` is the wall's CLEAR STRUCTURAL span: a rectangle is framed
+with one pair of walls running through and the other pair butting between them, so the butting
+pair's run starts and ends at the through walls' INNER faces. The covering pass tiled exactly that
+run. On a 20 × 12 shed the E and W skins therefore ran z 0.2917..11.7083 while the building runs
+0..12 — 3½ in short at each end, top to bottom, on all four corners of every shipped building:
+
+```
+gp-frame  E/W short 3.50 in / 3.50 in     storage shed  the same     every hut  the same
+```
+
+### Why it survived every check there is
+
+**It is not daylight.** The through wall's own corner stud fills the wall's thickness right behind
+the strip, so a ray cast along any axis is stopped: 0 clear sight lines through 120 000 stations,
+before the fix. What is there is the stud, half an inch back, in a channel between two sheets of
+siding — and at a glancing angle that channel reads as a slot with the background at the bottom of
+it. Neither the daylight walk added last iteration nor the per-wall skin walk could see it, because
+both sampled u ∈ [0, runFt] and the strip is **outside every wall's own run** — it belongs to no
+wall by the coordinates each test was using.
+
+And the conservation test said the area was right, because it asked the wrong question. `C-5 on
+real walls` asserted, per wall, `siding + openings == runFt × heightFt` — which the tiler satisfies
+by construction whatever `runFt` is. It has been restated as the building's own **perimeter**:
+`2(L + W) × height`, a figure no set of four clear runs adds up to unless every corner is closed.
+
+### The fix, and the two ways it could have gone wrong
+
+`skinReach` asks, per wall end, whether a perpendicular wall's INNER face lands on this wall's run
+end — which is what "this wall butts into that one" means — and if so the skin runs on to that
+wall's OUTER face. Through walls get nothing, because their run already is their face.
+
+- **The two skins must MEET, not overlap.** Closing a gap by lapping is not closing it, and an area
+  check cannot tell an overlap from a gap of the same size. Perpendicular planes intersect in a
+  line, so the pieces touch along the corner arris: 0 cross-wall clashes on all nine shipped
+  structures with a skin, before and after.
+- **The openings must not move.** Reaching past the run means the tiler's u = 0 is no longer the
+  surface's origin, so every cutout shifts with it. Get that wrong by a wall thickness and every
+  door and window on the butting walls slides 3½ in along the wall — which no area check would
+  notice and no render would obviously show.
+
+The infill above the plate had the same bound and got the same treatment. On a gable end the
+corner triangle is under two inches tall and hardly showed; on a **shed's rake wall the corner
+strip at the high end is the pony wall's full height**, which is a hole you could put an arm
+through. Its profile is read straight through rather than clamped at the run's ends — `topAt`
+evaluates the roof plane at whatever world station u lands on, and the roof really does continue
+over the corner. Clamping it flat there put a kink in a profile that has none, and a strip
+straddling the kink came out cut to the average of two different things (0.0136 sf out on a 45-sf
+triangle, and the rake's area is exact again without it).
+
+### A trap in the test, worth writing down
+
+The first version of the corner test rebuilt each hut's wall contract from `f.preset`. That is not
+the contract the model was built against: `generateStructure` NORMALIZES before it generates, and
+on the guard shack the raw preset and the normalized one disagree about the window sill by 4 in.
+The test duly reported siding lapping 24 × 4 in into an opening — a defect that does not exist, in
+a place the model is correct. `model.spec` is the normalized spec and is what a test must use.
+
+### Measured, not fixed
+
+- **The corner channel is still 3½ in of stud face, not a corner board.** The siding now runs to
+  the arris on both sides, which is how the toolkit's other skins meet; a real building would
+  often carry a corner board over the joint. That is a covering-system addition, not a geometry
+  fix, and it belongs with the vertical-siding question already in this sweep.

@@ -22,14 +22,14 @@ import { stagePlanForBuilding, requireOrdinal, ordinalOf } from '../stagePlan';
 import { generateFloor, floorLevels, type FloorInput, type FloorLevels } from '../floor';
 import { generateWalls, type Opening } from '../walls';
 import { generateRoof } from '../roof';
-import { wallContract, type WallsContract } from '../subsystems/wallSystem';
+import { wallContract, type WallsContract, type WallSurface } from '../subsystems/wallSystem';
 import { roofPlanes, generateShed, generatePurlins, generateHip, wallInfillProfiles } from '../subsystems/roofFamilies';
 import { generateRoofCovering, generateWallCovering, generateInfillCovering, generateSkids, generateSlabOnGrade, wallLayerThicknessFt, type InfillSurface } from '../subsystems/coverings';
 import { generateFloorOnBearings, joistNominalFor } from '../subsystems/floorSystem';
 import { generatePartitions } from '../subsystems/partitions';
 import { generateOpenFront, removeClosedWall } from '../subsystems/openFront';
 import { generateBuiltOpenings, generateEntrySteps } from '../subsystems/builtOpenings';
-import { LUMBER, PANEL, FOUNDATION, IN_PER_FT } from '../doctrine';
+import { LUMBER, PANEL, FOUNDATION, TOLERANCE, IN_PER_FT } from '../doctrine';
 import { headerForSpan } from '../normalize';
 
 export interface BuildingResult {
@@ -104,6 +104,36 @@ function gableOf(roof: RoofSpec): { risePer12: number; overhangFt: number } {
     return { risePer12: roof.risePer12, overhangFt: roof.overhangFt };
   }
   return { risePer12: 0, overhangFt: roof.kind === 'flat' ? roof.overhangFt : 0 };
+}
+
+/**
+ * How far past each end of its own run a wall's SKIN has to reach to close the corner.
+ *
+ * A WALL'S SKIN COVERS THE FACE IT PRESENTS TO THE WEATHER, AND ON A BUTTING WALL THAT FACE RUNS
+ * CORNER TO CORNER. `WallSurface.runFt` is the wall's clear STRUCTURAL span: a rectangle is framed
+ * with one pair of walls running through and the other pair butting between them, so the butting
+ * pair's run stops at the through walls' INNER faces — one full wall thickness short of the
+ * outside corner at each end. Tiling exactly that run left a 3½-in-wide strip of bare framing
+ * standing in every corner of every building, sole plate to cap plate, with the two sidings
+ * looking past each other and neither one covering it.
+ *
+ * The extension is to the through wall's OUTER face, which is where that face genuinely ends. The
+ * two skins then meet along the corner arris — they touch and neither runs into the other, because
+ * they lie in perpendicular planes that intersect exactly there.
+ */
+function skinReach(s: WallSurface, walls: WallsContract): { lead: number; tail: number } {
+  const half = walls.thicknessFt / 2;
+  let lead = 0;
+  let tail = 0;
+  for (const t of walls.surfaces) {
+    // Perpendicular walls only: a parallel one is the far side of the building.
+    if (Math.abs(s.along[0] * t.along[0] + s.along[1] * t.along[1]) > TOLERANCE.epsFt) continue;
+    const u = (t.origin[0] - s.origin[0]) * s.along[0] + (t.origin[1] - s.origin[1]) * s.along[1];
+    // Its INNER face landing on this wall's run end is what says this wall butts into it.
+    if (Math.abs(u + half) < TOLERANCE.epsFt) lead = Math.max(lead, walls.thicknessFt);
+    if (Math.abs(u - half - s.runFt) < TOLERANCE.epsFt) tail = Math.max(tail, walls.thicknessFt);
+  }
+  return { lead, tail };
 }
 
 /**
@@ -270,25 +300,44 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
   // sheathing and siding tile `walls.surfaces`, so the wall came back clad from the outside and
   // the opening was invisible from every angle that mattered. The raked infill ABOVE the plates
   // is not affected: a gable end over an open bay is still closed in.
-  const skinSurfaces = spec.openFront
+  const openSkin = spec.openFront
     ? walls.surfaces.filter((s) => s.wall !== spec.openFront)
     : walls.surfaces;
+
+  const skinSurfaces = openSkin.map((s) => {
+    const { lead, tail } = skinReach(s, walls);
+    if (lead === 0 && tail === 0) return s;
+    return {
+      ...s,
+      runFt: s.runFt + lead + tail,
+      origin: [s.origin[0] - s.along[0] * lead, s.origin[1] - s.along[1] * lead] as [number, number],
+      // Shifted with the origin, so an opening stays where it was cut.
+      cutouts: s.cutouts.map((c) => ({ ...c, u0: c.u0 + lead, u1: c.u1 + lead })),
+    };
+  });
 
   // What each wall must close in above its cap plate — a gable end's triangle, a shed's pony
   // wall and rakes. Resolved once here and skinned by whichever coverings are on, so the
   // sheathing and the siding agree about where the building stops.
   const infill: InfillSurface[] = wallInfillProfiles(spec, walls).flatMap((p) => {
     const s = walls.surfaces.find((q) => q.wall === p.wall);
-    return s ? [{
+    if (!s) return [];
+    const { lead, tail } = skinReach(s, walls);
+    return [{
       wall: s.wall,
-      runFt: s.runFt,
+      runFt: s.runFt + lead + tail,
       baseYFt: walls.plateTopY,
-      topAt: p.topAt,
+      // Straight through, NOT clamped at the run's ends: `topAt` reads the roof plane at the
+      // world station u lands on, so it answers for the corner strip too — which is right,
+      // because the roof really does continue over the corner. Clamping it flat there put a
+      // kink in a profile that has none, and a strip straddling the kink came out cut to a
+      // height that is the average of two different things.
+      topAt: (u: number) => p.topAt(u - lead),
       normal: s.normal,
-      origin: s.origin,
+      origin: [s.origin[0] - s.along[0] * lead, s.origin[1] - s.along[1] * lead] as [number, number],
       along: s.along,
       faceOffsetFt: s.faceOffsetFt,
-    }] : [];
+    }];
   });
 
   if (spec.coverings.wallSheathing !== 'none') {

@@ -125,9 +125,17 @@ test('THE BAND FILLS ITS OWN HOLE — the screen used to sit 1 1/2 in below it',
         + `${((hole!.v0 - y[0]) * IN_PER_FT).toFixed(2)} in out at the bottom, `
         + `${((hole!.v1 - y[1]) * IN_PER_FT).toFixed(2)} in at the top`);
       // And no siding strictly inside the hole, so there is nothing lapping over the screen.
+      //
+      // ALONG THE WALL AS WELL AS UP IT. A cutout is stated over the wall's own run, and the skin
+      // now reaches PAST that run at each end to close the corner — the through wall's thickness,
+      // where there is no band and the wall is solid. Checking only the height called those
+      // corner strips a lap over an opening that does not reach them.
       for (const sid of model.members.filter((m) => m.role === 'siding' && m.wall === s.wall)) {
-        const b = box(sid).y;
-        const bite = Math.min(b[1], hole!.v1) - Math.max(b[0], hole!.v0);
+        const b = box(sid);
+        const u = [b.x[0], b.x[1]].flatMap((x) => [b.z[0], b.z[1]]
+          .map((z) => (x - s.origin[0]) * s.along[0] + (z - s.origin[1]) * s.along[1]));
+        if (Math.min(hole!.u1, Math.max(...u)) - Math.max(hole!.u0, Math.min(...u)) <= 1e-9) continue;
+        const bite = Math.min(b.y[1], hole!.v1) - Math.max(b.y[0], hole!.v0);
         assert.ok(bite <= 1e-9,
           `${id}: ${sid.id} laps ${(bite * IN_PER_FT).toFixed(2)} in over the ${s.wall} band`);
       }
