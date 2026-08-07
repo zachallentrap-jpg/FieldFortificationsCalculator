@@ -83,6 +83,7 @@ screenshots get read.
 | **The loading ramp's toe** | **Fixed** — the ramp's walking surface started AT grade, so everything holding it up was underground: the toe plank entirely, and the stringers 12.34 in deep for the last six feet of a twenty-four-foot run. |
 | **Crib bunker — the doorway itself** | **Fixed** — jambs, header and baffle all framed an opening that was then LAGGED SHUT: eleven full-width courses across it and two wall posts standing in the clear span. Every point sampled inside it came back solid. |
 | **Crib bunker — `wallType: 'crib'`** | **Fixed** — the crib topped out 5½ in below the cap beam, so the cap, the overhead stringers, the roof lagging and two feet of earth bore on air all the way round; and the stack ran straight through the doorway as well. |
+| **The B-hut's partitions** | **Fixed** — every upright was a quarter turn out, so a partition was 1½ in of wood in its own 3½-in plate; and the doorway was struck off the WALL's thickness instead of the STUD's, which put the king where the jack goes and left the jack standing in the doorway. |
 
 ## The shed that had no walls above the plate
 
@@ -3322,3 +3323,87 @@ plan**, not how far its foot drops:
 
 Both are smaller than they were, and both are about lateral placement — the fix for either is to
 decide which side of the frame the rail line belongs on, for every railed structure at once.
+
+## The partition that was a quarter turn out
+
+The roles told me where to look. Thirty of the thirty member roles are named somewhere in this
+document; `kingStud`, `jackStud`, `cripple` and `rimJoist` are among the nine that are not, and a
+role nobody has written about is a role nobody has looked at. So: SAT on the wall frame of every
+shipped card — studs, kings, jacks, cripples, headers, sills and the three plates, every pair.
+Thirteen of the fourteen came back clean. The b-hut came back with **15 overlapping pairs, all of
+them in its partitions**, and the whole set 1.500 in deep, which is a 2x4's thickness — the tell
+for two pieces of wood occupying the same plane rather than merely touching.
+
+**Two slips with one root.** `walls.ts` builds a vertical member with the wall's yaw plus a quarter
+turn (`f.yaw + Math.PI / 2`), which is what stands a stud ACROSS the wall: 3½ in of face spanning
+the plate's width, 1½ in of edge showing along the run. `partitions.ts` wrote the yaw without the
+quarter turn. Every stud, king, jack and cripple in every partition was therefore laid flat IN the
+wall — 3½ in along the run, 1½ in across — so a b-hut divider read in plan as a hairline through a
+building whose exterior walls, and whose own sole and top plates, are 3½ in thick:
+
+```
+                        across the wall   along the run
+  E wall stud (walls.ts)      3.50 in         1.50 in
+  partition stud              1.50            3.50      <- turned
+```
+
+The doorway arithmetic was then written to match the wrong stud, and it is worth being precise
+about how, because the numbers look reasonable until you draw them. King and jack were spaced off
+`thick` — the WALL's 3½ in — rather than off the stud's 1½. In the b-hut's 36-in doorway, in the
+partition's own coordinate along the run:
+
+```
+  before   king  12.00 .. 15.50 in     jack  13.75 .. 17.25     opening 15.50 .. 51.50
+           header 13.75 .. 53.25       cripples 13.75, 29.75, 45.75
+  after    king  12.50 .. 14.00        jack  14.00 .. 15.50     opening 15.50 .. 51.50
+           header 14.00 .. 53.00       cripples 18.75, 34.75
+```
+
+Read the "before" line: **the king is standing where the jack belongs** — its inner face exactly on
+the opening edge — and the jack is straddling that edge, half of it inside the king it is nailed
+to and half of it in the doorway, over a sole plate that is cut out from under it. Three
+consequences, all of them things a person would see:
+
+- **A 36-in door came out 32½ in clear.** The rough opening is measured between the jacks' inner
+  faces and each jack ate 1¾ in of it.
+- **The header ran 1¾ in into both kings**, because its length was `width + thick` — the right form
+  with the wrong thickness.
+- **The first cripple was laid on the jack**, and the last was clamped onto the far one by
+  `at(Math.min(u, d1))` — the same clamp that left an inch of the loading platform undecked. A
+  cripple inside another piece of wood is not a cripple.
+
+The fix is `walls.ts`'s own layout, which has been right all along: jack on the edge, king outboard
+of it and touching, header `width + 2 × studT` so it bears fully on both jacks and butts both
+kings, cripples on the wall's own stud layout wherever that layout falls clear inside the opening.
+The layout itself is now struck off the stud's thickness too, so a partition's end stud stands
+flush against the wall it butts into instead of an inch inside it. The header is **doubled**, as
+every other framed opening in the toolkit is: a single on-edge piece was consistent with a 1½-in
+partition and would have left 1½ in of header in a 3½-in wall the moment the studs stood up.
+
+```
+  partition members overlapping anything in the model (SAT)   21 -> 6
+  b-hut member count                                          740 -> 740   (3 cripples out, 3 header pieces in)
+```
+
+Five tests in `test/timber2-partition-frame.test.ts`; all five fail on the old generator. One
+existing test had to be restated rather than pinned: `timber2-building`'s "four bays need three
+dividers" counted DISTINCT x coordinates, which is three walls only while nothing straddles a
+centreline — a doubled header does, by ¾ in each way. It now measures each member to the nearest
+quarter point of the hut and asserts three lines are used, which is the claim it was making.
+
+Two thumbnails moved, both the b-hut's, and no compat golden: the b-hut is the only card in the
+catalog with partitions, so the blast radius is exactly one family.
+
+### Measured, not fixed
+
+- **A partition's end stud stands in the hut's girt**, 3½ × 3½ × 1½ in, twice per partition and six
+  times on the b-hut. It is unchanged by this commit and predates it: the stud's foot is at the
+  exterior wall's inner face (`z 3.50..5.00 in`) and `HT-girt-01` runs the whole length of the
+  building through exactly that space (`z 3.50..5.00`, `y 3.854..4.146`). The girt's own comment
+  says it is "CUT at an opening on site" and cut again at each corner; a partition is one more
+  place it has to be cut, and that is a change to `hut.ts`'s girt run, not to the partition layout.
+- **The gable's rake studs have the same quarter turn**, in `roof.ts`: `RF-stud-01` measures 1.50 in
+  across the wall and 3.50 along its run, standing on a cap plate that is 3½ in across, directly
+  above E/W wall studs that are 3½ across and 1½ along. Every gable in the catalog does it — 22
+  studs on the b-hut, 28 on gp-frame. `roof.ts` is frozen legacy, so turning them is a compat-lock
+  event and gets its own pass.

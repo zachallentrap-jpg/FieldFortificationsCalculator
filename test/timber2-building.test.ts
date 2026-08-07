@@ -110,11 +110,19 @@ test('the B-hut has its bays: partitions are framed, and the framing stack meets
 
   // Bays are equal, and the partitions butt BETWEEN the exterior walls rather than through them.
   const { lengthFt: L, widthFt: W } = familyById('b-hut')!.preset.dims;
-  const stations = [...new Set(part.map((m) => Math.round(m.position[0] * 100) / 100))].sort((a, b) => a - b);
-  assert.equal(stations.length, 3, 'four bays need three dividers');
-  for (let i = 0; i < stations.length; i++) {
-    assert.ok(Math.abs(stations[i]! - (L * (i + 1)) / 4) < 1e-6, `divider ${i} is off its quarter point`);
+  // Measured to the LINE rather than by counting distinct coordinates: the doorway header is
+  // doubled and straddles its partition's centreline by ¾ in each way, exactly as an exterior
+  // wall's is, so a set of x values counts PIECES and not walls.
+  const halfWall = 3.5 / 12 / 2;
+  const quarters = [1, 2, 3].map((i) => (L * i) / 4);
+  const used = new Set<number>();
+  for (const m of part) {
+    const line = quarters.find((x) => Math.abs(m.position[0]! - x) <= halfWall + 1e-6);
+    assert.ok(line !== undefined,
+      `${m.id} at x=${m.position[0]!.toFixed(3)} is not on any quarter point of a ${L}-ft hut`);
+    used.add(line);
   }
+  assert.equal(used.size, 3, 'four bays need three dividers');
   for (const m of part) {
     const z = m.position[2]!;
     assert.ok(z > 0 && z < W, `${m.id} at z=${z.toFixed(2)} is outside the hut`);
