@@ -47,6 +47,7 @@ screenshots get read.
 | **Crib bunker — the entrance baffle** | **Fixed** — it started at the doorway's CENTRE, leaving two feet of a five-foot opening with a clear straight line in. |
 | **GP framed building** (48×20, piers, plywood, roll) | **Checked, clean.** Nothing wrong. Four measurements with negative controls: piers, walls, roof covering, gable rake. |
 | **The corners, where two skins meet** | **Fixed** — the siding stopped one wall thickness short at each end of the two butting walls, leaving a 3½-in strip of bare framing in every corner of every building, sole plate to cap plate. |
+| **Flat / shed roof — the top of the slope** | **Fixed** — a single-slope roof has no ridge, and the cap laid on its top edge hung half its width past the roof; the same edge had no fascia over its rafter tails. |
 | Guard shack (8×8, four openings) | **Checked, clean.** Nothing wrong. Its unbraced walls are a documented rule, now pinned by a test. |
 | Squad hut (50 ft — the longest building) | **Checked, clean.** Nothing wrong. Its fifty-foot runs are already handled, by a module I had not read. |
 | Weather barrier / building paper | **Already covered** — an earlier pass fixed it (row above). All that is left is a stale help string; see below. |
@@ -2940,3 +2941,67 @@ a place the model is correct. `model.spec` is the normalized spec and is what a 
   the arris on both sides, which is how the toolkit's other skins meet; a real building would
   often carry a corner board over the joint. That is a covering-system addition, not a geometry
   fix, and it belongs with the vertical-siding question already in this sweep.
+
+## A single-slope roof has no ridge
+
+Target: the storage shed with a **flat roof, no deck, corrugated roofing** — the last roof kind on
+that card nothing had rendered. The roof frames and covers correctly. What is wrong is what happens
+at the top of the slope, and it is wrong in two opposite directions at once.
+
+**A ridge is where two slopes meet.** `generateRidgeCaps` capped every plane's top edge, on the
+stated grounds that *"a plane's TOP edge is a ridge"*. That is true of a gable, whose other plane
+comes up to the same line, and false of a shed or a flat roof, which is ONE plane whose top edge is
+the eave over the high wall. Capped anyway:
+
+```
+storage shed, flat roof:   cap z 12.500..13.500      roofing ends z 12.978
+```
+
+Six inches of a twelve-inch cap, over the building's whole twenty feet, hanging in the air with
+nothing under it.
+
+**And the same edge had the opposite problem below it.** The fascia is emitted once per plane at
+v = 0 — right for a gable, where each plane has exactly one open edge, and wrong here: a shed's
+rafters overhang the pony wall by the same foot as the low eave, with the same square-cut tails
+showing, and nothing covered them. So the one edge in the toolkit that carried a cap it should not
+have was also the one edge missing the board it should. That is the defect the fascia was added to
+fix at the other three edges, surviving at the fourth.
+
+Both now ask one function. `freeTopEdges` counts how many planes come up to each top line — a
+shared line is seen twice, a free edge once — and the dedup that already existed in the cap
+generator was the answer sitting unused. A free top edge gets a fascia and no cap; a shared one
+gets a cap and no fascia. Hips are exempt from the count because a plane's side edges are only
+generated where it TAPERS, which is where a neighbour meets it by construction.
+
+```
+             caps  fascia            caps  fascia
+gable          1      2      shed      0      2   (was 1 and 1)
+hip            5      4      flat      0      2   (was 1 and 1)
+pyramid        5      4
+```
+
+### The claim a test can make about a cap
+
+The first version asserted "roofing under every point of the cap" and failed on the GABLE, at the
+ridge line itself — where there is deliberately no roofing, because each course is offset
+perpendicular from its own plane and cut at `slopeLengthFt`, so both slopes' sheets pull back from
+the line. Spanning that gap is what the cap is for. The claim that is actually true is the one the
+cap's own fastener note makes — *nailed on BOTH sides of the joint* — and it is exactly the one a
+cap over a free edge cannot satisfy: one side lies on the roofing and the other is over nothing.
+
+The second test is the general form of the missing board: **every rafter end is either continued by
+another slope or closed with a fascia.** A gable's upper ends are continued, its lower ends are
+closed, a hip's are one or the other everywhere — and a shed's high ends were neither. All three
+tests fail on the old generator.
+
+No card ships a shed or a flat roof, so no thumbnail golden moved; both are offered by the storage
+shed's and the custom card's roof pickers.
+
+### Measured, not fixed
+
+- **Corrugated over `roofDeck: 'none'`** puts the sheets straight on rafters at 16 in o.c. The
+  engine's own span check already says the rest: on this preset it warns that a 2x6 rafter runs
+  14.0 ft where the table allows 12 ft at that spacing, and that the fix is a deeper stick, closer
+  spacing, or a purlin.
+- **A shed and a flat roof have no rake overhang and no barge board**, the same as a gable. That is
+  the gable-rake entry already in this sweep, and it is one decision for all three.

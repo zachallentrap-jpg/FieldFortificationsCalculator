@@ -591,23 +591,35 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
   // Depth matches the rafter so the board covers the ends it is nailed to, centred on the rafter
   // centreline — a 1x6 over a 2x6 — and sitting just outside the eave line so it hides the ends
   // rather than sharing their space.
+  //
+  // BOTH FREE HORIZONTAL EDGES, not just the low one. A gable's two planes meet at the ridge and
+  // each has exactly one open edge, so "one fascia per plane" was right for every roof that had
+  // been looked at. A SHED or FLAT roof is one plane, and its top edge is an eave too — over the
+  // pony wall, with the same rafter tails overhanging it by the same foot and nothing on the far
+  // side. That edge had no fascia and a ridge cap instead, which is the same mistake twice.
   {
     const fasciaNominal = LUMBER.fasciaNominal.value as string;
     const fasciaT = DRESSED[fasciaNominal]!.w / IN_PER_FT;
-    for (const plane of planes) {
-      const back = fasciaT / 2;
-      const x = plane.origin[0] + plane.alongEave[0] * (plane.eaveLengthFt / 2) - plane.upSlope[0] * back;
-      const y = plane.origin[1] + plane.alongEave[1] * (plane.eaveLengthFt / 2) - plane.upSlope[1] * back;
-      const z = plane.origin[2] + plane.alongEave[2] * (plane.eaveLengthFt / 2) - plane.upSlope[2] * back;
-      emit('fascia', fasciaNominal, {
-        cutLengthFt: plane.eaveLengthFt,
-        position: [x, y, z],
-        // Along the eave, standing on edge: the board's face is the vertical one you see.
-        rotation: [0, Math.atan2(-plane.alongEave[2]!, plane.alongEave[0]!), 0],
-        stage: stageDeck,
-        nailing: '2-8d into each rafter tail (PH)',
-        doctrineRef: citeOf(LUMBER.fasciaNominal),
-      });
+    const free = freeTopEdges(planes);
+    for (const [i, plane] of planes.entries()) {
+      // v = 0 is the eave; v = slopeLengthFt is the top edge, an eave only when no plane meets it.
+      const at: [number, number][] = [[0, -1]];
+      if (free[i]) at.push([plane.slopeLengthFt, 1]);
+      for (const [v, out] of at) {
+        const back = out * (fasciaT / 2);
+        const mid = plane.eaveLengthFt / 2;
+        const p: [number, number, number] = [0, 1, 2].map((k) => plane.origin[k]!
+          + plane.alongEave[k]! * mid + plane.upSlope[k]! * (v + back)) as [number, number, number];
+        emit('fascia', fasciaNominal, {
+          cutLengthFt: plane.eaveLengthFt,
+          position: p,
+          // Along the eave, standing on edge: the board's face is the vertical one you see.
+          rotation: [0, Math.atan2(-plane.alongEave[2]!, plane.alongEave[0]!), 0],
+          stage: stageDeck,
+          nailing: '2-8d into each rafter tail (PH)',
+          doctrineRef: citeOf(LUMBER.fasciaNominal),
+        });
+      }
     }
   }
 
@@ -887,6 +899,34 @@ function atUV(p: RoofPlane, u: number, v: number): V3 {
 }
 
 /**
+ * Which planes' TOP edges are FREE — an eave, not a ridge.
+ *
+ * A RIDGE IS WHERE TWO SLOPES MEET. A plane's top edge is only one if another plane comes up to
+ * the same line; a gable's two do. A SHED or FLAT roof is one plane, and its top edge is an eave
+ * over the high wall with nothing on the far side of it — the same rafter tails overhanging by
+ * the same foot as the low eave. Capped as a ridge anyway, a 12-in cap laid on that line put half
+ * its width out past the roof's own edge: 6 in over the storage shed's whole 20 ft, hanging in
+ * the air with nothing under it. And the fascia, emitted once per plane at v = 0, never reached
+ * it — so the one edge that had a cap it should not have also lacked the board it should.
+ *
+ * Both callers ask this one function, so they cannot disagree about what the edge is.
+ */
+function freeTopEdges(planes: readonly RoofPlane[]): boolean[] {
+  const keyOf = (p: RoofPlane): string | null => {
+    const top = planeSpanAt(p, p.slopeLengthFt);
+    // A hip end tapers to a point: no top edge at all, so nothing to cap and nothing to trim.
+    if (top.hi - top.lo <= EPS) return null;
+    const a = atUV(p, top.lo, p.slopeLengthFt);
+    const b = atUV(p, top.hi, p.slopeLengthFt);
+    return [0, 1, 2].map((k) => Math.round(((a[k]! + b[k]!) / 2) * 100)).join(',');
+  };
+  const keys = planes.map(keyOf);
+  const count = new Map<string, number>();
+  for (const k of keys) if (k !== null) count.set(k, (count.get(k) ?? 0) + 1);
+  return keys.map((k) => k !== null && (count.get(k) ?? 0) < 2);
+}
+
+/**
  * The caps over every ridge and every hip.
  *
  * WHY THIS HAS TO EXIST. Roofing courses are rectangles, and a rectangle cannot be cut on a
@@ -916,14 +956,17 @@ export function generateRidgeCaps(
   const seen = new Set<string>();
 
   const lines: { a: V3; b: V3; hip: boolean; cos: number }[] = [];
-  for (const p of planes) {
+  const free = freeTopEdges(planes);
+  for (const [i, p] of planes.entries()) {
     const top = planeSpanAt(p, p.slopeLengthFt);
     const foot = planeSpanAt(p, 0);
     // `upSlope` is a unit vector, so its Y component is sin(pitch) and this is cos(pitch).
     const cos = Math.max(1e-9, Math.sqrt(Math.max(0, 1 - p.upSlope[1] * p.upSlope[1])));
-    // The top edge: a ridge wherever the plane still has width up there. A hip end tapers to a
-    // point and has none, which is why a pyramid has four hips and no ridge at all.
-    if (top.hi - top.lo > EPS) {
+    // The top edge: a ridge wherever the plane still has width up there AND another plane comes
+    // up to meet it. A hip end tapers to a point and has no top edge at all, which is why a
+    // pyramid has four hips and no ridge; a shed or flat roof HAS one and it is not a ridge, it
+    // is the eave over the high wall — see `freeTopEdges`.
+    if (top.hi - top.lo > EPS && !free[i]) {
       lines.push({ a: atUV(p, top.lo, p.slopeLengthFt), b: atUV(p, top.hi, p.slopeLengthFt), hip: false, cos });
     }
     // The side edges, but only where the plane actually tapers — otherwise they are the rake of
