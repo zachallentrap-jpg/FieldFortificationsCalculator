@@ -569,9 +569,14 @@ export function generateTower(spec: TowerSpec): TowerResult {
           doctrineRef: citeOf(STAIR.treadNominal),
         });
       }
+      // Butted against the deck rail's face, not run into it: the platform's front rail lies on
+      // the deck-edge line and these two meet it end-on, so half a rail's thickness of each was
+      // inside it — 12 pairs at 0.75 in.
+      const railT = DRESSED[RAIL.memberNominal.value as string]!.w / IN_PER_FT;
+      const meet = cx - deckHalf - railT / 2;
       bridgeEdges.push(
-        { id: 'bridge-w', from: [cx - accessWidth / 2, cx - deckHalf], to: [cx - accessWidth / 2, arriveZ] },
-        { id: 'bridge-e', from: [cx + accessWidth / 2, arriveZ], to: [cx + accessWidth / 2, cx - deckHalf] },
+        { id: 'bridge-w', from: [cx - accessWidth / 2, meet], to: [cx - accessWidth / 2, arriveZ] },
+        { id: 'bridge-e', from: [cx + accessWidth / 2, arriveZ], to: [cx + accessWidth / 2, meet] },
       );
     }
   }

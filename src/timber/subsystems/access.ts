@@ -375,10 +375,19 @@ export function generateStair(input: StairInput): StairResult {
       // wrong at the bottom: the other half of that extra put the foot 1¾ in below the nosing
       // line, into the treads and, at the head of a flight, into the deck it lands on.
       const proud = DRESSED[railMemberNominal]!.d / IN_PER_FT / 2;
+      // AND A RAIL IS NAILED TO ITS FACE, so the two are not on one line — `railings.ts`'s slip,
+      // copied here too. Post and rail shared the flight's edge line and the rail ran straight
+      // through every post: 8 pairs, the whole 2½ in, on the loading platform's ramp stair. The
+      // RAIL line is the one that holds — it is the flight's own edge and what a hand runs along
+      // — so the post steps IN off it by half of each, onto the tread it is bolted beside.
+      const inset = (DRESSED[railPostNominal]!.w / IN_PER_FT + DRESSED[railMemberNominal]!.w / IN_PER_FT) / 2;
       for (const side of [-1, 1] as const) {
         const off = (side * widthFt) / 2;
+        const postOff = off - side * inset;
         const px = (d: number): number => at[0] + dir[0] * d + across[0] * off;
         const pz = (d: number): number => at[1] + dir[1] * d + across[1] * off;
+        const qx = (d: number): number => at[0] + dir[0] * d + across[0] * postOff;
+        const qz = (d: number): number => at[1] + dir[1] * d + across[1] * postOff;
         // The walking line is the NOSING line: one riser up at the flight's base, climbing at
         // the unit run's own pitch. Rail heights are measured PLUMB from it, which is how a
         // stair rail is measured and why the rails are raked and the posts are not.
@@ -387,7 +396,7 @@ export function generateStair(input: StairInput): StairResult {
           const d = (sol.runFt * i) / bays;
           emit('railPost', railPostNominal, {
             cutLengthFt: railTopH + proud,
-            position: [px(d), walkY(d) + (railTopH + proud) / 2, pz(d)],
+            position: [qx(d), walkY(d) + (railTopH + proud) / 2, qz(d)],
             rotation: [0, 0, Math.PI / 2],
             stage,
             nailing: 'bolted to the stringer (PH)',

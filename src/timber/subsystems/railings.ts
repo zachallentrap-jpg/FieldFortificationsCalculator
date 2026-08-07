@@ -19,6 +19,9 @@ import { RAIL, IN_PER_FT, citeOf } from '../doctrine';
  */
 const MIN_RUN_FT = 0.5 / IN_PER_FT;
 
+/** "On this rail line" for the corner rule — a saw kerf, not doctrine. */
+const TOL_ON_LINE = 1e-6;
+
 /** One open edge, in plan. */
 export interface RailEdge {
   id: string;
@@ -111,6 +114,54 @@ export function generateRailing(input: RailingInput): Member[] {
   const maxSpacing = RAIL.postSpacingMaxFt.value as number;
   const toeBoards = input.toeBoards ?? true;
 
+  // A RAIL IS NAILED TO A POST'S FACE, SO THE TWO CANNOT BE ON ONE LINE. This module already
+  // knows it — `standingHalf` below stops a rail on the face of any post the FRAME stands at a
+  // span's end, and says why: "run to the centreline instead and the rail is half a post deep
+  // inside it". Its OWN posts, at every interval along a run, were passed straight through:
+  //
+  //   loading platform 53 pairs, worst 2.50 in      guard tower 6, worst 1.75
+  //
+  // The RAIL line is the one that cannot move — it is the deck edge, the toe board's line, the
+  // gap the access opens, and on a tower the line the bridge landing's rails meet. So the POST
+  // steps back off it by half of each, which is also where a post belongs: standing on the deck
+  // edge it had half its own foot over the drop.
+  const railT = DRESSED[memberNominal]!.w / IN_PER_FT;
+  const inset = (DRESSED[postNominal]!.w / IN_PER_FT + railT) / 2;
+  // WHICH WAY IS BACK is read off the run itself: the centroid of every edge in this pass is
+  // inside whatever is being railed — a deck's loop, a landing's three sides, the two sides of a
+  // bridge — so the post steps toward it. Nothing here has to be told which side the drop is on.
+  const ends = edges.flatMap((e) => [e.from, e.to]);
+  const centre: [number, number] = [
+    ends.reduce((s, p) => s + p[0], 0) / Math.max(1, ends.length),
+    ends.reduce((s, p) => s + p[1], 0) / Math.max(1, ends.length),
+  ];
+  /** Each edge's unit run and the step back off its rail line, precomputed for the corner rule. */
+  const lines = edges.filter((e) => len(e) >= MIN_RUN_FT).map((e) => {
+    const total = len(e);
+    const u: [number, number] = [(e.to[0] - e.from[0]) / total, (e.to[1] - e.from[1]) / total];
+    const m: [number, number] = [e.from[0] + u[0] * total / 2, e.from[1] + u[1] * total / 2];
+    const side = (centre[0] - m[0]) * -u[1] + (centre[1] - m[1]) * u[0] >= 0 ? 1 : -1;
+    return { from: e.from, u, total, back: [side * -u[1] * inset, side * u[0] * inset] as [number, number] };
+  });
+  /**
+   * How far back a post at this spot has to step — off EVERY rail line it stands on, not just the
+   * one that placed it. A CORNER post serves two runs at right angles, and stepping back from one
+   * of them left the other's top rail, mid rail and toe board still running through it: 20 pairs
+   * on the loading platform, the whole 2½ in. It steps back diagonally, off both.
+   */
+  const backAt = (x: number, z: number): [number, number] => {
+    const out: [number, number] = [0, 0];
+    for (const l of lines) {
+      const d = (x - l.from[0]) * l.u[0] + (z - l.from[1]) * l.u[1];
+      if (d < -TOL_ON_LINE || d > l.total + TOL_ON_LINE) continue;
+      const off = Math.abs((x - l.from[0]) * -l.u[1] + (z - l.from[1]) * l.u[0]);
+      if (off > TOL_ON_LINE) continue;
+      out[0] += l.back[0];
+      out[1] += l.back[1];
+    }
+    return out;
+  };
+
   for (const edge of edges) {
     const total = len(edge);
     if (total < MIN_RUN_FT) continue;
@@ -143,7 +194,7 @@ export function generateRailing(input: RailingInput): Member[] {
         const proud = DRESSED[memberNominal]!.d / IN_PER_FT / 2;
         emit('railPost', postNominal, {
           cutLengthFt: topH + proud,
-          position: [x, deckY + (topH + proud) / 2, z],
+          position: [x + backAt(x, z)[0], deckY + (topH + proud) / 2, z + backAt(x, z)[1]],
           rotation: [0, 0, Math.PI / 2],
           stage,
           nailing: 'bolted or 4-16d to the deck frame (PH)',
@@ -152,8 +203,22 @@ export function generateRailing(input: RailingInput): Member[] {
       }
       // The rails stop on the faces of anything the frame already stands at this span's ends.
       // Run to the centreline instead and the rail is half a post deep inside it.
-      const ra = a + (standingHalf(...at(a)) ?? 0);
-      const rb = b - (standingHalf(...at(b)) ?? 0);
+      //
+      // AND ON EACH OTHER, AT A CORNER. Two runs meeting at one both ran to the corner POINT, so
+      // each was half its own thickness inside the other — 12 pairs on the loading platform, top
+      // rail, mid rail and toe board alike, at every corner the frame does not already stand a
+      // post in. Trimmed by half a thickness apiece they meet on the arris, which is the joint
+      // two boards butting round a corner actually make.
+      const cornerTrim = (x: number, z: number): number =>
+        lines.some((l) => {
+          const d = (x - l.from[0]) * l.u[0] + (z - l.from[1]) * l.u[1];
+          const perp = Math.abs((x - l.from[0]) * -l.u[1] + (z - l.from[1]) * l.u[0]);
+          // Another run, not this one: a point ON this edge's own line is not a corner.
+          return perp <= TOL_ON_LINE && d >= -TOL_ON_LINE && d <= l.total + TOL_ON_LINE
+            && Math.abs(l.u[0] * ux + l.u[1] * uz) < 1 - TOL_ON_LINE;
+        }) ? railT / 2 : 0;
+      const ra = a + Math.max(standingHalf(...at(a)) ?? 0, cornerTrim(...at(a)));
+      const rb = b - Math.max(standingHalf(...at(b)) ?? 0, cornerTrim(...at(b)));
       const rSpan = rb - ra;
       if (rSpan < MIN_RUN_FT) continue;
       const [mx, mz] = at((ra + rb) / 2);

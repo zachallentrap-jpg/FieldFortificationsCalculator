@@ -149,12 +149,24 @@ test('`standing` IS OPT-IN — a railing told nothing posts its corners exactly 
     { id: 'd', from: [0, 8], to: [0, 0] },
   ];
   const plain = generateRailing({ edges: square, deckY: 10, stage: 3 });
+  // AT THE CORNER, WHICH IS NOT THE CORNER POINT. A rail is nailed to a post's face, so the post
+  // steps back off the rail line by half of each — and a corner post steps back off BOTH runs,
+  // diagonally. The claim here is that the railing posts its own corner when nothing else does;
+  // the coordinate it used to look at was the rail's line, not the post's.
+  const inset = (DRESSED['4x4']!.w + DRESSED['2x4']!.w) / 2 / IN_PER_FT;
   const corners = plain.filter((m) => m.role === 'railPost'
-    && Math.abs(m.position[0]) < 1e-9 && Math.abs(m.position[2]) < 1e-9);
+    && Math.abs(m.position[0] - inset) < 1e-9 && Math.abs(m.position[2] - inset) < 1e-9);
   assert.equal(corners.length, 1, 'with nothing standing, the railing posts the corner itself');
   const topsPlain = plain.filter((m) => m.role === 'railTop');
   assert.equal(topsPlain.length, 4);
-  for (const t of topsPlain) assert.ok(Math.abs(t.cutLength / IN_PER_FT - 8) < 1e-9, 'and its rails run corner to corner');
+  // Corner to corner LESS the arris: two runs meeting at a corner used to run to the same point,
+  // so each was half its own thickness inside the other. Trimmed by half a thickness apiece they
+  // butt on the arris, which is the joint two boards round a corner actually make.
+  const railT = DRESSED['2x4']!.w / IN_PER_FT;
+  for (const t of topsPlain) {
+    assert.ok(Math.abs(t.cutLength / IN_PER_FT - (8 - railT)) < 1e-9,
+      `its rails run ${(t.cutLength / IN_PER_FT).toFixed(4)} ft, not the 8 ft edge less a thickness at each corner`);
+  }
 
   // Told about a post at one corner, it skips that hole and lands the two rails meeting there on
   // the post's faces — half its width off each, and nothing else changes.
@@ -166,8 +178,10 @@ test('`standing` IS OPT-IN — a railing told nothing posts its corners exactly 
   assert.equal(told.filter((m) => m.role === 'railPost'
     && Math.abs(m.position[0]) < 1e-9 && Math.abs(m.position[2]) < 1e-9).length, 0,
   'told a post is standing there, the railing does not add a second one');
+  // Half the POST's width at that corner and half a RAIL's at the other — whichever end stops on
+  // what: a standing 4x4 takes 1¾ in, the arris of the run round the far corner takes ¾.
   const shortened = told.filter((m) => m.role === 'railTop')
-    .filter((m) => Math.abs(m.cutLength / IN_PER_FT - (8 - wide / 2)) < 1e-9);
+    .filter((m) => Math.abs(m.cutLength / IN_PER_FT - (8 - wide / 2 - railT / 2)) < 1e-9);
   assert.equal(shortened.length, 2, 'the two rails meeting that corner stop on its faces');
   assert.equal(told.filter((m) => m.role === 'railTop').length, 4, 'and the other two are untouched');
 });

@@ -23,6 +23,7 @@ import { generateStructure } from '../src/timber/families/index';
 import { familyById } from '../src/timber/catalog';
 import { IN_PER_FT } from '../src/timber/doctrine';
 import { stairStringerProfile } from '../src/timber/stringerCuts';
+import { DRESSED } from '../src/timber/types';
 import type { Member } from '../src/timber/types';
 
 type V3 = [number, number, number];
@@ -228,12 +229,21 @@ test('THE RAIL OPENS WHERE THE STAIR LANDS, and the two rails meet at one newel'
   const { L, W, rimFace, stair, deckRail } = platform();
   const newels = stair.filter((m) => m.role === 'railPost' && Math.abs(m.position[0] - rimFace) < TOL);
   assert.equal(newels.length, 2, 'the flight arrives between two head posts');
-  const deckPosts = deckRail.filter((m) => m.role === 'railPost' && Math.abs(m.position[0] - L) < TOL);
+  // ON THE POST LINE, NOT THE RAIL LINE. A rail is nailed to a post's face, so the posts step
+  // back off the edge they guard by half of each; the rail still lies on `L`, the posts a shade
+  // inside it. Counting at `L` found none of them.
+  const inset = (DRESSED['4x4']!.w + DRESSED['2x4']!.w) / 2 / IN_PER_FT;
+  const deckPosts = deckRail.filter((m) => m.role === 'railPost'
+    && Math.abs(m.position[0] - (L - inset)) < TOL);
   // A closed rail on the arrival edge is the tower's old fault: a stair delivering people into
   // a guardrail. The gap shows up as posts at its ends, so the edge carries four, not two.
   assert.equal(deckPosts.length, 4, `the E-edge rail has ${deckPosts.length} posts — it is not opened for the stair`);
   const zs = deckPosts.map((m) => m.position[2]).sort((a, b) => a - b);
-  assert.ok(Math.abs(zs[0]! - 0) < TOL && Math.abs(zs[3]! - W) < TOL, 'the rail still runs corner to corner');
+  // The corner posts step back off BOTH runs they serve, so they sit `inset` in from each end of
+  // the edge as well as `inset` off it — the rail still spans the edge, the post no longer sits
+  // on the corner point.
+  assert.ok(Math.abs(zs[0]! - inset) < TOL && Math.abs(zs[3]! - (W - inset)) < TOL,
+    `the rail's end posts are at z=${zs[0]!.toFixed(3)} and ${zs[3]!.toFixed(3)}, not ${inset.toFixed(3)} in from each corner`);
 
   // No rail member of either pass may occupy another's wood — the failure this gap width exists
   // to avoid is two 4x4 posts in one hole, which is what a gap cut to the bare stair width gives.
@@ -243,12 +253,17 @@ test('THE RAIL OPENS WHERE THE STAIR LANDS, and the two rails meet at one newel'
       assert.ok(gap > -TOL, `${a.id} runs ${(-gap * IN_PER_FT).toFixed(2)} in into ${b.id}`);
     }
   }
-  // And they are not standing apart either: each newel butts face to face on the deck rail's
-  // terminal post, which is the joint a newel actually makes.
+  // And they are not standing apart either. THE JOINT IS MADE BY THE RAILS, not by the posts:
+  // each system's posts now step back off their own rail line by half a post and half a rail, and
+  // the two lines are at right angles here, so the newel and the deck's terminal post stand that
+  // much apart instead of face to face. What must not happen is a gap a rail cannot cross — the
+  // two are still within the two setbacks of each other, and neither is inside the other.
+  const reach = 2 * ((DRESSED['4x4']!.w + DRESSED['2x4']!.w) / 2 / IN_PER_FT);
   for (const n of newels) {
     const nearest = Math.min(...deckPosts.map((p) => clearance(obbOf(n), obbOf(p))));
-    assert.ok(nearest < TOL + 1e-9,
-      `the newel at z=${n.position[2].toFixed(3)} stands ${(nearest * IN_PER_FT).toFixed(2)} in clear of the deck rail`);
+    assert.ok(nearest >= -TOL && nearest <= reach + TOL,
+      `the newel at z=${n.position[2].toFixed(3)} stands ${(nearest * IN_PER_FT).toFixed(2)} in from the deck rail's `
+      + `post — more than the ${(reach * IN_PER_FT).toFixed(2)} in the two setbacks account for`);
   }
 });
 

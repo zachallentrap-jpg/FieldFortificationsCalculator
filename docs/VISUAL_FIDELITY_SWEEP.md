@@ -89,6 +89,7 @@ screenshots get read.
 | **The guard tower's girts** | **Fixed** — every girt ran centre to centre and so was buried in both legs, and the top one sat at DECK level, through all sixteen joists, the deck, the cab posts and the railing's feet: 61 overlapping pairs, down to 8 at 0.007 in. |
 | **The guard tower's platform frame** | **Fixed** — the legs ran to the DECK line, so the two outermost joists ran through two corner legs each (2.74 in); and every joist was cut to the cab plan, stopping 0.05 in inside the girt it bears on. |
 | **The guard tower's stair** | **Fixed** — the well was struck off the DECK edge and a battered base is two feet wider, so the stair stood inside its own tower; it now stands clear of the frame and a railed landing bridges back to the deck. |
+| **Where a guardrail's pieces meet** | **Fixed** — every rail ran straight through every one of its own posts (59 pairs, to 2½ in) and two runs meeting at a corner each sat half a thickness inside the other (12 more). |
 
 ## The shed that had no walls above the plate
 
@@ -3747,3 +3748,51 @@ subdivision. Recording it so the next sweep does not re-find it as new.
 
 - **The tower's `platformHeightFt` is the FRAME's top, not the walking surface** — carried over
   from the platform pass, and the bridge landing had to work around it.
+
+## The rail that ran through every post it was nailed to
+
+Found by taking the SAT audit off the tower and over the whole catalog. Most of what it turns up is
+joinery a box cannot express — a rafter notched over its plate is 406 "overlaps" on gp-frame alone,
+and a tread let into a stringer is another 114 — but two role pairs are not joinery at all.
+
+**A rail is nailed to a post's face, so the two cannot be on one line.** `railings.ts` already knew
+it: `standingHalf` stops a rail on the face of any post the FRAME stands at a span's end, and the
+comment says why — *"run to the centreline instead and the rail is half a post deep inside it."*
+Its OWN posts, at every interval along every run, were passed straight through. `access.ts` had the
+same line copied for a stair's raked rails.
+
+**And two runs meeting at a corner both ran to the corner POINT**, so each was half its own
+thickness inside the other — top rail, mid rail and toe board alike, at every corner where the
+frame does not already stand a post.
+
+```
+  post inside a rail    loading platform 53 / 2.50 in   tower 6 / 1.75   ramp stair 8 / 2.50   -> 0
+  rail inside a rail    loading platform 12 / 0.75 in                                          -> 0
+```
+
+**The RAIL line is the one that cannot move.** It is the deck edge, the toe board's line, the gap
+the access opens, and — since last pass — the line a tower's stair bridge meets. So the POST steps
+back off it by half a post and half a rail, which is also where a post belongs: standing on the
+deck edge it had half its own foot out over the drop. A CORNER post steps back off BOTH runs,
+diagonally; stepping back off only the one that placed it left the other run's three members still
+through it, which is 20 of the 53. Which way "back" is gets read off the run itself — the centroid
+of the edges in a pass is inside whatever is being railed, whether that is a deck's loop, a
+landing's three sides or the two sides of a bridge — so nothing has to be told where the drop is.
+
+Four tests in `test/timber2-rail-joints.test.ts`; two fail on the old generator and two are guards —
+that a post still carries a rail rather than standing clear of them all, and that the rails are
+still at the 42 and 21 in EM 385-1-1 puts them at. Three existing tests were restated rather than
+pinned, all three for the same reason: they located posts by the RAIL's line, which is exactly what
+moved. One of them, the platform's newel test, asserted that the stair's head post butts the deck
+rail's terminal post face to face; with each stepping back off its own line those two now stand
+2½ in apart, and the joint is made by the rails meeting rather than by the posts touching — the
+restated assertion bounds the gap by the two setbacks instead of requiring contact. Four thumbnails
+moved, the platform's and the tower's.
+
+### Checked this pass and NOT a defect
+
+The catalog-wide audit's biggest numbers are all joinery: `capPlate x rafter` 406 pairs at 1.11 in
+is the bird's mouth, `stringer x tread` 114 at 6.95 in is a tread let into its stringer, and
+`towerLeg x sill` 4 at 0.53 in is the square end cut this repo already owns and pins. A box member
+cannot carry a notch, so the mesh is cut and the member is not. Recorded so the next sweep does not
+re-open them.
