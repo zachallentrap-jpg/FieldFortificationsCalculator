@@ -51,6 +51,7 @@ screenshots get read.
 | **The tent frame's `endDoor`** | **Fixed** — a live "Framed end door" toggle on both tent cards, set `true` by both presets, read by no generator: turning it off produced a byte-identical model. |
 | **Crib bunker — the top of the end walls** | **Fixed** — capped on the two long walls only, so both end walls stopped 7¼ in below the overhead: a slot the width of the bunker at each end, under two feet of earth. |
 | **Crib bunker — the bays between the stringers** | **Fixed** — every bay was a hole in the long wall, a stringer deep, open at the face and leading straight down into the bunker. |
+| **The attic hatch** (`atticAccess`) | **Fixed** — the "absorbed by trimmers" test used half the joist SPACING, so it deleted two ceiling joists at the hatch and put nothing in their place; one of them was inside the opening. |
 | Guard shack (8×8, four openings) | **Checked, clean.** Nothing wrong. Its unbraced walls are a documented rule, now pinned by a test. |
 | Squad hut (50 ft — the longest building) | **Checked, clean.** Nothing wrong. Its fifty-foot runs are already handled, by a module I had not read. |
 | Weather barrier / building paper | **Already covered** — an earlier pass fixed it (row above). All that is left is a stale help string; see below. |
@@ -3166,3 +3167,56 @@ enum on the card.
   building at cap height. The honest fix is to carry the lagging up to the cap's top rather than
   the posts', which is a change to how tall a wall's planking is cut — a decision about the wall,
   not about the cap.
+
+## The attic hatch deleted two ceiling joists
+
+`atticAccess` is wired end to end — the card offers it as "Attic hatch", `BuildingSpec` carries it,
+and `roof.ts` frames the opening the way the floor frames a stairwell: doubled trimmers, doubled
+headers, tail joists to the headers. It had never been rendered. Shot at the ceiling-joist stage in
+plan, the framing is there and it is wrong in one specific way.
+
+**The "absorbed by trimmers" test used half the joist SPACING where it should have used the width of
+the wood.** `Math.abs(x - edge) < oc / 2` is eight inches on a 16-in layout, so every ceiling joist
+within eight inches of an opening edge was deleted — and nothing took its place, because the
+trimmers stay on the opening line; they do not move out to the joist line. On the shipped custom
+card that is two joists of fourteen:
+
+```
+x = 8.125   outside the opening, 7½ in from its edge, 5¼ in clear of the trimmer — deleted
+x = 10.792  INSIDE the opening, where the pattern says a pair of tails — deleted
+```
+
+leaving 19¾ and 21½-in bays in a ceiling laid out at 16 in on centre, one of them straight across
+the hatch. A trimmer 5¼ in away has absorbed nothing; it is a separate member. The test is now the
+width of the wood: each trimmer pair runs 2t outward from its edge and a joist is t wide, so they
+share wood only over `(edge − 2½t, edge + ½t)` at the low side and the mirror at the high one.
+
+**Absorption is still allowed, and a second size proves it is real geometry rather than a blanket
+rule.** On a 24-ft ceiling the hatch edge falls half an inch off a joist line, and that joist IS
+absorbed — correctly, because it would land inside the trimmer. On the 20-ft one the nearest joist
+is 5¼ in clear. The test walks both, plus a 32-ft ceiling, and asks the same question of each.
+
+### The compat lock
+
+`roof.ts` is frozen legacy and the goldens were pinning the missing wood, so this is a **compat-lock
+event** — the second in this sweep, after the basement stair. The blast radius, measured rather than
+asserted:
+
+```
+curated fixtures   1 of 13 moves:  demo-braced-attic  325 → 328
+                   added   RF-tailJoist-03, RF-tailJoist-04, RF-joist-12
+                   removed (none)          moved (none)
+matrix rows        36 of 72 — exactly the rows with the hatch on
+everything else    byte-identical
+```
+
+The change is purely additive: three members restored on the one fixture that has an attic hatch,
+none deleted and none moved, and every spec without the hatch is untouched. No frame golden and no
+thumbnail moved, because no shipped card has it on by default.
+
+**The existing test was not pinning the bug, but it could not have caught it.** `attic scuttle:
+framed opening in the ceiling joists` asked for `tails.length >= 2`, which a scuttle that has lost
+half its tails passes. It now asks for a whole number of PAIRS — one each side of the opening for
+every joist line that crosses it — and the layout claim itself lives in the new file: no bay in the
+ceiling wider than the spacing, and every line through the hatch cut into tails that run to the
+headers and stop there.

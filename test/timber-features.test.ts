@@ -154,7 +154,10 @@ test('attic scuttle: framed opening in the ceiling joists (stage 7)', () => {
   const tails = members.filter((m) => m.role === 'tailJoist' && m.stage === 7);
   assert.equal(headers.length, 4);
   assert.equal(trimmers.length, 4);
-  assert.ok(tails.length >= 2, `scuttle tails: got ${tails.length}`);
+  // TAILS COME IN PAIRS — one each side of the opening for every joist line that crosses it.
+  // `>= 2` passed a scuttle that had lost half of them, which is exactly what it had done; the
+  // layout claim lives in `timber2-attic-scuttle`, and this is the shape of the answer.
+  assert.ok(tails.length >= 2 && tails.length % 2 === 0, `scuttle tails: got ${tails.length}`);
   // Off by default.
   const plain = generateFrame(golden);
   assert.equal(plain.members.filter((m) => m.role === 'headerJoist' && m.stage === 7).length, 0);

@@ -103,7 +103,19 @@ export function generateRoof(input: RoofInput): Member[] {
 
   for (const x of cjXs) {
     if (scuttle) {
-      if (Math.abs(x - scuttle.x0) < oc / 2 || Math.abs(x - scuttle.x1) < oc / 2) continue; // absorbed by trimmers
+      // ABSORBED MEANS THE JOIST WOULD LAND IN THE DOUBLED TRIMMER, not merely near the opening.
+      // The test was `oc / 2` — half the joist SPACING, eight inches on a 16-in layout — so it
+      // deleted any ceiling joist within eight inches of an edge and put nothing in its place:
+      // the trimmers stay on the opening line, they do not move out to the joist line. On the
+      // shipped custom card that was two joists of fourteen, leaving 21¼ and 22¼-in bays in a
+      // 16-in ceiling, and one of the two was INSIDE the opening, where it should have been cut
+      // into tails and instead vanished.
+      //
+      // The width of the wood is the test. Each trimmer pair runs 2t OUTWARD from its edge and a
+      // joist is t wide, so they share wood only over (edge − 2½t, edge + ½t) at the low side and
+      // (edge − ½t, edge + 2½t) at the high one.
+      if (x > scuttle.x0 - 2.5 * t && x < scuttle.x0 + 0.5 * t) continue;
+      if (x > scuttle.x1 - 0.5 * t && x < scuttle.x1 + 2.5 * t) continue;
       if (x > scuttle.x0 && x < scuttle.x1) {
         if (scuttle.z1 - 2 * t > 0.2) {
           cjAt(x, 0, scuttle.z1 - 2 * t, 'tailJoist', {
