@@ -29,7 +29,7 @@ import type { HutSpec, BuildingSpec, WallOpenings } from '../spec';
 import type { WallId } from '../types';
 import { WALL_ORDER } from '../spec';
 import { makeEmitter } from '../emit';
-import { HUT, LATRINE, LUMBER, OPENING, IN_PER_FT, citeOf } from '../doctrine';
+import { HUT, LATRINE, LUMBER, OPENING, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
 import { generateBuilding, type BuildingResult } from './building';
 import { defaultOpenings } from '../openings';
 import { surfaceYaw, type WallSurface, type WallsContract } from '../subsystems/wallSystem';
@@ -98,29 +98,64 @@ export function bandFor(spec: HutSpec): { sillFt: number; heightFt: number } | n
 const bandRect = (b: { sillFt: number; heightFt: number }) => ({ v0: b.sillFt, v1: b.sillFt + b.heightFt });
 
 /**
- * Horizontal girts between the studs, one level every `girtSpacingFt` up the wall, stopping
- * short of the plate. They run the full clear run of the wall — a girt is CUT at an opening on
- * site, and the take-off bills the stock it is cut from, which is what a runner needs.
+ * Horizontal girts ACROSS the studs, one level every `girtSpacingFt` up the wall, stopping short
+ * of the plate. They run the full clear run of the wall — a girt is CUT at an opening on site, and
+ * the take-off bills the stock it is cut from, which is what a runner needs.
+ *
+ * A GIRT IS NAILED TO THE STUDS; IT IS NOT IN THE SAME PLANE AS THEM. `s.origin` is the wall's
+ * CENTRELINE, so a girt placed on it with no offset sat dead in the middle of a 3½-in wall and
+ * passed clean through every stud it crossed — the whole 1½ × 3½ × 1½-in block at each one, 23 of
+ * them on one wall of a sea hut and 102 on a squad hut, on all six variants. That the run is
+ * continuous is the point of the piece and is not the fault; the fault is the plane.
+ *
+ * INBOARD, because that is the side that is clear. The siding is outboard of the studs and the
+ * let-in braces are notched into their outer face, so a girt on the outside would run into both.
+ * (A girt is also a siding NAILER, and that reading puts it outboard with the siding standing off
+ * by its thickness — a covering-system change, written up in the sweep rather than guessed at
+ * here.)
  */
 function generateGirts(walls: WallsContract, stage: number, wallHeightFt: number): Member[] {
   const emit = makeEmitter('HT');
   const nominal = HUT.girtNominal.value as string;
   const spacing = HUT.girtSpacingFt.value as number;
   const d = DRESSED[nominal]!.d / IN_PER_FT;
+  // Centreline to "outer face of the girt against the studs' inner face", measured inward.
+  const inset = walls.thicknessFt / 2 + DRESSED[nominal]!.w / IN_PER_FT / 2;
+  const half = walls.thicknessFt / 2;
   for (const s of walls.surfaces) {
+    // THE CLEAR RUN IS CLEAR OF THE OTHER WALLS. `runFt` is the wall's own run, and a rectangle
+    // is framed with one pair running through and the other pair butting between them — so a
+    // through wall's run is the whole outside length and its ends are INSIDE the butting walls.
+    // In the stud plane that never showed; moved inboard, where the butting walls are, each end
+    // landed in a corner stud (3½ × 3½ × 1½ in, one per corner). A girt is cut at the corner.
+    let u0 = 0;
+    let u1 = s.runFt;
+    for (const t of walls.surfaces) {
+      if (Math.abs(s.along[0] * t.along[0] + s.along[1] * t.along[1]) > 1e-6) continue; // parallel
+      // Where t's slab crosses this wall's run. The comparisons are ON a knife edge — a butting
+      // wall's face lands exactly on the through wall's end — so they carry a tolerance. Without
+      // one, the N wall's rounding fell the other way from the S wall's and one hut in three kept
+      // a corner-stud collision that its mirror image did not have.
+      const u = (t.origin[0] - s.origin[0]) * s.along[0] + (t.origin[1] - s.origin[1]) * s.along[1];
+      const e = TOLERANCE.epsFt;
+      if (u - half <= u0 + e && u + half > u0 + e) u0 = u + half;
+      if (u + half >= u1 - e && u - half < u1 - e) u1 = u - half;
+    }
+    const runFt = u1 - u0;
+    if (runFt <= 0) continue;
     for (let v = spacing; v < wallHeightFt - d; v += spacing) {
-      const uMid = s.runFt / 2;
+      const uMid = (u0 + u1) / 2;
       emit('girt', nominal, {
-        cutLengthFt: s.runFt,
+        cutLengthFt: runFt,
         position: [
-          s.origin[0] + s.along[0] * uMid,
+          s.origin[0] + s.along[0] * uMid - s.normal[0] * inset,
           v,
-          s.origin[1] + s.along[1] * uMid,
+          s.origin[1] + s.along[1] * uMid - s.normal[1] * inset,
         ],
         rotation: [0, surfaceYaw(s), 0],
         stage,
         wall: s.wall,
-        nailing: '2-16d ea end (PH)',
+        nailing: '2-16d ea stud (PH)',
         doctrineRef: citeOf(HUT.girtSpacingFt),
       });
     }

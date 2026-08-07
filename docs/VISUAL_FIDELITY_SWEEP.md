@@ -2623,3 +2623,62 @@ Three regression tests, two failing on the old code. The third passes both ways 
 still a box** — the lid reaches the front face and the wall, everything under it comes up to the
 lid's underside, and everything reaches the floor. That is the guard that closing two joints did not
 open a third. The latrine's card goldens regenerated.
+
+## The huts' girts ran through every stud
+
+`generateGirts` serves all six hut variants and had never been measured. `WallSurface.origin` is
+the wall's CENTRELINE, and the girt was placed on it with no offset — so a 2x4 girt sat dead in the
+middle of a 3½-in wall and passed clean through every stud it crossed, sharing the whole
+1½ × 3½ × 1½-in block at each one:
+
+```
+sea hut 70    swa hut 78    b-hut 72    squad hut 102    guard shack 27    latrine 40
+```
+
+plus every king stud and jack stud at every opening, and the door braces. That the run is
+continuous is the POINT of the piece — *"a girt is CUT at an opening on site, and the take-off bills
+the stock it is cut from, which is what a runner needs"* — and is not the fault. The fault is the
+plane, and the nailing note (`2-16d ea end`) was describing a different piece.
+
+**Inboard**, because that is the side that is clear: the siding is applied outboard of the studs and
+the let-in braces are notched into their OUTER face, so a girt put there trades one collision for
+two. The nailing note now reads `2-16d ea stud`, which is what a continuous girt gets.
+
+### And the clear run has to be clear of the other walls
+
+A rectangle is framed with one pair of walls running through and the other pair butting between
+them, so a through wall's own `runFt` is the whole outside length and its ends are INSIDE the
+butting walls. In the stud plane that never showed; moved inboard, where the butting walls are,
+each end landed in a corner stud. The girt is now trimmed to the walls it actually runs between.
+
+**And that trim sits on a knife edge** — a butting wall's face lands exactly on the through wall's
+end, so the comparison is `x <= x`. Without a tolerance the N wall's rounding fell the other way
+from the S wall's, and the b-hut came out with its S girt at 35.417 ft and its N girt at 35.708,
+one of the pair still in a corner stud and the other not. The regression test for that is stated as
+**opposite walls match**, because a square hut has one girt length and an oblong two, so counting
+distinct lengths says nothing.
+
+```
+girt-into-stud pairs, after:  sea 0   swa 0   squad 0   guard shack 0   latrine 0   b-hut 6
+```
+
+Four tests, three failing on the old code; the fourth is the guard that a girt shifted out of the
+wall did not go missing on the way — four walls, doctrine spacing, and outside the wall's own
+thickness. Six card goldens regenerated.
+
+### Measured, not fixed
+
+- **The b-hut's 6.** It is the only shipped hut with partitions, and a through-wall girt still
+  crosses a partition's end studs where one lands on an exterior wall. Same case as an opening,
+  where the girt is cut on site — except that at a partition there IS wood. Closing it means
+  splitting the girt at the partition, which is the one thing the billing comment exists to avoid.
+- **THE SCREEN BAND'S SILL AND HEAD HAVE THE SAME FAULT AND NEED A DIFFERENT FIX.** They are in the
+  stud plane and run the full wall, so they cross every stud too — **46 pairs on one wall of a sea
+  hut**, at the same 1½ × 3½ × 1½ in. But a sill and a head are FRAMING, like a window's: they
+  belong between the studs, cut to the bay, not nailed across on a face. Next target.
+- **The screen panel grazes the studs by 0.03 in** — half its own cloth thickness — because it sits
+  on the wall's outer-face plane at z = 0 while the studs start there.
+- **The doctrinal alternative for the girt.** A girt is also the siding's NAILER, and that reading
+  puts it OUTBOARD with the siding standing off by its thickness — which is how a SEA hut with
+  vertical siding is really built. It is a covering-system change across six families, so it is
+  written down rather than guessed at.
