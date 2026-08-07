@@ -197,7 +197,20 @@ test('bridging derives from the framed bays: nothing passes through a trimmer or
             const input: BuildingInput = { ...golden, lengthFt, widthFt, foundation, bridging, joistSpacingIn, openings: [] };
             const tag = `${lengthFt}x${widthFt}/${foundation}/${bridging}/${joistSpacingIn}"`;
             const { members } = generateFrame(input);
-            const plan = stairPlan({ lengthFt, widthFt, joistSpacingIn, crawlFt: golden.crawlFt, foundation });
+            // The stairwell to check against is the one this model actually FRAMED, read back
+            // off its own doubled trimmers (x) and headers (z). Asking `stairPlan` for it from
+            // the raw input describes an opening the engine never built: `dims.widthFt` is
+            // bounded 4-24 ft (spec.ts — a wider span needs a second girder line), so the 32 ft
+            // row is clamped to 24 and its stair sits 4 ft from where the unclamped math puts
+            // it. The check would then look for bridging in an empty band and pass over the
+            // bays that matter.
+            const ply = 1.5 / 12; // dressed 2x thickness — the doubled plies straddle each face
+            const trimX = members.filter((m) => m.role === 'trimmerJoist').map((m) => m.position[0]).sort((a, b) => a - b);
+            const hdrZ = members.filter((m) => m.role === 'headerJoist').map((m) => m.position[2]).sort((a, b) => a - b);
+            const plan =
+              trimX.length === 4 && hdrZ.length === 4
+                ? { x0: trimX[1]! + ply / 2, x1: trimX[2]! - ply / 2, z1: hdrZ[1]! + ply / 2, z2: hdrZ[2]! - ply / 2 }
+                : null;
             const spans = members.filter(
               (m) => m.stage === 3 && (m.role === 'joist' || m.role === 'tailJoist' || m.role === 'trimmerJoist'),
             );

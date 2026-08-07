@@ -936,3 +936,59 @@ assert real relationships — the ridge top is flush with the rafter tops, the s
 rafter plane along its normal — so they now read the datum from the same rule the engine does
 instead of restating an elevation. A test that recomputes the thing it is checking cannot fail
 when the thing is wrong.
+
+## 2026-08-07 — Work that was finished but never merged, and the bridging it brought back (a compat-lock event)
+
+Five branches were editing this repository and only one of them was reaching the deployed app.
+`main` builds the Replit autoscale deployment, so anything not merged into `main` is, from the
+user's side, work that does not exist. An audit of every branch against `main` found:
+
+- **`claude/woodframe-model-improvements-stogju` — 100 commits, none of them merged.** PR #10
+  was *squash*-merged on 08-03, which left `main` with the squashed content but none of the
+  branch's history as an ancestor. The branch was then rebased onto the new `main` and kept
+  going for another five days: the TIMBER-2 model-fidelity sweep, the 1371 LEARNING trainer
+  (`src/timber/train/`, `src/ui/learn/`), and the command-packet document
+  (`src/timber/packet/`). Because the merge-base was `main`'s own head, this fast-forwards —
+  there was never a conflict to resolve, only a merge nobody had performed.
+- **`claude/basement-stair-bracing-s9cnbl` — one commit, orphaned.** See below.
+- **`claude/survivability-app-audit-h0yyt9` — one commit past PR #9.** Recorded separately.
+- **`claude/project-description-bbzjvj` — superseded.** Its 1371 rebrand routed the suite through
+  an `src/ui/survivability.html` shim; PR #2 reached the same place by a better road
+  (`scripts/build-suite.mjs` assembles SAP-2 into `dist/survivability/`). Nothing to port.
+- **`renders`** — Blender stills and a flyover for an LED house, a different project's artifacts.
+  Not app code and deliberately left where it is.
+
+**The bridging fix, recovered.** `claude/basement-stair-bracing-s9cnbl` fixed a real defect and
+was never merged: bridging rows were laid out by walking the *nominal joist layout grid*, but the
+stair opening edits that layout after the fact — it suppresses grid positions near each opening
+face, adds doubled trimmers just outside them, and cuts the joists it crosses down to tails that
+stop at a header. The grid walk could see none of that. In the shipped demo basement it emitted
+**eight 31 3/16-inch cross braces centred on x = 6'-8" and x = 16'-0"** — the two stairwell
+trimmer lines, whose plies sit at 6.231/6.356 and 16.063/16.188 — so each stick ran from the last
+field joist, straight through both plies, and out into the tail-joist field beyond. Geometry that
+cannot be built, on a cut list that told a crew to build it.
+
+Bays are now derived from the runs **actually emitted at stage 3** — joists, tail joists and
+trimmers all register themselves as they are placed — so a change to the framing moves the bay
+boundaries and the bridging follows by construction. Two questions the old code conflated are now
+separate: whether a run is physically present at the row line (which makes it a bay boundary
+bridging can never jump), and whether the row lands inside one of that run's own span segments
+and that segment is long enough to want a row. Measuring the second one per-run also retires the
+building-wide `W / 2 >= 7.5` gate, so the short tail joists hung between a header and the near
+wall no longer collect a line of blocking a couple of inches off their header.
+
+**This is a compat-lock event, taken deliberately.** Both golden sets moved, and the blast radius
+is exactly what a stairwell-only fix should produce: `frame/basement-stairs` and
+`frame-compat/demo-basement` and nothing else — every other case in the 72-row matrix is
+unchanged, because no other foundation builds a stair. The demo basement goes from 52 bridging
+members to 46, the longest stick from 31 3/16 in to 19 3/8 in, and the pieces that die against
+the trimmers now carry a doctrine note saying they are cut to the stairwell rather than field
+bridging, so the short cut explains itself on the card.
+
+**The recovered test was pinning a building the engine no longer makes.** Its stairwell-void
+check asked `stairPlan` for the opening using the *raw* input width. TIMBER-2 has since bounded
+`dims.widthFt` to 4–24 ft (`spec.ts` — a wider span needs a second girder line, which is not
+built yet), so the matrix's 32-ft row is clamped to 24 and its stair sits four feet from where
+the unclamped math puts it: the check was looking for bridging in an empty band. It now reads the
+opening back off the doubled trimmers and headers the model actually framed. A test that derives
+its expectation from an input the engine discarded cannot fail when the engine is wrong.
