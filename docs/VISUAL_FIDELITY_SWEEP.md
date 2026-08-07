@@ -90,6 +90,7 @@ screenshots get read.
 | **The guard tower's platform frame** | **Fixed** — the legs ran to the DECK line, so the two outermost joists ran through two corner legs each (2.74 in); and every joist was cut to the cab plan, stopping 0.05 in inside the girt it bears on. |
 | **The guard tower's stair** | **Fixed** — the well was struck off the DECK edge and a battered base is two feet wider, so the stair stood inside its own tower; it now stands clear of the frame and a railed landing bridges back to the deck. |
 | **Where a guardrail's pieces meet** | **Fixed** — every rail ran straight through every one of its own posts (59 pairs, to 2½ in) and two runs meeting at a corner each sat half a thickness inside the other (12 more). |
+| **The hut's girts at a corner** | **Fixed** — the ends were clipped against the perpendicular WALLS' faces, but a girt lies inboard of the studs, so both girts of every corner reached the same 1½-in square: 24 pairs across the six hut cards. |
 
 ## The shed that had no walls above the plate
 
@@ -3796,3 +3797,42 @@ is the bird's mouth, `stringer x tread` 114 at 6.95 in is a tread let into its s
 `towerLeg x sill` 4 at 0.53 in is the square end cut this repo already owns and pins. A box member
 cannot carry a notch, so the mesh is cut and the member is not. Recorded so the next sweep does not
 re-open them.
+
+## Two girts in one corner
+
+The same shape as the rail corners, one module along, and `generateGirts` had already written down
+the rule it was breaking: it clips each girt's ends against the perpendicular WALLS' inner faces
+and the comment ends *"A girt is cut at the corner."*
+
+The clip is against the wall SLAB, and a girt is not in the wall slab — an earlier pass moved it
+INBOARD of the studs by its own thickness, which is further along the crossing wall's run than
+that wall's face is. So both girts of every corner reached the same 1½ in square and sat inside
+each other there, on all six hut cards:
+
+```
+  before   S girt x 3.50..596.50   W girt z 3.50..236.50    both own (3.50..5.00, 3.50..5.00)
+  after    S girt x 3.50..596.50   W girt z 5.00..235.00    the butting pair stops on the face
+
+  girt inside a girt, whole catalog    24 -> 0
+```
+
+Which of the two gives is read off the geometry rather than off the wall's name: the end a wall's
+slab already clipped belongs to a THROUGH wall and stays where it is; the end that needed no clip
+belongs to a BUTTING wall — its run starts on the through wall's face — and that is the one that
+takes the extra thickness. A rectangle framed with one pair running through is the same convention
+the walls themselves use, so the girts now match the studs under them.
+
+Four tests in `test/timber2-hut-girt.test.ts`; two fail on the old generator, and the other two are
+the guards that matter more than the fix. **The corner has to stay CLOSED** — trimming both girts
+instead of one would pass any "no overlap" check and leave a 1½ in hole with nothing bracing it, so
+the joint is asserted to TOUCH. And **the girt is still nailed to the studs, inboard, at the
+doctrine spacing** — the plane and the level are what two earlier passes fixed here, and a length
+change is exactly the sort of edit that quietly undoes them. Twelve thumbnails moved, all six huts.
+
+### Measured, not fixed
+
+- **A hut girt still runs through a partition's end stud** — 6 pairs at 1.50 in on the b-hut, the
+  only card with partitions. Carried over: the girt's own comment says it is cut at an opening and
+  at a corner, and a partition is one more place it has to be cut. Both directions of the fix need
+  something the modules do not have — `generateGirts` is handed only the wall contract, and
+  `partitions.ts` is a building subsystem that knows nothing about a hut's girts.

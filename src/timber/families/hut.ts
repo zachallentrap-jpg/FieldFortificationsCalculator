@@ -130,6 +130,7 @@ function generateGirts(walls: WallsContract, stage: number, wallHeightFt: number
     // landed in a corner stud (3½ × 3½ × 1½ in, one per corner). A girt is cut at the corner.
     let u0 = 0;
     let u1 = s.runFt;
+    const girtT = DRESSED[nominal]!.w / IN_PER_FT;
     for (const t of walls.surfaces) {
       if (Math.abs(s.along[0] * t.along[0] + s.along[1] * t.along[1]) > 1e-6) continue; // parallel
       // Where t's slab crosses this wall's run. The comparisons are ON a knife edge — a butting
@@ -139,7 +140,9 @@ function generateGirts(walls: WallsContract, stage: number, wallHeightFt: number
       const u = (t.origin[0] - s.origin[0]) * s.along[0] + (t.origin[1] - s.origin[1]) * s.along[1];
       const e = TOLERANCE.epsFt;
       if (u - half <= u0 + e && u + half > u0 + e) u0 = u + half;
+      else if (Math.abs(u + half - u0) <= e) u0 += girtT;
       if (u + half >= u1 - e && u - half < u1 - e) u1 = u - half;
+      else if (Math.abs(u - half - u1) <= e) u1 -= girtT;
     }
     const runFt = u1 - u0;
     if (runFt <= 0) continue;
