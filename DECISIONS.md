@@ -1041,3 +1041,44 @@ touched: the cap plate goes from 10 to 14 16d on a 96-inch run (the lap billed o
 twice at 2), the collar tie from 8 8d to 6 10d, and the sill bolts still bill one drift each. The
 phrasing is deliberate on one of them — "in the lap" rather than "in the lapped area", because
 the tail rule reads `ea\b` and *area* ends in one, which would have doubled the lap to 16 nails.
+
+## 2026-08-07 — The stop-the-line gate that had never once stopped the line
+
+Consolidating the unmerged branches meant reading CI properly, and the "legacy timber suites are
+immutable" step turns out to have been reporting success without checking anything — for its
+entire life.
+
+**How it failed.** `actions/checkout@v4` clones at depth 1. The step then fetched the base branch
+with `--depth=1` and asked for `git merge-base HEAD FETCH_HEAD`; two shallow histories share no
+commit, so there is no merge base, so `BASE` came back empty. The whole comparison sat inside
+`if [ -n "$BASE" ]`, and the line after it — `echo "legacy timber suites untouched"` — was
+unconditional. The run log for `2005e06` says it plainly:
+
+    * branch            main       -> FETCH_HEAD
+    legacy timber suites untouched
+
+That commit's range edits **both** `test/timber-features.test.ts` and `test/timber-frame.test.ts`.
+The step went green anyway, and every commit on the branch since has been merged past it. This is
+the same failure the offline gate had on 2026-08-02, in the same repository, three days later: a
+gate that cannot distinguish *checked and clean* from *checked nothing*. Depth is now `0` and an
+unresolvable base is a hard failure, so the check can never again go quiet.
+
+**And the rule it was guarding needed to change, not just start running.** Turning the old check
+on as written would have stopped three commits that are all correct: the stringer through the
+basement slab, the bird's mouth that moved the roof plane (both 2026-08-05), and the bridging
+through the stairwell trimmers (above). Every one of them replaced an assertion that pinned a
+**bug** — `hypot(runFt, totalRiseFt)` for a stringer, a roof datum measured off the plate top —
+with one that states the physical claim instead. That edit cannot be made from another file: the
+old assertion does not become true because a new test exists elsewhere, it just fails.
+
+Plan I-8 / TD31 wrote the acceptance as "git diff empty on `test/timber-*.test.ts`", full stop,
+and that holds exactly as long as the legacy engine's output never legitimately changes. Three
+compat-lock events say otherwise. **So the rule is no longer "never" — it is "never silently."**
+A legacy-suite edit is accepted only when the same range also moves `test/goldens/frame-compat/`
+(the actual contract, plan §9 K2) *and* records the reason in `DECISIONS.md`. An edit on its own
+— a deleted assertion, a loosened tolerance, anything with no engine change under it — still
+stops the line, which is the abuse the gate existed to catch.
+
+Both paths were exercised against real commit ranges before this shipped: the consolidated branch
+is accepted (suites edited, 13 golden files moved, entry written), and the bridging cherry-pick on
+its own, before its goldens and its entry existed, is refused.

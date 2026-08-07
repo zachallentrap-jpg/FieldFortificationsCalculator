@@ -18,6 +18,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The legacy-suite check below needs a merge base, and a merge base needs history.
+          # At the default depth-1 checkout `git merge-base HEAD FETCH_HEAD` finds no common
+          # commit, which is how that check spent its whole life printing "untouched" without
+          # looking at anything.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version-file: sap2/.nvmrc # 22.x — the suite build's floor, and what Replit runs
@@ -25,21 +31,46 @@ jobs:
       - run: npm ci
       - name: verify (typecheck + tests + offline scan + asset allowlist)
         run: npm run verify
-      - name: legacy timber suites are immutable
-        # Plan I-8 / TD31: acceptance is "git diff empty on test/timber-*.test.ts", never a
-        # repo-wide test count. Compare against the merge base, not a fixed ref.
+      - name: legacy timber suites change only as a declared compat-lock event
+        # Plan I-8 / TD31 wrote this acceptance as "git diff empty on test/timber-*.test.ts",
+        # full stop, and that holds exactly as long as the legacy engine's output never
+        # legitimately changes. It has, three times: the stringer that ran through the basement
+        # slab and the bird's mouth that moved the roof plane (DECISIONS 2026-08-05), and the
+        # bridging that ran through the stairwell trimmers (2026-08-07). Each replaced an
+        # assertion that pinned a BUG with one that states the physical claim — and that cannot
+        # be done from a different file, because leaving the old assertion behind just fails.
+        #
+        # So the rule is no longer "never". It is "never SILENTLY": an edit is accepted only
+        # when the same range also moves the compat goldens — the actual contract (plan §9 K2)
+        # — and writes the DECISIONS.md entry saying why. An edit on its own, a deleted
+        # assertion or a loosened tolerance with no engine change under it, still stops the
+        # line.
+        #
+        # An unresolvable base is a FAILURE, not a shrug. A gate that cannot tell "checked and
+        # clean" from "checked nothing" is not a gate (DECISIONS 2026-08-02).
         run: |
-          git fetch origin ${{ github.base_ref || github.event.repository.default_branch }} --depth=1 || true
-          BASE=$(git merge-base HEAD FETCH_HEAD 2>/dev/null || echo "")
-          if [ -n "$BASE" ]; then
-            CHANGED=$(git diff --name-only "$BASE" HEAD -- 'test/timber-frame.test.ts' 'test/timber-walls.test.ts' 'test/timber-features.test.ts')
-            if [ -n "$CHANGED" ]; then
-              echo "STOP-THE-LINE: a legacy timber suite was edited:"; echo "$CHANGED"
-              echo "The compat suite (test/timber2-compat.test.ts) is the only sanctioned bridge (plan §9 K2)."
-              exit 1
-            fi
+          set -euo pipefail
+          git fetch --no-tags origin "${{ github.base_ref || github.event.repository.default_branch }}"
+          if ! BASE=$(git merge-base HEAD FETCH_HEAD); then
+            echo "STOP-THE-LINE: no merge base against the base branch — this check cannot run,"
+            echo "and a check that cannot run must not report success."
+            exit 1
           fi
-          echo "legacy timber suites untouched"
+          CHANGED=$(git diff --name-only "$BASE" HEAD -- 'test/timber-frame.test.ts' 'test/timber-walls.test.ts' 'test/timber-features.test.ts')
+          if [ -z "$CHANGED" ]; then
+            echo "legacy timber suites untouched (checked against $BASE)"
+            exit 0
+          fi
+          echo "legacy timber suite(s) edited:"; echo "$CHANGED"
+          GOLDENS=$(git diff --name-only "$BASE" HEAD -- 'test/goldens/frame-compat/')
+          RECORD=$(git diff --name-only "$BASE" HEAD -- DECISIONS.md)
+          if [ -z "$GOLDENS" ] || [ -z "$RECORD" ]; then
+            echo "STOP-THE-LINE: this is not a declared compat-lock event."
+            [ -z "$GOLDENS" ] && echo "  - test/goldens/frame-compat/ did not move, so the legacy engine's output did not change — and then the test had no reason to."
+            [ -z "$RECORD" ] && echo "  - DECISIONS.md carries no entry for it."
+            exit 1
+          fi
+          echo "accepted: the compat goldens moved and DECISIONS.md records why."
 
   deploy-build:
     runs-on: ubuntu-latest
