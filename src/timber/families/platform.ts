@@ -27,6 +27,9 @@ import { generateSkids } from '../subsystems/coverings';
 import { headerForSpan } from '../normalize';
 import type { FloorLevels } from '../floor';
 
+/** A remainder thinner than this is not a board. Mirrors `TOLERANCE.epsFt`, stated once here. */
+const EPS_FT = 1e-6;
+
 export interface FamilyResult {
   members: Member[];
   levels: FloorLevels;
@@ -59,6 +62,19 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
   const L = spec.dims.lengthFt;
   const W = spec.dims.widthFt;
   const deckY = spec.deckHeightFt;
+  // THE DECK SITS ON THE JOISTS, AND `deckHeightFt` IS THE SURFACE YOU WALK ON. Everything under
+  // the deck was hung off `deckY` with the JOISTS' TOPS at it, and then the decking was laid with
+  // ITS top at the same figure — so the boards were buried in the top 1½ in of every joist, over
+  // the platform's whole 20 by 12 ft. (A panel deck did the same in the top ¾.) The tent frame in
+  // this very file has it right: it stacks skid + joist + deck and calls the TOP of that `deckY`.
+  //
+  // Which of the two moves is settled by what `deckHeightFt` means everywhere else — the rail pass
+  // asks `railRequired(deckY)` about a fall from it, and the stair lands on it — so the walking
+  // surface stays at the height the operator asked for and the frame drops by the deck's thickness.
+  const deckThick = spec.deck === 'plank'
+    ? DRESSED[TENT.deckNominal.value as string]!.w / IN_PER_FT
+    : (PANEL.subfloorThickIn.value as number) / IN_PER_FT;
+  const frameTopY = deckY - deckThick;
   const joistNominal = LUMBER.joistNominal.value as string;
   const sillNominal = LUMBER.sillNominal.value as string;
   const postNominal = LUMBER.postNominal.value as string;
@@ -97,7 +113,7 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
           doctrineRef: 'FM 5-426 post footers (PH page)',
         });
       }
-      const postLen = deckY - joistDepth - sillDepth - skidTop;
+      const postLen = frameTopY - joistDepth - sillDepth - skidTop;
       // Below this a 'post' is a shim, not a member — the same guard floor.ts uses.
       if (postLen > (PLATFORM.minPostFt.value as number)) {
         emit('post', postNominal, {
@@ -115,7 +131,7 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
   }
 
   // ── Sills and joists
-  const sillY = deckY - joistDepth - sillDepth / 2;
+  const sillY = frameTopY - joistDepth - sillDepth / 2;
   for (const z of [sillDepth / 2, W - sillDepth / 2]) {
     emit('sill', sillNominal, {
       cutLengthFt: L,
@@ -131,7 +147,7 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
   for (let i = 0; i < joists; i++) {
     emit('joist', joistNominal, {
       cutLengthFt: W,
-      position: [(L * i) / (joists - 1), deckY - joistDepth / 2, W / 2],
+      position: [(L * i) / (joists - 1), frameTopY - joistDepth / 2, W / 2],
       rotation: [0, Math.PI / 2, 0],
       stage: sFrame,
       nailing: '3-16d toenail ea bearing (PH)',
@@ -152,12 +168,21 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
   if (spec.deck === 'plank') {
     const nominal = TENT.deckNominal.value as string;
     const w = DRESSED[nominal]!.d / IN_PER_FT;
-    for (let z = w / 2; z < W; z += w) {
+    // THE LAST BOARD IS RIPPED TO FIT. `Math.min(z, W - w / 2)` clamped the last board's CENTRE
+    // back inside the platform, which does not widen the board — it just stops short, and twelve
+    // feet is 26.18 boards, so an inch of the deck along the whole 20-ft edge was open. The same
+    // `Math.min` is written up in bunker.ts as the wrong answer to the same question; a platform
+    // is a thing people walk on with their hands full, and an inch of nothing at the edge is
+    // where a boot goes. Ripped, the remainder is one narrow board and the take-off still bills
+    // the width it covers.
+    for (let z = 0; z < W - EPS_FT; z += w) {
+      const cut = Math.min(w, W - z);
       emit('deckPlank', nominal, {
         cutLengthFt: L,
-        position: [L / 2, deckY - DRESSED[nominal]!.w / IN_PER_FT / 2, Math.min(z, W - w / 2)],
+        position: [L / 2, deckY - DRESSED[nominal]!.w / IN_PER_FT / 2, z + cut / 2],
         rotation: [-Math.PI / 2, 0, 0],
         stage: sDeck,
+        actual: { w: DRESSED[nominal]!.w, d: cut * IN_PER_FT },
         nailing: '2-16d ea joist (PH)',
         doctrineRef: citeOf(TENT.deckNominal),
       });
@@ -427,13 +452,17 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
     });
   }
   const boardW = DRESSED[deckNominal]!.d / IN_PER_FT;
-  for (let z = boardW / 2; z < W; z += boardW) {
+  // Ripped to fit at the far side, like the platform's — the same clamp left the tent floor an
+  // inch short down its whole 29½-ft length.
+  for (let z = 0; z < W - EPS_FT; z += boardW) {
+    const cut = Math.min(boardW, W - z);
     emit('deckPlank', deckNominal, {
       cutLengthFt: L,
-      position: [L / 2, skidTop + joistDepth + deckThick / 2, Math.min(z, W - boardW / 2)],
+      position: [L / 2, skidTop + joistDepth + deckThick / 2, z + cut / 2],
       rotation: [-Math.PI / 2, 0, 0], // flat — see the platform deck above
 
       stage: sDeck,
+      actual: { w: DRESSED[deckNominal]!.w, d: cut * IN_PER_FT },
       nailing: '2-16d ea joist (PH)',
       doctrineRef: citeOf(TENT.deckNominal),
     });

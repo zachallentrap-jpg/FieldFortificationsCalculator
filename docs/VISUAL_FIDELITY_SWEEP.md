@@ -52,6 +52,7 @@ screenshots get read.
 | **Crib bunker — the top of the end walls** | **Fixed** — capped on the two long walls only, so both end walls stopped 7¼ in below the overhead: a slot the width of the bunker at each end, under two feet of earth. |
 | **Crib bunker — the bays between the stringers** | **Fixed** — every bay was a hole in the long wall, a stringer deep, open at the face and leading straight down into the bunker. |
 | **The attic hatch** (`atticAccess`) | **Fixed** — the "absorbed by trimmers" test used half the joist SPACING, so it deleted two ceiling joists at the hatch and put nothing in their place; one of them was inside the opening. |
+| **The loading platform's deck** | **Fixed** — the decking was laid INTO the top of every joist, and the last board was clamped instead of ripped, leaving an inch of open deck along the whole edge. |
 | Guard shack (8×8, four openings) | **Checked, clean.** Nothing wrong. Its unbraced walls are a documented rule, now pinned by a test. |
 | Squad hut (50 ft — the longest building) | **Checked, clean.** Nothing wrong. Its fifty-foot runs are already handled, by a module I had not read. |
 | Weather barrier / building paper | **Already covered** — an earlier pass fixed it (row above). All that is left is a stale help string; see below. |
@@ -3220,3 +3221,53 @@ half its tails passes. It now asks for a whole number of PAIRS — one each side
 every joist line that crosses it — and the layout claim itself lives in the new file: no bay in the
 ceiling wider than the spacing, and every line through the hatch cut into tails that run to the
 headers and stop there.
+
+## The platform's deck was inside its own joists
+
+Target: the loading platform with **`deck: 'panel'`, piers, ramp and steps together** — the one
+platform combination the earlier passes took a piece at a time. The ramp, the steps, the rail gaps
+and the pier line are all right. The deck is not, in two ways, and the second one only shows if you
+walk the surface rather than count the boards.
+
+**THE DECK SITS ON THE JOISTS, AND `deckHeightFt` IS THE SURFACE YOU WALK ON.** Everything under the
+deck was hung off `deckY` with the JOISTS' TOPS at it, and then the decking was laid with ITS top
+at the same figure — so the boards were buried in the top 1½ in of every joist, over the platform's
+whole 20 by 12 ft:
+
+```
+plank   joists 3.3958..4.0000   deck 3.8750..4.0000   420 overlapping pairs
+panel   joists 3.3958..4.0000   deck 3.9375..4.0000    58
+```
+
+The tent frame **in the same file** has it right — it stacks skid + joist + deck and calls the TOP
+of that `deckY` — and that is what settles which of the two has to move. `deckHeightFt` is a fall
+height to the rail pass (`railRequired(deckY)`) and a landing to the stair pass, so the surface
+stays exactly where the operator asked for it and the frame drops by the deck's thickness. The test
+asserts both halves, because dropping the frame is only right if the height the card promises did
+not drop with it.
+
+**And the last board is ripped to fit.** `Math.min(z, W - w / 2)` clamped the last board's CENTRE
+back inside the platform, which does not widen the board — it just stops short. Twelve feet is
+26.18 boards, so an inch of deck along the whole 20-ft edge was open, on a thing people walk on with
+their hands full. The identical `Math.min` was in the tent floor, an inch short down its 29½-ft
+length; `bunker.ts` already had this written up as the wrong answer to the same question, one
+family over.
+
+```
+after:  0 bare stations of 16000 on both decks and both tent floors
+        0 deck-into-frame pairs, 0 boards lapping each other
+```
+
+Four tests, all four failing on the old generator. Two platform thumbnails and two tent thumbnails
+moved; no compat golden did, because neither family is on the frozen path.
+
+### Measured, not fixed
+
+- **A guardrail post passes through the deck's edge.** Each post runs from 1¾ in below the walking
+  surface, so it shares 1¾ × 1½ × 1¾ in with the edge board — 21 pairs on the shipped platform. It
+  is the anchoring detail rather than a placement error (the post reaches past the deck to be
+  fastened to the frame), but the post is centred ON the deck edge, half in and half out, which is
+  the "a member placed ON a face instead of INSIDE it" pattern this sweep keeps finding. It lives in
+  `railings.ts` and so belongs to every railed structure, not just this one.
+- **The rail heights themselves are exact**, measured from the deck surface after the drop: top rail
+  42.00 in, midrail 21.00 in, toe board sitting 0.25 in clear — against EM 385-1-1's 42, 21 and 4.
