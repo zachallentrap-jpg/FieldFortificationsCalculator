@@ -295,6 +295,44 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
     });
   }
 
+  // ── And a cap on the TWO END WALLS, which had none.
+  //
+  // "Caps along the two long walls, carrying the stringers" was the whole rule, and as a statement
+  // about what carries the overhead it is right: the stringers span the width and land on those
+  // two. But a cap is not only a bearing — it is the course that closes the top of a wall, and
+  // without one the end walls stopped 7¼ in below the overhead. That is a slot the width of the
+  // bunker at each end, between the top of the lagging and the underside of the stringers, with
+  // two feet of earth on top of it:
+  //
+  //   wall lagging tops out 6.5000   stringer soffit 7.1042   5 ft 4 in of the 10-ft width open
+  //
+  // THE HEADER ALREADY SAID SO. It is emitted as `capNominal` and documented as "the cap continued
+  // across the doorway" — which presupposes a cap on that wall for it to continue. There was none
+  // either side of it: the entrance end was a header hanging between two lengths of nothing.
+  //
+  // BUTTED BETWEEN THE LONG CAPS, the same way the end walls butt between the long walls, and
+  // interrupted by the doorway exactly as the wall below it is — the header is that course's
+  // middle piece.
+  const capW = DRESSED[capNominal]!.w / IN_PER_FT;
+  const endCapZ: [number, number] = [postInset + capW / 2, outerW - postInset - capW / 2];
+  for (const x of [postInset, outerL - postInset]) {
+    const onEntry = Math.abs(x - postInset) < 1e-9;
+    const runs: [number, number][] = onEntry
+      ? [[endCapZ[0], doorClear[0]], [doorClear[1], endCapZ[1]]]
+      : [endCapZ];
+    for (const [z0, z1] of runs) {
+      if (z1 - z0 <= TOLERANCE.minSliverFt) continue;
+      emit('capBeam', capNominal, {
+        cutLengthFt: z1 - z0,
+        position: [x, capY, (z0 + z1) / 2],
+        rotation: [0, Math.PI / 2, 0],
+        stage: sCap,
+        nailing: 'drift-pinned to every post or crib course; butted to the side caps (PH)',
+        doctrineRef: citeOf(BUNKER.capNominal),
+      });
+    }
+  }
+
   // ── Overhead stringers across the clear span, then lagging over them.
   const stringerD = DRESSED[stringer.nominal]!.d / IN_PER_FT;
   const stringerY = capY + capD / 2 + stringerD / 2;

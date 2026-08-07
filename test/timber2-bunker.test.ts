@@ -644,26 +644,39 @@ test('and the cap beam is centred on the wall it caps, bearing across its whole 
   // spans between bearings, exactly as it does over the posts of a post-plank wall. Members that
   // run the length of another wall are left out — an end-wall stretcher crosses the cap's band and
   // says nothing about what the cap sits on.
+  // ALL FOUR WALLS, not two. The end walls used to have no cap at all and this test said so by
+  // asserting there were exactly two; a cap is what closes the top of a wall, and the ends had a
+  // 7¼-in slot where one belonged. The check is now per cap and reads the axis off the piece:
+  // a side cap is thin in z, an end cap thin in x, and each must bear on the wall under it.
   for (const wallType of ['post-plank', 'crib']) {
     const { caps, wall, wallThick } = bunkerGeom(wallType);
-    assert.equal(caps.length, 2, `${wallType}: a bunker is capped on both long walls`);
+    assert.equal(caps.length, 5, `${wallType}: a bunker is capped all round — the entrance end in `
+      + 'two pieces, because the doorway header is the middle one');
     const bearing = wall.filter((k) => k.role === 'post' || k.role === 'cribLog');
     const top = Math.max(...bearing.map((k) => boxB(k).y[1]!));
     const topCourse = bearing.filter((k) => boxB(k).y[1]! > top - 1e-9);
     assert.ok(topCourse.length >= 4, `${wallType}: nothing at the top of the wall for the cap to bear on`);
     for (const cap of caps) {
-      const cb = boxB(cap).z as [number, number];
+      const full = boxB(cap);
+      const across: 'x' | 'z' = full.x[1]! - full.x[0]! > full.z[1]! - full.z[0]! ? 'z' : 'x';
+      const along: 'x' | 'z' = across === 'z' ? 'x' : 'z';
+      const cb = full[across] as [number, number];
+      const cl = full[along] as [number, number];
       const under = topCourse.filter((k) => {
-        const z = boxB(k).z as [number, number];
-        return z[1] - z[0] <= 2 * wallThick + 1e-9 && z[1] > cb[0] + 1e-9 && z[0] < cb[1] - 1e-9;
+        const b = boxB(k);
+        const w = b[across] as [number, number];
+        return w[1] - w[0] <= 2 * wallThick + 1e-9 && w[1] > cb[0] + 1e-9 && w[0] < cb[1] - 1e-9
+          // TOUCHING COUNTS along the cap's own run: an end cap butts between the two side caps
+          // and lands ON the corner post, which meets its end exactly rather than overlapping it.
+          && b[along][1]! >= cl[0] - 1e-9 && b[along][0]! <= cl[1] + 1e-9;
       });
       assert.ok(under.length > 0, `${wallType}: ${cap.id} has no wall under it at all`);
       const band: [number, number] = [
-        Math.min(...under.map((k) => boxB(k).z[0]!)),
-        Math.max(...under.map((k) => boxB(k).z[1]!)),
+        Math.min(...under.map((k) => boxB(k)[across][0]!)),
+        Math.max(...under.map((k) => boxB(k)[across][1]!)),
       ];
       assert.ok(band[0] <= cb[0] + 1e-9 && band[1] >= cb[1] - 1e-9,
-        `${wallType}: ${cap.id} covers z ${cb[0].toFixed(4)}..${cb[1].toFixed(4)} and the wall under it is `
+        `${wallType}: ${cap.id} covers ${across} ${cb[0].toFixed(4)}..${cb[1].toFixed(4)} and the wall under it is `
         + `${band[0].toFixed(4)}..${band[1].toFixed(4)} — ${((Math.max(0, band[0] - cb[0]) + Math.max(0, cb[1] - band[1])) * IN_PER_FT).toFixed(2)} in of the cap is over air`);
       assert.ok(Math.abs((band[0] + band[1]) / 2 - (cb[0] + cb[1]) / 2) < 1e-9,
         `${wallType}: ${cap.id} is centred at ${((cb[0] + cb[1]) / 2).toFixed(4)} on a wall centred at ${((band[0] + band[1]) / 2).toFixed(4)}`);
@@ -751,8 +764,11 @@ test('at no more than the spacing the stringer table asks for, and no more of th
 test('and every stringer bears on both caps across its whole thickness', () => {
   for (const wallType of ['post-plank', 'crib']) {
     const { model, caps, stringers } = bunkerGeom(wallType);
-    assert.equal(caps.length, 2);
-    for (const cap of caps) {
+    // The stringers span the WIDTH and land on the two long walls' caps. The end caps close the
+    // top of their walls and carry nothing, which is why they are not in this check.
+    const sideCaps = caps.filter((k) => boxB(k).x[1]! - boxB(k).x[0]! > boxB(k).z[1]! - boxB(k).z[0]!);
+    assert.equal(sideCaps.length, 2, `${wallType}: two caps run the length, under the stringers`);
+    for (const cap of sideCaps) {
       const cb = boxB(cap);
       for (const s of stringers) {
         const sb = boxB(s);

@@ -49,6 +49,7 @@ screenshots get read.
 | **The corners, where two skins meet** | **Fixed** — the siding stopped one wall thickness short at each end of the two butting walls, leaving a 3½-in strip of bare framing in every corner of every building, sole plate to cap plate. |
 | **Flat / shed roof — the top of the slope** | **Fixed** — a single-slope roof has no ridge, and the cap laid on its top edge hung half its width past the roof; the same edge had no fascia over its rafter tails. |
 | **The tent frame's `endDoor`** | **Fixed** — a live "Framed end door" toggle on both tent cards, set `true` by both presets, read by no generator: turning it off produced a byte-identical model. |
+| **Crib bunker — the top of the end walls** | **Fixed** — capped on the two long walls only, so both end walls stopped 7¼ in below the overhead: a slot the width of the bunker at each end, under two feet of earth. |
 | Guard shack (8×8, four openings) | **Checked, clean.** Nothing wrong. Its unbraced walls are a documented rule, now pinned by a test. |
 | Squad hut (50 ft — the longest building) | **Checked, clean.** Nothing wrong. Its fifty-foot runs are already handled, by a module I had not read. |
 | Weather barrier / building paper | **Already covered** — an earlier pass fixed it (row above). All that is left is a stale help string; see below. |
@@ -3056,3 +3057,66 @@ them can pass by finding nothing to check. Both tent cards' thumbnails moved.
   on the deck's end line. Matching them is the right call for a frame standing in the bent's plane;
   whether the whole end bent should be held half a post inboard is one decision about the family,
   not about this doorway.
+
+## The bunker's end walls did not reach their own overhead
+
+Target: the crib bunker with **`wallType: 'post-plank'` and `entrance: 'open'`** — the one bunker
+combination the five earlier bunker entries never rendered. The open entrance itself is right: the
+doorway is clear, the jambs and header frame it, the baffle is correctly absent, and nothing
+interpenetrates anywhere in the model. What is wrong is thirty inches above the door head.
+
+*"Caps along the two long walls, carrying the stringers."* As a statement about what CARRIES the
+overhead that is exactly right — the stringers span the width and land on those two. But a cap is
+not only a bearing: **it is the course that closes the top of a wall**, and with none on the ends
+the two end walls stopped 7¼ in short of the roof they hold up:
+
+```
+wall lagging tops out  6.5000        stringer soffit  7.1042
+5472 clear sight lines straight through the building, all at y 6.51..7.10
+```
+
+Five feet four inches of the ten-foot width, at BOTH ends, on both wall types and with either
+entrance — an open slot with two feet of earth resting over it.
+
+**The header already said so.** It is emitted as `capNominal` and documented in as many words as
+*"the cap continued across the doorway"* — which presupposes a cap on that wall for it to continue.
+There was none either side of it: the entrance end was a header hanging between two lengths of
+nothing. The fix reads like the sentence that was already there — the end caps butt between the
+long ones, exactly as the end walls butt between the long walls, and are interrupted by the doorway
+exactly as the wall below them is, with the header as that course's middle piece.
+
+```
+after:  5 cap pieces        clear sight lines through the building at cap height: 0
+        0 interpenetrations, both wall types, both entrances
+```
+
+The 266 rays that survive are not a breach: they run in the 1½-in band directly above the wall
+lagging and OUTSIDE the cap, parallel to the wall and blocked inboard by it — a rebate in the
+outside face that the earth fills, not a way in.
+
+### Two existing tests said "exactly two caps"
+
+Both had to be restated rather than renumbered, because both were describing the defect. *"The cap
+beam is centred on the wall it caps"* asserted `caps.length === 2` and then measured each cap
+across z — which only makes sense for a cap lying along x. It now reads the axis off the piece and
+checks the same thing on whichever way the cap runs. *"Every stringer bears on both caps"* is now
+explicit that it means the two SIDE caps: the end caps close their walls and carry nothing, which
+is the point of separating the two jobs a cap does.
+
+One more thing that had to change with them: an end cap lands ON the corner post, meeting its end
+exactly rather than overlapping it, so a bearing filter written with strict inequalities found no
+wall under the end caps at all. Touching counts.
+
+### Measured, not fixed — the same defect one course higher
+
+Between the stringers, the LONG walls are open by exactly as much:
+
+```
+7020 clear sight lines through the building, all at y 7.13..7.69
+```
+
+That is the course between the stringers' soffit and the roof lagging — 7¼ in tall, running the
+whole 17-ft length of each long wall, open in every bay between one stringer and the next, and
+leading straight down into the bunker. Closing it needs BLOCKING between the stringers over each
+cap: a piece the toolkit does not have, with no nominal and no citation of its own, which is a
+decision about the overhead system rather than a correction to this one. It is the next target.
