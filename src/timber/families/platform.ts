@@ -19,11 +19,12 @@ import { DRESSED } from '../types';
 import type { PlatformSpec, TentFrameSpec } from '../spec';
 import type { WallId } from '../types';
 import { makeEmitter } from '../emit';
-import { TENT, LUMBER, PANEL, RAMP, PLATFORM, RAIL, IN_PER_FT, citeOf } from '../doctrine';
+import { TENT, LUMBER, OPENING, PANEL, RAMP, PLATFORM, RAIL, IN_PER_FT, citeOf } from '../doctrine';
 import { stagePlan, requireOrdinal, type StagePlanEntry } from '../stagePlan';
 import { generateRailing, railRequired, type RailEdge } from '../subsystems/railings';
 import { generateStair } from '../subsystems/access';
 import { generateSkids } from '../subsystems/coverings';
+import { headerForSpan } from '../normalize';
 import type { FloorLevels } from '../floor';
 
 export interface FamilyResult {
@@ -519,6 +520,58 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
     nailing: '3-8d ea bent (PH)',
     doctrineRef: citeOf(TENT.bentSpacingFt),
   });
+
+  // ── The framed end door.
+  //
+  // `endDoor` has been on `TentFrameSpec` since the family was written, BOTH shipped tent presets
+  // set it `true`, and the planning card offers it as a live toggle labelled "Framed end door" —
+  // and no generator has ever read it. Same class as `fill`, `entrySteps`, `openFront`,
+  // `partitions` and `shutters` before it: a field the spec carries and nothing consumes, so the
+  // toggle moved and the model did not.
+  //
+  // WHAT IT IS. There is no wall here to cut a hole in — a tent frame is a deck and a rank of
+  // bents, and the end is closed by canvas. So the door is FRAMED rather than opened: two jambs
+  // standing on the deck and a head across them, standing in the END BENT'S OWN PLANE, which is
+  // what the canvas end laces to and what a man walks through. Its size is the toolkit's standard
+  // rough opening, so a tent door is the same hole as a hut door rather than a second opinion.
+  //
+  // BOTH ENDS. The field names no end, a tent frame's two ends are identical, and the toolkit's
+  // own vocabulary pairs them — the sea hut's standard drawing is "2 end doors". Framing one and
+  // not the other would be an arbitrary choice made silently.
+  if (spec.endDoor) {
+    const doorW = OPENING.doorWidthFt.value as number;
+    const doorH = OPENING.doorHeightFt.value as number;
+    // The frame is cut from the bents' own stock: 3½ in through the opening, 1½ in along it,
+    // which is a jamb the same way a stud is one.
+    const jambT = DRESSED[bentNominal]!.w / IN_PER_FT;
+    for (const x of [0, L]) {
+      for (const s of [-1, 1]) {
+        emit('post', bentNominal, {
+          cutLengthFt: doorH,
+          position: [x, deckY + doorH / 2, W / 2 + s * (doorW + jambT) / 2],
+          rotation: [0, 0, Math.PI / 2],
+          stage: sBent,
+          nailing: 'framing anchor top and bottom (PH)',
+          doctrineRef: `${citeOf(OPENING.doorWidthFt)} — end-door jamb, in the end bent's plane`,
+        });
+      }
+      // Bearing on both jambs, so the head is the clear opening plus a jamb at each side — and
+      // SIZED BY THE SPAN TABLE, not cut from the same 2x4 as the jambs. The first version was,
+      // and the engine's own life-safety span check failed the build over it: a 2x4 carries 3 ft
+      // and this head spans 3 ft 3 in. `headerForSpan` is the same function every doorway in the
+      // toolkit asks, so a tent door is not the one opening with its own opinion.
+      const headNominal = headerForSpan(doorW + 2 * jambT);
+      const headD = DRESSED[headNominal]!.d / IN_PER_FT;
+      emit('header', headNominal, {
+        cutLengthFt: doorW + 2 * jambT,
+        position: [x, deckY + doorH + headD / 2, W / 2],
+        rotation: [0, Math.PI / 2, 0],
+        stage: sBent,
+        nailing: '4-8d ea end (PH)',
+        doctrineRef: `${citeOf(OPENING.doorHeightFt)} — end-door head, sized for its own span`,
+      });
+    }
+  }
 
   return {
     members: emit.members,

@@ -48,6 +48,7 @@ screenshots get read.
 | **GP framed building** (48×20, piers, plywood, roll) | **Checked, clean.** Nothing wrong. Four measurements with negative controls: piers, walls, roof covering, gable rake. |
 | **The corners, where two skins meet** | **Fixed** — the siding stopped one wall thickness short at each end of the two butting walls, leaving a 3½-in strip of bare framing in every corner of every building, sole plate to cap plate. |
 | **Flat / shed roof — the top of the slope** | **Fixed** — a single-slope roof has no ridge, and the cap laid on its top edge hung half its width past the roof; the same edge had no fascia over its rafter tails. |
+| **The tent frame's `endDoor`** | **Fixed** — a live "Framed end door" toggle on both tent cards, set `true` by both presets, read by no generator: turning it off produced a byte-identical model. |
 | Guard shack (8×8, four openings) | **Checked, clean.** Nothing wrong. Its unbraced walls are a documented rule, now pinned by a test. |
 | Squad hut (50 ft — the longest building) | **Checked, clean.** Nothing wrong. Its fifty-foot runs are already handled, by a module I had not read. |
 | Weather barrier / building paper | **Already covered** — an earlier pass fixed it (row above). All that is left is a stale help string; see below. |
@@ -3005,3 +3006,53 @@ shed's and the custom card's roof pickers.
   spacing, or a purlin.
 - **A shed and a flat roof have no rake overhang and no barge board**, the same as a gable. That is
   the gable-rake entry already in this sweep, and it is one decision for all three.
+
+## The tent's framed end door, which was a switch wired to nothing
+
+Recorded as measured-not-fixed two passes ago and now closed. `endDoor` has been on
+`TentFrameSpec` since the family was written, BOTH shipped tent presets set it `true`, the
+planning card offers it as a live toggle labelled *"Framed end door"* — and no generator ever read
+it. Turning it off produced a model byte-identical to leaving it on:
+
+```
+tent-floor  endDoor=true  105 members      endDoor=false  105 members
+```
+
+Fifth of its kind in this sweep, after `fill`, `entrySteps`, `openFront`, `partitions` and
+`shutters`: a field the spec carries, the card exposes and nothing consumes, so the knob moves and
+the drawing does not.
+
+**What a tent door has to be.** There is no wall here to cut a hole in — a tent frame is a deck and
+a rank of bents, and the end is closed by canvas. So the door is FRAMED rather than opened: two
+jambs standing on the deck and a head across them, in the END BENT'S OWN PLANE, which is what the
+canvas end laces to and what a man walks through. Its size is `OPENING.doorWidthFt` ×
+`OPENING.doorHeightFt` — the same 3 ft by 6 ft 8 in rough opening a hut door gets, so a tent door
+is not the toolkit's second opinion about what a doorway is.
+
+**Both ends.** The field names no end, a tent frame's two ends are identical, and the toolkit's own
+vocabulary pairs them — the sea hut's standard drawing is *"2 end doors"*. Framing one and not the
+other would have been an arbitrary choice made silently, which is worse than either answer.
+
+### Two things caught it before the tests did
+
+- **The engine's own span check failed the build.** The first head was cut from the bents' 2x4
+  like the jambs, and `timber2-spans` refused the card: *"2× 2x4 header spans 3.3 ft; the table
+  allows 3 ft."* It is right — the head spans the opening plus a jamb at each side. It is sized by
+  `headerForSpan` now, the same function every other doorway in the toolkit asks, and comes out a
+  2x6. A life-safety gate catching a member added ten minutes earlier is the gate working.
+- **My own clash probe was wrong first.** An AABB round a bent RAFTER spans its whole lean, and it
+  duly reported four collisions between the door frame and rafters that pass eight feet above it.
+  On SAT with oriented boxes: zero. The tightest real figure is the collar tie, which crosses the
+  doorway at eave height and is lapped beside the bent — it passes the jambs face to face at
+  exactly 0.000 in, touching and sharing nothing.
+
+Four tests, all four failing on the old generator, and each states its own precondition so none of
+them can pass by finding nothing to check. Both tent cards' thumbnails moved.
+
+### Measured, not fixed
+
+- **A jamb half-overhangs the deck end**, x −0.1458..0.1458 against a deck starting at x = 0. That
+  is not the door's doing: the END BENT'S OWN POSTS do exactly the same, because a bent is centred
+  on the deck's end line. Matching them is the right call for a frame standing in the bent's plane;
+  whether the whole end bent should be held half a post inboard is one decision about the family,
+  not about this doorway.
