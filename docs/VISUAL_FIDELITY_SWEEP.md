@@ -97,6 +97,7 @@ screenshots get read.
 | **The tower brace's foot** | **Fixed** — struck corner to corner and left square, the board's low corner hung 2.21 in below the corner it was struck from, so every bottom-bay brace drove into the footing: 1.93 in of the mudsill, 1.92 of the concrete pad. Nothing cuts a `towerBrace`, so this one was on screen. |
 | **The gable rake** | **Fixed** — the roof stopped at the FRAMING line while the finished wall stands a skin thickness outside it, so half an inch of siding (an inch and a half of board-and-batten) ran along both rakes of every gable, shed and flat roof with nothing over it. There was no barge board in the toolkit. |
 | **The bunker's build order** | **Fixed** — the doorway's two jamb posts and its header were stamped into the ENTRANCE stage, three after the caps they line up with and two after the overhead cover that bears on them: scrub to stage 4 and ten stringers span the opening on nothing. |
+| Build order, catalog-wide | **Checked, clean.** Nothing wrong. 2,777 borne members and 8,794 bearing pairs across all fourteen cards, none of them standing on something built later. Landed as a permanent guard, with its blind spot written down. |
 
 ## The shed that had no walls above the plate
 
@@ -4228,3 +4229,64 @@ them.** "A's underside is level with B's top and they touch" is not the same as 
 Every one is two members that happen to share a level and touch sideways. A stricter relation — the
 supporting member has to be under the supported one in plan, not merely adjacent to it — is what
 would make the scan catalog-wide, and until it is, the rule is stated where it was measured.
+
+## The build-order scan, made catalog-wide — and it found nothing
+
+The previous pass introduced the "when, not where" axis on one family and left a note about what
+it would take to run it everywhere: *"the support has to be under the supported piece in plan, not
+merely beside it."* This pass did that, and the honest result is that **nothing else in the catalog
+is out of order.**
+
+The relation, which is the whole of the exercise:
+
+> A member whose UNDERSIDE meets another member's TOP, with their plan footprints genuinely
+> overlapping, must have at least one such support built by its own stage.
+
+Both halves earn their place. Requiring a real plan overlap — 2D SAT over the convex hulls of the
+two members' plan projections, at least 0.6 in deep — is what cleared the previous pass's four
+false-positive classes at a stroke:
+
+```
+  joist(7) beside siding(11)     70 pairs per hut   a ceiling joist bearing on the CAP PLATE,
+                                                    level with the wall siding's top, touching it
+                                                    sideways and carried by neither
+  stud(8), jackStud(5)           34                 the same, at the gable and at the sole plate
+```
+
+And requiring only ONE support by the member's own stage — not all of them — is what cleared the
+last two:
+
+```
+  jackStud(5) on stringer(11)     4 per card    the entry stair's uncut BOX reaches into the wall;
+                                                the jack stud stands on the sole plate regardless
+  deckPlank(3) on stringer(5)     4, platform   the ramp's head tucks 2 in under the deck's edge
+                                                two stages after the deck went on, and the joists
+                                                under it carried it the whole time
+```
+
+A piece is only in the air when NOTHING under it exists yet. With that:
+
+```
+  2,777 borne members    8,794 bearing pairs    14 cards    0 standing on something built later
+```
+
+**What the scan does NOT see, said plainly, because a green run is worth exactly what its relation
+is worth.** A dependency through an END BUTT. The crib bunker's short cap beams butt between a
+corner post and the doorway's jamb and bear on neither in plan — the relation skips them entirely,
+which is precisely why the bunker's own defect was caught by a looser rule last pass and needs its
+own test. Anything that hangs off the END of a piece rather than sitting on top of one is outside
+this.
+
+So the scan is landed as a guard rather than a fix: one test in `test/timber2-build-order.test.ts`,
+bucketed by level so it runs the whole catalog in a quarter of a second, and **validated by
+breaking something** — pushing the bunker's caps into the lagging stage makes it fail with
+*"BK-ohcStringer-01 goes up at stage 4, and the first thing under it … not until stage 5"*. It also
+carries two floor assertions, so a relation that quietly stops matching anything fails instead of
+passing: at least sixteen borne members per card, and five thousand bearing pairs overall.
+
+### Checked this pass and NOT a defect
+
+**Plain board siding** (`siding: 'boards'`, as against the storage shed's board-and-batten and
+everything else's plywood) on the guard shack: boards run vertically at their dressed width, the
+gable triangle is closed in with boards cut to the rake, the new barge board trims both rakes, the
+fascia closes the eave, and the openings read as openings. Nothing wrong.
