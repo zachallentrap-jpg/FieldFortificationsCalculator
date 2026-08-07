@@ -243,6 +243,8 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
         wallHeightFt: story.wallHeightFt,
         risePer12,
         rafterSpacingIn: toLegacySpacing(spec.spacing.rafterSpacingIn),
+        // The gable-end studs stand on the END WALL's layout, not the rafter grid.
+        studSpacingIn: toLegacySpacing(spec.spacing.studSpacingIn),
         overhangFt,
         atticAccess: spec.atticAccess,
       }),

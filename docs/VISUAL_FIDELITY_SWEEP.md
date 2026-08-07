@@ -84,6 +84,7 @@ screenshots get read.
 | **Crib bunker — the doorway itself** | **Fixed** — jambs, header and baffle all framed an opening that was then LAGGED SHUT: eleven full-width courses across it and two wall posts standing in the clear span. Every point sampled inside it came back solid. |
 | **Crib bunker — `wallType: 'crib'`** | **Fixed** — the crib topped out 5½ in below the cap beam, so the cap, the overhead stringers, the roof lagging and two feet of earth bore on air all the way round; and the stack ran straight through the doorway as well. |
 | **The B-hut's partitions** | **Fixed** — every upright was a quarter turn out, so a partition was 1½ in of wood in its own 3½-in plate; and the doorway was struck off the WALL's thickness instead of the STUD's, which put the king where the jack goes and left the jack standing in the doorway. |
+| **The gable end studs** | **Fixed** — the same quarter turn, in `roof.ts`: 186 gable studs across nine cards stood 1½ in across a 3½-in wall, ½ in off the plate's centre and 3½ in off the stud below, and the one at the peak ran 1.45 in into the ridge board. |
 
 ## The shed that had no walls above the plate
 
@@ -3407,3 +3408,91 @@ catalog with partitions, so the blast radius is exactly one family.
   above E/W wall studs that are 3½ across and 1½ along. Every gable in the catalog does it — 22
   studs on the b-hut, 28 on gp-frame. `roof.ts` is frozen legacy, so turning them is a compat-lock
   event and gets its own pass.
+
+## The gable end, where the wall changed its mind about which way a stud faces
+
+The last pass turned the partition studs and wrote down, as a measured residue, that `roof.ts`'s
+gable-end studs have the same quarter turn. This is that. It is a **compat-lock event** — `roof.ts`
+is frozen legacy — so it is written up with the blast radius measured rather than asserted.
+
+Render a gable end at the roof-framing stage and the defect reads straight off the picture: below
+the cap plate the studs are thin edges, above it they are chunky posts. Same wall, same nominal,
+two different pieces of wood. The numbers:
+
+```
+                              across the wall   along the run   off the plate's centre
+  E wall stud (walls.ts)          3.50 in          1.50 in            0.00
+  gable stud  (roof.ts)           1.50             3.50               0.50
+```
+
+`walls.ts` builds a vertical member with the wall's yaw PLUS a quarter turn — `f.yaw + Math.PI / 2`
+— which is what stands a stud ACROSS a wall. `roof.ts` wrote the quarter turn alone. Everything
+else in that eight-line loop was then chosen to suit the turned stud, and each choice is its own
+defect:
+
+- **It was set at 1½ stud thicknesses in from the building line**, which is a ROOF coordinate. It
+  was picked so a 1½-in stud tucked in BESIDE the end rafter instead of standing under it — and it
+  left the stud ½ in off the centre of the cap plate it stands on, and ½ in inside the plane the
+  gable's own siding is hung on.
+- **It marched in z from the building's OUTSIDE face** (`for (let z = oc; z < W; z += oc)`), while
+  the end wall's studs are laid out along the wall's own clear run, which starts one wall thickness
+  in. Every gable stud in the toolkit was therefore 3.50 in off the stud below it. Not "most" —
+  **186 of 186, on all nine gable cards, with no wall framing under any of them at all.**
+- **It stopped at the RAFTER line even at the peak**, where the thing overhead is a 2x8 ridge board
+  and not a 2x6 rafter. A stud there ran **1.4525 in into the ridge** — five of the nine cards,
+  every one whose half-width lands on the layout, the shipped b-hut among them.
+
+Two things had to be got right for the fix rather than assumed. **Each end wall is laid out from
+its own start corner, viewed from outside**, so the E wall's studs march up in z and the W wall's
+march down; the clear run is 185 in on a 16-ft hut, which is not a whole number of 16-in bays, so
+one shared layout lands on one end and misses the other by 7 in. The layout is struck per end. And
+standing the stud on the wall puts it UNDER the end rafter rather than beside it, so its head is
+now cut at the rafter's underside beneath its own LOW corner — cut at the centre, half of a 1½-in
+stud is above that line and inside the rafter.
+
+`RoofInput` gained an optional `studSpacingIn`, defaulting to `rafterSpacingIn`. The gable studs
+continue the WALL's layout and the wall's spacing is a different field; every shipped card sets
+both to 16, so leaving it off changes nothing, and `building.ts` now passes the real one.
+
+### The blast radius, measured
+
+Old and new member lists dumped for all 84 compat fixtures and compared by id:
+
+```
+  fixtures touched          84 of 84      (every fixture in the set has a gable roof)
+  members moved             1836
+  members added                2
+  members removed              0
+  touched members that are NOT an RF- gable stud:  0
+```
+
+Nothing else in any model moves — no rafter, no plate, no joist, no covering. The two added members
+are both on `shallow-2-12-no-overhang` (306 → 308): the wall's layout puts one more station per end
+within reach, and on a 2:12 roof those two studs come out 2.54 in long, which clears the generator's
+own 0.2-ft minimum. Every other fixture keeps its exact member count.
+
+**No test was pinning the bug.** The six failures before the goldens were regenerated were four
+golden comparisons (`T0/TD12`, `curated goldens`, `full option matrix`, `TD5 emission order`) and
+the two thumbnail goldens — all of them the golden mechanism itself, none of them a claim about
+gable studs. The one test that mentions rake studs, in `timber2-roofs`, is about the SHED's
+`rakeStud` role, which is a different member from a different generator and did not move.
+
+Regenerated in this commit: `test/goldens/frame-compat/` (12 curated + 72 matrix hashes),
+`test/goldens/frame/` (17 cases), and 18 thumbnails — the nine gable cards, plain and solid.
+
+Four tests in `test/timber2-gable-studs.test.ts`, all four failing on the old generator:
+
+```
+  gable studs with wall framing under them   0 of 186  ->  186 of 186
+  gable studs sharing wood with anything     10        ->  0
+```
+
+The ridge case is pinned by calling `generateRoof` directly at 199 in of width, because the layout
+change means no shipped card puts a stud on the peak any more — the cap is what makes it right for
+any width that does, and a test that only exercised the shipped cards would not touch it.
+
+### Measured, not fixed
+
+- **A partition's end stud stands in the hut's girt**, 3½ × 3½ × 1½ in, six times on the b-hut.
+  Carried over from the last pass, unchanged: the girt has to be cut at each partition, which is a
+  change to `hut.ts`'s girt run.

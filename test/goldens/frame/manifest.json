@@ -1,7 +1,7 @@
 [
  {
   "case": "basement-stairs",
-  "sha256": "95879c1f4c7d7574c91892e229d41c26cfbdbb858e1009f381050c2592839478",
+  "sha256": "634dc4537ea63b02a53e170ec63e56ba5bb2bb6dc004aba30f548d4eaa8df76e",
   "members": 295
  },
  {
@@ -11,77 +11,77 @@
  },
  {
   "case": "golden",
-  "sha256": "5ba2f7cadcf8dcd7a67b5d8c83b7c67b8ff9b4174fc4136551f843e16912b5ab",
+  "sha256": "facee38a74de78933ebd828ae5323ecd52baf72a9f9998c3bfbbb387374f1d0e",
   "members": 309
  },
  {
   "case": "large-40x24",
-  "sha256": "7027501773355d63496ee1bf7173eb4cc350bbaef6c7a33a8a60816819e04cd5",
+  "sha256": "a0b06d34c6fb904a797d127d5f5bc16f3c6e15827e591b5be5b7ad6021f1dcef",
   "members": 522
  },
  {
   "case": "low-sill-window",
-  "sha256": "d916dab17f126b1d75957924edfbcf94e05bc803dfaa37d7f8f37c130f8d5bd2",
+  "sha256": "6215cffdb2cd1472c65e05e3f04494740966587aa85172ef5deed7c32a358bcf",
   "members": 294
  },
  {
   "case": "negative-crawl",
-  "sha256": "24b73b222c2a07a6cbf9e71d0cf94c487b43e5b5d198c370b12eec489949a4bb",
+  "sha256": "9d3dcf18bfd370d76c7eca19d93f7729d5d5ed4aaaed7152b784dcf99becd0e4",
   "members": 288
  },
  {
   "case": "no-overhang",
-  "sha256": "7bba632e5e419e38ef11ab5b2022ed2877e9279b7dfd58ecbdaa062cbcb916ac",
+  "sha256": "4a52ee2f663d718a72d8c710de4e59e9be5f2bbd841a804e6cf339714e95c766",
   "members": 288
  },
  {
   "case": "offmultiple-13.5x14",
-  "sha256": "a8b2116105bdbedd5ef3bac776d158ee625ab0dba753ca89a1384a4003c7c3ff",
+  "sha256": "7b18af25fa0e12bfe2c7aedd5c55920ded643ef8afb9208b10af46957f1ffd6c",
   "members": 175
  },
  {
   "case": "offmultiple-13.5x8",
-  "sha256": "02b46b641ac64efe5b8a8cb9d7045d26924545fd9da884c436fe5d512326793d",
+  "sha256": "a88de8f66f28dbd5651b5bcdb8f3447a8681efba0c95e7bc957cbea1f3d6717a",
   "members": 150
  },
  {
   "case": "piers-nopenings",
-  "sha256": "0e58b96f19d0f73edbc305f5e647611e3c4d2930d8626d400444e0c79c624c36",
+  "sha256": "c49414bbc150d6ff01bcac1c7189d2585d8ad56d8e11db89c466b3c23e8741ba",
   "members": 288
  },
  {
   "case": "slab-on-grade-crawl0",
-  "sha256": "4b0c25a0e704cf526972d469c815cc22484dc06e274e697c145714eb94ae2b65",
+  "sha256": "63b73172ae3687f9814c351e3e0c0c49895b7c0900f6b9f656f7f1ac7379cf6a",
   "members": 288
  },
  {
   "case": "spacing-24",
-  "sha256": "d1c1ac9fadcaa8e079fd3ec02d2acd105aed1f78d1a2cb5cc5bf554b67321450",
+  "sha256": "df2277382d18ca1aae750968ebea536a67f65bcde59e7f1eeca7cc28786e74a9",
   "members": 221
  },
  {
   "case": "steep-roof-rise12",
-  "sha256": "742a2e43fd14cfce5e01f0c9be6de5b910e97a210454316e04c3c199a5d57310",
+  "sha256": "e9497eb8d5f12005143532fe99a2cfaba65cd0151e787c14822ea510c4e6fe30",
   "members": 294
  },
  {
   "case": "td5-all-walls",
-  "sha256": "ba33592877389dacdb13d34fd3d53a7320d492a2ef17175104d7350de64eb308",
+  "sha256": "8972d6459123b8f6207b0e29b1f4f3cbfb33c02a870a4c6f2412b23e93bf8a5a",
   "members": 318
  },
  {
   "case": "td5-equal-offset",
-  "sha256": "2768cd7894680887099edd60b64df6dd7f5580f64088bfa9060d99a046075f1f",
+  "sha256": "204975ee3074c674c02b72d2cf6144a495278902e879dcf37f270e1778c3a0b2",
   "members": 306
  },
  {
   "case": "td5-unsorted-openings",
-  "sha256": "468f8c1083535d826944c5cebf9be46d2896cf82737b67989f094d886d70e610",
+  "sha256": "19a5794c1479f0d779d76725b8fbe2a97d3f98979e44248e934650005343b1f7",
   "members": 309
  },
  {
   "case": "wall-foundation",
-  "sha256": "59f75c1ed368d51aa428def0bfbc422af2a2f702fa7483c1cb823dee05d9960e",
+  "sha256": "372a403f2a0b67eba42777be2a77525ce7fd604e3a97e919571ac372ac4363e5",
   "members": 278
  }
 ]

@@ -29,6 +29,12 @@ export interface RoofInput {
   wallHeightFt: number; // top of cap plate
   risePer12: number; // inches of rise per foot of run (e.g. 4 = 4:12 pitch)
   rafterSpacingIn: 16 | 24;
+  /**
+   * The WALL's stud spacing, for the gable-end studs — they continue the end wall's layout and
+   * are not on the rafter grid. Defaults to `rafterSpacingIn`, which every shipped card uses for
+   * both, so leaving it off changes nothing.
+   */
+  studSpacingIn?: 16 | 24;
   overhangFt?: number; // horizontal eave overhang, default 1
   atticAccess?: boolean; // framed scuttle opening in the ceiling joists (default false)
 }
@@ -199,16 +205,50 @@ export function generateRoof(input: RoofInput): Member[] {
       doctrineRef: 'FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)',
     });
   }
-  // Gable-end studs: verticals from the cap plate up to the RAFTER UNDERSIDE, set just
-  // inside the end rafters, on the same OC grid.
+  // Gable-end studs: verticals from the cap plate up to whatever is over them, standing on the
+  // end wall's own stud layout.
+  //
+  // A GABLE STUD IS A STUD, and none of these was standing like one. Three things, all from this
+  // one loop and all of them visible on a gable-end elevation of any card in the catalog:
+  //
+  //  - TURNED A QUARTER TURN. `walls.ts` builds a vertical member with the wall's yaw PLUS a
+  //    quarter turn, which is what stands a stud ACROSS a wall — 3½ in of face filling the plate,
+  //    1½ in of edge along the run. These carried the quarter turn alone, so every gable stud was
+  //    1½ in across a 3½-in wall and 3½ in along the run: the exact reverse of the wall studs
+  //    directly beneath it. On screen, sticks below the cap plate and posts above it.
+  //  - OFF THE WALL. Set at 1½ stud thicknesses in — a roof coordinate, chosen so a 1½-in-wide
+  //    stud tucked beside the end rafter — it sat ½ in off the centre of the cap plate it stands
+  //    on, and ½ in inside the plane the gable's own siding is hung on.
+  //  - OFF THE LAYOUT. Marched in z from the building's outside face, while the end wall's studs
+  //    are laid out along its own run, which starts one wall thickness in. Every gable stud was
+  //    therefore 3.50 in — one wall thickness — off the stud below it, on all nine gable cards.
+  //
+  // Standing them on the wall means they are under the end rafter rather than beside it, so the
+  // top is now cut at the rafter's underside under the stud's LOW corner instead of its centre;
+  // otherwise half of a 1½-in stud is above that line and inside the rafter.
+  const wallT = DRESSED['2x4']!.d / FT;
   const underside = rafterHalf / cosP;
-  for (const xEnd of [1.5 * t, L - 1.5 * t]) {
-    for (let z = oc; z < W - 0.01; z += oc) {
-      // From the cap plate up to the rafter underside — measured off the rafter plane's own
-      // datum, so a gable stud still dies into the rafter when the plane is seated properly.
-      const riseHere = eaveDatum - H + (halfSpan - Math.abs(z - halfSpan)) * slope - underside;
+  // And under the ridge there is a 2x8, not a 2x6. A stud carried up to the rafter line at the
+  // peak ran 1.452 in into the ridge board on every building whose half-width is a multiple of
+  // the spacing — five of the nine gable cards, the shipped b-hut among them.
+  const ridgeBottom = ridgeTop - ridgeD;
+  const studOc = (input.studSpacingIn ?? input.rafterSpacingIn) / FT;
+  const endRun = W - 2 * wallT;
+  // EACH END WALL IS LAID OUT FROM ITS OWN START CORNER, viewed from outside — so the E wall's
+  // studs march up in z and the W wall's march down, and one shared layout can only ever land on
+  // one of them. The clear run is 185 in on a 16-ft hut, which is not a whole number of bays, so
+  // the two are genuinely 7 in apart at every station. Struck per end, a gable stud lands on the
+  // stud below it at both ends.
+  for (const [xEnd, up] of [[wallT / 2, false], [L - wallT / 2, true]] as [number, boolean][]) {
+    for (const s of layoutCenters(endRun, studOc, t)) {
+      const z = up ? wallT + s : W - wallT - s;
+      // Measured off the rafter plane's own datum, so a gable stud still dies into the rafter
+      // when the plane is seated properly.
+      const toRafter = eaveDatum + (halfSpan - Math.abs(z - halfSpan) - t / 2) * slope - underside;
+      const underRidge = Math.abs(z - halfSpan) < t;
+      const riseHere = (underRidge ? Math.min(toRafter, ridgeBottom) : toRafter) - H;
       if (riseHere < 0.2) continue;
-      emit('stud', '2x4', riseHere, [xEnd, H + riseHere / 2, z], [0, Math.PI / 2, Math.PI / 2], 8, {
+      emit('stud', '2x4', riseHere, [xEnd, H + riseHere / 2, z], [0, 0, Math.PI / 2], 8, {
         nailing: 'toenail 2-8d ea end (PH)',
         doctrineRef: 'FM 5-426 gable studs (PH page)',
       });
