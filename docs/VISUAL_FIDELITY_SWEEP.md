@@ -109,6 +109,7 @@ screenshots get read.
 | Duplicate members, and anything below grade | **Checked, nothing wrong.** No two members anywhere in the catalog share a role, size, position and rotation. Nothing stands below grade but the tower ladder's raked foot, 0.175 in — measured, recorded, below the visual threshold. |
 | **A thirty-foot fixed ladder** | **Fixed** — the rule that forces a stair past the cage threshold was written as `platformHeightFt === 24 \|\| === 32`, the picker's two tall options. A 26-, 28- or 30-ft tower — reachable from a saved spec or a link — came back with a ladder, against `LADDER.cageThresholdFt` and the card's own help text. |
 | **Two posts in one hole on a tall tower's stair** | **Fixed** — a switchback is four railed surfaces meeting, and each flight's rail post shared its hole with the landing's: 10 pairs at 3.500 in on a 32-ft tower, 8 on a 24. Plus the bridge's own end post a quarter inch inside the deck rail's. |
+| **The shed roof's pony wall** | **Fixed, twice.** No shipped card has a shed or flat roof and neither had ever been measured. Its siding ran up to the rafters' CENTRE line and buried all 48 of them to half their depth (2.750 in); and its studs were a quarter turn out on a N or S high side — 1½ in across a 3½-in wall, the gable rake studs' defect in the sibling generator. |
 
 ## The shed that had no walls above the plate
 
@@ -4839,3 +4840,88 @@ Three of the four fail on the old generator.
 `timber2-tower-stair.test.ts` needed one of its four restated: the bridge's rail now BUTTS the
 flight's post at its far end instead of running to the last inch of decking, so `< near` became
 `< near + half a post`, with the other half of the joint asserted alongside it.
+
+## The shed roof's pony wall, which no card ships
+
+The last pass found its target by turning a knob no preset turns. This one did it deliberately:
+every option the planning card offers, on every family, one at a time, each variant audited against
+its own preset for overlap classes the preset does not have. The two roofs nothing ships —
+**`shed` and `flat`, one click away on the gp-frame and custom cards** — came back with the same
+pair of defects. (`hip` and `pyramid` came back with a long list too; that is the rafters-meeting-a-
+ridge family this sweep has worked before, and it is not this pass.)
+
+### The siding ran up to the rafters' centre line
+
+```
+  gp-frame + shed     48 rafter x infill pairs at 2.750 in — half a 2x6, on every rafter
+  gp-frame + flat     the same 48 at the same 2.750
+  gp-frame + gable    0
+```
+
+`wallInfillProfiles` takes every raked area to `lift + span·slope`, where `lift` is the rafter
+CENTRE plane's datum above the plate. For a RAKE that is right, and the comment says why it was
+added: *"otherwise the siding stops short of the rake by an inch and three quarters and daylight
+shows through the gable."* There the siding runs up BESIDE the end rafter.
+
+The high wall is the one the rafters CROSS. Every one of them lands on its pony plate and runs on
+out to the eave, so siding taken up to their centre buries each one to half its depth. A gable has
+no such wall — its bearing walls stop at the plate — which is why the gable measures zero and why
+nothing had ever caught this.
+
+The figure it should be is one `generateShed` already computes and states in its own comment:
+
+```
+  the pony wall's height   (span − plateWidth)·slope       6.5694 ft on a 48 x 20 at 4 in 12
+  its plate top            14.5694
+  the rafters' underside   14.5693                          the same line, to a ten-thousandth
+  the old infill top       14.8110                          2.9 in of siding over the top of it
+```
+
+*"The seat at the LOW wall lands at the plate's inner face and the seat at the HIGH wall at its
+outer face"* — that is why the two agree exactly, and why the pony plate's top IS where the siding
+has to stop.
+
+### And the pony studs were a quarter turn out
+
+```
+  wall stud below     1.50 in along the run, 3.50 across      z 19.708..20.000 — the whole wall
+  pony stud above     3.50 in along the run, 1.50 across      z 19.792..19.917 — floating in it
+```
+
+`rotation: [0, 0, π/2]` says "a stud" only when the wall runs along Z. On a high side of N or S the
+thirty-seven pony studs filled neither face of the wall they stood in, did not stack on the studs
+below, and pushed 1 in past the building line at each corner. It is the gable rake studs' defect —
+*"186 gable studs across nine cards stood 1½ in across a 3½-in wall"*, fixed in `roof.ts` as a
+compat-lock event — sitting untouched in the sibling generator, on the two high sides out of four
+that nobody had built.
+
+`surfaceYaw` is the yaw that lays a member ALONG a wall; a stud is turned across it, so the quarter
+turn belongs in the rotation rather than nowhere. E and W come out at the yaw they already had.
+
+### What the renders show, and what they do not
+
+The shed roof renders as a correct single-slope building — one plane, pony wall, eave, fascia,
+roofing — before and after. Both defects are inside the wall: the siding's top 2.9 in are under the
+roof deck, and a stud's plan section is not something an exterior view resolves. Both contradict the
+generator's own written rules, both are measured to a thousandth, and both are stated that way
+rather than dressed up as something the eye caught.
+
+### The four things asserted
+
+`test/timber2-shed-pony-wall.test.ts`, over shed on all four high sides plus flat — five
+configurations, 4,000+ rafter/infill pairs. All four fail on the old generator.
+
+1. **The high wall closes in under the rafters** — no rafter shares wood with the infill, with the
+   gable as a control.
+2. **And it reaches that plate** — the infill's top and the pony plate's top are the same line to
+   1e-9. A fix by an arbitrary drop would pass (1) and open a strip of daylight.
+3. **A pony stud's face goes across its wall** — the same plan section as the stud it stands on.
+4. **And it fills the same slab, and stands over the framing below** — the section alone is
+   necessary and not sufficient; a stud turned right but set off the centreline is still not in
+   its wall.
+
+`timber2-coverings.test.ts` needed one of its assertions restated: it pinned the pony wall's infill
+area at `L·(W·slope + lift)`, which is the old figure — the assertion that encoded the defect. The
+`lift` still belongs on the two rakes below it, and those are unchanged.
+
+Nothing on any shipped card moves: all fourteen presets byte-identical, no golden touched.

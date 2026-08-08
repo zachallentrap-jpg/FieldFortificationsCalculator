@@ -326,8 +326,17 @@ test('a shed closes in its pony wall and both rakes; a hip has nothing to close 
 
   const shed = generateStructure({ ...base, roof: { kind: 'shed', risePer12: 4, overhangFt: 1, highSide: 'N' } });
   // High wall: a pony wall of constant height over a wall that runs the full length.
+  //
+  // TO THE PONY PLATE, NOT TO THE ROOF PLANE. `W · slope + lift` is where the rafters' CENTRE line
+  // crosses this wall, and the rafters CROSS it — they land on its plate and run on to the eave —
+  // so siding taken up to that line buried every one of them to half its depth (48 pairs at
+  // 2.750 in). The pony wall's own height is `(W − plateWidth)·slope`, which `generateShed`
+  // computes and states, and its plate top IS the rafters' underside. The `lift` still belongs on
+  // the two RAKES below, where the siding runs up beside the end rafter rather than under it.
   const lift = rafterSeatLiftFt(DRESSED['2x6']!.d, DRESSED['2x4']!.d, slope);
-  assert.ok(Math.abs(infillArea(shed, 'N') - L * (W * slope + lift)) < 1e-6, 'pony wall over the high plate');
+  const plateWidth = DRESSED['2x4']!.d / 12;
+  assert.ok(Math.abs(infillArea(shed, 'N') - L * (W - plateWidth) * slope) < 1e-6,
+    `pony wall over the high plate: ${infillArea(shed, 'N')} vs ${L * (W - plateWidth) * slope}`);
   // The two walls parallel to the slope: a right triangle rising to the high side over the FULL
   // WIDTH, corner to corner — not over the clear run between the through walls, which is where
   // this used to stop and is how a 3½-in strip of open rake stood in each corner. The profile is

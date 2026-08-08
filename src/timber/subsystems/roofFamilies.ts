@@ -24,7 +24,7 @@ import { DRESSED } from '../types';
 import type { BuildingSpec, RoofSpec } from '../spec';
 import { makeEmitter } from '../emit';
 import { LUMBER, LAYOUT, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
-import type { WallsContract } from './wallSystem';
+import { surfaceYaw, type WallsContract } from './wallSystem';
 import { rafterSeatLiftFt } from '../birdsMouth';
 
 /** A roof surface in its own (u along the eave, v up the slope) coordinates. */
@@ -341,7 +341,22 @@ export function wallInfillProfiles(
   const span = alongZ ? W : L;
   const up = highSide === 'N' || highSide === 'E' ? 1 : -1;
   const high = walls.surfaces.find((q) => q.wall === highSide);
-  if (high) out.push({ wall: highSide, topAt: () => lift + span * slope });
+  if (high) {
+    // THE HIGH WALL'S TOP IS ITS OWN PLATE, not the roof plane. `lift` is the rafter CENTRE
+    // plane's datum, which is the right line for a RAKE — there the siding runs up BESIDE the end
+    // rafter and stopping at its underside would leave a wedge of daylight. The high wall is the
+    // one the rafters CROSS: every one of them lands on this wall's pony plate and runs on out to
+    // the eave, so siding taken up to their centre line buries each one to half its depth.
+    //
+    //   gp-frame + shed     48 rafter x infill pairs at 2.750 in — half a 2x6, on every rafter
+    //
+    // The figure is the pony wall's own height, which `generateShed` already computes and states:
+    // "(span − plateWidth)·slope, NOT span·slope … the seat at the LOW wall lands at the plate's
+    // inner face and the seat at the HIGH wall at its outer face". Its plate top IS the rafters'
+    // underside there, to the last thousandth, so the siding stops exactly where they start.
+    const plateWidthFt = DRESSED[LUMBER.plateNominal.value as string]!.d / IN_PER_FT;
+    out.push({ wall: highSide, topAt: () => Math.max(0, (span - plateWidthFt) * slope) });
+  }
   for (const wall of (alongZ ? ['E', 'W'] : ['S', 'N']) as WallId[]) {
     const s = walls.surfaces.find((q) => q.wall === wall);
     if (!s) continue;
@@ -459,7 +474,17 @@ export function generateShed(input: ShedInput): Member[] {
       emit('ponyStud', studNominal, {
         cutLengthFt: studLen,
         position: [x, H + studLen / 2, z],
-        rotation: [0, 0, Math.PI / 2],
+        // A STUD'S FACE GOES ACROSS ITS WALL, and a bare `[0, 0, π/2]` only says so when the wall
+        // happens to run along Z. On a high side of N or S these stood 1½ in across a 3½-in wall
+        // with their 3½-in face along the run — the gable rake studs' quarter turn (fixed in
+        // `roof.ts`, a compat-lock event) in the sibling generator, and never caught because no
+        // shipped card has a shed roof. It reads as a stud that does not fill its own wall, does
+        // not stack on the stud below, and pushes 1 in past the building line at each corner.
+        //
+        // `surfaceYaw` is the yaw that lays a member ALONG a wall; a stud is turned across it, so
+        // the quarter turn belongs here rather than nowhere. E and W come out at the yaw they
+        // already had, so a high side that was right stays byte-identical in extent.
+        rotation: [0, surfaceYaw(highSurface) + Math.PI / 2, Math.PI / 2],
         stage: stageRoofFrame,
         wall: highSide,
         nailing: 'toenail 2-8d each end (PH)',
