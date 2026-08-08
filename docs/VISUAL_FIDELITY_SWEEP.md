@@ -111,6 +111,8 @@ screenshots get read.
 | **Two posts in one hole on a tall tower's stair** | **Fixed** — a switchback is four railed surfaces meeting, and each flight's rail post shared its hole with the landing's: 10 pairs at 3.500 in on a 32-ft tower, 8 on a 24. Plus the bridge's own end post a quarter inch inside the deck rail's. |
 | **The shed roof's pony wall** | **Fixed, twice.** No shipped card has a shed or flat roof and neither had ever been measured. Its siding ran up to the rafters' CENTRE line and buried all 48 of them to half their depth (2.750 in); and its studs were a quarter turn out on a N or S high side — 1½ in across a 3½-in wall, the gable rake studs' defect in the sibling generator. |
 | **A hut with a shed roof, which threw** | **Fixed** — `normalize.ts`'s roof repair lived inside `normalizeBuilding` and `normalizeHut` ran none of it. All six hut cards declare `shed` in their own `roofs` list; the spec threw on `walls.surfaces.find(…)!` and the workbench sat on "Laying out the frame…" for ever. Four other malformed roofs came back with NO ROOF and zero issues. |
+| **The beam over an open front** | **Fixed** — laid `bayFt + postD` long and centred on its bay, each beam reached half a post past BOTH ends: at every interior post the two beams meeting there each covered the whole post (5 pairs at 1.500 in on a 48-ft front), and the two end beams stood 1¾ in past the building line into the side wall's siding. |
+| The let-in brace against what it is let into | **Checked, not a defect.** A brace let ¾ in into the studs' outer faces shares 0.700 in with every one it crosses — 364 pairs at a flat 0.700 across the seven braced cards, and the same 0.700 against an open front's corner post. The notch is not a mesh cut; sixth documented approximation. |
 
 ## The shed that had no walls above the plate
 
@@ -5003,3 +5005,67 @@ of the five fail on the old normalizer.
    about its roof.
 
 Nothing on any shipped card moves: all fourteen presets byte-identical, no golden touched.
+
+## The beam over an open front, where two bays meet
+
+`openFront` names one wall as the whole opening — a storage shed you back a vehicle into. The pass
+that builds it lays posts on the wall line and one beam per bay across them. The beam was
+`bayFt + postD` long and centred on its bay, which reaches half a post past BOTH of its ends:
+
+```
+  gp-frame, front open on S, 48 ft, six 8-ft bays
+    OF-header-01  x −0.146 .. 8.146      OF-header-02  x 7.854 .. 16.146      …
+
+    5  header x header   1.500 in    a 3½ x 9¼ x 1½-in block of wood, shared
+    2  header x siding   1.750 in    both end beams past the corner, into the side wall
+```
+
+At an interior post the two beams meeting there each covered the WHOLE post, so each was a post
+deep inside the other. At the two corners the beam stood 1¾ in past the building line.
+
+**A splice over a post lands on its centreline** — half the post under each beam, which is the
+joint two beams butting over a post actually make. The two ends go the other way and run to the
+plan line: the corner posts are already held half a post inside the corner so they stand ON it, so
+the beam that reaches them bears on the whole post and stops where the building does.
+
+```
+  after   0..8   8..16   16..24   24..32   32..40   40..48
+```
+
+Rendered at the walls stage the open bay is three posts and a beam line with the plates over it;
+clad, it is a covered bay with a clean head and no post standing proud at either corner.
+
+### Checked this pass and NOT a defect
+
+**The let-in brace against what it is let into.** The open front's corner post picked up a
+`brace x post` overlap of 0.700 in, which looked like a new collision and is not one:
+
+```
+  E-brace-01 x OF-post-07   0.700 in        E-brace-01 x E-stud-01    0.700 in
+  brace x stud, catalog-wide, seven braced cards   364 pairs, 0.700 .. 0.700 in — flat
+```
+
+A let-in brace is a ¾-in board buried in a notch cut in the studs' outer faces. The board's box
+sits 0.700 in inside that face and 0.05 in proud of it, so it shares exactly 0.700 in with every
+piece of framing it crosses — every stud on every braced card, at one identical figure. The notch
+is not modelled as a mesh cut, so the pair reads as an overlap and renders as a let-in brace. The
+open front's corner post is simply one more thing the brace is let into, at the same figure.
+
+Sixth documented approximation this sweep has re-found; recorded with the five before it.
+
+### The four things asserted
+
+`test/timber2-open-front-beam.test.ts`, over three building cards × four walls. All four fail on
+the old generator.
+
+1. **No two beams share wood** — the defect, stated as a collision.
+2. **Nothing stands past the building line** — beams inside the posts' own extent, and clear of the
+   neighbouring walls' skin.
+3. **The beam line is CONTINUOUS** — no gap between consecutive beams; every splice on a post's
+   centreline with half that post under each, and the two end beams on the whole corner post. This
+   is the guard a fix by shortening would fail: it would pass (1) and leave the plates unsupported.
+4. **The bay schedule is what it always was** — one beam per bay, each sized by the header table
+   for that bay, and the line spanning the whole opening.
+
+No shipped card sets `openFront` — the storage-shed card offers it in words and ships a doorway
+instead — so all fourteen presets are byte-identical and no golden moved.

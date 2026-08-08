@@ -98,12 +98,23 @@ export function generateOpenFront(input: OpenFrontInput): Member[] {
   }
 
   // One beam per bay, bearing on the posts and carrying the plates over the opening.
+  //
+  // A BEAM STOPS ON THE POST IT SHARES. `bayFt + postD`, centred on the bay, reached half a post
+  // past BOTH of its ends — so at every interior post the two beams meeting there each covered
+  // the whole post and shared a 3½ x 9¼ x 1½-in block of wood with each other (5 pairs on a 48-ft
+  // front), and the two end beams stood 1¾ in past the building line, into the corner wall's
+  // siding. A splice over a post lands on its CENTRELINE, which gives each beam half the post to
+  // bear on and the other beam the other half.
+  //
+  // The two ends are the exception and go the other way: the corner posts are already held half a
+  // post inside the corner so they stand ON the plan line, so the beam that reaches them runs to
+  // that line and bears on the whole post.
   for (let i = 0; i < bays; i++) {
-    const u0 = i * bayFt;
-    const u1 = (i + 1) * bayFt;
+    const u0 = i === 0 ? 0 : i * bayFt;
+    const u1 = i === bays - 1 ? runFt : (i + 1) * bayFt;
     const mid = at((u0 + u1) / 2);
     emit('header', beamNominal, {
-      cutLengthFt: bayFt + postD,
+      cutLengthFt: u1 - u0,
       position: [mid[0], beamBottom + beamD / 2, mid[1]],
       rotation: [0, yaw, 0],
       stage: stageWalls,
