@@ -14,7 +14,7 @@
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { lumberPiece, plywoodSheet, roofingSheet, screenSheet, disposeObject, toonGradient } from '../three-viewer';
+import { lumberPiece, cutLumberPiece, plywoodSheet, roofingSheet, screenSheet, disposeObject, toonGradient } from '../three-viewer';
 import type { LumberSize } from '../three-viewer';
 import type { Member } from '../../timber/types';
 import type { StructureModel } from '../../timber/families/index';
@@ -28,6 +28,11 @@ import {
   type CutawayState, type Aabb,
 } from './cutaway';
 import { cameraRigsFor, memberAabb, type CameraRig } from './camera';
+import { roofingTiling } from './tiling';
+import { seatCutsFor, seatProfile, type SeatCut } from '../../timber/birdsMouth';
+import { stringerEndProfile, stairStringerProfile, ridgeHeadProfile, levelFootProfile } from '../../timber/stringerCuts';
+import { riserLidOf, seatOpeningsFor, seatOpeningPath } from '../../timber/riserSeats';
+import { fmtFtIn } from '../../timber/units';
 
 export interface StudioHandles {
   setModel(model: StructureModel): void;
@@ -37,7 +42,13 @@ export interface StudioHandles {
 }
 
 const CONCRETE = 0xa9a69f;
-const SELECT_TINT = 0xff8844;
+// Every tint MULTIPLIES the material's own color, so these read as a wash over the real
+// material rather than as flat paint — the plywood still shows its grain and the corrugated
+// roofing still shows its ribs, they just go red. That matters: the point of highlighting is to
+// say WHICH piece, not to hide what the piece is made of. Red is chosen over the old orange
+// because tan lumber under an orange wash is still tan lumber.
+const SELECT_TINT = 0xd2402a;
+const HOVER_TINT = 0xffa06a;
 const STAGE_TINT = 0xffe9b0;
 
 function propFor(nominal: string): LumberSize {
@@ -46,16 +57,11 @@ function propFor(nominal: string): LumberSize {
   return nominal.startsWith('2x') ? '2x6' : '4x4';
 }
 
-/** Carpenter-readable feet-inches: 92.625" → 7'-8 5/8". */
-export function fmtFtIn(inches: number): string {
-  const eighths = Math.round(inches * 8);
-  const ft = Math.floor(eighths / 96);
-  let rem = eighths - ft * 96;
-  const inch = Math.floor(rem / 8);
-  rem -= inch * 8;
-  const frac = rem === 0 ? '' : rem % 4 === 0 ? ' 1/2' : rem % 2 === 0 ? ` ${rem / 2}/4` : ` ${rem}/8`;
-  return `${ft}'-${inch}${frac}"`;
-}
+/**
+ * Carpenter-readable feet-inches: 92.625" → 7'-8 5/8". Re-exported rather than defined here so
+ * the trainer, which runs under `node --test`, can format a length without importing the DOM.
+ */
+export { fmtFtIn };
 
 const esc = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -75,6 +81,7 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
   let model = initial;
   let stage = Number.MAX_SAFE_INTEGER; // "All" until the user scrubs
   let selected: string | null = null;
+  let hovered: string | null = null;
   let cut: CutawayState = initialCutawayState();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -88,8 +95,8 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
   // saturated thing in the frame.
   const darkAppearance = window.matchMedia('(prefers-color-scheme: dark)');
   const sceneColors = () => (darkAppearance.matches
-    ? { sky: 0x1c1c1e, ground: 0x2c2c2e, bounce: 0x14161a, ambient: 0.30 }
-    : { sky: 0xf2f2f5, ground: 0xdedee2, bounce: 0x4a3a22, ambient: 0.26 });
+    ? { sky: 0x1c1c1e, grid: 0x3a3a3d, gridAxis: 0x55555a, bounce: 0x14161a, ambient: 0.30 }
+    : { sky: 0xf2f2f5, grid: 0xc9c9ce, gridAxis: 0xa8a8b0, bounce: 0x4a3a22, ambient: 0.26 });
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(sceneColors().sky);
@@ -104,12 +111,27 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
   const sun = new THREE.DirectionalLight(0xffffff, 1.15);
   sun.position.set(12, 20, 8);
   scene.add(sun);
+  // GROUND BOUNCE, and it is not decoration. With one sun overhead every downward-facing
+  // surface sat in the bottom band of the toon ramp — which was invisible but harmless while a
+  // solid ground slab meant nobody could get under the building. Now that the orbit goes all
+  // the way beneath, the underside is a view people will actually use, and unlit it comes back
+  // as one black mass with the framing lost inside it. This light points UP, so it reaches
+  // only the faces the sun cannot and leaves every lit surface exactly as tuned above.
+  const bounceUp = new THREE.DirectionalLight(0xffffff, 0.62);
+  bounceUp.position.set(-9, -16, -7);
+  scene.add(bounceUp);
   darkAppearance.addEventListener('change', () => {
     const s = sceneColors();
     scene.background = new THREE.Color(s.sky);
     hemi.groundColor.setHex(s.bounce);
     ambient.intensity = s.ambient;
-    if (ground) (ground.material as THREE.MeshToonMaterial).color.setHex(s.ground);
+    // The grid bakes its two colors into vertex colors, so it is remade rather than recolored.
+    if (ground) {
+      scene.remove(ground);
+      (ground as THREE.GridHelper).dispose();
+      ground = makeGrade();
+      scene.add(ground);
+    }
     // The render loop is continuous, so the next frame picks this up on its own.
   });
   // Warm fill from inside, so a cut face is lit rather than a black hole.
@@ -119,12 +141,46 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
   const persp = new THREE.PerspectiveCamera(40, 1, 0.1, 800);
   const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, -400, 800);
   let camera: THREE.Camera = persp;
-  let controls = new OrbitControls(persp, renderer.domElement);
-  controls.enableDamping = true;
+  /**
+   * One place configures every OrbitControls this studio ever makes (the rig switch between
+   * perspective and orthographic disposes and recreates them, so settings applied only at boot
+   * silently vanished on the first Plan-view click).
+   *
+   * THE ORBIT IS A FULL SPHERE, on purpose. It used to stop at grade — there was a solid ground
+   * slab and a floor on the camera's own height, because dropping below it filled the screen
+   * with a grey underside and the building vanished. The slab is gone (see `rebuild`), so
+   * "below grade" is now the most useful angle in the tool rather than a dead end: it is the
+   * only way to look up at what a floor is built from, how a pier deck is carried, what a
+   * bunker's overhead stringers land on, or how deep a basement actually goes.
+   */
+  const tuneControls = (c: OrbitControls): OrbitControls => {
+    c.enableDamping = true;
+    return c;
+  };
+  let controls = tuneControls(new OrbitControls(persp, renderer.domElement));
 
   const group = new THREE.Group();
   scene.add(group);
-  let ground: THREE.Mesh | null = null;
+  /**
+   * GRADE IS A GRID, NOT A FLOOR. This used to be a solid slab three footprints wide, and it
+   * did exactly what a floor does: it hid everything under it. The pier posts a building stands
+   * on, the joists and bridging over them, the underside of a deck, a bunker's overhead
+   * stringers, how far a basement really drops — all of it was on the far side of an opaque
+   * surface, and the orbit was clamped above that surface precisely because dropping below it
+   * showed nothing but grey.
+   *
+   * A line grid carries everything the slab was actually for — where grade is, which way is
+   * down, and a 4-ft module to read size against — while occluding nothing. Look up from
+   * underneath and the whole structure is there, with the grid drawn across it like a
+   * survey line rather than a lid.
+   */
+  const GRID_MODULE_FT = 4; // one plywood module, so the squares are a ruler and not decoration
+  // Seen from above, grade is a datum and reads at full strength. Seen from BELOW it is between
+  // the eye and the framing — a mesh of lines laid over the very thing you dropped down there to
+  // look at — so it fades back to a hint that still says where grade is without veiling anything.
+  const GRID_OPACITY = 0.55;
+  const GRID_OPACITY_UNDER = 0.14;
+  let ground: THREE.Object3D | null = null;
   const byId = new Map<string, THREE.Group>();
   const clipPlanes: THREE.Plane[] = [];
 
@@ -133,8 +189,23 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
 
   // ── Scene construction ─────────────────────────────────────────────────────
 
+  /**
+   * Every rafter's bird's-mouth, recomputed with the model. Derived, never stored: the notch is a
+   * consequence of where the engine put the rafter and the plate, so nothing upstream has to know
+   * the viewer draws it and no golden moves when it changes.
+   */
+  let seats = new Map<string, SeatCut[]>();
+  /**
+   * The latrine lid's seat openings, and the id of the lid they belong to. Derived with the
+   * model for the same reason the notch is: the holes are a consequence of where the engine put
+   * the lid and its dividers, so nothing upstream has to know the viewer punches them.
+   */
+  let riserLidId: string | null = null;
+  let riserHoles: [number, number][][] = [];
+
   function buildMemberMesh(m: Member): THREE.Group {
     let p: THREE.Group;
+    const seat = seats.get(m.id);
     if (m.nominal.includes('conc') || m.role === 'slab' || m.role === 'footing' || m.role === 'foundationWall') {
       p = new THREE.Group();
       const geo = new THREE.BoxGeometry(
@@ -144,20 +215,22 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
       );
       p.add(new THREE.Mesh(geo, new THREE.MeshToonMaterial({ color: CONCRETE, gradientMap: toonGradient() })));
       group.add(p);
-    } else if (m.role === 'roofingCourse') {
+    } else if (m.role === 'roofingCourse' || m.role === 'ridgeCap') {
       // Roll goods vs. corrugated metal — two different materials, told apart by the nominal the
-      // engine already wrote. `repeatAlong` keeps the granule/rib scale constant on any run
-      // length: a course is as long as the eave, so one stretched tile would be nonsense.
-      const corrugated = m.nominal.startsWith('corrugated');
-      const tileFt = corrugated ? 26 / 12 : 3;
-      p = roofingSheet(group, corrugated ? 'corrugated' : 'roll', Math.round(m.cutLength / 12 / tileFt), corrugated ? 1 : Math.round(m.actual.d / 36));
+      // engine already wrote. The tile counts keep the granule/rib scale constant on any piece,
+      // and they are RATIOS: see `tiling.ts` for what rounding them to whole tiles did.
+      const t = roofingTiling(m);
+      p = roofingSheet(group, t.kind, t.along, t.across);
       p.scale.set(m.cutLength / 12, m.actual.d / 12, Math.max(0.02, m.actual.w / 12));
     } else if (m.role === 'soilGhost') {
       // MASSING, not material. Translucent and unlit so it can never be mistaken for something
       // that was built, and its member card carries the boundary sentence as its doctrine ref.
       p = new THREE.Group();
+      // (len, d, w) — the same mapping every other role in this function uses. It used to read
+      // (len, w, d), a private swap that cancelled a swap in the emitter, so the 3D view was right
+      // and every other consumer of `actual` was wrong. Fixed in the emitter instead.
       p.add(new THREE.Mesh(
-        new THREE.BoxGeometry(Math.max(0.05, m.cutLength / 12), Math.max(0.05, m.actual.w / 12), Math.max(0.05, m.actual.d / 12)),
+        new THREE.BoxGeometry(Math.max(0.05, m.cutLength / 12), Math.max(0.05, m.actual.d / 12), Math.max(0.05, m.actual.w / 12)),
         new THREE.MeshBasicMaterial({ color: 0x8a7a5e, transparent: true, opacity: 0.22, depthWrite: false }),
       ));
       group.add(p);
@@ -168,6 +241,45 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     } else if (m.nominal.includes('panel')) {
       p = plywoodSheet(group);
       p.scale.set(m.cutLength / 12, m.actual.d / 12, Math.max(0.02, m.actual.w / 12));
+    } else if (m.id === riserLidId && riserHoles.length) {
+      // THE SEAT OPENINGS. `generateRiserBox` promised "a seat opening per seat" and cut none, so
+      // a four-seat latrine was an unbroken ten-foot bench — the one feature that makes the
+      // building a latrine, missing. The lid is a flat board; the holes go through it.
+      const hx = m.cutLength / 24;
+      const hy = m.actual.d / 24;
+      p = cutLumberPiece(
+        group,
+        [[-hx, -hy], [hx, -hy], [hx, hy], [-hx, hy]],
+        m.actual.w / 12,
+        riserHoles,
+      );
+    } else if (m.role === 'stringer') {
+      // A STAIR stringer is cut: a level seat under every tread, a plumb face between each pair,
+      // the foot cut level on the ground and the head plumb at the landing. Drawn as a plain
+      // raked box it ended in two sharp wedges — one 4 in under the earth, one the same distance
+      // above the landing — and its straight top edge crossed every tread it was meant to carry.
+      //
+      // A RAMP's stringer carries the same role and has no steps to cut, so it falls back to the
+      // end cuts alone. `stairStringerProfile` says which is which off the piece itself.
+      p = cutLumberPiece(group, stairStringerProfile(m) ?? stringerEndProfile(m), m.actual.w / 12);
+    } else if (m.role === 'towerBrace' && levelFootProfile(m)) {
+      // A TOWER X-BRACE lands on the footing its legs stand on, and a diagonal meeting a level
+      // thing is cut level. Struck corner to corner and left square, the board's low corner
+      // reaches 2.21 in below the corner it was struck from, which put every bottom-bay brace's
+      // foot inside the mudsill (1.93 in) or the concrete pad (1.92) on all four faces.
+      p = cutLumberPiece(group, levelFootProfile(m)!, m.actual.w / 12);
+    } else if (m.role === 'bentRafter' && ridgeHeadProfile(m)) {
+      // A TENT BENT'S RAFTER lands on a ridge board, and a rafter meeting a ridge is cut plumb.
+      // Square to the rake it is a wedge that cannot be placed: bear its low corner on the board
+      // and its top corner gapes; centre it on the board's face and the low corner is inside both
+      // the ridge and the opposite rafter. The cut is what makes the joint placeable at all.
+      p = cutLumberPiece(group, ridgeHeadProfile(m)!, m.actual.w / 12);
+    } else if (seat?.length) {
+      // A NOTCHED rafter. The plain prop is a box, and a box laid at pitch across a cap plate
+      // intersects it — 3 inches of rafter buried in the plate at every bearing, on every roof.
+      // Cut the seat instead: the piece now lands ON the plate, and the notch reads as the
+      // bird's-mouth it is from any angle you orbit to.
+      p = cutLumberPiece(group, seatProfile(m, seat), m.actual.w / 12);
     } else {
       p = lumberPiece(group, propFor(m.nominal), m.cutLength / 12, m.actual.d / 12, m.actual.w / 12);
     }
@@ -190,16 +302,34 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     return p;
   }
 
+  /**
+   * Recolor every material under a wrapper, or restore each one's own original color.
+   *
+   * WHAT WAS BROKEN. This used to read `o.material instanceof THREE.MeshToonMaterial`, and that
+   * test is false for most of the interesting members. A plywood sheet carries an ARRAY of six
+   * materials (grained faces, ply-edge sides) and an array is not an instance of anything; so
+   * does a roofing course; insect screen is a MeshBasicMaterial because it has to be
+   * see-through. So selecting a piece of plywood, a screen panel or a run of roofing highlighted
+   * NOTHING — the operator clicked a panel, read its card, and had no idea which panel on screen
+   * it was. Everything with a color gets tinted now, arrays included, and the original is
+   * remembered PER MATERIAL rather than per mesh (one mesh, six colors to put back).
+   */
   function tint(wrapper: THREE.Group, hex: number | null): void {
     wrapper.traverse((o) => {
-      if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshToonMaterial) {
-        const mat = o.material;
+      if (!(o instanceof THREE.Mesh)) return;
+      // The cartoon outline is a black backface shell. Tinting it turns the piece into a
+      // coloured blob with no silhouette, so it keeps its own color throughout.
+      if (o.userData.isOutline === true) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const mat of mats) {
+        const m = mat as THREE.Material & { color?: THREE.Color };
+        if (!m?.color) continue;
+        const store = m.userData as { baseColor?: number };
         if (hex === null) {
-          const base = (o.userData.baseColor as number | undefined);
-          if (base !== undefined) mat.color.setHex(base);
+          if (store.baseColor !== undefined) m.color.setHex(store.baseColor);
         } else {
-          if (o.userData.baseColor === undefined) o.userData.baseColor = mat.color.getHex();
-          mat.color.setHex(hex);
+          if (store.baseColor === undefined) store.baseColor = m.color.getHex();
+          m.color.setHex(hex);
         }
       }
     });
@@ -230,31 +360,69 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     });
   }
 
+  /**
+   * The grade grid, sized to whatever is standing. Square and generous — grade does not stop at
+   * the eave — and snapped to whole modules so the lines stay on foot marks at any building
+   * size. Non-writing depth and a low opacity are what keep it a reference rather than a
+   * surface: it never hides a member, from above or from below.
+   */
+  function makeGrade(): THREE.Object3D {
+    const box = memberAabb(model.members);
+    const span = Math.max(box.max[0] - box.min[0], box.max[2] - box.min[2]);
+    const size = Math.ceil((span * 2 + 20) / GRID_MODULE_FT) * GRID_MODULE_FT;
+    const c = sceneColors();
+    const grid = new THREE.GridHelper(size, size / GRID_MODULE_FT, c.gridAxis, c.grid);
+    const mat = grid.material as THREE.LineBasicMaterial;
+    mat.transparent = true;
+    mat.opacity = GRID_OPACITY;
+    mat.depthWrite = false;
+    grid.position.set(
+      (box.min[0] + box.max[0]) / 2,
+      model.levels.gradeY ?? 0,
+      (box.min[2] + box.max[2]) / 2,
+    );
+    // Behind everything built, so a member and the grid never fight over the same pixel.
+    grid.renderOrder = -1;
+    return grid;
+  }
+
   function rebuild(): void {
     disposeObject(group);
     group.clear();
     byId.clear();
+    seats = seatCutsFor(model.members);
+    const lid = riserLidOf(model.members);
+    riserLidId = lid?.id ?? null;
+    riserHoles = lid ? seatOpeningsFor(model.members).map(seatOpeningPath) : [];
     for (const m of model.members) {
       const mesh = buildMemberMesh(m);
       byId.set(m.id, mesh);
     }
     if (ground) {
-      disposeObject(ground);
+      // A GridHelper is LineSegments, which `disposeObject` (Mesh/Sprite only) would skip —
+      // it frees its own geometry and material instead.
       scene.remove(ground);
+      (ground as THREE.GridHelper).dispose();
     }
-    const box = memberAabb(model.members);
-    const gy = model.levels.gradeY ?? 0;
-    ground = new THREE.Mesh(
-      new THREE.BoxGeometry((box.max[0] - box.min[0]) * 3 + 20, 0.05, (box.max[2] - box.min[2]) * 3 + 20),
-      new THREE.MeshToonMaterial({ color: sceneColors().ground, gradientMap: toonGradient() }),
-    );
-    ground.position.set((box.min[0] + box.max[0]) / 2, gy - 0.03, (box.min[2] + box.max[2]) / 2);
+    ground = makeGrade();
     scene.add(ground);
     applyClipping();
     applyStage();
     applySelection();
   }
 
+  /**
+   * ONE PASS OWNS EVERY MEMBER'S COLOR. Stage tinting and selection tinting used to be two
+   * passes that each undid part of the other's work, which is survivable with two states and
+   * not with three — and hovering is the third. Precedence, highest first:
+   *
+   *   selected  the piece whose card is open. Unmistakable, because "which one is it" is the
+   *             question the card cannot answer on its own.
+   *   hovered   what the pointer is over right now, so you can see what you are about to click.
+   *   stage     everything going in during the stage being scrubbed.
+   *
+   * Visibility is settled here too, since it depends on the same stage number.
+   */
   function applyStage(): void {
     const maxStage = model.stagePlan.length;
     const showAll = stage >= maxStage;
@@ -264,15 +432,16 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
       mesh.visible = m.stage <= stage;
       // "All" is a DISTINCT state from selecting the last stage: no current-stage tint.
       const isCurrent = !showAll && m.stage === stage;
-      if (m.id !== selected) tint(mesh, isCurrent ? STAGE_TINT : null);
+      tint(mesh, m.id === selected ? SELECT_TINT
+        : m.id === hovered ? HOVER_TINT
+        : isCurrent ? STAGE_TINT
+        : null);
     }
   }
 
+  /** Kept as its own name because the call sites read better in pairs; the work is above. */
   function applySelection(): void {
-    for (const [id, mesh] of byId) {
-      if (id === selected) tint(mesh, SELECT_TINT);
-      else if (!(stage < model.stagePlan.length && (mesh.userData.stage as number) === stage)) tint(mesh, null);
-    }
+    applyStage();
   }
 
   // ── Cutaway ────────────────────────────────────────────────────────────────
@@ -358,8 +527,7 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     if (next !== camera) {
       controls.dispose();
       camera = next;
-      controls = new OrbitControls(camera as THREE.PerspectiveCamera, renderer.domElement);
-      controls.enableDamping = true;
+      controls = tuneControls(new OrbitControls(camera as THREE.PerspectiveCamera, renderer.domElement));
     }
     camera.position.set(...rig.position);
     camera.up.set(...rig.up);
@@ -528,8 +696,33 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
 
   // ── Picking ────────────────────────────────────────────────────────────────
 
+  // ── First-run hint ─────────────────────────────────────────────────────────
+  //
+  // The Learning app's whole promise is "tap any piece to find out what it is", and nothing on
+  // a fresh viewport says so — a 3D scene reads as a picture until something proves it is not.
+  // One pill, above the model, once ever: it ignores the pointer entirely (so it can never
+  // block the tap it is asking for), disappears on the first successful pick, and never comes
+  // back. Its own localStorage key rather than the versioned session store, because a hint is
+  // not state worth migrating.
+  const TAP_HINT_KEY = 'timber.hint.tap-piece';
+  let tapHint: HTMLElement | null = null;
+  if (FEATURES.flashcards && !window.localStorage.getItem(TAP_HINT_KEY)) {
+    tapHint = document.createElement('div');
+    tapHint.className = 'tap-hint';
+    tapHint.textContent = 'Tap any piece to see what it is';
+    dom.viewport.appendChild(tapHint);
+  }
+  function dismissTapHint(): void {
+    if (!tapHint) return;
+    tapHint.remove();
+    tapHint = null;
+    try { window.localStorage.setItem(TAP_HINT_KEY, '1'); } catch { /* private mode: shows again, harmless */ }
+  }
+
   const raycaster = new THREE.Raycaster();
-  renderer.domElement.addEventListener('click', (ev) => {
+
+  /** The member under the pointer, or null. One implementation, so hover and click agree. */
+  function memberAt(ev: { clientX: number; clientY: number }): string | null {
     const r = renderer.domElement.getBoundingClientRect();
     const ndc = new THREE.Vector2(
       ((ev.clientX - r.left) / r.width) * 2 - 1,
@@ -537,27 +730,53 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
     );
     raycaster.setFromCamera(ndc, camera);
     const eq = planeForState(cut, bounds());
-    const hits = raycaster.intersectObjects(group.children, true);
-    let id: string | null = null;
-    for (const h of hits) {
-      // Clicking through a cut must select what you SEE — same plane equation as the renderer.
+    for (const h of raycaster.intersectObjects(group.children, true)) {
+      // Picking through a cut must find what you SEE — same plane equation as the renderer.
       if (!passesCut([h.point.x, h.point.y, h.point.z], eq)) continue;
       let o: THREE.Object3D | null = h.object;
       while (o && !o.userData.memberId) o = o.parent;
-      if (o?.userData.memberId) {
-        id = o.userData.memberId as string;
-        break;
-      }
+      if (!o?.userData.memberId) continue;
+      // Same rule for the stage scrubber: three's raycaster tests meshes the renderer is
+      // hiding, so with the build scrubbed back to stage 8 a tap on a rafter would select
+      // the invisible roofing above it — and the card would name a piece that is not on
+      // screen. What you see is what you pick; a hidden hit lets the ray keep going.
+      if (!o.visible) continue;
+      return o.userData.memberId as string;
     }
-    selected = id;
+    return null;
+  }
+
+  renderer.domElement.addEventListener('click', (ev) => {
+    selected = memberAt(ev);
+    if (selected) dismissTapHint();
     applyStage();
-    applySelection();
     renderMemberCard();
   });
 
+  // HOVER. A raycast per pointermove is affordable here (a few hundred boxes) but pointless
+  // while the camera is being dragged, so orbiting suppresses it — otherwise every orbit
+  // repaints the whole model as the pointer sweeps across it.
+  let dragging = false;
+  renderer.domElement.addEventListener('pointerdown', () => { dragging = true; });
+  window.addEventListener('pointerup', () => { dragging = false; });
+  renderer.domElement.addEventListener('pointerleave', () => {
+    if (hovered === null) return;
+    hovered = null;
+    applyStage();
+  });
+  renderer.domElement.addEventListener('pointermove', (ev) => {
+    if (dragging) return;
+    const id = memberAt(ev);
+    renderer.domElement.style.cursor = id ? 'pointer' : '';
+    if (id === hovered) return;
+    hovered = id;
+    applyStage();
+  });
+
   window.addEventListener('resize', () => {
+    // fitViewport alone: aspect and ortho frustum follow the new box, the POSE stays. Re-running
+    // the rig here meant every phone address-bar show/hide snapped the camera home mid-orbit.
     fitViewport();
-    useRig(activeRig);
   });
 
   // ── Boot ───────────────────────────────────────────────────────────────────
@@ -583,17 +802,37 @@ export function createStudio(dom: StudioDom, initial: StructureModel): StudioHan
   const loop = (): void => {
     raf = requestAnimationFrame(loop);
     controls.update();
+    if (ground) {
+      const gridMat = (ground as THREE.GridHelper).material as THREE.LineBasicMaterial;
+      const want = camera.position.y < ground.position.y ? GRID_OPACITY_UNDER : GRID_OPACITY;
+      if (gridMat.opacity !== want) gridMat.opacity = want;
+    }
     renderer.render(scene, camera);
   };
   loop();
 
   return {
     setModel(next) {
+      // THE CAMERA IS THE USER'S, NOT THE MODEL'S. This used to end in `useRig(activeRig)`,
+      // which snaps the camera back to the preset — so typing ONE DIGIT into Length threw away
+      // whatever viewpoint the operator had orbited to, on every keystroke. The pose is kept
+      // unless the structure's overall size or position changed enough that the old framing is
+      // pointing at empty air (dimension edits at that scale genuinely need a re-frame; a
+      // spacing or covering edit never does).
+      const before = memberAabb(model.members);
       model = next;
       if (selected && !model.members.some((m) => m.id === selected)) selected = null;
       rebuild();
       renderViews();
-      useRig(activeRig);
+      const after = memberAabb(model.members);
+      const size = (b: Aabb): number => Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]);
+      const drift = Math.hypot(
+        (after.min[0] + after.max[0]) - (before.min[0] + before.max[0]),
+        (after.min[1] + after.max[1]) - (before.min[1] + before.max[1]),
+        (after.min[2] + after.max[2]) - (before.min[2] + before.max[2]),
+      ) / 2;
+      const grew = size(after) / Math.max(1e-6, size(before));
+      if (grew > 1.25 || grew < 0.8 || drift > size(after) * 0.25) useRig(activeRig);
       renderStages();
       renderStagePanel();
       renderMemberCard();

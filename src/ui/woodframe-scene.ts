@@ -22,8 +22,7 @@ import {
 } from './woodframe/store';
 import { parseRoute, routeToHash, decodeSpec, encodeSpec } from './woodframe/router';
 import { FEATURES, APP_NAME, MODE } from './woodframe/mode';
-import { openCommandSheet } from './woodframe/sheet';
-import { buildDeck, groupLabel, shuffle, type Card } from './woodframe/cards';
+import { askPacketOptions, downloadMaterialsCsv, openCommandSheet, PACKET_DEFAULTS } from './woodframe/sheet';
 
 const esc = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -117,6 +116,7 @@ function render(): void {
 // ── Picker screen ───────────────────────────────────────────────────────────
 
 function renderPickerScreen(): void {
+  workbenchToken += 1; // cancel any workbench build still waiting on its paint frames
   if (studio) {
     studio.dispose();
     studio = null;
@@ -140,12 +140,6 @@ function regenerate(): void {
   studio?.setModel(model);
   renderIssues(issues.map((i) => i.message));
   renderStrips();
-  // The deck is generated FROM the model, so a changed model invalidates it — otherwise the
-  // student drills on a rafter the building no longer has.
-  deckCards = [];
-  deckIndex = 0;
-  deckFlipped = false;
-  renderDeck();
   session = commitBuild(session, { ...current, updatedAt: Date.now() }).state;
   scheduleSave();
 }
@@ -157,13 +151,15 @@ function renderIssues(messages: string[]): void {
   el.innerHTML = messages.map((m) => `<p>${esc(m)}</p>`).join('');
 }
 
-function renderWorkbench(build: StoredBuild): void {
-  current = build;
-  document.body.dataset.screen = 'build';
-  const family = familyById(build.familyId);
-  model = generateStructure(build.spec);
+/**
+ * Guards the two-phase workbench open: bumped on every navigation, checked before the deferred
+ * heavy build runs. Clicking Back during the yield must win — a build that fires anyway would
+ * resurrect a screen the user already left.
+ */
+let workbenchToken = 0;
 
-  app.innerHTML = `
+function workbenchHtml(build: StoredBuild, family: ReturnType<typeof familyById>, opening: boolean): string {
+  return `
     <div class="workbench">
       <header class="wb-head">
         <button class="back" id="backBtn" type="button">◀ Structures</button>
@@ -173,8 +169,8 @@ function renderWorkbench(build: StoredBuild): void {
           <button class="chip" id="shareBtn" type="button">Copy link</button>
           <button class="chip" id="unlockBtn" type="button">Unlock everything</button>
           ${FEATURES.commandOutputs
-            ? '<button class="chip chip--go" id="sheetBtn" type="button">Command sheet</button>'
-            : '<button class="chip chip--go" id="cardsBtn" type="button">Flashcards</button>'}
+            ? '<button class="chip chip--go" id="sheetBtn" type="button">Command packet</button>'
+            : '<a class="chip chip--go" href="learn.html">Flashcards</a>'}
         </div>
       </header>
       <div id="issues" class="issues" hidden></div>
@@ -189,10 +185,11 @@ function renderWorkbench(build: StoredBuild): void {
         <section class="pane pane--config" aria-label="Configure">
           <div id="configPanel"></div>
         </section>
-        <div id="viewport" class="viewport"></div>
+        <div id="viewport" class="viewport">${opening
+          ? '<div class="opening" role="status"><span class="ring" aria-hidden="true"></span><p>Laying out the frame…</p></div>'
+          : ''}</div>
         <aside class="pane pane--inspect" aria-label="Inspect">
           <div id="memberCard" class="member-card" hidden></div>
-          ${FEATURES.flashcards ? '<section id="deck" class="deck"></section>' : ''}
           <div id="stagePanel"></div>
           <!-- The strips belong beside the model, not below the fold: the window itself no
                longer scrolls, so anything parked under it would simply never be seen. -->
@@ -205,6 +202,45 @@ function renderWorkbench(build: StoredBuild): void {
         </aside>
       </main>
     </div>`;
+}
+
+/**
+ * RESPOND FIRST, BUILD SECOND.
+ *
+ * Opening a structure used to be one synchronous run: generate the model, build seven hundred
+ * meshes, then paint — and the click did NOTHING VISIBLE for up to 1.7 seconds (measured,
+ * gp-frame, this machine). A press with no response for that long reads as a dead button, and
+ * people click again. So the workbench chrome — title, toolbar, an opening line where the model
+ * will be — paints immediately, the browser is given two frames to actually put it on screen
+ * (one is not enough: rAF fires BEFORE paint, so the heavy work would still beat the pixels),
+ * and the expensive part runs after. Back works during the wait, and navigating away cancels
+ * the deferred build via the token.
+ */
+function renderWorkbench(build: StoredBuild): void {
+  current = build;
+  document.body.dataset.screen = 'build';
+  const family = familyById(build.familyId);
+  const token = ++workbenchToken;
+
+  app.innerHTML = workbenchHtml(build, family, true);
+  document.getElementById('backBtn')!.addEventListener('click', () => go('#/'));
+
+  window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+    if (token !== workbenchToken) return; // the user already left
+    finishWorkbench(build, family);
+  }));
+}
+
+function finishWorkbench(build: StoredBuild, family: ReturnType<typeof familyById>): void {
+  model = generateStructure(build.spec);
+
+  app.innerHTML = workbenchHtml(build, family, false);
+  // THE PANEL HAD NEVER SPOKEN ON LOAD. `regenerate` is what renders normalize's report, and it
+  // runs only after the operator changes a control — so a build that arrived already needing
+  // repair opened silently. Every warning was there and none of it was on screen: a forwarded
+  // link carrying a roof this engine cannot frame, an opening moved back inside its wall, a
+  // second story dropped. It is said here, when the build opens, which is when it matters.
+  renderIssues(normalizeSpec(build.spec).issues.map((i) => i.message));
 
   studio = createStudio(
     {
@@ -222,24 +258,30 @@ function renderWorkbench(build: StoredBuild): void {
 
   document.getElementById('backBtn')!.addEventListener('click', () => go('#/'));
   document.getElementById('sheetBtn')?.addEventListener('click', () => {
-    // The sheet carries a still of the view the operator set up, so the drawing on the page is
-    // the one they were looking at when they decided it was right. `preserveDrawingBuffer` is on
-    // for exactly this; a blocked pop-up falls back to printing the workbench itself.
-    const canvas = document.querySelector<HTMLCanvasElement>('#viewport canvas');
-    const opened = openCommandSheet({
-      model: model!,
-      title: current!.label ?? family?.name ?? current!.id,
-      lineage: family?.lineage ?? '',
-      viewImage: canvas ? canvas.toDataURL('image/png') : null,
+    // Ask for the three numbers the tool has no basis for before generating anything. A labor
+    // table built on defaults nobody chose is a labor table the unit gets held to anyway.
+    void askPacketOptions(PACKET_DEFAULTS).then((opts) => {
+      if (!opts) return;
+      // The packet carries a still of the view the operator set up, so the drawing on the page
+      // is the one they were looking at when they decided it was right. `preserveDrawingBuffer`
+      // is on for exactly this; a blocked pop-up falls back to printing the workbench itself.
+      const canvas = document.querySelector<HTMLCanvasElement>('#viewport canvas');
+      const input = {
+        model: model!,
+        title: current!.label ?? family?.name ?? current!.id,
+        lineage: family?.lineage ?? '',
+        viewImage: canvas ? canvas.toDataURL('image/png') : null,
+        ...opts,
+      };
+      if (opts.action === 'csv') {
+        // Fitted to the SAME stock lengths as the packet, from the same compile.
+        downloadMaterialsCsv(input);
+        showNotices(['Materials CSV saved. It carries the estimate\'s limits at the top — keep them with it.']);
+        return;
+      }
+      const opened = openCommandSheet(input);
+      if (!opened) showNotices(['This browser would not open a print frame — try Save as PDF from the browser menu.']);
     });
-    if (!opened) {
-      showNotices(['Your browser blocked the new window — printing this page instead.']);
-      window.print();
-    }
-  });
-  document.getElementById('cardsBtn')?.addEventListener('click', () => {
-    deckOpen = !deckOpen;
-    renderDeck();
   });
   document.getElementById('shareBtn')!.addEventListener('click', () => {
     const url = `${window.location.origin}${window.location.pathname}#/build/${current!.id}?c=${encodeSpec(current!.spec)}`;
@@ -326,9 +368,12 @@ function rowHtml(row: PanelRow, value: unknown): string {
       <input type="checkbox" data-path="${esc(row.path)}" ${value ? 'checked' : ''} ${row.lockedBy ? 'disabled' : ''}/>
       ${locked}${help}</label>`;
   }
-  if (row.control === 'select') {
+  if (row.control === 'select' || row.control === 'family') {
+    // The option VALUE stays the spec's own token; the reader sees the plain-language label.
+    // A select full of raw enum tokens was the panel quietly assuming everyone already knew
+    // the vocabulary — in the tool whose other half exists to teach it.
     const opts = (row.options ?? [])
-      .map((o) => `<option value="${esc(o)}"${String(value) === o ? ' selected' : ''}>${esc(o)}</option>`)
+      .map((o, i) => `<option value="${esc(o)}"${String(value) === o ? ' selected' : ''}>${esc(row.optionLabels?.[i] ?? o)}</option>`)
       .join('');
     return `<label class="row"><span class="row-label">${esc(row.label)}</span>
       <select data-path="${esc(row.path)}" ${row.lockedBy ? 'disabled' : ''}>${opts}</select>
@@ -345,10 +390,32 @@ function renderConfigPanel(): void {
   if (!current) return;
   const schema = configSchemaFor(current.familyId);
   const panel = document.getElementById('configPanel')!;
-  panel.innerHTML = schema.groups
-    .map((g, i) => `<details class="cfg-group"${i < 2 ? ' open' : ''}>
+  // THE PANEL REMEMBERS WHAT YOU HAD OPEN. Every edit re-renders it, and the rebuild used to
+  // reset the disclosure state to its default — open FOUNDATION, change the crawl height, and
+  // the section slammed shut on the control you were still using. Open-state is keyed by
+  // section title so it survives the rebuild; a fresh panel (or a family switch, whose titles
+  // differ) falls back to the default of the first two sections open. Scroll position gets the
+  // same treatment for the same reason.
+  const openState = new Map(
+    [...panel.querySelectorAll<HTMLDetailsElement>('details.cfg-group')]
+      .map((d) => [d.querySelector('summary')?.textContent ?? '', d.open] as const),
+  );
+  const pane = panel.parentElement;
+  const scrollTop = pane?.scrollTop ?? 0;
+  // Rows that do not apply to the current choices do not render, and a section left with
+  // nothing to say disappears whole — the panel is exactly as long as the structure is
+  // complicated, which is the point of the cascade.
+  const visibleGroups = schema.groups
+    .map((g) => ({ ...g, rows: g.rows.filter((r) => !r.applies || r.applies(current!.spec)) }))
+    .filter((g) => g.rows.length > 0);
+  panel.innerHTML = visibleGroups
+    .map((g, i) => `<details class="cfg-group"${(openState.get(g.title) ?? i < 2) ? ' open' : ''}>
       <summary>${esc(g.title)}</summary>
-      ${g.rows.map((r) => rowHtml(r, getPath(current!.spec, r.path))).join('')}
+      ${g.rows.map((r) => rowHtml(r,
+        r.path === '__family' ? current!.familyId
+        : r.path === 'openFront' ? (getPath(current!.spec, r.path) ?? 'none')
+        : r.path === 'site.soil' ? (getPath(current!.spec, r.path) ?? 'unknown')
+        : getPath(current!.spec, r.path))).join('')}
     </details>`)
     .join('');
 
@@ -363,13 +430,43 @@ function renderConfigPanel(): void {
     el.addEventListener('change', () => {
       const path = el.dataset.path!;
       const spec = current!.spec as BuildingSpec;
-      if (path === 'screenBand') {
+      if (path === '__family') {
+        // Changing the TYPE is not an edit of this spec — it opens that structure's standard
+        // build, exactly as the picker card would, so the first input on the panel and the
+        // picker are the same decision made in two places.
+        const next = buildFromFamily((el as HTMLSelectElement).value as FamilyId);
+        if (next) {
+          session = commitBuild(session, next).state;
+          scheduleSave();
+          go(routeToHash({ name: 'build', id: next.id }));
+        }
+        return;
+      }
+      if (path === 'openFront') {
+        // 'none' clears it: an absent field means the building is closed in, and storing the
+        // string 'none' would read as a wall named none everywhere downstream.
+        const w = (el as HTMLSelectElement).value;
+        (spec as unknown as { openFront?: string }).openFront = w === 'none' ? undefined : w;
+      } else if (path === 'site.soil') {
+        const soil = (el as HTMLSelectElement).value;
+        // 'unknown' clears the record rather than storing a value that claims an observation.
+        (spec as unknown as { site?: { soil?: string } }).site = soil === 'unknown' ? undefined : { soil };
+      } else if (path === 'screenBand') {
         // The toggle is "does this hut breathe"; the spec value is the band itself, or null.
         // Mapping it here keeps the doctrine numbers out of the control and out of the panel.
         (spec as unknown as Record<string, unknown>).screenBand = (el as HTMLInputElement).checked
           ? { sillFt: HUT_BAND.sillFt, heightFt: HUT_BAND.heightFt }
           : null;
-      } else if (path === 'roof.kind') setRoofKind(spec, (el as HTMLSelectElement).value as RoofSpec['kind']);
+      } else if (path === 'roof.kind') {
+        setRoofKind(spec, (el as HTMLSelectElement).value as RoofSpec['kind']);
+        // A consequence of THIS choice, carried with it: the frozen gable lays its own solid
+        // deck, so a purlin deck picked under another roof shape resolves to the deck a gable
+        // actually gets. Left as 'purlins', the panel's gable row could not display the value
+        // it holds — a control showing one thing over a spec meaning another.
+        if (spec.roof.kind === 'gable' && spec.coverings?.roofDeck === 'purlins') {
+          spec.coverings.roofDeck = 'plywood';
+        }
+      }
       else if (path === 'foundation.kind') setFoundationKind(spec, (el as HTMLSelectElement).value as FoundationSpec['kind']);
       else if (el instanceof HTMLInputElement && el.type === 'checkbox') setPath(spec, path, el.checked);
       else if (el instanceof HTMLInputElement && el.type === 'number') {
@@ -391,6 +488,7 @@ function renderConfigPanel(): void {
     });
   });
   renderOpeningsEditor();
+  if (pane) pane.scrollTop = scrollTop;
 }
 
 // ── Openings ────────────────────────────────────────────────────────────────
@@ -667,68 +765,3 @@ render();
   studio: () => studio?.debug(),
   spec: () => current?.spec,
 };
-
-// ── Flashcards (learning app only) ──────────────────────────────────────────
-//
-// The deck is generated from the model on screen, so it drills the building the student is
-// looking at. State is deliberately tiny and local: which card, is it flipped, is the panel
-// open. Nothing about a drill belongs in the saved session — a half-finished deck restored
-// three days later is noise, not progress.
-
-let deckOpen = false;
-let deckSeed = 1;
-let deckIndex = 0;
-let deckFlipped = false;
-let deckCards: Card[] = [];
-
-function renderDeck(): void {
-  const host = document.getElementById('deck');
-  if (!host) return;
-  if (!deckOpen) {
-    host.innerHTML = '';
-    host.hidden = true;
-    return;
-  }
-  host.hidden = false;
-  if (deckCards.length === 0 && model) deckCards = shuffle(buildDeck(model), deckSeed);
-  const card = deckCards[deckIndex];
-  if (!card) {
-    host.innerHTML = '<p class="doctrine">No cards for this structure yet.</p>';
-    return;
-  }
-  host.innerHTML = `
-    <div class="deck-head">
-      <h2>Flashcards<span class="deck-tag">${esc(groupLabel(card.group))}</span></h2>
-      <span class="deck-count">${deckIndex + 1} / ${deckCards.length}</span>
-    </div>
-    <button class="card-face${deckFlipped ? ' card-face--back' : ''}" id="cardFace" type="button">
-      <p class="card-q">${esc(card.front).replace(/\n\n/g, '</p><p class="card-q2">')}</p>
-      ${deckFlipped
-        ? `<p class="card-a">${esc(card.back)}</p><p class="card-src">${esc(card.source)}</p>`
-        : '<p class="card-hint">Tap to show the answer</p>'}
-    </button>
-    <div class="deck-nav">
-      <button class="chip" data-deck="prev" type="button">‹ Back</button>
-      <button class="chip" data-deck="shuffle" type="button">Shuffle</button>
-      <button class="chip" data-deck="next" type="button">Next ›</button>
-    </div>`;
-  document.getElementById('cardFace')!.addEventListener('click', () => {
-    deckFlipped = !deckFlipped;
-    renderDeck();
-  });
-  host.querySelectorAll<HTMLButtonElement>('[data-deck]').forEach((el) => {
-    el.addEventListener('click', () => {
-      const n = deckCards.length;
-      if (el.dataset.deck === 'next') deckIndex = (deckIndex + 1) % n;
-      else if (el.dataset.deck === 'prev') deckIndex = (deckIndex - 1 + n) % n;
-      else {
-        // A new seed rather than a re-sort of the same order, so "shuffle" actually reshuffles.
-        deckSeed = (deckSeed * 1103515245 + 12345) >>> 0;
-        deckCards = shuffle(buildDeck(model!), deckSeed);
-        deckIndex = 0;
-      }
-      deckFlipped = false;
-      renderDeck();
-    });
-  });
-}

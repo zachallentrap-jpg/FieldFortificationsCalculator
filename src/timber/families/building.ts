@@ -18,15 +18,18 @@ import { DRESSED } from '../types';
 import type { BuildingSpec, RoofSpec } from '../spec';
 import { WALL_ORDER, toLegacySpacing } from '../spec';
 import type { StagePlanEntry } from '../stagePlan';
-import { stagePlanForLegacyBuilding, requireOrdinal } from '../stagePlan';
+import { stagePlanForBuilding, requireOrdinal, ordinalOf } from '../stagePlan';
 import { generateFloor, floorLevels, type FloorInput, type FloorLevels } from '../floor';
 import { generateWalls, type Opening } from '../walls';
 import { generateRoof } from '../roof';
-import { wallContract, type WallsContract } from '../subsystems/wallSystem';
-import { roofPlanes, generateShed, generatePurlins, generateHip } from '../subsystems/roofFamilies';
-import { generateRoofCovering, generateWallCovering, generateSkids } from '../subsystems/coverings';
+import { wallContract, type WallsContract, type WallSurface } from '../subsystems/wallSystem';
+import { roofPlanes, generateShed, generatePurlins, generateHip, wallInfillProfiles } from '../subsystems/roofFamilies';
+import { generateRoofCovering, generateWallCovering, generateInfillCovering, generateSkids, generateSlabOnGrade, wallLayerThicknessFt, finishedWallThicknessFt, type InfillSurface, type SkinSurface } from '../subsystems/coverings';
 import { generateFloorOnBearings, joistNominalFor } from '../subsystems/floorSystem';
-import { LUMBER, PANEL, IN_PER_FT } from '../doctrine';
+import { generatePartitions } from '../subsystems/partitions';
+import { generateOpenFront, removeClosedWall } from '../subsystems/openFront';
+import { generateBuiltOpenings, generateEntrySteps } from '../subsystems/builtOpenings';
+import { LUMBER, PANEL, FOUNDATION, TOLERANCE, IN_PER_FT } from '../doctrine';
 import { headerForSpan } from '../normalize';
 
 export interface BuildingResult {
@@ -104,6 +107,36 @@ function gableOf(roof: RoofSpec): { risePer12: number; overhangFt: number } {
 }
 
 /**
+ * How far past each end of its own run a wall's SKIN has to reach to close the corner.
+ *
+ * A WALL'S SKIN COVERS THE FACE IT PRESENTS TO THE WEATHER, AND ON A BUTTING WALL THAT FACE RUNS
+ * CORNER TO CORNER. `WallSurface.runFt` is the wall's clear STRUCTURAL span: a rectangle is framed
+ * with one pair of walls running through and the other pair butting between them, so the butting
+ * pair's run stops at the through walls' INNER faces — one full wall thickness short of the
+ * outside corner at each end. Tiling exactly that run left a 3½-in-wide strip of bare framing
+ * standing in every corner of every building, sole plate to cap plate, with the two sidings
+ * looking past each other and neither one covering it.
+ *
+ * The extension is to the through wall's OUTER face, which is where that face genuinely ends. The
+ * two skins then meet along the corner arris — they touch and neither runs into the other, because
+ * they lie in perpendicular planes that intersect exactly there.
+ */
+function skinReach(s: WallSurface, walls: WallsContract): { lead: number; tail: number } {
+  const half = walls.thicknessFt / 2;
+  let lead = 0;
+  let tail = 0;
+  for (const t of walls.surfaces) {
+    // Perpendicular walls only: a parallel one is the far side of the building.
+    if (Math.abs(s.along[0] * t.along[0] + s.along[1] * t.along[1]) > TOLERANCE.epsFt) continue;
+    const u = (t.origin[0] - s.origin[0]) * s.along[0] + (t.origin[1] - s.origin[1]) * s.along[1];
+    // Its INNER face landing on this wall's run end is what says this wall butts into it.
+    if (Math.abs(u + half) < TOLERANCE.epsFt) lead = Math.max(lead, walls.thicknessFt);
+    if (Math.abs(u - half - s.runFt) < TOLERANCE.epsFt) tail = Math.max(tail, walls.thicknessFt);
+  }
+  return { lead, tail };
+}
+
+/**
  * Generate a one-story building. The frozen legacy branch does the framing whenever the spec
  * describes what it already built — floor → walls → roof, in that emission order, every byte
  * pinned by `test/goldens/frame/`. Anything the frozen branch cannot express (a shed or flat
@@ -113,7 +146,12 @@ function gableOf(roof: RoofSpec): { risePer12: number; overhangFt: number } {
 export function generateBuilding(spec: BuildingSpec): BuildingResult {
   const story = spec.stories[0]!;
   const { lengthFt: L, widthFt: W } = spec.dims;
-  const stagePlan = stagePlanForLegacyBuilding();
+  // The plan is told which skins are ON, so it does not advertise a Roofing or a Siding stop
+  // for work the spec says is not being done — a scrubber stop that can never contain anything.
+  const stagePlan = stagePlanForBuilding(spec.roof.kind, spec.foundation.kind, {
+    roofing: spec.coverings.roofing !== 'none',
+    walls: spec.coverings.siding !== 'none' || spec.coverings.wallSheathing !== 'none',
+  });
   const walls = wallContract(L, W, story.wallHeightFt, story.openings, 0, spec.wallBands ?? []);
   const members: Member[] = [];
   let levels: FloorLevels;
@@ -121,13 +159,25 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
   const grounded = spec.foundation.kind === 'skids' || spec.foundation.kind === 'slab';
 
   // ── Substructure + floor
-  if (grounded) {
+  if (spec.foundation.kind === 'slab') {
+    // The slab IS the floor: one pour, its top at y = 0 where the sole plates land. No joists
+    // and no deck — this branch used to fall through to the framed floor below and emit a
+    // suspended wood floor with nothing under it, and no concrete anywhere in the model.
+    members.push(...generateSlabOnGrade(
+      L, W, requireOrdinal(stagePlan, 'foundation'), requireOrdinal(stagePlan, 'floor'),
+    ));
+    const slabT = (FOUNDATION.slabThickIn.value as number) / IN_PER_FT;
+    levels = { subfloorTop: 0, joistTop: 0, sillTop: 0, gradeY: -slabT };
+  } else if (grounded) {
     const deckThick = PANEL.subfloorThickIn.value as number;
     const skidD = DRESSED[LUMBER.skidNominal.value as string]!.d / IN_PER_FT;
     const deckTopY = 0;
-    if (spec.foundation.kind === 'skids') {
-      members.push(...generateSkids(L, W, requireOrdinal(stagePlan, 'foundation')));
-    }
+    // The runners bear on the ground, and the ground is where this branch says it is — see
+    // `levels.gradeY` below, which is the same expression. Passing it is what stops the skids
+    // floating clear of the earth while the floor they carry is buried in it.
+    const joistDepth = DRESSED[joistNominalFor(W)]!.d / IN_PER_FT;
+    const gradeY = deckTopY - deckThick / IN_PER_FT - joistDepth - skidD;
+    members.push(...generateSkids(L, W, requireOrdinal(stagePlan, 'foundation'), gradeY));
     members.push(
       ...generateFloorOnBearings({
         lengthFt: L,
@@ -137,17 +187,16 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
         bearings: walls.bearings,
         deck: 'panel',
         stageFloor: requireOrdinal(stagePlan, 'floor'),
-        stageDeck: requireOrdinal(stagePlan, 'floor') + 1, // the deck follows the joists in the legacy plan
+        stageDeck: requireOrdinal(stagePlan, 'subfloor'),
         prefix: 'FL',
       }),
     );
-    const joistD = DRESSED[joistNominalFor(W)]!.d / IN_PER_FT;
     const joistTop = deckTopY - deckThick / IN_PER_FT;
     levels = {
       subfloorTop: 0,
       joistTop,
-      sillTop: joistTop - joistD,
-      gradeY: spec.foundation.kind === 'skids' ? joistTop - joistD - skidD : joistTop - joistD,
+      sillTop: joistTop - joistDepth,
+      gradeY, // the runners are what this floor stands on — and they are placed on it, above
     };
   } else {
     const floorInput = legacyFloorInput(spec);
@@ -167,6 +216,23 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
     }),
   );
 
+  // ── The open front, if this building has one: drop what the frozen generator framed into
+  // that wall and stand posts and a beam in its place. The plates stay — they are what the
+  // rafters bear on, and the beam under them is what now carries them.
+  if (spec.openFront) {
+    const kept = removeClosedWall(members, spec.openFront);
+    members.length = 0;
+    members.push(...kept, ...generateOpenFront({
+      spec, walls, stageWalls: requireOrdinal(stagePlan, 'walls'),
+    }));
+  }
+
+  // ── Interior partitions. They go up with the walls and carry nothing, so they are framed
+  // AFTER the exterior walls (which the frozen generator emits) and before the roof.
+  members.push(...generatePartitions({
+    spec, wallHeightFt: story.wallHeightFt, stage: requireOrdinal(stagePlan, 'walls'),
+  }));
+
   // ── Roof frame
   if (spec.roof.kind === 'gable') {
     const { risePer12, overhangFt } = gableOf(spec.roof);
@@ -177,12 +243,19 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
         wallHeightFt: story.wallHeightFt,
         risePer12,
         rafterSpacingIn: toLegacySpacing(spec.spacing.rafterSpacingIn),
+        // The gable-end studs stand on the END WALL's layout, not the rafter grid.
+        studSpacingIn: toLegacySpacing(spec.spacing.studSpacingIn),
         overhangFt,
         atticAccess: spec.atticAccess,
       }),
     );
   } else if (spec.roof.kind === 'hip') {
-    members.push(...generateHip({ spec, walls, stageRoofFrame: requireOrdinal(stagePlan, 'roof-frame') }));
+    members.push(...generateHip({
+      spec,
+      walls,
+      stageCeiling: requireOrdinal(stagePlan, 'ceiling'),
+      stageRoofFrame: requireOrdinal(stagePlan, 'roof-frame'),
+    }));
   } else if (spec.roof.kind === 'shed' || spec.roof.kind === 'flat') {
     members.push(...generateShed({ spec, walls, stageRoofFrame: requireOrdinal(stagePlan, 'roof-frame') }));
   }
@@ -198,48 +271,159 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
   // thickness still lifts the roofing off the rafters.
   const deck = deckedByFrozenPath ? 'none' : spec.coverings.roofDeck;
 
-  if (spec.coverings.roofDeck === 'purlins' && planes.length > 0) {
-    members.push(...generatePurlins(planes, requireOrdinal(stagePlan, 'roof-deck')));
+  // A FROZEN-DECKED GABLE CANNOT TAKE PURLINS. Its stage-9 solid deck is part of the frozen
+  // branch's output (C-9), not an option — so emitting purlins too would double the deck
+  // system on the roof and on the bill. Under a gable the purlin choice resolves to the deck
+  // that is actually there, and the config panel does not offer it in the first place.
+  if (spec.coverings.roofDeck === 'purlins' && !deckedByFrozenPath && planes.length > 0) {
+    // Purlins sit ON the rafters — the lift is the same half-depth the sheet deck gets.
+    members.push(...generatePurlins(planes, requireOrdinal(stagePlan, 'roof-deck'), rafterHalf));
   }
   if (planes.length > 0 && (deck !== 'none' || spec.coverings.roofing !== 'none')) {
     members.push(
       ...generateRoofCovering({
         planes,
-        deck: spec.coverings.roofDeck === 'purlins' ? 'none' : spec.coverings.roofDeck,
+        // 'purlins' passes through UN-mapped: the covering module emits nothing for it (the
+        // rows above are the deck) but counts its thickness, so the roofing lands on the
+        // purlins instead of floating at rafter height with the hips poking through.
+        deck: deckedByFrozenPath && spec.coverings.roofDeck === 'purlins' ? 'plywood' : spec.coverings.roofDeck,
         deckLaidElsewhere: deckedByFrozenPath,
         roofing: spec.coverings.roofing,
         buildingPaper: spec.coverings.buildingPaper,
         stageDeck: requireOrdinal(stagePlan, 'roof-deck'),
-        stageRoofing: requireOrdinal(stagePlan, 'roofing'),
+        // No roofing means no roofing row — and nothing reads this, because the covering module
+        // emits no course for `roofing: 'none'`. The deck's ordinal keeps it a real number.
+        stageRoofing: ordinalOf(stagePlan, 'roofing') ?? requireOrdinal(stagePlan, 'roof-deck'),
         rafterHalfFt: rafterHalf,
+        // So the rake's barge board lands ON the finished gable end rather than behind it.
+        wallSkinFt: finishedWallThicknessFt(spec.coverings.wallSheathing, spec.coverings.siding),
       }),
     );
   }
+  // The open front is not a wall to be skinned. Dropping its STUDS is only half the job —
+  // sheathing and siding tile `walls.surfaces`, so the wall came back clad from the outside and
+  // the opening was invisible from every angle that mattered. The raked infill ABOVE the plates
+  // is not affected: a gable end over an open bay is still closed in.
+  const openSkin = spec.openFront
+    ? walls.surfaces.filter((s) => s.wall !== spec.openFront)
+    : walls.surfaces;
+
+  const skinSurfaces: SkinSurface[] = openSkin.map((s) => {
+    const { lead, tail } = skinReach(s, walls);
+    if (lead === 0 && tail === 0) return s;
+    return {
+      ...s,
+      runFt: s.runFt + lead + tail,
+      origin: [s.origin[0] - s.along[0] * lead, s.origin[1] - s.along[1] * lead] as [number, number],
+      // Shifted with the origin, so an opening stays where it was cut.
+      cutouts: s.cutouts.map((c) => ({ ...c, u0: c.u0 + lead, u1: c.u1 + lead })),
+      // And carried, because the STUDS did not move: the frame's run still starts `lead` along
+      // this surface, and that is where the sheet grid has to be struck from.
+      gridLeadFt: lead,
+    };
+  });
+  const nailerSpacingFt = spec.spacing.studSpacingIn / IN_PER_FT;
+
+  // What each wall must close in above its cap plate — a gable end's triangle, a shed's pony
+  // wall and rakes. Resolved once here and skinned by whichever coverings are on, so the
+  // sheathing and the siding agree about where the building stops.
+  const infill: InfillSurface[] = wallInfillProfiles(spec, walls).flatMap((p) => {
+    const s = walls.surfaces.find((q) => q.wall === p.wall);
+    if (!s) return [];
+    const { lead, tail } = skinReach(s, walls);
+    return [{
+      wall: s.wall,
+      runFt: s.runFt + lead + tail,
+      baseYFt: walls.plateTopY,
+      // Straight through, NOT clamped at the run's ends: `topAt` reads the roof plane at the
+      // world station u lands on, so it answers for the corner strip too — which is right,
+      // because the roof really does continue over the corner. Clamping it flat there put a
+      // kink in a profile that has none, and a strip straddling the kink came out cut to a
+      // height that is the average of two different things.
+      topAt: (u: number) => p.topAt(u - lead),
+      normal: s.normal,
+      origin: [s.origin[0] - s.along[0] * lead, s.origin[1] - s.along[1] * lead] as [number, number],
+      along: s.along,
+      faceOffsetFt: s.faceOffsetFt,
+    }];
+  });
+
   if (spec.coverings.wallSheathing !== 'none') {
+    const kind = spec.coverings.wallSheathing === 'boards' ? 'boards' : 'plywood';
     members.push(
       ...generateWallCovering({
-        surfaces: walls.surfaces,
-        kind: spec.coverings.wallSheathing === 'boards' ? 'boards' : 'plywood',
+        surfaces: skinSurfaces,
+        kind,
         role: 'sheathingPanel',
         stage: requireOrdinal(stagePlan, 'siding'),
         standoffFt: 0,
+        nailerSpacingFt,
+      }),
+      ...generateInfillCovering({
+        surfaces: infill, kind, role: 'sheathingPanel',
+        stage: requireOrdinal(stagePlan, 'siding'), standoffFt: 0,
       }),
     );
   }
   if (spec.coverings.siding !== 'none') {
+    // The standoff is the SHEATHING's own thickness, not the siding's. Board sheathing is ¾ in
+    // where plywood is ½, and holding the siding out by the wrong one buried it a quarter inch
+    // inside the layer it is nailed to.
     const sheathingThick = spec.coverings.wallSheathing !== 'none'
-      ? (PANEL.sidingThickIn.value as number) / IN_PER_FT
+      ? wallLayerThicknessFt(spec.coverings.wallSheathing === 'boards' ? 'boards' : 'plywood')
       : 0;
+    const kind = spec.coverings.siding === 'boardAndBatten' ? 'boardAndBatten'
+      : spec.coverings.siding === 'boards' ? 'boards' : 'plywood';
     members.push(
       ...generateWallCovering({
-        surfaces: walls.surfaces,
-        kind: spec.coverings.siding === 'boardAndBatten' ? 'boardAndBatten'
-          : spec.coverings.siding === 'boards' ? 'boards' : 'plywood',
+        surfaces: skinSurfaces,
+        kind,
         role: 'siding',
         stage: requireOrdinal(stagePlan, 'siding'),
         standoffFt: sheathingThick,
+        nailerSpacingFt,
+      }),
+      ...generateInfillCovering({
+        surfaces: infill, kind, role: 'siding',
+        stage: requireOrdinal(stagePlan, 'siding'), standoffFt: sheathingThick,
       }),
     );
+  }
+
+  // WHAT FILLS THE OPENINGS. Hung with the exterior finish, because that is when a door goes on
+  // and because the `siding` stage is the only one that exists here — a bare-frame card (custom
+  // ships with no sheathing and no siding) has no closing-in stage and gets no door, which is
+  // right: it is a framing drawing, and its openings are meant to read as holes.
+  const closingIn = ordinalOf(stagePlan, 'siding');
+  if (closingIn !== undefined) {
+    // THE FINISHED wall, batten and all. A shutter hangs ON the wall and a flight of steps lands
+    // AGAINST it, so what both of them need is where the wall stops — not how thick its last
+    // layer is. `wallLayerThicknessFt` answers the second question, which is right for a layer
+    // being laid over another layer and wrong for anything hung on the stack: it leaves out the
+    // batten, because a batten has nothing over it. Given that figure, a shutter on a
+    // board-and-batten wall stood at the BOARD face and occupied exactly the shell the battens
+    // are in — its leaves 0.75 in inside every batten they crossed, which is the whole thickness.
+    const skinThickFt = finishedWallThicknessFt(spec.coverings.wallSheathing, spec.coverings.siding);
+    members.push(...generateBuiltOpenings({
+      surfaces: skinSurfaces,
+      openings: story.openings,
+      stage: closingIn,
+      skinThickFt,
+      ...(spec.shutters ? { shutters: spec.shutters } : {}),
+    }));
+    // And something to stand on. `entrySteps` defaults ON: a door the floor has lifted out of
+    // reach is not a design choice, and the flag exists so a card that genuinely wants none —
+    // a drawing of the frame, a building against a loading dock — can say so.
+    if (spec.entrySteps !== false) {
+      members.push(...generateEntrySteps({
+        surfaces: skinSurfaces,
+        openings: story.openings,
+        stage: closingIn,
+        thresholdY: levels.subfloorTop,
+        gradeY: levels.gradeY,
+        skinThickFt,
+      }));
+    }
   }
 
   return { members, levels, stagePlan, walls };

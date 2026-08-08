@@ -1,7 +1,7 @@
 {
   "name": "sap1",
   "version": "1.0.0",
-  "description": "SAP-1 \u2014 Survivability Position Planner. Deterministic, offline, parametric planner for doctrinal combat-engineer survivability positions. Illustrative placeholder data; NOT FOR FIELD USE.",
+  "description": "SAP-1 — Survivability Position Planner. Deterministic, offline, parametric planner for doctrinal combat-engineer survivability positions. Illustrative placeholder data; NOT FOR FIELD USE.",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -24,7 +24,8 @@
     "build:woodframe": "vite build -c vite.woodframe.config.ts",
     "build:suite": "node scripts/build-suite.mjs",
     "update:thumb-goldens": "node --import tsx scripts/gen-thumb-goldens.ts",
-    "verify:full": "npm run verify && npm run build:suite && npm run check:offline:dist"
+    "verify:full": "npm run verify && npm run build:suite && npm run check:offline:dist",
+    "gen:train-vectors": "node --import tsx scripts/gen-train-vectors.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",

@@ -101,6 +101,27 @@
   .wb-toolbar .grp > span {
     display: inline-flex; gap: 0; padding: 2px; background: var(--fill);
     border-radius: 8px; max-width: 100%; overflow-x: auto; scrollbar-width: none;
+    /* `min-width: 0` is what makes the `overflow-x` above do anything. A flex item's automatic
+       minimum size is its CONTENT width, so eleven stage chips refused to shrink, pushed the
+       toolbar wider than the phone, and took the whole page sideways with them — every screen
+       scrolled horizontally by a few pixels and the last chip in each row was clipped off the
+       edge with no way to reach it. The track scrolls inside itself now. */
+    min-width: 0;
+    /* SCROLL SHADOWS, so a clipped track says so. A phone shows six of eleven stage chips and
+       nothing about a flat cut edge suggests the rest are one swipe away. This is the
+       background-attachment trick: the two `local` covers scroll WITH the content and sit on
+       top of the two `scroll` shadows, so a shadow is only visible at an end you have not
+       reached yet. No script, and it cannot get out of step with the real scroll position. */
+    background-color: var(--fill);
+    background-image:
+      linear-gradient(to right, var(--fill), rgba(120, 120, 128, 0)),
+      linear-gradient(to left, var(--fill), rgba(120, 120, 128, 0)),
+      radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.19), rgba(0, 0, 0, 0)),
+      radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.19), rgba(0, 0, 0, 0));
+    background-position: left center, right center, left center, right center;
+    background-repeat: no-repeat;
+    background-size: 26px 100%, 26px 100%, 11px 100%, 11px 100%;
+    background-attachment: local, local, scroll, scroll;
   }
   .wb-toolbar .grp > span::-webkit-scrollbar { display: none; }
   .wb-toolbar .grp > span .chip {
@@ -120,10 +141,15 @@
     -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
     position: sticky; top: 0; z-index: 50;
   }
+  /* The way out of the tool: identical component, identical position, every app in the
+     suite. It leads the bar rather than trailing it, because the thing that takes you OUT
+     of a screen belongs where a back button belongs. */
+  .topbar .home { order: -1; margin: 0; font-size: 12.5px; font-weight: 540; color: var(--label-2);
+                   text-decoration: none; white-space: nowrap; padding: 5px 11px; border-radius: 999px;
+                   box-shadow: inset 0 0 0 0.5px var(--sep-strong); }
+  .topbar .home:hover { background: var(--fill); color: var(--label); text-decoration: none; }
   .topbar .name { font-size: 13px; font-weight: 640; letter-spacing: -0.01em; }
   .topbar .sub { font-size: 12px; color: var(--label-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .topbar .home { margin-left: auto; font-size: 12px; color: var(--accent); text-decoration: none; white-space: nowrap; }
-  .topbar .home:hover { text-decoration: underline; }
   body[data-screen='build'] > .topbar, body[data-screen='build'] > footer { display: none; }
 
   .notices, .issues {
@@ -173,7 +199,9 @@
   }
   .wb-head h1 { font-size: 13.5px; font-weight: 640; letter-spacing: -0.01em; }
   .wb-head .lineage { font-size: 11.5px; color: var(--label-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .wb-actions { margin-left: auto; display: flex; gap: 6px; }
+  /* Wrapping, because three chips do not fit beside a title on a phone and the third was
+     running off the right edge — which on this bar is the primary action of the whole app. */
+  .wb-actions { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; }
   .back { display: inline-flex; align-items: center; gap: 3px; color: var(--accent); font-weight: 500; }
 
   .wb-toolbar {
@@ -314,30 +342,24 @@
   .chip--go:hover { filter: brightness(1.07); background: var(--accent); }
   body[data-app='learn'] .topbar .name { color: var(--accent); }
 
-  /* Flashcards */
-  .deck { margin-bottom: 14px; }
-  .deck[hidden] { display: none; }
-  .deck-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-  .deck-head h2 { display: flex; align-items: center; gap: 7px; }
-  .deck-tag {
-    font-size: 10px; font-weight: 500; letter-spacing: 0.02em; text-transform: none;
-    background: var(--fill-2); color: var(--label-2); border-radius: 4px; padding: 1px 6px;
+  /* The flashcards TILE on the Learning picker. The drill itself is its own page now: a deck
+     bolted into the workbench meant the general vocabulary sat behind a choice of building,
+     and it interrupted anyone who had opened a structure to look at the structure. */
+  .card--cards { text-decoration: none; display: flex; flex-direction: column; }
+  .group--cards .cards { grid-template-columns: minmax(0, 1fr); max-width: 620px; }
+  .card--cards .card-art { background: linear-gradient(160deg, #23252b, #15161a); padding: 0; }
+  .card--cards .fan { position: relative; display: block; height: 196px; overflow: hidden; }
+  .card--cards .fan .face {
+    position: absolute; left: 50%; top: 50%; width: 42%; border-radius: 10px; overflow: hidden;
+    background: #17181b; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+    transition: transform 0.24s ease;
   }
-  .deck-count { font-size: 11.5px; color: var(--label-3); font-variant-numeric: tabular-nums; }
-  .card-face {
-    display: block; width: 100%; text-align: left; cursor: pointer; font: inherit; color: var(--label);
-    background: var(--raised); border: 0; border-radius: var(--r-lg); padding: 15px 15px 13px;
-    margin: 6px 0 8px; box-shadow: var(--shadow-1), inset 0 0 0 0.5px var(--sep);
-    /* A card that resizes as it flips makes the buttons under it jump out from under the
-       thumb that is about to press them. Hold a floor instead. */
-    min-height: 148px;
-  }
-  .card-face--back { background: var(--accent-soft); box-shadow: inset 0 0 0 0.5px var(--accent); }
-  .card-q { margin: 0; font-size: 14.5px; line-height: 1.45; font-weight: 500; }
-  .card-q2 { margin: 9px 0 0; font-size: 14.5px; line-height: 1.45; font-weight: 620; }
-  .card-hint { margin: 12px 0 0; font-size: 11.5px; color: var(--label-3); }
-  .card-a { margin: 12px 0 0; font-size: 16px; font-weight: 620; letter-spacing: -0.01em; }
-  .card-src { margin: 5px 0 0; font-size: 11px; color: var(--label-2); line-height: 1.45; }
+  .card--cards .fan .face svg { display: block; width: 100%; height: auto; }
+  .card--cards .fan .f0 { transform: translate(-50%, -50%) rotate(-13deg) translateX(-66%); }
+  .card--cards .fan .f1 { transform: translate(-50%, -50%) rotate(-1deg); }
+  .card--cards .fan .f2 { transform: translate(-50%, -50%) rotate(12deg) translateX(66%); }
+  .card--cards:hover .fan .f0 { transform: translate(-50%, -50%) rotate(-17deg) translateX(-78%); }
+  .card--cards:hover .fan .f2 { transform: translate(-50%, -50%) rotate(16deg) translateX(78%); }
   .deck-nav { display: flex; gap: 5px; }
   .deck-nav .chip { flex: 1; }
 
@@ -386,6 +408,11 @@
     .pane--inspect { width: auto; }
     .chip, .back, .jump, .resume-chip { min-height: 34px; padding-left: 13px; padding-right: 13px; }
     .wb-toolbar .grp > span .chip { min-height: 30px; }
+    /* One control group per row. Side by side, "View" and "Stage" each got half a phone and
+       both scrolled — two tiny scrollers beside each other is worse than two full-width ones. */
+    .wb-toolbar { gap: 8px 12px; }
+    .wb-toolbar .grp { flex: 1 1 100%; }
+    .wb-actions { width: 100%; margin-left: 0; }
     /* Stack label over control: side by side pushed the input off the right edge, and a
        number you cannot see is a number you cannot set. */
     .row { display: grid; grid-template-columns: 1fr; gap: 5px; }
@@ -414,3 +441,60 @@
     .strip-scroll svg { width: 100%; height: auto; }
     details { break-inside: avoid; }
   }
+
+  /* ── Command-packet options ────────────────────────────────────────────
+     Three numbers the tool has no basis for, asked once before anything
+     prints: crew size, productive hours, stock lengths. Every one is an
+     arithmetic divisor, so the dialog clamps rather than validates. */
+  .pktdlg {
+    border: 0; border-radius: var(--r-lg); padding: 0; max-width: 400px; width: calc(100% - 32px);
+    background: var(--raised); color: var(--label); box-shadow: var(--shadow-2);
+  }
+  .pktdlg::backdrop { background: rgba(0, 0, 0, 0.34); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+  .pktdlg form { padding: 18px 20px 16px; display: flex; flex-direction: column; gap: 13px; }
+  .pktdlg h2 { font-size: 17px; font-weight: 640; letter-spacing: -0.015em; }
+  .pktdlg > form > p { margin: -6px 0 0; font-size: 12.5px; color: var(--label-2); line-height: 1.45; }
+  .pktdlg label { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; font-weight: 560; }
+  .pktdlg input {
+    font: inherit; font-weight: 400; padding: 7px 10px; border: 0; border-radius: var(--r);
+    background: var(--field); color: var(--label); box-shadow: inset 0 0 0 0.5px var(--sep-strong);
+  }
+  .pktdlg small { font-size: 11px; font-weight: 400; color: var(--label-2); line-height: 1.4; }
+  .pktdlg-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 3px; }
+  .pktdlg-row .chip { min-height: 32px; padding: 6px 14px; }
+
+  /* ── First-run hint over the Learning viewport ──────────────────────────
+     pointer-events: none is load-bearing: the pill is asking for a tap and must never be the
+     thing that swallows it. It floats clear of the bottom edge so it misses both the orbit
+     gesture's natural start point and the iOS home indicator. */
+  .tap-hint {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    pointer-events: none; white-space: nowrap; z-index: 5;
+    font-size: 12.5px; font-weight: 560; color: var(--label);
+    background: var(--chrome); -webkit-backdrop-filter: saturate(180%) blur(20px);
+    backdrop-filter: saturate(180%) blur(20px);
+    padding: 8px 14px; border-radius: 999px;
+    box-shadow: var(--shadow-2), inset 0 0 0 0.5px var(--sep-strong);
+    animation: tap-hint-in 0.5s 0.8s ease-out backwards;
+  }
+  @keyframes tap-hint-in { from { opacity: 0; transform: translateX(-50%) translateY(6px); } }
+  @media (prefers-reduced-motion: reduce) { .tap-hint { animation: none; } }
+
+  /* ── The two-frame opening state ────────────────────────────────────────
+     What the viewport shows between the instant paint and the heavy scene build. role=status
+     lets a screen reader hear that something is happening during the same gap. */
+  .viewport .opening {
+    position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px;
+    align-items: center; justify-content: center; color: var(--label-2); font-size: 13px;
+  }
+  .opening .ring {
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 2.5px solid var(--fill-2); border-top-color: var(--accent);
+    animation: opening-spin 0.8s linear infinite;
+  }
+  @keyframes opening-spin { to { transform: rotate(1turn); } }
+  @media (prefers-reduced-motion: reduce) { .opening .ring { animation: none; border-top-color: var(--fill-2); } }
+
+  /* A press answers INSTANTLY even though the open takes real time — the card gives under the
+     pointer the way a physical button gives. */
+  .card:active { transform: scale(0.985); transition: transform 0.05s ease; }

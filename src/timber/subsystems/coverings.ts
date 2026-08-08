@@ -14,11 +14,11 @@
 // the compat goldens and stays in the frozen `roof.ts`. This module's generalized tiler serves
 // new roof kinds and any surface with cutouts.
 
-import type { Member } from '../types';
+import type { Member, WallId } from '../types';
 import { DRESSED } from '../types';
 import { makeEmitter } from '../emit';
-import { PANEL, ROOFING, SIDING, LUMBER, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
-import type { RoofPlane } from './roofFamilies';
+import { PANEL, ROOFING, SIDING, LUMBER, FOUNDATION, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
+import { planeSpanAt, type RoofPlane } from './roofFamilies';
 import type { WallSurface } from './wallSystem';
 
 /** A rectangle in a surface's own (u, v) coordinates. */
@@ -63,46 +63,307 @@ export function subtractCutouts(tile: Rect, cutouts: Rect[]): Rect[] {
 /**
  * Lay sheet goods over a surface: full sheets from the origin, courses offset by `stagger`,
  * last row and column cut to fit — never overlapped, which would double-count material.
+ *
+ * `span` clips each course to the surface's own width at that height. A rectangle passes the
+ * full run at every height and comes out exactly as before; a hip's trapezoid narrows toward
+ * the ridge and its ends narrow to a point. The clip is per COURSE rather than per tile
+ * because that is how the material is cut on site — you snap a line and cut the row.
+ *
+ * WHERE a tapered course is clipped is the whole problem, because a rectangle cannot be cut on
+ * a diagonal and every choice leaves an artifact somewhere:
+ *
+ *   'cover' takes the course's WIDEST edge. Nothing is left bare, and the pieces overhang the
+ *     hip by up to half a course into the neighbouring slope's airspace.
+ *   'average' takes the MID-height width. Exact area — the taper is linear, so mid-height is
+ *     the course's true average — and nothing overhangs, at the cost of thin triangular gaps
+ *     hugging the hip lines.
+ *
+ * Both are used, one per layer, and the pairing is what makes a hip look right:
+ * the DECK averages (its gaps sit under the roofing, unseen, and its diagonal offcuts are
+ * genuinely reusable because a hip's four corners are mirror pairs — the triangle cut off at
+ * one is the piece needed at another), and the ROOFING covers (it is the visible surface, so
+ * it must be complete, and a small overlap along the hip reads as the hip cap it would have).
+ *
+ * Getting this backwards is what the first two attempts did, and both looked plausible in a
+ * summary: averaging BOTH layers put diamond-shaped holes along every hip with framing showing
+ * through, and covering both floated tan deck panels above the neighbouring roofing.
  */
+export type TaperClip = 'cover' | 'average';
+
 export function tileSurface(
   runFt: number,
   heightFt: number,
   sheetWFt: number,
   sheetHFt: number,
   stagger = 0,
+  span?: (v: number) => { lo: number; hi: number },
+  clip: TaperClip = 'cover',
+  /**
+   * Rip the FIRST piece of every course to this width, so the module grid downstream of it is
+   * struck from somewhere other than the surface's own start. `stagger` cannot do this job: it
+   * offsets alternate courses only, which is what a running bond wants and the opposite of what
+   * a wall wants — a wall's joints have to line up with the studs on every course.
+   */
+  firstCutFt = 0,
 ): Tile[] {
   const tiles: Tile[] = [];
   let row = 0;
   for (let v = 0; v < heightFt - EPS; v += sheetHFt, row++) {
-    const v1 = Math.min(v + sheetHFt, heightFt);
-    const off = row % 2 === 1 ? stagger : 0;
-    let u = 0;
-    if (off > 0) {
-      const first = Math.min(off, runFt);
-      tiles.push({ u0: 0, u1: first, v0: v, v1, full: false });
-      u = first;
-    }
-    for (; u < runFt - EPS; u += sheetWFt) {
-      const u1 = Math.min(u + sheetWFt, runFt);
-      tiles.push({ u0: u, u1, v0: v, v1, full: u1 - u >= sheetWFt - EPS && v1 - v >= sheetHFt - EPS });
+    const rowV1 = Math.min(v + sheetHFt, heightFt);
+    // HOW STEEPLY THE ROW TAPERS decides whether one rectangle can stand in for it.
+    //
+    // Neither clip rule survives a course whose width changes by more than a foot or two over
+    // its own height, and on a small pyramid roof — the guard tower's cab — a 4-ft course
+    // spans most of a 5-ft slope, so the taper is the whole roof. 'cover' then flaps yards past
+    // the hip; 'average' overhangs the PEAK, which is the tan cross that was showing through
+    // the middle of the cab's roofing where four deck tiles crossed above it.
+    //
+    // So a row is cut into as many pieces up the slope as it takes to bring that error down to
+    // a cap's width. A rectangle (no `span`) tapers by nothing and comes out exactly as one
+    // piece — byte-for-byte what it was — and a gently tapered trapezoid usually does too.
+    const rowTaper = span
+      ? Math.abs((span(rowV1).hi - span(rowV1).lo) - (span(v).hi - span(v).lo))
+      : 0;
+    const bands = Math.min(TOLERANCE.maxTaperBands, Math.max(1, Math.ceil(rowTaper / TOLERANCE.hipCapFt)));
+    for (let k = 0; k < bands; k++) {
+      const v0 = v + ((rowV1 - v) * k) / bands;
+      const v1 = v + ((rowV1 - v) * (k + 1)) / bands;
+      const edges = span
+        ? (clip === 'average' ? [span((v0 + v1) / 2)] : [span(v0), span(v1)])
+        : [{ lo: 0, hi: runFt }];
+      const lo = Math.min(...edges.map((e) => e.lo));
+      const hi = Math.max(...edges.map((e) => e.hi));
+      if (hi - lo <= EPS) continue; // the point at the top of a hip end — nothing to cut
+      // A rip as wide as the module is not a rip — it is the first full sheet, and flagging it
+      // otherwise would put `full: false` on a whole sheet and bill it as an offcut.
+      const off = (row % 2 === 1 ? stagger : 0) + (firstCutFt >= sheetWFt - EPS ? 0 : firstCutFt);
+      let u = lo;
+      if (off > 0) {
+        const first = Math.min(lo + off, hi);
+        tiles.push({ u0: lo, u1: first, v0, v1, full: false });
+        u = first;
+      }
+      for (; u < hi - EPS; u += sheetWFt) {
+        const u1 = Math.min(u + sheetWFt, hi);
+        tiles.push({ u0: u, u1, v0, v1, full: u1 - u >= sheetWFt - EPS && v1 - v >= sheetHFt - EPS });
+      }
     }
   }
   return tiles;
 }
 
+// ── Raked infill: closing in above the cap plate ─────────────────────────────
+//
+// A wall does not stop at its cap plate. A gable roof leaves a triangle at each end, a shed
+// leaves a full-height pony wall on its high side and a raked triangle on each side wall, and
+// every one of them is framed (`roof.ts` gable studs, `generateShed`'s pony and rake studs) and
+// then CLOSED IN. The covering pass only ever tiled `walls.surfaces` — rectangles ending at the
+// plate — so every one of those areas came out as bare framing you could see straight through,
+// and the take-off was short by their whole area.
+//
+// WHY VERTICAL STRIPS AND NOT THE ROW TILER. `tileSurface` bands a taper in v, which is right
+// for a roof plane: those taper gently over a long slope. A gable end is the opposite shape —
+// twenty feet wide and three feet tall — so horizontal bands step sideways by a foot or more
+// each, and the rake comes out as a staircase either overhanging the roof or gapping under it.
+// Cutting the same triangle into vertical strips puts the step in the direction the edge is
+// actually cut, and a strip narrow enough to hold `rakeStepFt` reads as a straight rake.
+
+/** One wall's infill: what sits above the cap plate, and how tall it is at each station. */
+export interface InfillSurface {
+  wall: WallId;
+  runFt: number;
+  /** World Y of the infill's bottom — the cap-plate top. */
+  baseYFt: number;
+  /** Height above `baseYFt` at station u along the run. Zero means nothing to close in. */
+  topAt: (u: number) => number;
+  normal: [x: number, z: number];
+  origin: [x: number, z: number];
+  along: [x: number, z: number];
+  faceOffsetFt: number;
+}
+
+/**
+ * Vertical strips covering `topAt`, each no wider than `moduleFt` and each narrow enough that
+ * its top edge is within `TOLERANCE.rakeStepFt` of the true rake. A flat top (a shed's pony
+ * wall) never subdivides and comes out as plain full-width strips.
+ */
+export function tileRakedInfill(runFt: number, topAt: (u: number) => number, moduleFt: number): Rect[] {
+  const out: Rect[] = [];
+  for (let u0 = 0; u0 < runFt - EPS; u0 += moduleFt) {
+    const uEnd = Math.min(u0 + moduleFt, runFt);
+    // Walk the module in fine cells and MERGE while the top edge stays inside one step, rather
+    // than cutting it into equal strips. Two reasons, and the second is the one a screenshot
+    // found: equal strips waste cuts where the edge is flat, and — worse — sizing them from
+    // the module's two ENDS is blind to a peak in the middle. A gable's ridge lands inside a
+    // module, both of whose ends are then the same height, so the module read as flat and came
+    // out as one 4-ft slab standing at ridge height in the middle of the gable end.
+    const cells = TOLERANCE.maxRakeStrips;
+    const res = (uEnd - u0) / cells;
+    let u = u0;
+    while (u < uEnd - EPS) {
+      let end = Math.min(u + res, uEnd);
+      let lo = topAt((u + end) / 2);
+      let hi = lo;
+      while (end < uEnd - EPS) {
+        const next = Math.min(end + res, uEnd);
+        const h = topAt((end + next) / 2);
+        if (Math.max(hi, h) - Math.min(lo, h) > TOLERANCE.rakeStepFt) break;
+        hi = Math.max(hi, h);
+        lo = Math.min(lo, h);
+        end = next;
+      }
+      // Cut to the middle of the range this piece spans — half a step proud at one edge, half
+      // shy at the other, which is what a ripped piece against a sloped line looks like.
+      const h = (hi + lo) / 2;
+      if (h > TOLERANCE.minSliverFt && end - u > EPS) out.push({ u0: u, u1: end, v0: 0, v1: h });
+      u = end;
+    }
+  }
+  return out;
+}
+
+export interface InfillCoveringInput {
+  surfaces: InfillSurface[];
+  kind: 'plywood' | 'boards' | 'boardAndBatten';
+  role: 'sheathingPanel' | 'siding';
+  stage: number;
+  standoffFt: number;
+}
+
+/** Close in every raked area above the plates, in the same material as the walls below. */
+export function generateInfillCovering(input: InfillCoveringInput): Member[] {
+  // Its OWN prefix. The wall pass and this one emit the same roles ('siding', 'sidingBoard',
+  // 'sheathingPanel'), and `makeEmitter` numbers per role from one — so sharing 'CV' handed
+  // two different pieces the same id, which the id-collision test caught immediately.
+  const emit = makeEmitter('RK');
+  const { surfaces, kind, role, stage, standoffFt } = input;
+  for (const s of surfaces) {
+    const plywood = kind === 'plywood';
+    const boardNominal = SIDING.boardNominal.value as string;
+    const moduleFt = plywood ? (PANEL.widthFt.value as number) : DRESSED[boardNominal]!.d / IN_PER_FT;
+    const thick = wallLayerThicknessFt(kind);
+    for (const t of tileRakedInfill(s.runFt, s.topAt, moduleFt)) {
+      const uMid = (t.u0 + t.u1) / 2;
+      const out = s.faceOffsetFt + standoffFt + thick / 2;
+      const x = s.origin[0] + s.along[0] * uMid + s.normal[0] * out;
+      const z = s.origin[1] + s.along[1] * uMid + s.normal[1] * out;
+      const yaw = Math.atan2(-s.along[1], s.along[0]);
+      const widthFt = t.u1 - t.u0;
+      const heightFt = t.v1 - t.v0;
+      const y = s.baseYFt + heightFt / 2;
+      if (plywood) {
+        emit(role, `${PANEL.widthFt.value}x${PANEL.lengthFt.value} panel`, {
+          cutLengthFt: widthFt,
+          position: [x, y, z],
+          rotation: [0, yaw, 0],
+          stage,
+          wall: s.wall,
+          actual: { w: PANEL.sidingThickIn.value as number, d: heightFt * IN_PER_FT },
+          nailing: '8d @ 6" edges / 12" field (PH)',
+          doctrineRef: `${citeOf(PANEL.sidingThickIn)} — cut to the rake above the plate`,
+        });
+      } else {
+        emit(kind === 'boardAndBatten' ? 'sidingBoard' : role, boardNominal, {
+          cutLengthFt: heightFt,
+          position: [x, y, z],
+          rotation: [0, yaw, Math.PI / 2],
+          stage,
+          wall: s.wall,
+          actual: { w: DRESSED[boardNominal]!.w, d: widthFt * IN_PER_FT },
+          nailing: '8d @ 12" (PH)',
+          doctrineRef: `${citeOf(SIDING.boardNominal)} — cut to the rake above the plate`,
+        });
+      }
+    }
+
+    // THE BATTENS DID NOT COME UP HERE. The wall pass lays a batten over every board joint and
+    // this one laid none, so on a board-and-batten gable every batten stopped dead in a straight
+    // horizontal line at the cap plate and the triangle above it was bare boards — a ribbed wall
+    // under a flat one, and the joint line reads as a seam across the whole end of the building.
+    //
+    // The seams are the module boundaries, the same grid the wall's boards use, so a batten
+    // above the plate lands on the continuation of the board joint below it. Each runs from the
+    // plate up to the true rake AT THE SEAM — between the heights of the two boards it covers.
+    if (kind === 'boardAndBatten') {
+      const battenNominal = SIDING.battenNominal.value as string;
+      const battenT = DRESSED[battenNominal]!.w / IN_PER_FT;
+      const boardT = wallLayerThicknessFt(kind);
+      for (let seam = moduleFt; seam < s.runFt - EPS; seam += moduleFt) {
+        const h = s.topAt(seam);
+        if (h <= TOLERANCE.minSliverFt) continue;
+        const out = s.faceOffsetFt + standoffFt + boardT + battenT / 2;
+        emit('batten', battenNominal, {
+          cutLengthFt: h,
+          position: [
+            s.origin[0] + s.along[0] * seam + s.normal[0] * out,
+            s.baseYFt + h / 2,
+            s.origin[1] + s.along[1] * seam + s.normal[1] * out,
+          ],
+          rotation: [0, Math.atan2(-s.along[1], s.along[0]), Math.PI / 2],
+          stage,
+          wall: s.wall,
+          nailing: '8d @ 12" into the joint (PH)',
+          doctrineRef: `${citeOf(SIDING.battenNominal)} — carried up over the plate to the rake`,
+        });
+      }
+    }
+  }
+  return emit.members;
+}
+
 // ── Wall surfaces ────────────────────────────────────────────────────────────
 
+// Re-exported so anything that places pieces on a wall imports the surface and the placement
+// convention from the same module — see `wallTilePlacement`.
+export type { WallSurface };
+
+/**
+ * A wall surface as the SKIN sees it: the frame's run, plus however far the covering reaches past
+ * it to close the corner. `gridLeadFt` is that reach at the run's start, and it is the difference
+ * between a sheet grid struck from the frame and one struck from thin air.
+ */
+export interface SkinSurface extends WallSurface {
+  gridLeadFt?: number;
+}
+
 export interface WallCoveringInput {
-  surfaces: WallSurface[];
+  surfaces: SkinSurface[];
   kind: 'plywood' | 'boards' | 'boardAndBatten';
   role: 'sheathingPanel' | 'siding';
   stage: number;
   /** Outward offset from the wall face — sheathing sits on it, siding sits on the sheathing. */
   standoffFt: number;
+  /** Stud spacing, so a sheet's joints can be landed on one. Omitted, they fall where they fall. */
+  nailerSpacingFt?: number;
 }
 
-/** Place a tile on a wall surface, returning world position + rotation. */
-function wallTilePlacement(
+/**
+ * How wide to rip the first sheet of a wall so every joint after it lands on a stud.
+ *
+ * The studs are laid out from the FRAME's run; the skin starts `leadFt` before that, wrapping the
+ * corner to the through wall's outer face. Tiling straight from the skin's own start therefore
+ * puts every 4-ft joint `leadFt` short of a stud — half a wall thickness less half a stud face,
+ * 2¾ in on a 2x4 wall, which is a sheet edge nailed to nothing.
+ *
+ * So the first sheet is ripped to the last nailer that fits inside one sheet. That is what a
+ * framer does at a corner and it costs one rip; starting the grid at `leadFt` instead would land
+ * the joints just as well and leave a 3½-in ribbon of plywood down every corner.
+ */
+export function firstSheetFt(leadFt: number, sheetWFt: number, nailerFt: number): number {
+  if (!(leadFt > EPS) || !(nailerFt > EPS)) return sheetWFt;
+  const n = Math.floor((sheetWFt - leadFt) / nailerFt + EPS);
+  return n >= 1 ? leadFt + n * nailerFt : leadFt;
+}
+
+/**
+ * Place a tile on a wall surface, returning world position + rotation.
+ *
+ * EXPORTED because it is the one place that knows where a thing nailed to a wall goes, and the
+ * tower cab is what happens when a second place decides for itself: it centred its panels on the
+ * corner posts' own centreline and buried them in the frame. `standoffFt` may be NEGATIVE — a
+ * door leaf hangs INSIDE the wall face, at `-thickFt`, not outboard of it.
+ */
+export function wallTilePlacement(
   s: WallSurface,
   t: Rect,
   standoffFt: number,
@@ -125,19 +386,62 @@ function wallTilePlacement(
   };
 }
 
+/**
+ * How thick ONE layer of wall covering is — which is also the standoff the next layer out has
+ * to clear.
+ *
+ * It exists because that second sentence was not true. `generateBuilding` computed the siding's
+ * standoff over sheathing as `PANEL.sidingThickIn` no matter what the sheathing WAS, so board
+ * sheathing — ¾ in, not ½ — held the siding out by only half an inch and the siding sat a
+ * quarter-inch INSIDE it. Two skins occupying the same quarter inch, on every wall of the
+ * building, from a constant that happened to be right for one of the two choices.
+ *
+ * One function answers it now, and every layer asks the same one.
+ */
+export function wallLayerThicknessFt(kind: 'plywood' | 'boards' | 'boardAndBatten'): number {
+  return kind === 'plywood'
+    ? (PANEL.sidingThickIn.value as number) / IN_PER_FT
+    : DRESSED[SIDING.boardNominal.value as string]!.w / IN_PER_FT;
+}
+
+/**
+ * How far a FINISHED wall stands outside the framing line — every layer on it, batten included.
+ *
+ * `wallLayerThicknessFt` answers a different question: how thick is ONE layer, which is the
+ * standoff the layer over it needs. A batten has nothing over it, so it is correctly absent from
+ * that answer and just as correctly present in this one. The rake's barge board is the piece that
+ * needs the whole stack: it is nailed over the finished gable end, not over the studs.
+ */
+export function finishedWallThicknessFt(
+  sheathing: 'none' | 'plywood' | 'boards',
+  siding: 'none' | 'plywood' | 'boards' | 'boardAndBatten',
+): number {
+  const sheath = sheathing === 'none' ? 0 : wallLayerThicknessFt(sheathing === 'boards' ? 'boards' : 'plywood');
+  if (siding === 'none') return sheath;
+  const skin = wallLayerThicknessFt(
+    siding === 'boardAndBatten' ? 'boardAndBatten' : siding === 'boards' ? 'boards' : 'plywood');
+  const batten = siding === 'boardAndBatten'
+    ? DRESSED[SIDING.battenNominal.value as string]!.w / IN_PER_FT : 0;
+  return sheath + skin + batten;
+}
+
 export function generateWallCovering(input: WallCoveringInput): Member[] {
   const emit = makeEmitter('CV');
-  const { surfaces, kind, role, stage, standoffFt } = input;
+  const { surfaces, kind, role, stage, standoffFt, nailerSpacingFt } = input;
 
   for (const s of surfaces) {
     const cutouts: Rect[] = s.cutouts.map((c) => ({ u0: c.u0, u1: c.u1, v0: c.v0, v1: c.v1 }));
 
     if (kind === 'plywood') {
-      const thick = (PANEL.sidingThickIn.value as number) / IN_PER_FT;
+      const thick = wallLayerThicknessFt('plywood');
       const sheetW = PANEL.widthFt.value as number;
       const sheetH = PANEL.lengthFt.value as number;
-      // Sheets stand on end (4 ft wide, 8 ft tall) so joints land on studs.
-      for (const t of tileSurface(s.runFt, s.heightFt, sheetW, sheetH)) {
+      // Sheets stand on end (4 ft wide, 8 ft tall) so joints land on studs — and the FIRST one is
+      // ripped so that they do. See `firstSheetFt`: a wall whose skin wraps a corner starts half a
+      // wall thickness before its own studs do, and a grid struck from the skin's end misses every
+      // one of them.
+      const first = firstSheetFt(s.gridLeadFt ?? 0, sheetW, nailerSpacingFt ?? 0);
+      for (const t of tileSurface(s.runFt, s.heightFt, sheetW, sheetH, 0, undefined, 'cover', first)) {
         for (const piece of subtractCutouts(t, cutouts)) {
           const p = wallTilePlacement(s, piece, standoffFt, thick);
           emit(role, `${PANEL.widthFt.value}x${PANEL.lengthFt.value} panel`, {
@@ -162,7 +466,7 @@ export function generateWallCovering(input: WallCoveringInput): Member[] {
     // check catches exactly that: a third of a square foot per wall, invisible by eye.)
     const boardNominal = SIDING.boardNominal.value as string;
     const boardW = DRESSED[boardNominal]!.d / IN_PER_FT;
-    const boardT = DRESSED[boardNominal]!.w / IN_PER_FT;
+    const boardT = wallLayerThicknessFt('boards');
     const seams: number[] = [];
     for (let u = 0; u < s.runFt - EPS; u += boardW) {
       const u1 = Math.min(u + boardW, s.runFt);
@@ -234,7 +538,7 @@ function roofTilePlacement(
 
 export interface RoofCoveringInput {
   planes: RoofPlane[];
-  deck: 'none' | 'plywood' | 'boards' | 'skip' | 'purlins';
+  deck: 'none' | 'plywood' | 'boards' | 'purlins';
   roofing: 'none' | 'roll' | 'rollDouble' | 'corrugated';
   buildingPaper?: boolean;
   stageDeck: number;
@@ -249,21 +553,88 @@ export interface RoofCoveringInput {
    * course half an inch INTO the deck, and the deck showed through along both eaves.
    */
   deckLaidElsewhere?: boolean;
+  /**
+   * How far the finished wall stands outside the framing line, so the RAKE's barge board can be
+   * nailed over it instead of behind it. Zero — a bare frame — leaves the board on the deck's own
+   * edge, which is still what it is there to cover.
+   */
+  wallSkinFt?: number;
 }
 
 export function generateRoofCovering(input: RoofCoveringInput): Member[] {
   const emit = makeEmitter('CV');
-  const { planes, deck, roofing, stageDeck, stageRoofing, rafterHalfFt, deckLaidElsewhere } = input;
-  // What is UNDER the roofing, regardless of who put it there.
-  const deckThick = deck === 'plywood' || deck === 'boards' ? (PANEL.roofDeckThickIn.value as number) / IN_PER_FT : 0;
+  const { planes, deck, roofing, stageDeck, stageRoofing, rafterHalfFt, deckLaidElsewhere, buildingPaper } = input;
+  const wallSkinFt = Math.max(0, input.wallSkinFt ?? 0);
+  // What is UNDER the roofing, regardless of who put it there. Purlins are emitted by
+  // `generatePurlins`, not here — but they are still a deck, and their flat thickness is what
+  // holds the roofing off the rafters. Ignoring it left the corrugated sheets at rafter
+  // height with the hip rafters' top edges breaking through them.
+  //
+  // "REGARDLESS OF WHO PUT IT THERE" was the intent and not the behaviour. A frozen gable lays
+  // its own stage-9 deck whatever the covering spec says — the caller's own comment says so:
+  // "`deckLaidElsewhere` tells it the gable's stage-9 deck already exists so its thickness still
+  // lifts the roofing off the rafters." This expression never read that flag. It read `deck`,
+  // which for a gable is whatever the user picked, so choosing "no roof deck" on the ONE roof
+  // kind that always has one dropped half an inch of lift and sank every course of roofing into
+  // the deck below it. On screen the plywood won the depth test over the bottom third of the
+  // slope: a smooth tan panel where ribbed corrugated should be. Reachable straight from the
+  // panel — gable, roof deck "none", corrugated — and true of `roofing: 'roll'` just the same.
+  //
+  // `Math.max`, so this can only ever ADD lift: every case that was already right is untouched,
+  // including purlins under a non-frozen roof, where nothing is laid elsewhere.
+  const laidElsewhereThick = deckLaidElsewhere ? (PANEL.roofDeckThickIn.value as number) / IN_PER_FT : 0;
+  // A BOARD DECK IS AS THICK AS THE BOARD, not as thick as a sheet of plywood. Sharing the
+  // panel's ½ in here would have lifted the roofing by the wrong amount over a ¾-in deck.
+  const deckBoardNominal = LUMBER.deckBoardNominal.value as string;
+  const deckBoardT = DRESSED[deckBoardNominal]!.w / IN_PER_FT;
+  const deckBoardW = DRESSED[deckBoardNominal]!.d / IN_PER_FT;
+  const deckThick = Math.max(
+    laidElsewhereThick,
+    deck === 'plywood' ? (PANEL.roofDeckThickIn.value as number) / IN_PER_FT
+    : deck === 'boards' ? deckBoardT
+    : deck === 'purlins' ? DRESSED[LUMBER.purlinNominal.value as string]!.w / IN_PER_FT
+    : 0,
+  );
 
   // ── Deck
-  if (!deckLaidElsewhere && (deck === 'plywood' || deck === 'boards')) {
+  //
+  // BOARDS ARE BOARDS. `roofDeck: 'boards'` came out of here as 4x8 plywood sheets — the same
+  // members, the same nominal, the same smooth panel on screen and the same line on the cut
+  // list as `'plywood'`, byte for byte. The wall pass next door has always laid its board
+  // siding as real boards at their true dressed width with the last one ripped; this is that,
+  // running ACROSS the rafters and stepping up the slope.
+  if (!deckLaidElsewhere && deck === 'boards') {
+    // Its OWN course loop, not `tileSurface`. That tiler splits a course into bands up the slope
+    // when a hip tapers faster than a sheet's height can follow — right for a 4-ft sheet, and on
+    // a board it sliced every 7¼-in course into four 1⅞-in strips. A board is one piece: it is
+    // laid whole and cut on the diagonal at the hip, which is what clipping to the span at its
+    // own mid-height describes.
+    for (const plane of planes) {
+      for (let v = 0; v < plane.slopeLengthFt - EPS; v += deckBoardW) {
+        const v1 = Math.min(v + deckBoardW, plane.slopeLengthFt);
+        const at = planeSpanAt(plane, (v + v1) / 2);
+        if (at.hi - at.lo <= EPS) continue; // the point at the top of a hip end
+        const t: Tile = { u0: at.lo, u1: at.hi, v0: v, v1, full: v1 - v >= deckBoardW - EPS };
+        const p = roofTilePlacement(plane, t, rafterHalfFt + deckBoardT / 2);
+        emit('roofPanel', deckBoardNominal, {
+          cutLengthFt: t.u1 - t.u0,
+          position: p.position,
+          rotation: [Math.PI / 2 - p.pitch, p.yaw, 0],
+          stage: stageDeck,
+          actual: { w: DRESSED[deckBoardNominal]!.w, d: (v1 - v) * IN_PER_FT },
+          nailing: '2-8d ea rafter (PH)',
+          doctrineRef: citeOf(LUMBER.deckBoardNominal),
+        });
+      }
+    }
+  }
+  if (!deckLaidElsewhere && deck === 'plywood') {
     const thick = (PANEL.roofDeckThickIn.value as number) / IN_PER_FT;
     const sheetW = PANEL.lengthFt.value as number; // 8 ft along the eave
     const sheetH = PANEL.widthFt.value as number; // 4 ft up the slope
     for (const plane of planes) {
-      for (const t of tileSurface(plane.eaveLengthFt, plane.slopeLengthFt, sheetW, sheetH)) {
+      for (const t of tileSurface(plane.eaveLengthFt, plane.slopeLengthFt, sheetW, sheetH, 0,
+        (v) => planeSpanAt(plane, v), 'average')) {
         const p = roofTilePlacement(plane, t, rafterHalfFt + thick / 2);
         emit('roofPanel', `${PANEL.widthFt.value}x${PANEL.lengthFt.value} panel`, {
           cutLengthFt: t.u1 - t.u0,
@@ -278,21 +649,199 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
     }
   }
 
+  // ── Fascia: the board that closes the eave over the rafter tails.
+  //
+  // "Why are there always pieces of wood sticking out of the roofs?" — the owner, about every
+  // render in this repo. They are the RAFTER TAILS, and they were not sticking through anything:
+  // measured square to the roof they sit an inch below the roofing, exactly where they belong.
+  // What was missing is the piece that covers them. An eave is finished with a fascia across the
+  // tails; without one, every roof in the toolkit ended in a row of raw square-cut rafter ends,
+  // which is what a row of little wooden wedges along the eave actually was.
+  //
+  // Depth matches the rafter so the board covers the ends it is nailed to, centred on the rafter
+  // centreline — a 1x6 over a 2x6 — and sitting just outside the eave line so it hides the ends
+  // rather than sharing their space.
+  //
+  // BOTH FREE HORIZONTAL EDGES, not just the low one. A gable's two planes meet at the ridge and
+  // each has exactly one open edge, so "one fascia per plane" was right for every roof that had
+  // been looked at. A SHED or FLAT roof is one plane, and its top edge is an eave too — over the
+  // pony wall, with the same rafter tails overhanging it by the same foot and nothing on the far
+  // side. That edge had no fascia and a ridge cap instead, which is the same mistake twice.
+  {
+    const fasciaNominal = LUMBER.fasciaNominal.value as string;
+    const fasciaT = DRESSED[fasciaNominal]!.w / IN_PER_FT;
+    const free = freeTopEdges(planes);
+    for (const [i, plane] of planes.entries()) {
+      // v = 0 is the eave; v = slopeLengthFt is the top edge, an eave only when no plane meets it.
+      const at: [number, number][] = [[0, -1]];
+      if (free[i]) at.push([plane.slopeLengthFt, 1]);
+      for (const [v, out] of at) {
+        const back = out * (fasciaT / 2);
+        const mid = plane.eaveLengthFt / 2;
+        const p: [number, number, number] = [0, 1, 2].map((k) => plane.origin[k]!
+          + plane.alongEave[k]! * mid + plane.upSlope[k]! * (v + back)) as [number, number, number];
+        emit('fascia', fasciaNominal, {
+          cutLengthFt: plane.eaveLengthFt,
+          position: p,
+          // Along the eave, standing on edge: the board's face is the vertical one you see.
+          rotation: [0, Math.atan2(-plane.alongEave[2]!, plane.alongEave[0]!), 0],
+          stage: stageDeck,
+          nailing: '2-8d into each rafter tail (PH)',
+          doctrineRef: citeOf(LUMBER.fasciaNominal),
+        });
+      }
+    }
+  }
+
+  // ── Barge board: what trims a RAKE, the way the fascia trims an eave.
+  //
+  // `generateRidgeCaps` already named the missing piece — a rectangle plane's side edges "are the
+  // rake of a gable, WHICH IS TRIMMED WITH A BARGE BOARD and not capped" — and nothing ever
+  // emitted one. So a gable ended where the DECK ended, at the framing line, while the siding's
+  // outer face stands a skin thickness outside that:
+  //
+  //   gp-frame 48x20   eave: the roof reaches 12.64 in past the skin
+  //                    rake: the roof stops 0.50 in SHORT of it (1.50 on board-and-batten)
+  //
+  // Half an inch of siding along both rakes of every gable, shed and flat roof in the toolkit,
+  // with nothing over it — and the stepped tops of the raked infill standing in the open next to
+  // a raw deck edge, which is what the render shows.
+  //
+  // The board runs UP the rake with its face vertical, which is the fascia's own rotation with
+  // the pitch put back into it, and stands off the plane's side edge by half its thickness so it
+  // covers that edge rather than sharing it. A plane that TAPERS has hips on its sides, not
+  // rakes, and is skipped — the same test the caps use, and the reason a hip roof and the tower's
+  // pyramid cab get none.
+  {
+    const bargeNominal = LUMBER.fasciaNominal.value as string;
+    const bargeT = DRESSED[bargeNominal]!.w / IN_PER_FT;
+    const bargeD = DRESSED[bargeNominal]!.d / IN_PER_FT;
+    const freeTop = freeTopEdges(planes);
+    for (const [i, plane] of planes.entries()) {
+      if (plane.topLengthFt !== undefined || plane.slopeLengthFt <= EPS) continue;
+      const up = plane.upSlope;
+      const pitch = Math.asin(Math.max(-1, Math.min(1, up[1])));
+      // `asin(up.y)` is the pitch; the yaw is the fascia's, struck from the direction the board
+      // runs rather than from the eave. At zero pitch the two are the same rotation.
+      const rot: [number, number, number] = [0, Math.atan2(-up[2], up[0]), pitch];
+      // AT A RIDGE THE TWO BOARDS ARE MITRED. Both slopes' barges lie in the same vertical plane
+      // — the gable end — and run up to the same point, so square heads cross each other there.
+      // A vertical cut at the ridge takes `halfDepth · tan(pitch)` off each: shortening the board
+      // by that much butts them on the ridge line instead. A SHED or FLAT roof's top edge is a
+      // free eave, not a ridge, and its board runs the whole way.
+      const mitre = freeTop[i] ? 0 : (bargeD / 2) * Math.abs(Math.tan(pitch));
+      const runFt = Math.max(EPS, plane.slopeLengthFt - mitre);
+      for (const [edge, out] of [[0, -1], [plane.eaveLengthFt, 1]] as [number, number][]) {
+        emit('bargeBoard', bargeNominal, {
+          cutLengthFt: runFt,
+          position: atUV(plane, edge + out * (wallSkinFt + bargeT / 2), runFt / 2),
+          rotation: rot,
+          stage: stageDeck,
+          nailing: '2-8d into the rake at every rafter; mitred at the ridge (PH)',
+          doctrineRef: citeOf(LUMBER.fasciaNominal),
+        });
+      }
+    }
+  }
+
+  // ── Building paper: felt underlayment between the deck and the roofing.
+  //
+  // THIS WAS ACCEPTED AND IGNORED. `buildingPaper` arrived in this function's input type, was
+  // never destructured, and nothing was ever emitted for it — while `ROOFING.feltWidthIn` and
+  // `feltLapIn` sat unused in doctrine, the `felt` role sat unused in the type union with a
+  // label reading "Underlayment between deck and roofing", and this module's own header claimed
+  // felt was among the things it generates. Every part of the feature existed except the part
+  // that makes it exist.
+  //
+  // Courses run the eave, 36 in wide and lapping 2, laid from the bottom up so each sheds onto
+  // the one below — the same rule as the roofing over it, and the reason the bill wants more
+  // felt than the roof has area.
+  const feltThick = (ROOFING.feltThickIn.value as number) / IN_PER_FT;
+  const paperThick = buildingPaper ? feltThick : 0;
+  if (buildingPaper && (deckThick > 0 || deckLaidElsewhere)) {
+    const feltW = (ROOFING.feltWidthIn.value as number) / IN_PER_FT;
+    const exposure = feltW - (ROOFING.feltLapIn.value as number) / IN_PER_FT;
+    for (const plane of planes) {
+      const courses = Math.max(1, Math.ceil(plane.slopeLengthFt / exposure));
+      for (let c = 0; c < courses; c++) {
+        const v0 = c * exposure;
+        const v1 = Math.min(v0 + feltW, plane.slopeLengthFt);
+        // Banded up the slope on a tapered plane, exactly as the roofing is: a rectangle cannot
+        // be cut on a hip's diagonal, so the course becomes as many pieces as it takes.
+        const taper = Math.abs((planeSpanAt(plane, v0).hi - planeSpanAt(plane, v0).lo)
+          - (planeSpanAt(plane, v1).hi - planeSpanAt(plane, v1).lo));
+        const bands = Math.min(TOLERANCE.maxTaperBands, Math.max(1, Math.ceil(taper / TOLERANCE.hipCapFt)));
+        for (let k = 0; k < bands; k++) {
+          const vb0 = v0 + ((v1 - v0) * k) / bands;
+          const vb1 = v0 + ((v1 - v0) * (k + 1)) / bands;
+          const a = planeSpanAt(plane, vb0);
+          const b = planeSpanAt(plane, vb1);
+          const lo = Math.min(a.lo, b.lo);
+          const hi = Math.max(a.hi, b.hi);
+          if (hi - lo <= TOLERANCE.epsFt) continue;
+          const p = roofTilePlacement(plane, { u0: lo, u1: hi, v0: vb0, v1: vb1 },
+            rafterHalfFt + deckThick + TOLERANCE.surfaceLiftFt + feltThick / 2);
+          emit('felt', `${ROOFING.feltWidthIn.value}-in felt`, {
+            cutLengthFt: hi - lo,
+            position: p.position,
+            rotation: [Math.PI / 2 - p.pitch, p.yaw, 0],
+            stage: stageRoofing,
+            actual: { w: ROOFING.feltThickIn.value as number, d: (vb1 - vb0) * IN_PER_FT },
+            nailing: 'staples or 1-in roofing nails @ 12" (PH)',
+            doctrineRef: `${citeOf(ROOFING.feltWidthIn)} — ${ROOFING.feltLapIn.value}-in lap, laid from the eave up`,
+          });
+        }
+      }
+    }
+  }
+
   // ── Roofing: courses from the eave up, each lapping the one below.
+  //
+  // ROLL GOODS AND CORRUGATED SHEET ARE LAID AT RIGHT ANGLES TO EACH OTHER, and for a long time
+  // this laid both as roll. A 36-in roll unrolls ALONG the eave and you work up the slope in
+  // courses — which is what the loop below does, and for roll it is right. A 26 x 96 in
+  // corrugated sheet does not: its corrugations run along its 8-ft LENGTH and that length runs UP
+  // the slope, so water runs down the channels instead of across them. Laid as courses it came
+  // out 8 ft along the eave by 26 in up the slope — the sheet on its side.
+  //
+  // Measured before this change, on a 48 x 20 gable: every full piece 8.000 ft along the eave by
+  // 26.00 in up the slope, and consecutive pieces in a course at an edge-to-edge offset of
+  // EXACTLY 0. Three things wrong at once. `corrugatedSideLapIn` — the lap between neighbouring
+  // sheets ACROSS the slope — was being spent between courses UP it, where an end lap belongs. A
+  // 7.4-ft slope got four horizontal courses where one sheet reaches eave to ridge. And a butted
+  // joint is a hole: a ray at the shared edge passes between the two pieces, which is why a
+  // raycast into one of the specks on a deckless hip came back holding a ceiling joist.
+  //
+  // The loop already had the right shape — pieces along u, stepping up in v — so what changes is
+  // which figure feeds which axis. Roll keeps exactly what it had and comes out byte-for-byte.
   if (roofing !== 'none') {
     const isRoll = roofing === 'roll' || roofing === 'rollDouble';
     const widthIn = isRoll ? (ROOFING.rollWidthIn.value as number) : (ROOFING.corrugatedWidthIn.value as number);
     const lapIn = isRoll
       ? (roofing === 'rollDouble' ? widthIn / 2 : (ROOFING.rollEndLapIn.value as number))
       : (ROOFING.corrugatedSideLapIn.value as number);
-    const exposureFt = (widthIn - lapIn) / IN_PER_FT;
-    const courseWFt = widthIn / IN_PER_FT;
+    // UP THE SLOPE: how far each piece starts above the last, and how far one piece reaches.
+    // Roll: a 36-in course lapping 6. Corrugated: an 8-ft sheet lapping its end lap.
+    const sheetUpFt = isRoll
+      ? widthIn / IN_PER_FT
+      : (ROOFING.corrugatedLengthFt.value as number);
+    const upExposureFt = isRoll
+      ? (widthIn - lapIn) / IN_PER_FT
+      : sheetUpFt - (ROOFING.corrugatedEndLapIn.value as number) / IN_PER_FT;
+    // ACROSS THE SLOPE: roll runs the whole way in one piece; corrugated is 26-in sheets
+    // side-lapping each other.
+    const sheetAcrossFt = isRoll ? Infinity : widthIn / IN_PER_FT;
+    const acrossExposureFt = isRoll ? Infinity : (widthIn - lapIn) / IN_PER_FT;
+    const exposureFt = upExposureFt;
+    const courseWFt = sheetUpFt;
     const nominal = isRoll
       ? (roofing === 'rollDouble' ? 'roll roofing (double coverage)' : 'roll roofing')
       : `corrugated ${ROOFING.corrugatedWidthIn.value}x${ROOFING.corrugatedLengthFt.value}`;
     const cite = isRoll
       ? (roofing === 'rollDouble' ? citeOf(ROOFING.rollDoubleMinSlopePer12) : citeOf(ROOFING.rollMinSlopePer12))
       : citeOf(ROOFING.corrugatedWidthIn);
+    // Hoisted: the cap over the ridge has to know how thick the roofing under it got.
+    const coveringThick = (ROOFING.coveringThickIn.value as number) / IN_PER_FT;
 
     for (const plane of planes) {
       const courses = Math.max(1, Math.ceil(plane.slopeLengthFt / exposureFt));
@@ -305,55 +854,398 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
         // is ceil(slopeLength / exposure), so every v0 is already short of the ridge and this
         // can never produce an empty course.
         const v1 = Math.min(v0 + courseWFt, plane.slopeLengthFt);
-        const sheetLen = isRoll ? plane.eaveLengthFt : (ROOFING.corrugatedLengthFt.value as number);
-        const runs = isRoll ? 1 : Math.ceil(plane.eaveLengthFt / sheetLen);
-        for (let r = 0; r < runs; r++) {
-          const u0 = r * sheetLen;
-          const u1 = Math.min(u0 + sheetLen, plane.eaveLengthFt);
-          // Each course laps the one below it, so consecutive courses share `lapIn` of the
-          // slope. Placed at one common lift they were two slabs in the same plane —
-          // interpenetrating, z-fighting, and reading as a stepped seam the width of the lap.
-          // Stack them instead: course c rides on the c courses under it. The buildup is real
-          // (lapped roofing does thicken toward the ridge) and tiny — five 1/4-in courses is
-          // 1 1/4 in over a 12-ft slope — but it is what turns the lap into a clean shadow line.
-          // `roofTilePlacement`'s lift is to the tile's CENTRE, so every term here is measured
-          // to the middle of the course: rafter top, deck, a hair of clearance, the courses
-          // already under this one, and finally half of this course's own thickness. Leaving
-          // that last half out sank each course an eighth of an inch INTO the deck, and the
-          // deck striped through — the same class of mistake as the sign above, seen twice.
-          const coveringThick = (ROOFING.coveringThickIn.value as number) / IN_PER_FT;
+        // A hip's courses get SHORTER toward the ridge, and on its triangular ends they run out
+        // to nothing. Roofing is the VISIBLE surface, so a course takes its WIDEST edge and is
+        // complete: averaging leaves stripes of bare deck along both hips.
+        //
+        // THAT RULE IS RIGHT AND IT IS NOT ENOUGH ON ITS OWN, which the guard tower's cab found.
+        // The overhang a widest-edge course leaves past the hip is the plane's taper over one
+        // course height — negligible on a 40-ft building whose hip ends taper an inch a course,
+        // and enormous on an 8-ft pyramid roof with a 5-ft slope, where a 26-in course tapers
+        // FOUR FEET and every course flapped two feet out past the hip on each side. Four faces
+        // of that is the dark wings the owner would have found on the cab.
+        //
+        // So a course is cut into as many pieces up the slope as it takes to keep that overhang
+        // down to a hip-cap's worth. On a rectangle the taper is zero and this is exactly one
+        // piece, byte-for-byte what it was before. On a triangle it is several pieces of
+        // different lengths — which is also what cutting corrugated to a rake actually gives
+        // you, so the bill gets truer at the same time as the picture.
+        const taper = Math.abs(planeSpanAt(plane, v0).hi - planeSpanAt(plane, v0).lo
+          - (planeSpanAt(plane, v1).hi - planeSpanAt(plane, v1).lo));
+
+        // One piece, wherever it lands. The lift is the whole reason this is a closure: it is
+        // built from three independent terms and every caller needs the same three.
+        //
+        // `c` stacks the runs up the slope, because each laps the one below and two coplanar
+        // plates in one plane interpenetrate and z-fight. `roofTilePlacement`'s lift is to the
+        // tile's CENTRE, so every term is measured to the middle: rafter top, deck, a hair of
+        // clearance, the runs already under this one, and half of this piece's own thickness.
+        // Leaving that last half out sank each course an eighth of an inch INTO the deck.
+        //
+        // AND THE SIDE LAP NEEDS THE SAME TREATMENT, on the other axis. Two coplanar plates
+        // overlapping by 3.25 in z-fight down the whole joint. Stacking monotonically the way the
+        // runs do is not available here: a 50-ft eave is 27 strips, and 27 quarter-inches is a
+        // roof that ramps almost seven inches end to end. So the strips ALTERNATE — every other
+        // sheet over its two neighbours — bounded at one thickness. Roll is one piece per course
+        // and never takes this term.
+        const layPiece = (u0: number, u1: number, vb0: number, vb1: number, sideParity: number) => {
           const p = roofTilePlacement(
             plane,
-            { u0, u1, v0, v1 },
-            rafterHalfFt + deckThick + TOLERANCE.surfaceLiftFt + c * coveringThick + coveringThick / 2,
+            { u0, u1, v0: vb0, v1: vb1 },
+            rafterHalfFt + deckThick + paperThick + TOLERANCE.surfaceLiftFt
+              + c * coveringThick + sideParity * coveringThick + coveringThick / 2,
           );
           emit('roofingCourse', nominal, {
             cutLengthFt: u1 - u0,
             position: p.position,
             rotation: [Math.PI / 2 - p.pitch, p.yaw, 0],
             stage: stageRoofing,
-            actual: { w: ROOFING.coveringThickIn.value as number, d: (v1 - v0) * IN_PER_FT },
+            actual: { w: ROOFING.coveringThickIn.value as number, d: (vb1 - vb0) * IN_PER_FT },
             nailing: isRoll ? 'roofing nails @ 6" laps (PH)' : 'lead-head nails at every 3rd corrugation (PH)',
             doctrineRef: cite,
           });
+        };
+
+        if (isRoll) {
+          // A roll course spans the WHOLE eave, so the plane's taper is its taper, and it steps
+          // down the rake in bands. Unchanged, and byte-for-byte what it was.
+          const bands = Math.min(TOLERANCE.maxTaperBands, Math.max(1, Math.ceil(taper / TOLERANCE.hipCapFt)));
+          for (let k = 0; k < bands; k++) {
+            const vb0 = v0 + ((v1 - v0) * k) / bands;
+            const vb1 = v0 + ((v1 - v0) * (k + 1)) / bands;
+            const a = planeSpanAt(plane, vb0);
+            const b = planeSpanAt(plane, vb1);
+            const lo = Math.min(a.lo, b.lo);
+            const hi = Math.max(a.hi, b.hi);
+            if (hi - lo <= TOLERANCE.epsFt) continue;
+            layPiece(lo, hi, vb0, vb1, 0);
+          }
+          continue;
+        }
+
+        // A CORRUGATED STRIP IS 26 INCHES WIDE, AND MOST OF THEM ARE NOWHERE NEAR A HIP.
+        //
+        // The band count above is the PLANE's taper — right for a roll course, which spans the
+        // whole eave and really does have to step down the rake. Applied to a narrow strip it is
+        // nonsense: on a 16 x 12 hip the plane narrows 14 ft over its slope, so every strip got
+        // cut into the maximum 8 bands and the roof came out as 176 pieces of 26 by 11 in. The
+        // gable, which tapers by nothing, gave one 7.4-ft sheet per strip — the right answer, and
+        // the tell. Eight butted seams up every strip is also eight more places for a ray to slip
+        // between two coplanar rectangles, which is what the specks scattered over a hip were.
+        //
+        // What decides whether one rectangle can stand in for a strip is how much THAT STRIP's
+        // own clipped width changes over the run — zero for a strip that lies wholly inside the
+        // plane, whatever the rest of the roof is doing.
+        const s0 = planeSpanAt(plane, v0);
+        const s1 = planeSpanAt(plane, v1);
+        const lo = Math.min(s0.lo, s1.lo);
+        const hi = Math.max(s0.hi, s1.hi);
+        if (hi - lo <= TOLERANCE.epsFt) continue;
+        const strips = Math.max(1, Math.ceil((hi - lo - (sheetAcrossFt - acrossExposureFt)) / acrossExposureFt));
+        for (let r = 0; r < strips; r++) {
+          const su0 = lo + r * acrossExposureFt;
+          const su1 = Math.min(su0 + sheetAcrossFt, hi);
+          const clippedWidth = (v: number) => {
+            const sp = planeSpanAt(plane, v);
+            return Math.max(0, Math.min(su1, sp.hi) - Math.max(su0, sp.lo));
+          };
+          const stripTaper = Math.abs(clippedWidth(v1) - clippedWidth(v0));
+          const bands = Math.min(TOLERANCE.maxTaperBands, Math.max(1, Math.ceil(stripTaper / TOLERANCE.hipCapFt)));
+          for (let k = 0; k < bands; k++) {
+            const vb0 = v0 + ((v1 - v0) * k) / bands;
+            const vb1 = v0 + ((v1 - v0) * (k + 1)) / bands;
+            const a = planeSpanAt(plane, vb0);
+            const b = planeSpanAt(plane, vb1);
+            const clo = Math.max(su0, Math.min(a.lo, b.lo));
+            const chi = Math.min(su1, Math.max(a.hi, b.hi));
+            // A SLIVER IS NOT A SHEET. Near the apex of a triangular face a strip clips to almost
+            // nothing — the plausibility check found quarter-inch "sheets" on the tower's cab, and
+            // it was right to. Two floors, both derived rather than picked:
+            //
+            //   from the second strip on, the SIDE LAP. Both strips are clipped to the same edge
+            //   and the previous one starts a lap further back, so anything narrower than the lap
+            //   is already wholly inside it — dropping it covers the same roof with one fewer
+            //   absurdity on the cut list.
+            //
+            //   for the first strip, ONE CORRUGATION — the side lap over the corrugations it
+            //   spans, which doctrine already carries as 3 1/4 in across 1 1/2. You cannot cut and
+            //   fasten a piece of corrugated narrower than a single rib, and what little it would
+            //   have covered sits under the caps that meet at the apex.
+            const corrugationFt = (ROOFING.corrugatedSideLapIn.value as number)
+              / (ROOFING.corrugatedSideLapCorrugations.value as number) / IN_PER_FT;
+            const minPieceFt = r > 0 ? sheetAcrossFt - acrossExposureFt : corrugationFt;
+            if (chi - clo <= minPieceFt) continue;
+            layPiece(clo, chi, vb0, vb1, r % 2);
+          }
         }
       }
     }
+    // A CAP SITS ON THE ROOFING, NOT ON THE DECK. This passed the deck's own offset, so the cap
+    // was laid at deck level and every course of roofing was stacked on top of it — the piece
+    // whose whole job is to be the outermost thing at the joint was the innermost. On a hip the
+    // 2x8 ridge board then showed through it as a tan line along the peak. The courses build up
+    // toward the ridge (each rides on the ones below), so the cap has to clear ALL of them:
+    // `courses` layers of roofing, then half the cap's own thickness to reach its centre.
+    // `courses` layers of roofing. This is the roofing's OUTER SURFACE, perpendicular to the roof;
+    // the cap adds half of its own thickness on top, vertically, inside `generateRidgeCaps`.
+    const capCourses = planes.reduce(
+      (n, plane) => Math.max(n, Math.max(1, Math.ceil(plane.slopeLengthFt / exposureFt))), 1);
+    emit.members.push(...generateRidgeCaps(planes, nominal, cite, stageRoofing,
+      rafterHalfFt + deckThick + paperThick + TOLERANCE.surfaceLiftFt + capCourses * coveringThick,
+      // A cap is nailed on BOTH sides of the joint it straddles, in the same fastener as the
+      // courses under it. Both phrasings below are ones `fasteners.ts` already reads, and that
+      // is not a coincidence to preserve by luck: its unparsed-schedule gate failed this file
+      // the moment the caps shipped with prose nobody could count.
+      isRoll
+        ? 'roofing nails @ 6" each side of the joint, lapped downhill (PH)'
+        : 'lead-head nails at every 3rd corrugation, each side of the joint (PH)'));
   }
 
   return emit.members;
 }
 
+// ── Ridge and hip caps ───────────────────────────────────────────────────────
+
+type V3 = [number, number, number];
+const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const len = (a: V3): number => Math.hypot(a[0], a[1], a[2]);
+
+/** A point on a plane, from its own (u, v). */
+function atUV(p: RoofPlane, u: number, v: number): V3 {
+  return [
+    p.origin[0] + p.alongEave[0] * u + p.upSlope[0] * v,
+    p.origin[1] + p.alongEave[1] * u + p.upSlope[1] * v,
+    p.origin[2] + p.alongEave[2] * u + p.upSlope[2] * v,
+  ];
+}
+
+/**
+ * Which planes' TOP edges are FREE — an eave, not a ridge.
+ *
+ * A RIDGE IS WHERE TWO SLOPES MEET. A plane's top edge is only one if another plane comes up to
+ * the same line; a gable's two do. A SHED or FLAT roof is one plane, and its top edge is an eave
+ * over the high wall with nothing on the far side of it — the same rafter tails overhanging by
+ * the same foot as the low eave. Capped as a ridge anyway, a 12-in cap laid on that line put half
+ * its width out past the roof's own edge: 6 in over the storage shed's whole 20 ft, hanging in
+ * the air with nothing under it. And the fascia, emitted once per plane at v = 0, never reached
+ * it — so the one edge that had a cap it should not have also lacked the board it should.
+ *
+ * Both callers ask this one function, so they cannot disagree about what the edge is.
+ */
+function freeTopEdges(planes: readonly RoofPlane[]): boolean[] {
+  const keyOf = (p: RoofPlane): string | null => {
+    const top = planeSpanAt(p, p.slopeLengthFt);
+    // A hip end tapers to a point: no top edge at all, so nothing to cap and nothing to trim.
+    if (top.hi - top.lo <= EPS) return null;
+    const a = atUV(p, top.lo, p.slopeLengthFt);
+    const b = atUV(p, top.hi, p.slopeLengthFt);
+    return [0, 1, 2].map((k) => Math.round(((a[k]! + b[k]!) / 2) * 100)).join(',');
+  };
+  const keys = planes.map(keyOf);
+  const count = new Map<string, number>();
+  for (const k of keys) if (k !== null) count.set(k, (count.get(k) ?? 0) + 1);
+  return keys.map((k) => k !== null && (count.get(k) ?? 0) < 2);
+}
+
+/**
+ * The caps over every ridge and every hip.
+ *
+ * WHY THIS HAS TO EXIST. Roofing courses are rectangles, and a rectangle cannot be cut on a
+ * diagonal — so where two slopes meet, the courses are cut ON the line and their cut edges ARE
+ * the roof. On a gable that is a ridge board's worth of joint; on a hip roof it is four
+ * diagonals; on a pyramid cab it is four diagonals meeting at a point, which is precisely the
+ * bare patch at the peak of the guard tower. A cap is the piece that closes it, it is a real
+ * item somebody has to draw from supply, and until now the toolkit neither drew it nor billed
+ * it — a roof that would have leaked at every seam, quietly, on paper.
+ *
+ * The lines come from the planes themselves rather than from each roof kind's own geometry, so
+ * a new roof shape gets its caps for free: a plane's TOP edge is a ridge, and its slanted side
+ * edges are hips. A rectangle's sides are vertical in (u, v) — a gable rake, not a hip — and are
+ * correctly skipped. Adjacent planes share every line, so they are deduplicated by midpoint.
+ */
+export function generateRidgeCaps(
+  planes: readonly RoofPlane[],
+  nominal: string,
+  cite: string,
+  stage: number,
+  liftFt: number,
+  nailing: string,
+): Member[] {
+  const emit = makeEmitter('CP');
+  const capW = (ROOFING.capWidthIn.value as number) / IN_PER_FT;
+  const capThickFt = (ROOFING.coveringThickIn.value as number) / IN_PER_FT;
+  const seen = new Set<string>();
+
+  const lines: { a: V3; b: V3; hip: boolean; cos: number }[] = [];
+  const free = freeTopEdges(planes);
+  for (const [i, p] of planes.entries()) {
+    const top = planeSpanAt(p, p.slopeLengthFt);
+    const foot = planeSpanAt(p, 0);
+    // `upSlope` is a unit vector, so its Y component is sin(pitch) and this is cos(pitch).
+    const cos = Math.max(1e-9, Math.sqrt(Math.max(0, 1 - p.upSlope[1] * p.upSlope[1])));
+    // The top edge: a ridge wherever the plane still has width up there AND another plane comes
+    // up to meet it. A hip end tapers to a point and has no top edge at all, which is why a
+    // pyramid has four hips and no ridge; a shed or flat roof HAS one and it is not a ridge, it
+    // is the eave over the high wall — see `freeTopEdges`.
+    if (top.hi - top.lo > EPS && !free[i]) {
+      lines.push({ a: atUV(p, top.lo, p.slopeLengthFt), b: atUV(p, top.hi, p.slopeLengthFt), hip: false, cos });
+    }
+    // The side edges, but only where the plane actually tapers — otherwise they are the rake of
+    // a gable, which is trimmed with a barge board and not capped.
+    if (p.topLengthFt !== undefined) {
+      lines.push({ a: atUV(p, foot.lo, 0), b: atUV(p, top.lo, p.slopeLengthFt), hip: true, cos });
+      lines.push({ a: atUV(p, foot.hi, 0), b: atUV(p, top.hi, p.slopeLengthFt), hip: true, cos });
+    }
+  }
+
+  for (const line of lines) {
+    const d = sub(line.b, line.a);
+    const l = len(d);
+    if (l <= EPS) continue;
+    const mid: V3 = [(line.a[0] + line.b[0]) / 2, (line.a[1] + line.b[1]) / 2, (line.a[2] + line.b[2]) / 2];
+    const key = mid.map((n) => Math.round(n * 100)).join(',');
+    if (seen.has(key)) continue; // the plane on the other side of the same line
+    seen.add(key);
+    const u: V3 = [d[0] / l, d[1] / l, d[2] / l];
+    // Solving Ry(ry)·Rx(rx)·Rz(rz) for "length along `u`, face width HORIZONTAL across it":
+    // taking rz = PI/2 makes the face-width column (-cos ry, 0, sin ry), which is horizontal for
+    // any ry — and then the length column is (sin ry·sin rx, cos rx, cos ry·sin rx), which is
+    // `u` at rx = acos(u.y) and ry = atan2(u.x, u.z). A cap sits ON the joint, so its face lies
+    // across the two slopes and its thickness stands off them.
+    const rx = Math.acos(Math.max(-1, Math.min(1, u[1])));
+    const ry = Math.atan2(u[0], u[2]);
+    // `liftFt` is the roofing's outer surface measured PERPENDICULAR to the roof, the way every
+    // other covering offset in this file is, and `mid` is on the roof plane — so the sheet edge
+    // the cap lands on is `liftFt * cos(pitch)` above it, and the cap's own half-thickness goes on
+    // top of that. Both were previously skipped: the cap took the DECK's offset added straight to
+    // Y, so every course of roofing was stacked on the one piece whose whole job is to be
+    // outermost, and on a hip the 2x8 ridge board showed through it.
+    //
+    // `* cos`, not `/ cos`. Dividing would put the cap at the apex where the two roofing PLANES
+    // would meet if extended — but the sheets do not reach that apex: each course is offset
+    // perpendicular from the plane and still cut at `slopeLengthFt`, so its top edge pulls back
+    // from the ridge by `lift * sin(pitch)` and sits `lift * cos(pitch)` up instead. A cap at the
+    // apex therefore floats above the material it is nailed to, by 3.8 in at 12-in-12 — which is
+    // what the plausibility check means by "touches nothing at all". The cap goes where the
+    // sheets actually are. (That the sheets stop short at all is a separate defect; see
+    // docs/VISUAL_FIDELITY_SWEEP.md.)
+    emit('ridgeCap', nominal, {
+      cutLengthFt: l,
+      position: [mid[0], mid[1] + liftFt * line.cos + capThickFt / 2, mid[2]],
+      rotation: [rx, ry, Math.PI / 2],
+      stage,
+      actual: { w: ROOFING.coveringThickIn.value as number, d: capW * IN_PER_FT },
+      nailing,
+      doctrineRef: cite,
+    });
+  }
+  return emit.members;
+}
+
 /** Skid runners under a building on grade (foundation 'skids'). */
-export function generateSkids(lengthFt: number, widthFt: number, stage: number, count = 3): Member[] {
+/**
+ * Slab on grade — where the floor and the foundation are the SAME POUR.
+ *
+ * "Slab on grade" used to emit no slab. The option built a suspended wood floor — joists,
+ * bridging, subfloor — resting on nothing at all, which is what it looked like from underneath
+ * once the ground stopped being an opaque plane: a framed floor and clear air below it. The
+ * concrete the option is named after was never generated, so the picture showed a building with
+ * no foundation and the bill listed no concrete to pour.
+ *
+ * What a slab actually is here: one pour whose TOP IS THE FLOOR (y = 0, where the wall sole
+ * plates land), with its edge thickened under every wall line to carry them. No joists and no
+ * subfloor — putting a wood floor on a slab is not a foundation choice, it is two floors.
+ */
+export function generateSlabOnGrade(lengthFt: number, widthFt: number, stageEdge: number, stageSlab: number): Member[] {
+  const emit = makeEmitter('FL');
+  const slabT = (FOUNDATION.slabThickIn.value as number) / IN_PER_FT;
+  const edgeW = (FOUNDATION.stripFootingWidthIn.value as number) / IN_PER_FT;
+  const edgeD = (FOUNDATION.stripFootingDepthIn.value as number) / IN_PER_FT;
+  const edgeCite = `${citeOf(FOUNDATION.stripFootingWidthIn)} — thickened edge under the wall lines`;
+
+  // Thickened edge first: it is dug and poured before the slab goes over it. The two long runs
+  // go through and the two cross runs butt between them, the same convention the foundation
+  // walls use, so no two pours claim the same cubic foot.
+  for (const z of [edgeW / 2, widthFt - edgeW / 2]) {
+    emit('footing', `conc edge ${FOUNDATION.stripFootingWidthIn.value}x${FOUNDATION.stripFootingDepthIn.value}`, {
+      cutLengthFt: lengthFt,
+      position: [lengthFt / 2, -slabT - edgeD / 2, z],
+      rotation: [0, 0, 0],
+      stage: stageEdge,
+      actual: { w: FOUNDATION.stripFootingWidthIn.value as number, d: FOUNDATION.stripFootingDepthIn.value as number },
+      nailing: 'no fasteners — concrete (PH)',
+      doctrineRef: edgeCite,
+    });
+  }
+  for (const x of [edgeW / 2, lengthFt - edgeW / 2]) {
+    emit('footing', `conc edge ${FOUNDATION.stripFootingWidthIn.value}x${FOUNDATION.stripFootingDepthIn.value}`, {
+      cutLengthFt: Math.max(0.5, widthFt - 2 * edgeW),
+      position: [x, -slabT - edgeD / 2, widthFt / 2],
+      rotation: [0, -Math.PI / 2, 0],
+      stage: stageEdge,
+      actual: { w: FOUNDATION.stripFootingWidthIn.value as number, d: FOUNDATION.stripFootingDepthIn.value as number },
+      nailing: 'no fasteners — concrete (PH)',
+      doctrineRef: edgeCite,
+    });
+  }
+
+  emit('slab', `conc slab ${FOUNDATION.slabThickIn.value}in`, {
+    cutLengthFt: lengthFt,
+    position: [lengthFt / 2, -slabT / 2, widthFt / 2],
+    rotation: [0, 0, 0],
+    // Length along X, thickness UP (actual.d), width across Z — the same convention the
+    // basement slab is emitted with, so one reader serves both.
+    actual: { w: widthFt * IN_PER_FT, d: FOUNDATION.slabThickIn.value as number },
+    stage: stageSlab,
+    nailing: 'no fasteners — concrete; sole plates anchored to the slab (PH)',
+    doctrineRef: citeOf(FOUNDATION.slabThickIn),
+  });
+  return emit.members;
+}
+
+/**
+ * The runners a skid building sits on and is dragged by.
+ *
+ * `gradeY` IS REQUIRED, and it is the whole story. This used to assume grade was y = 0 and hang
+ * the skid BELOW it — while the caller computed grade as `joistTop − joistDepth − skidDepth`,
+ * more than a foot lower, and the scene drew the ground there. Two ideas of where the ground is,
+ * in one branch. What came out: the skids floating 8 in clear of the ground they are supposed to
+ * lie on, the joists 8 in UNDERGROUND, and the two ranges overlapping so the skids ran straight
+ * through every joist they crossed — 50 interpenetrating pairs on the storage shed, the worst a
+ * rim joist buried 4¾ in into a skid over its whole 20-ft length.
+ *
+ * Told where grade is, the skid's bottom lands on it and its top lands exactly on the joist
+ * underside, because `gradeY + skidDepth` is `joistTop − joistDepth` by that same definition.
+ */
+export function generateSkids(
+  lengthFt: number,
+  widthFt: number,
+  stage: number,
+  gradeY: number,
+  /**
+   * A COUNT spreads runners evenly across the width. That is right under a floor deck — the
+   * joists cross every one of them, so every one carries — and it is what a building and a tent
+   * floor pass.
+   *
+   * A LIST says where the load actually comes DOWN, which is what a platform needs. Its load
+   * arrives on two lines of posts rather than spread across the width, and three even runners put
+   * one of them under nothing at all while the other two missed the posts by an inch.
+   */
+  at: number | readonly number[] = 3,
+): Member[] {
   const emit = makeEmitter('FL');
   const nominal = LUMBER.skidNominal.value as string;
-  const d = DRESSED[nominal]!.d / IN_PER_FT;
-  for (let i = 0; i < count; i++) {
-    const z = (widthFt / (count - 1 || 1)) * i;
+  const depth = DRESSED[nominal]!.d / IN_PER_FT; // on edge: the face width stands vertical
+  const halfWide = DRESSED[nominal]!.w / IN_PER_FT / 2; // across Z — its THICKNESS, not its depth
+  const zs = typeof at === 'number'
+    ? Array.from({ length: at }, (_, i) => (widthFt / (at - 1 || 1)) * i)
+    : at;
+  for (const z of zs) {
     emit('skid', nominal, {
       cutLengthFt: lengthFt,
-      position: [lengthFt / 2, -d / 2, Math.min(Math.max(z, d / 2), widthFt - d / 2)],
+      // Inset by the half-extent along Z, which is the thickness. Using the depth here held the
+      // outer runners an inch inboard of the wall line they carry, so the rim joist overhung them.
+      position: [lengthFt / 2, gradeY + depth / 2, Math.min(Math.max(z, halfWide), widthFt - halfWide)],
       rotation: [0, 0, 0],
       stage,
       nailing: 'drift-pinned; chamfer both ends for dragging (PH)',

@@ -84,9 +84,12 @@ export function generateStructure(spec: StructureSpec): StructureModel {
       // T7. See families/bunker.ts for the §2.7 boundary this family sits on: the depth of soil
       // is an INPUT it consumes as dead load, never an output it computes.
       const r = generateBunker(normalized);
-      const extra = r.pastReviewedTable
-        ? [{ path: 'interiorWidthFt', kind: 'ls-note' as const, message: r.pastReviewedTable, severity: 'error' as const }]
-        : [];
+      const extra = [
+        ...(r.pastReviewedTable
+          ? [{ path: 'interiorWidthFt', kind: 'ls-note' as const, message: r.pastReviewedTable, severity: 'error' as const }]
+          : []),
+        ...r.notes.map((n) => ({ path: n.path, kind: 'clamped' as const, message: n.message, severity: 'warn' as const })),
+      ];
       return withSpanChecks({
         spec: normalized,
         members: r.members,

@@ -13,8 +13,19 @@
 
 import { pickerGroups, type FamilyDef } from '../../timber/catalog';
 import { isLearning } from './mode';
-import { thumbnailCached } from '../../timber/thumbnails';
+import { portraitCached } from '../../timber/portrait';
+import { generateStructure } from '../../timber/families/index';
 import type { StoredBuild } from './store';
+
+/**
+ * The three pieces on the flashcards tile: a joint, a stick and a foundation, from three
+ * different structures — so the stack says "the whole trade" rather than "one building".
+ */
+const FAN_PICKS: readonly [string, string][] = [
+  ['tower', 'hipRafter'],
+  ['gp-frame', 'header'],
+  ['gp-frame', 'post'],
+];
 
 export interface PickerCallbacks {
   onOpenFamily(familyId: FamilyDef['id']): void;
@@ -26,7 +37,11 @@ const esc = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 function cardHtml(f: FamilyDef): string {
-  const art = thumbnailCached(`card:${f.id}`, f.preset);
+  // SOLID, NOT WIRE. These were line drawings — thin dark strokes designed to read on white
+  // paper — and the app is dark, so fourteen cards of a building came out as fourteen faint
+  // smudges you could not tell apart. The owner's word for it was "undiscernable". A card whose
+  // whole job is "which structure is this" has to show the structure.
+  const art = portraitCached(`card:${f.id}`, f.preset, { width: 300, height: 200 });
   const capacity = f.capacity ? `<span class="chip-meta">${esc(f.capacity)}</span>` : '';
   // Lineage on the card is the pub NAME only; the (PH) status lives in the workbench.
   const lineage = esc(f.lineage.replace(/\s*\(PH[^)]*\)/g, '').split(';')[0] ?? '');
@@ -40,6 +55,49 @@ function cardHtml(f: FamilyDef): string {
         <span class="card-meta">${capacity}<span class="chip-meta">${lineage}</span></span>
       </span>
     </button>`;
+}
+
+/**
+ * THE FLASHCARDS TILE — first thing in the Learning app, and a stack of cards rather than a
+ * building.
+ *
+ * Flashcards used to be a button inside each structure's workbench: you picked a hut, waited
+ * for it to draw, and then found a deck about huts. That put the general vocabulary — the part
+ * that transfers between every job — behind a choice of building, and it interrupted anyone
+ * who had opened a structure to look at the structure. So the deck moved out to its own page
+ * and this is its front door, at the top, before any of the buildings.
+ *
+ * The three faces are drawn from the catalog's own presets, which keeps this tile honest: no
+ * image files, and it cannot advertise a piece the engine does not build.
+ */
+function flashcardsHtml(): string {
+  const faces = FAN_PICKS
+    .map(([familyId, role], i) => {
+      const family = pickerGroups().flatMap((g) => g.families).find((f) => f.id === familyId);
+      if (!family) return '';
+      const member = generateStructure(family.preset).members.find((m) => m.role === role);
+      if (!member) return '';
+      const art = portraitCached(`fan:${familyId}:${role}`, family.preset, {
+        width: 300, height: 210, context: 0.8, focus: new Set([member.id]), stageMax: member.stage, background: "#17181b",
+      });
+      return `<span class="face f${i}">${art}</span>`;
+    })
+    .join('');
+  return `<section class="group group--cards">
+      <h2>Flashcards</h2>
+      <div class="cards">
+        <a class="card card--cards" href="learn.html">
+          <span class="card-art" aria-hidden="true"><span class="fan">${faces}</span></span>
+          <span class="card-body">
+            <span class="card-name">General knowledge</span>
+            <span class="card-line">See a piece, name it. Every piece of framing in the toolkit, pictured in
+              the structure it belongs to at the moment it goes in — then the same pieces asked harder,
+              with the stock, the span and the citation.</span>
+            <span class="card-meta"><span class="chip-meta">Pieces dictionary</span><span class="chip-meta">Build sequences</span></span>
+          </span>
+        </a>
+      </div>
+    </section>`;
 }
 
 function resumeHtml(builds: StoredBuild[]): string {
@@ -73,10 +131,11 @@ export function renderPicker(root: HTMLElement, builds: StoredBuild[], cb: Picke
       <div class="picker-head">
         <h1>${isLearning ? 'What do you want to learn?' : 'What are you building?'}</h1>
         <p class="sub">${isLearning
-          ? 'Pick a structure to take apart. Watch it go up stage by stage, tap any piece, change anything you like — then drill on the cards.'
+          ? 'Start with the cards if you are learning the vocabulary. Or pick a structure to take apart — watch it go up stage by stage, tap any piece, change anything you like.'
           : 'Pick a standard design to start from, or a clean sheet. Every one is fully adjustable, down to the hardware.'}</p>
         <nav class="jumps" aria-label="Jump to a group">${jump}</nav>
       </div>
+      ${isLearning ? flashcardsHtml() : ''}
       ${resumeHtml(builds)}
       ${sections}
       <p class="footnote">(PH) beside a citation in a build means the manual page check is still pending.</p>

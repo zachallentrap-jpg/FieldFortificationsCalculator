@@ -32,6 +32,39 @@
 
 ---
 
+## 0.0 SHIPPED — what this plan has actually built (added after the fact)
+
+The status line above is from the day the plan was written. Since then TIMBER-2 T0–T8 shipped,
+and four of the F phases with them. Where the plan and the code disagree, **the code is the
+record** — the differences below were all forced by driving the thing rather than reading it.
+
+| Phase | State | Where it lives |
+|---|---|---|
+| **F1** — pure core, scheduler, deck compiler | shipped | `src/timber/train/{core,compile,decks,drill}.ts`, pinned vectors at `test/fixtures/train-vectors.json` |
+| **F2** — TIMBER flip deck UI | shipped, and larger than specced: a **toolkit-level** trainer at `learn.html`, not only a panel inside the studio | `src/ui/learn/**` + the 1371 hub card |
+| **F3** — command packet | shipped | `src/timber/packet/**`, `src/ui/woodframe/sheet.ts`, `.materials.csv` export |
+| **F4** — quiz modes | shipped with F2 (identify, name-to-part, stage-order) | `src/timber/train/drill.ts` |
+| F5–F9 | not started | — |
+
+**Four plan decisions were wrong in a way only the browser showed, and the code carries the
+corrected version plus the reason:**
+
+- **§4.1.1's repeating footer** was specced as a CSS margin box. Chrome does not implement
+  margin boxes; it renders nowhere. `position: fixed` was the second attempt and prints once
+  in Firefox. The shipped mechanism is a `<tfoot>` on a document-wrapping table — which is
+  what FD69 already said, and is why FD69 is right.
+- **FD60's panel-thickness split** was budgeted as an additive generator change. Those
+  generators (`floor.ts`, `roof.ts`) are frozen under C-10, and the split belongs in the BOM
+  anyway: it is a projection, and correcting a bill needs no change to the model it bills.
+- **§4.1.5's LS table** was to be matched by citation. Members cite the METHOD they were cut
+  by; doctrine entries cite the TABLE. Consumers are declared in `packet/lsgate.ts` instead,
+  gated by a test that every LS constant names its own.
+- **R-T4's "no cover-depth field"** is narrower than it reads: the boundary sentence IS the
+  soil ghost's citation, so the citation register quotes it verbatim, which is exactly the
+  adjacency the rule wants. What is forbidden is a machine-readable cover-depth VALUE.
+
+---
+
 ## 0. How to read this document
 
 §1 states the mandate as requirements and restates the two liability regimes as binding

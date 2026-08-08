@@ -50,6 +50,12 @@ export const LUMBER = {
   braceNominal: doc('1x4', 'FM 5-426 let-in corner brace'),
   crossBridgingNominal: doc('1x3', 'FM 5-426 cross bridging'),
   purlinNominal: doc('2x4', 'FM 5-426 purlin roof deck'),
+  // The board across the rafter tails that closes an eave. Matched to the rafter's depth so it
+  // covers the tails it is nailed to — a 1x6 over a 2x6.
+  fasciaNominal: doc('1x6', 'FM 5-426 cornice: fascia over the rafter tails (PH)'),
+  // What a BOARD roof deck is made of. `coverings.roofDeck: 'boards'` used to lay 4x8 plywood
+  // sheets — the option was a label with the other option's material behind it.
+  deckBoardNominal: doc('1x8', 'FM 5-426 roof sheathing laid as boards (PH)'),
   girtNominal: doc('2x6', 'TM 5-302 girts at panel lines'),
   deckPlankNominal: doc('2x6', 'TM 5-302 plank deck'),
   skidNominal: doc('4x6', 'TM 5-302 skid runners, PT, chamfered, drift-pinned'),
@@ -99,6 +105,24 @@ export const TOLERANCE = {
   epsFt: 0.01,
   /** Infill studs shorter than this are not worth cutting; the plate covers the gap. */
   minInfillStudFt: 0.2,
+  /**
+   * How far a course of roofing may overhang the hip it is cut against — the width of a hip
+   * cap, which is what covers that joint on a real roof. Past this the course is cut into more
+   * pieces up the slope, because a rectangle cannot be cut on a diagonal.
+   */
+  hipCapFt: 4 / IN_PER_FT,
+  /** Ceiling on that subdivision, so a degenerate plane cannot emit a thousand offcuts. */
+  maxTaperBands: 8,
+  /**
+   * How far a piece of wall covering may step away from a RAKE — the sloped top edge of a
+   * gable end or a shed's rake wall — before it is ripped narrower. Siding is cut to the rake
+   * on site; a rectangle cannot be, so a wide sheet against a shallow gable either overshoots
+   * the roof or leaves a wedge of daylight. Stepping at 3 in is close enough that the rake
+   * reads as a straight line, and the cut pieces are what a crew would actually rip.
+   */
+  rakeStepFt: 3 / IN_PER_FT,
+  /** Ceiling on THAT subdivision — same reasoning as `maxTaperBands`, in the other axis. */
+  maxRakeStrips: 64,
 } as const;
 
 // ── Foundations ──────────────────────────────────────────────────────────────
@@ -172,7 +196,10 @@ export const RAMP = {
 // catalog presets. Three copies of "a door is 3 by 6 foot 8" is three chances to disagree.
 export const OPENING = {
   doorWidthFt: doc(3, 'FM 5-426 door rough opening (PH)', { unit: 'ft' }),
-  doorHeightFt: doc(6.7, 'FM 5-426 door rough opening — 6 ft 8 in (PH)', { unit: 'ft' }),
+  // 6 ft 8 in is 6.667 ft, not 6.7 — the value disagreed with its own citation by four tenths
+  // of an inch, and that was the difference between the guard shack's door fitting under its
+  // 7.5-ft wall and its header running through the top plate.
+  doorHeightFt: doc(6 + 8 / 12, 'FM 5-426 door rough opening — 6 ft 8 in (PH)', { unit: 'ft' }),
   windowWidthFt: doc(3, 'FM 5-426 window rough opening (PH)', { unit: 'ft' }),
   windowHeightFt: doc(3.5, 'FM 5-426 window rough opening (PH)', { unit: 'ft' }),
   windowSillFt: doc(3.5, 'FM 5-426 window sill height (PH)', { unit: 'ft' }),
@@ -183,6 +210,22 @@ export const OPENING = {
   cornerSetbackFt: doc(2, 'FM 5-426 opening layout (PH)', { unit: 'ft' }),
   /** Spacing between the windows a long wall gets by default. */
   windowPitchFt: doc(12, 'FM 5-426 opening layout (PH)', { unit: 'ft' }),
+  // ── What fills the opening (plan §2.6 TO-built sub-assemblies) ─────────────
+  doorBoardNominal: doc('1x6', 'FM 5-426 ledged-and-braced door — 1x6 boards (PH)'),
+  doorLedgeNominal: doc('1x6', 'FM 5-426 ledged-and-braced door — ledges and braces (PH)'),
+  doorLedges: doc(3, 'FM 5-426 ledged-and-braced door — three ledges (PH)'),
+  doorBraces: doc(2, 'FM 5-426 ledged-and-braced door — two braces, in compression (PH)'),
+  /** Gap all round a leaf inside its rough opening, so it swings. */
+  leafClearanceIn: doc(0.25, 'FM 5-426 door fitting clearance (PH)', { unit: 'in' }),
+  /** How far a shutter laps past the opening, so a closed one shows no light gap. */
+  shutterLapIn: doc(1, 'FM 5-426 shutter laps the opening (PH)', { unit: 'in' }),
+  shutterBattens: doc(2, 'FM 5-426 batten shutter — two battens (PH)'),
+  /**
+   * How far a threshold has to stand above grade before the door needs steps. Below it the step
+   * up is one long stride, which is what a doorsill on a skid building is; above it the door is
+   * unusable without something to stand on.
+   */
+  entryStepMinRiseFt: doc(1.5, 'FM 5-426 entry steps at a raised floor (PH)', { unit: 'ft', lifeSafety: true }),
 } as const;
 
 // ── Named structure dimensions (plan §2.2 — the "exhaustive hut family") ─────
@@ -220,6 +263,13 @@ export const LATRINE = {
   // person can fall into is exactly the failure mode the gate exists for.
   pitDepthFt: doc(6, 'TM 5-302 latrine pit depth (PH)', { unit: 'ft', lifeSafety: true }),
   aisleWidthFt: doc(3, 'TM 5-302 latrine aisle (PH)', { unit: 'ft' }),
+  // THE SEAT ITSELF. The riser box generator's own docstring promised "a seat opening per seat"
+  // and cut none — `seats` sized the divider count and nothing else, so a four-seat latrine came
+  // out as an unbroken bench. These are the hole, and they are what makes it a latrine.
+  seatOpeningWidthIn: doc(11, 'TM 5-302 latrine seat opening (PH)', { unit: 'in' }),
+  seatOpeningLengthIn: doc(14, 'TM 5-302 latrine seat opening (PH)', { unit: 'in' }),
+  /** Clear board left in front of the opening, measured from the riser box's front face. */
+  seatFrontMarginIn: doc(4, 'TM 5-302 latrine seat set back from the front board (PH)', { unit: 'in' }),
 } as const;
 
 // ── Guard tower (TM 5-302 (PH); EM 385-1-1 for everything that can drop you) ──
@@ -275,9 +325,18 @@ export const ROOFING = {
   corrugatedLengthFt: doc(8, 'FM 5-426 corrugated metal sheet length', { unit: 'ft' }),
   corrugatedSideLapCorrugations: doc(1.5, 'FM 5-426 corrugated side lap'),
   corrugatedSideLapIn: doc(3.25, 'FM 5-426 corrugated side lap (1.5 corrugations at 2 1/6 in pitch)', { unit: 'in' }),
+  // A sheet runs its 8-ft LENGTH up the slope; the side lap above is between neighbouring sheets
+  // ACROSS it. Where a slope is longer than one sheet the next one laps its lower end, and that
+  // is a different figure — carried at the roll-roofing end lap until the corrugated table is
+  // page-checked, which is what the (PH) says.
+  corrugatedEndLapIn: doc(6, 'FM 5-426 corrugated end lap (PH)', { unit: 'in' }),
   coveringThickIn: doc(0.25, 'roofing course thickness as modeled (roll goods lie flat)', { unit: 'in' }),
+  // A cap straddles the joint, so half its width lands on each slope. Roll goods are cut from
+  // the same stock; corrugated comes as a formed ridge/hip piece in about the same girth.
+  capWidthIn: doc(12, 'FM 5-426 ridge and hip cap (PH)', { unit: 'in' }),
   feltWidthIn: doc(36, 'FM 5-426 felt underlayment', { unit: 'in' }),
   feltLapIn: doc(2, 'FM 5-426 felt lap', { unit: 'in' }),
+  feltThickIn: doc(0.05, 'felt underlayment thickness as modeled (15-lb felt lies flat)', { unit: 'in' }),
   squareSf: doc(100, 'roofing square = 100 sf', { unit: 'sf', ph: false }),
 } as const;
 

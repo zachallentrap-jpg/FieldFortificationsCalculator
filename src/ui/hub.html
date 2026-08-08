@@ -10,9 +10,23 @@
     <style>
       * { box-sizing: border-box; }
       body { margin: 0; background: #f4f2ec; font-family: system-ui, sans-serif; color: #2b2419; }
+      /* The two marks flank the title on a wide screen and stack above it on a phone, where a
+         46px emblem either side would leave the title four words wide. */
       header { padding: 26px 20px 10px; text-align: center; }
+      .crest { display: flex; align-items: center; justify-content: center; gap: 18px; }
+      .crest svg { flex: none; width: 52px; height: 52px; color: #2b2419; }
+      /* Drawn, not fetched: the whole suite ships as one offline bundle with zero external
+         requests, so an emblem is inline geometry or it is nothing. Both are STYLISED marks —
+         a recognisable eagle-globe-and-anchor and a recognisable engineer castle — not
+         reproductions of an official insignia file. */
+      .crest .cut { fill: #f4f2ec; }
       header h1 { margin: 0; font-size: 26px; letter-spacing: 0.02em; }
       header p { margin: 6px 0 0; color: #6b6250; font-size: 14px; }
+      @media (max-width: 620px) {
+        .crest { flex-wrap: wrap; gap: 12px; }
+        .crest h1 { order: 3; flex-basis: 100%; }
+        .crest svg { width: 42px; height: 42px; }
+      }
       main { display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; padding: 26px 20px 10px; max-width: 1080px; margin: 0 auto; }
       a.card, div.card { width: 310px; min-height: 190px; border: 1px solid #c9c0ad; border-radius: 14px; background: #fbf9f4; padding: 16px 18px; text-decoration: none; color: inherit; display: flex; flex-direction: column; box-shadow: 0 2px 8px rgba(43, 36, 25, 0.06); }
       a.card:hover { border-color: #2b2419; box-shadow: 0 4px 14px rgba(43, 36, 25, 0.14); }
@@ -21,12 +35,44 @@
       .card p { margin: 0; font-size: 13px; color: #4b4436; line-height: 1.45; flex: 1; }
       .card .doc { margin-top: 12px; font-size: 11px; color: #6b6250; }
       div.card.ghost { border-style: dashed; color: #9b917c; align-items: center; justify-content: center; text-align: center; }
-      footer { text-align: center; padding: 18px 20px 30px; font-size: 11px; color: #6b6250; max-width: 720px; margin: 0 auto; }
     </style>
   </head>
   <body>
     <header>
-      <h1>COMBAT ENGINEER TOOLKIT</h1>
+      <div class="crest">
+        <svg viewBox="0 0 64 64" role="img" aria-label="Eagle, globe and anchor" fill="currentColor">
+          <title>Eagle, globe and anchor</title>
+          <!-- Eagle: two swept wings over a small head. -->
+          <path d="M32 9.6c-1.8 0-3.2 1.1-3.8 2.6C24.4 8.6 18 6.9 11.6 8.2c4.1 1.1 7.6 3 10.2 5.6-3-.9-6.1-.9-8.7.2 3.5.4 6.6 1.5 8.9 3.5h20c2.3-2 5.4-3.1 8.9-3.5-2.6-1.1-5.7-1.1-8.7-.2 2.6-2.6 6.1-4.5 10.2-5.6C46 6.9 39.6 8.6 35.8 12.2c-.6-1.5-2-2.6-3.8-2.6z"/>
+          <!-- Anchor: shank, stock, arms and flukes. It runs BEHIND the globe, which is why the
+               shank is drawn first and the globe's outline crosses it. -->
+          <rect x="30.5" y="14" width="3" height="38" rx="1.4"/>
+          <rect x="18" y="21" width="28" height="3" rx="1.5"/>
+          <path d="M13 37c0 10.4 8.5 17.6 19 17.6S51 47.4 51 37" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+          <path d="M13.6 38.4 7.6 34.6l.6 8.6z"/>
+          <path d="M50.4 38.4l6-3.8-.6 8.6z"/>
+          <!-- Globe -->
+          <circle cx="32" cy="31" r="12.6" class="cut"/>
+          <circle cx="32" cy="31" r="12.6" fill="none" stroke="currentColor" stroke-width="2.6"/>
+          <ellipse cx="32" cy="31" rx="12.6" ry="4.8" fill="none" stroke="currentColor" stroke-width="1.7"/>
+          <ellipse cx="32" cy="31" rx="4.8" ry="12.6" fill="none" stroke="currentColor" stroke-width="1.7"/>
+        </svg>
+        <h1>COMBAT ENGINEER TOOLKIT</h1>
+        <svg viewBox="0 0 64 64" role="img" aria-label="Engineer castle" fill="currentColor">
+          <title>Engineer castle</title>
+          <!-- Curtain walls, then the three towers, then the battlements on each. -->
+          <path d="M20 33h24v22H20z"/>
+          <path d="M8 27h13v28H8z M43 27h13v28H43z M25 19h14v36H25z"/>
+          <path d="M8 22h3.6v6H8z M14.7 22h3.6v6h-3.6z M21.4 28h3.6v6h-3.6z"/>
+          <path d="M43 22h3.6v6H43z M49.7 22h3.6v6h-3.6z M39 28h3.6v6H39z"/>
+          <path d="M25 13h4v7h-4z M30 13h4v7h-4z M35 13h4v7h-4z"/>
+          <!-- The gate, and an arrow slit in each flanking tower. -->
+          <path d="M27.8 55V45a4.2 4.2 0 0 1 8.4 0v10z" class="cut"/>
+          <rect x="12.6" y="35" width="3.8" height="9" rx="1.9" class="cut"/>
+          <rect x="47.6" y="35" width="3.8" height="9" rx="1.9" class="cut"/>
+          <rect x="30.1" y="25" width="3.8" height="9" rx="1.9" class="cut"/>
+        </svg>
+      </div>
       <p>Field planning tools — offline-first, doctrine-cited, every drawing generated from the same math.</p>
     </header>
     <main>
@@ -57,14 +103,17 @@
            cards. <strong>No man-hours, no supply counts:</strong> the principle, not the work order.</p>
         <span class="doc">Doctrine: FM 5-426 (public release) · flashcards · stage-by-stage</span>
       </a>
-      <div class="card ghost">
-        <p>Next tool goes here —<br />bridging, culverts, demolition calcs…<br />
-        one card + one page per tool.</p>
-      </div>
+      <!-- Toolkit-level, not inside any one tool: the vocabulary is what transfers between
+           jobs, so it sits beside them. Its decks are compiled from the same engine the
+           planners use, which is why it can never teach a piece the tools do not build. -->
+      <a class="card" href="./learn.html">
+        <span class="tag">1371 · LEARNING</span>
+        <h2>Learn the Trade</h2>
+        <p>Flashcards over every piece the toolkit can build — drawn from real structures, with the
+           stock, the length, the nailing and where it goes. Plus the <strong>piece dictionary</strong>
+           and the <strong>build sequence</strong> for each structure, in order, with why.</p>
+        <span class="doc">Doctrine: FM 5-426 (public release) · spaced repetition · offline</span>
+      </a>
     </main>
-    <footer>
-      Single offline bundle: every tool ships in one deploy with zero external requests.
-      Occupied or permanent structures follow local building code and qualified review.
-    </footer>
   </body>
 </html>

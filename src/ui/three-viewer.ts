@@ -158,6 +158,20 @@ function corrugatedTexture(): THREE.Texture {
 // Sawn dimensional lumber — warm SPF tone with fine, faintly wavy grain lines. Distinct from
 // the pale plywood face below (lumber is warmer and more densely grained), and dresses every
 // dimensional-lumber prop: stringers, the plywood-revetment frame, and platform/step decking.
+//
+// GRAIN RUNS ALONG THE STICK, and for a long time it did not. The lumber props are unit cubes
+// carrying a box-atlas UV, and on a board's broad face that atlas puts **V across the full
+// length** while U is a sliver a few percent wide — measured off the GLBs, corner (-0.5,-0.46)
+// maps to (0.076, 0.998) and (+0.5,+0.43) to (0.041, 0.002). Grain drawn as lines of constant
+// canvas-Y is therefore a line of constant V: it crosses the board and repeats ALONG it. Nine
+// lines over an eight-foot board is a band every eleven inches, which is why board-and-batten
+// siding — vertical boards, correct geometry, asserted by its own test — rendered as horizontal
+// clapboard. The material was lying about which way the wood ran.
+//
+// So the grain is drawn as VERTICAL lines (constant canvas-X, spanning canvas-Y), which the
+// atlas maps to lines running the length of the piece. `repeat.x` then compensates for that
+// sliver: the broad face samples about 3.5% of the canvas across its width, so the pattern has
+// to tile hard to put more than one line on a board.
 let lumberTexCache: THREE.Texture | null = null;
 function lumberTexture(): THREE.Texture {
   if (lumberTexCache) return lumberTexCache;
@@ -171,20 +185,25 @@ function lumberTexture(): THREE.Texture {
   for (let i = 0; i < 9; i++) {
     ctx.strokeStyle = i % 3 === 0 ? '#a97f4e' : i % 3 === 1 ? '#b98d59' : '#c29a66';
     ctx.beginPath();
-    const gy = 3 + i * 7;
-    ctx.moveTo(0, gy);
-    for (let x = 0; x <= 64; x += 4) {
-      ctx.lineTo(x, gy + Math.sin((x / 64) * Math.PI * 2 + i * 1.7) * 1.6);
+    const gx = 3 + i * 7;
+    ctx.moveTo(gx, 0);
+    for (let y = 0; y <= 64; y += 4) {
+      ctx.lineTo(gx + Math.sin((y / 64) * Math.PI * 2 + i * 1.7) * 1.6, y);
     }
     ctx.stroke();
   }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace; // see dirtTexture — all canvas color maps are sRGB
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  // ~4 grain lines across a board's width, given the atlas hands the face only 0.035 of U.
+  tex.repeat.set(LUMBER_GRAIN_REPEAT, 1);
   lumberTexCache = tex;
   sharedTextures.add(tex);
   return tex;
 }
+
+/** How hard the grain tiles across a piece — see `lumberTexture` for why it is not 1. */
+const LUMBER_GRAIN_REPEAT = 14;
 
 // Plywood FACE — the sanded veneer of one whole sheet, mapped 1:1 onto it (the caller scales a
 // unit box, so this canvas IS the sheet, corner to corner). Warm CDX tan, clearly not the
@@ -405,7 +424,11 @@ function roofingSheet(parent: THREE.Group, kind: 'roll' | 'corrugated', repeatAl
   const map = roofingTexture(kind).clone();
   map.needsUpdate = true;
   map.wrapS = map.wrapT = THREE.RepeatWrapping;
-  map.repeat.set(Math.max(1, repeatAlong), Math.max(1, repeatAcross));
+  // FRACTIONS ARE THE POINT. These used to be clamped to at least one whole tile, which meant
+  // every piece narrower than one tile got the whole pattern squeezed into it — twelve
+  // corrugations across a three-inch sliver. The texture wraps, so a partial tile renders as a
+  // cut sheet, which is what the piece is. The floor is only a guard against zero or NaN.
+  map.repeat.set(Math.max(1e-4, repeatAlong), Math.max(1e-4, repeatAcross));
   sharedTextures.add(map);
   const mat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: toonGradient(), map });
   const edge = new THREE.MeshToonMaterial({ color: kind === 'roll' ? 0x23251f : 0x8e9298, gradientMap: toonGradient() });
@@ -1005,6 +1028,89 @@ function lumberPiece(group: THREE.Group, size: LumberSize, length: number, width
   outline?.scale.set(1 + (2 * outlineFt) / l, 1 + (2 * outlineFt) / w, 1 + (2 * outlineFt) / t);
   return wrapper;
 }
+
+/**
+ * One piece of lumber that has been CUT — a profile in the board's own side elevation, extruded
+ * across its thickness. This is what draws a bird's-mouth.
+ *
+ * The plain `lumberPiece` above is a prop scaled to a box, and a box cannot have a notch in it, so
+ * a rafter drawn that way passes straight through the plate it is supposed to sit on. Hand this
+ * the profile the framing square gives you (local x along the length, local y across the face, in
+ * feet, anticlockwise) and it returns the same toon-shaded, grained, outlined wrapper the box path
+ * returns — already in real feet, so the caller sets rotation and position and nothing else.
+ *
+ * UVs are projected from the profile plane rather than left to ExtrudeGeometry's generator, whose
+ * front/back mapping is in raw feet: on a 12-ft rafter that is 12 texture repeats of grain running
+ * the wrong way. `LUMBER_FACE_U` reproduces the atlas share the GLB props give a board's face, so
+ * a cut rafter and an uncut one carry the same grain at the same scale.
+ */
+function cutLumberPiece(
+  group: THREE.Group,
+  profile: readonly (readonly [number, number])[],
+  thickFt: number,
+  holes: readonly (readonly (readonly [number, number])[])[] = [],
+): THREE.Group {
+  const shape = new THREE.Shape();
+  shape.moveTo(profile[0]![0], profile[0]![1]);
+  for (const [x, y] of profile.slice(1)) shape.lineTo(x, y);
+  shape.closePath();
+  // Holes go straight through — a latrine's seat openings, punched in the lid it is cut from.
+  // THREE.Shape wants each hole wound OPPOSITE the outer contour, and `Path` does not care which
+  // way the caller listed the corners, so the winding is fixed here rather than trusted.
+  for (const h of holes) {
+    if (h.length < 3) continue;
+    const area = h.reduce((s2, [x, y], i) => {
+      const [nx, ny] = h[(i + 1) % h.length]!;
+      return s2 + x * ny - nx * y;
+    }, 0);
+    const pts = area > 0 ? [...h].reverse() : [...h];
+    const path = new THREE.Path();
+    path.moveTo(pts[0]![0], pts[0]![1]);
+    for (const [x, y] of pts.slice(1)) path.lineTo(x, y);
+    path.closePath();
+    shape.holes.push(path);
+  }
+  const t = Math.max(0.02, thickFt);
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false, curveSegments: 1 });
+  geo.translate(0, 0, -t / 2); // extrusion runs 0..depth; the member frame is centred
+  geo.computeVertexNormals();
+
+  const pos = geo.getAttribute('position');
+  const uv = geo.getAttribute('uv');
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < pos.count; i++) {
+    minY = Math.min(minY, pos.getY(i));
+    maxY = Math.max(maxY, pos.getY(i));
+  }
+  const span = Math.max(1e-6, maxY - minY);
+  for (let i = 0; i < uv.count; i++) {
+    // U across the face width (grain lines run the length of the board), V along the length at a
+    // fixed real-world rate so the wander repeats every GRAIN_PERIOD_FT no matter how long the cut.
+    uv.setXY(i, (LUMBER_FACE_U * (pos.getY(i) - minY)) / span, pos.getX(i) / GRAIN_PERIOD_FT);
+  }
+  uv.needsUpdate = true;
+
+  const wrapper = addToonMesh(group, geo, 0xffffff, { map: lumberTexture() });
+  // Same hairline rule as `lumberPiece`: the shared 3.5% shell is calibrated for compact props and
+  // would ink a 12-ft board. Here the geometry is already in feet, so the shell is scaled about
+  // the origin by the ratio that turns a fixed offset into the piece's own extents.
+  const outlineFt = 0.012;
+  const outline = wrapper.children.length > 1 ? (wrapper.children[0] as THREE.Mesh) : null;
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox!;
+  outline?.scale.set(
+    1 + (2 * outlineFt) / Math.max(0.05, bb.max.x - bb.min.x),
+    1 + (2 * outlineFt) / Math.max(0.05, span),
+    1 + (2 * outlineFt) / t,
+  );
+  return wrapper;
+}
+
+/** The share of U a board's face gets in the prop atlas — matched so cut and uncut stock agree. */
+const LUMBER_FACE_U = 0.035;
+/** Feet of board per repeat of the grain wander, along the length. */
+const GRAIN_PERIOD_FT = 2;
 
 // A deck of 2x6 planks over a solid fill body — the standing platform and the firing step are
 // built lumber, not bare earth mounds. Planks run along the longer horizontal dimension, laid
@@ -1685,4 +1791,4 @@ export function onPropAssetsReady(cb: () => void): () => void {
   return () => rerenderCallbacks.delete(cb);
 }
 
-export { disposeObject, toonGradient, lumberPiece, plywoodSheet, roofingSheet, screenSheet };
+export { disposeObject, toonGradient, lumberPiece, cutLumberPiece, plywoodSheet, roofingSheet, screenSheet };

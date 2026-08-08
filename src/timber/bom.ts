@@ -4,6 +4,7 @@
 
 import type { Member } from './types';
 import { STAGES } from './types';
+import { fracIn } from './units';
 import type { StagePlanEntry } from './stagePlan';
 
 // Nominal section board-feet per lineal foot (nominal w×d ÷ 12). EXPORTED (plan §3.6) so the
@@ -41,13 +42,75 @@ export function classifyNominal(nominal: string): 'lumber' | 'sheet' | 'hardware
   return 'other'; // concrete, earth fill, and anything else measured its own way
 }
 
+export type NominalClass = ReturnType<typeof classifyNominal>;
+
+/**
+ * How a quantity is ordered. A number with no unit of issue is not a requisition — "37" could
+ * be pieces, board-feet or sheets, and a supply section that guesses wrong gets the wrong pile
+ * of wood delivered.
+ */
+export type UnitOfIssue = 'EA' | 'LF' | 'BF' | 'SHT' | 'CY' | 'LB';
+
+const UNIT_BY_CLASS: Record<NominalClass, UnitOfIssue> = {
+  lumber: 'BF',
+  sheet: 'SHT',
+  hardware: 'EA',
+  other: 'LF', // concrete runs; the cubic-yard rollup is computed separately
+};
+
+/**
+ * Ground contact rots untreated wood, and the members that touch the ground are exactly the
+ * ones holding the building up. Derived by ROLE with a citation — a role with no cited rule
+ * gets `undefined` and the column prints blank, because a guessed treatment on a requisition
+ * is worse than an admitted gap.
+ */
+export type Treatment = 'ground-contact' | 'above-ground';
+
+const TREATMENT_BY_ROLE: Readonly<Record<string, Treatment>> = {
+  sill: 'ground-contact',
+  post: 'ground-contact',
+  skid: 'ground-contact',
+  cribLog: 'ground-contact',
+  lagging: 'ground-contact',
+  ladderRail: 'above-ground',
+  towerLeg: 'ground-contact',
+  bentPost: 'ground-contact',
+  deckPlank: 'above-ground',
+  tread: 'above-ground',
+};
+
+export function treatmentFor(role: string): Treatment | undefined {
+  return TREATMENT_BY_ROLE[role];
+}
+
+/** The one sentence that has to travel with the treatment column wherever it prints. */
+export const TREATMENT_NOTE =
+  'Treatment is derived from where the member sits, not from a supply catalogue: '
+  + 'ground-contact for anything bearing on soil or a footing, above-ground for walking '
+  + 'surfaces. Roles with no cited rule print blank rather than a guess. (PH)';
+
 export interface CutLine {
+  /** As ordered — sheet goods carry their thickness (see `orderNominal`). */
   nominal: string;
+  /** As the member calls itself. The 3D scene and the cut list stay linked through this. */
+  memberNominal: string;
   cutLengthIn: number; // rounded to 1/8"
   count: number;
   roles: string[]; // e.g. ["stud", "cripple"]
   memberIds: string[]; // BOM ↔ 3D linkage (design doc §4.1)
   boardFeet: number; // 0 for panels
+  klass: NominalClass;
+  unitOfIssue: UnitOfIssue;
+  /** Grade as the generator stated it — `Member.grade`, which `cutList` used to throw away. */
+  grade: string;
+  treatment?: Treatment;
+  /** Sheet goods only: face area in ft², from which sheets-to-buy is computed. */
+  areaSqFt?: number;
+  /**
+   * Cross-section in in², off `Member.actual`. Concrete is billed by volume and the DRESSED
+   * table has no concrete entry, so the only place the section can come from is the member.
+   */
+  sectionSqIn?: number;
 }
 
 export interface StageBom {
@@ -70,9 +133,21 @@ export interface BomSummary {
 
 // Placeholder labor rates, man-hours per board-foot equivalent (FM 5-426 Table C-1 pending
 // verification — design doc §8 keeps these DOCTRINE-UNVERIFIED and visibly footnoted).
-const MH_PER_BF = 0.055; // (PH)
-const MH_PER_PANEL = 0.5; // (PH)
-const MH_PER_CONC_LF = 0.15; // (PH) concrete form/pour per lineal foot of wall/footing/slab run
+//
+// EXPORTED (FD71) because a man-hour total is the exact number a unit gets held to, and a
+// labor block that prints the total without the rate that produced it is asking to be believed.
+// The packet prints `LABOR_RATES` inline on the block; keeping these module-private made that
+// impossible and was the reason the sibling's labor page could not be audited from the page.
+export const MH_PER_BF = 0.055; // (PH)
+export const MH_PER_PANEL = 0.5; // (PH)
+export const MH_PER_CONC_LF = 0.15; // (PH) concrete form/pour per lineal foot of wall/footing/slab run
+
+/** The governing rates, in the form the labor block prints them. */
+export const LABOR_RATES: readonly { label: string; value: string; note: string }[] = [
+  { label: 'Framing', value: `${MH_PER_BF} MH per board-foot`, note: '(PH) — unverified against FM 5-426 Table C-1 / TM 5-303' },
+  { label: 'Sheet goods', value: `${MH_PER_PANEL} MH per sheet`, note: '(PH) — unverified' },
+  { label: 'Concrete', value: `${MH_PER_CONC_LF} MH per lineal foot`, note: '(PH) — form, pour and strip, unverified' },
+];
 
 const eighth = (inches: number): number => Math.round(inches * 8) / 8;
 
@@ -81,20 +156,63 @@ export function boardFeet(m: Member): number {
   return perLf ? (m.cutLength / 12) * perLf : 0;
 }
 
+/**
+ * The nominal AS ORDERED, which for a sheet good is not the nominal the member carries.
+ *
+ * Subfloor, roof sheathing and plywood siding all call themselves `4x8 panel`; their real
+ * thicknesses are 3/4, 1/2 and 1/2 inch, and the generators do set them on `actual.w`. Keyed on
+ * the bare nominal, three products collapse into one order line — a supply section reads it,
+ * requisitions one pile of plywood, and either the floor goes down in half-inch or the roof in
+ * three-quarter. Thickness is what keeps them apart.
+ *
+ * Done HERE rather than in the generators on purpose: the BOM is a projection (I-3), the two
+ * legacy floor/roof generators are frozen under C-10, and correcting a bill needs no change to
+ * the model it bills. The member is untouched; only the order line is qualified.
+ */
+export function orderNominal(m: Member): string {
+  if (classifyNominal(m.nominal) !== 'sheet') return m.nominal;
+  const thick = m.actual?.w;
+  return thick && thick > 0 ? `${m.nominal} ${fracIn(thick)}"` : m.nominal;
+}
+
 export function cutList(members: Member[]): CutLine[] {
   const byKey = new Map<string, CutLine>();
   for (const m of members) {
     const len = eighth(m.cutLength);
-    const key = `${m.nominal}|${len}`;
+    const nominal = orderNominal(m);
+    // Grade is part of the key: a No. 2 and a select-structural 2x6 of the same length are two
+    // different order lines, and merging them under-orders the better one.
+    const key = `${nominal}|${len}|${m.grade}`;
     let line = byKey.get(key);
     if (!line) {
-      line = { nominal: m.nominal, cutLengthIn: len, count: 0, roles: [], memberIds: [], boardFeet: 0 };
+      const klass = classifyNominal(m.nominal);
+      line = {
+        nominal,
+        memberNominal: m.nominal,
+        cutLengthIn: len,
+        count: 0,
+        roles: [],
+        memberIds: [],
+        boardFeet: 0,
+        klass,
+        unitOfIssue: UNIT_BY_CLASS[klass],
+        grade: m.grade,
+        ...(klass === 'sheet' ? { areaSqFt: 0 } : {}),
+        ...(m.actual ? { sectionSqIn: m.actual.w * m.actual.d } : {}),
+      };
       byKey.set(key, line);
     }
     line.count += 1;
     line.memberIds.push(m.id);
     if (!line.roles.includes(m.role)) line.roles.push(m.role);
     line.boardFeet += boardFeet(m);
+    // The first cited treatment wins; a line whose roles disagree keeps the stricter one,
+    // because under-treating a member that touches soil is the failure that matters.
+    const t = treatmentFor(m.role);
+    if (t && (line.treatment === undefined || t === 'ground-contact')) line.treatment = t;
+    if (line.areaSqFt !== undefined && m.actual) {
+      line.areaSqFt += (m.cutLength / 12) * (m.actual.d / 12);
+    }
   }
   return [...byKey.values()].sort(
     (a, b) => a.nominal.localeCompare(b.nominal) || b.cutLengthIn - a.cutLengthIn,

@@ -836,3 +836,249 @@ The general lesson, recorded because it will recur: **a gate that cannot disting
 "checked and clean" from "checked nothing" is not a gate.** Every gate this repo adds
 should be asked what it prints when its subject is absent. T0's own acceptance criterion
 was "CI runs and is green" — green was true and meant less than it appeared to.
+
+## 2026-08-05 — A stringer that ran through the basement floor (a compat-lock event)
+
+The visual-fidelity sweep rendered the basement foundation, which nobody had ever actually
+looked at: until the ground stopped being an opaque slab you could not orbit under, the whole
+basement was on the far side of it. Measured against the model's own `slabTop`, the stair
+stringers reached **6.6 inches below the basement floor** — through a four-inch slab and into
+the earth beneath it.
+
+**Two mistakes compounded, and each hid the other.**
+
+The length came from `hypot(runFt, totalRiseFt)`. A flight always has one more riser than
+treads — the top nosing IS the floor above — so `runFt` counts TREADS unit runs while
+`totalRiseFt` counts RISERS unit rises. Those two numbers describe a line at a different pitch
+than `beta`, the pitch the board is actually rotated to. Length and angle disagreed by about
+two degrees and nothing downstream could notice.
+
+The board was then dropped half its depth square to the run. That is right at the TOP, where
+the first nosing is the floor itself, and wrong at the bottom, where a stringer is cut level
+and sits ON the slab.
+
+**The fix places the board off its two real ends instead of off a formula:** the axis length
+that puts the lower corner on the slab while the upper corner stays at the floor above. Both
+errors go away together because neither end is now derived from a length that was never the
+board's length.
+
+**This is a compat-lock event, taken deliberately.** `floor.ts` is the frozen legacy branch;
+both golden sets moved with this commit. The blast radius is exactly what it should be —
+`FL-stringer-01/02/03` in `frame/basement-stairs` and `frame-compat/demo-basement`, three
+members, nothing added and nothing removed. Every other case in the 72-row matrix is unchanged,
+because no other foundation builds a stair.
+
+**The test was pinning the bug.** `timber-features` asserted the stringer length equalled
+`hypot(runFt, totalRiseFt)` — it checked that the code computed what the code computed. It now
+asserts the physical claim instead: the lowest corner sits on the slab and the highest reaches
+the floor above, which is true of any correct stringer at any pitch. A test that restates a
+formula cannot fail when the formula is wrong.
+
+## 2026-08-05 — The bird's mouth, and the roof plane that had to move to make room for it (a compat-lock event)
+
+`roof.ts` carried this line at the top, and had since the first commit:
+
+> ponytail: bird's-mouth seat geometry is carried as angles on the member (plumb/seat cuts)
+> but not notched in scene geometry, exactly as the design doc §6 prescribes.
+
+Every rafter in the catalog declared `angles: { plumbCut, seatCut }`. Nothing ever cut them. A
+rafter was a straight stick laid at pitch ACROSS the cap plate, **2.9 inches of it inside the
+plate** at every bearing on every roof — and the plate is only 1.5 inches thick, so the rafter
+went through it and out the other side. Scrub to any framing stage and the rafters crossed the
+plates as though the plates were not there.
+
+**Cutting the notch turned out to be the second half of the problem, not the first.**
+
+The notch is derived, not stored: `birdsMouth.ts` takes the rafter and the plate it crosses and
+solves the member's own frame for the two cuts a framing square gives you. That is a pure
+module, adds nothing to the model, and moves no golden. But the first honest notch came out
+**56% of the rafter's face** — past the third of the depth a bending member may lose at its
+bearing, and a shape no framer would recognise. The geometry was right; what it was measuring
+was wrong.
+
+**The engine put the rafter's CENTRE LINE on the plate's outer top corner.** That is not a
+framing convention, it is a modelling shortcut — it sinks the rafter half its own depth into the
+wall and calls the result seated. A real rafter's elevation is set by the seat: the seat is one
+plate wide, the heel is however deep the pitch makes it over that length, and the rafter's height
+above the plate follows.
+
+    plumb depth of the rafter     = face / cos θ
+    plumb depth the notch eats    = plateWidth · tan θ
+    HAP (height above plate)      = the difference
+
+For a 2x6 at 4/12 on a 2x4 plate that is **1¾ inches** of missing elevation. `rafterSeatLiftFt`
+states it once; `roof.ts` (frozen), `roofPlanes`, `generateShed`, `generateHip` and
+`wallInfillProfiles` all read it, so the framing, the deck, the roofing and the siding that
+closes in under the rake cannot drift apart. The notch is now 20% of the face and the seat is
+exactly one plate wide, in every shipped family, on both slopes.
+
+**Two things fell out that were wrong on their own terms.**
+
+The collar tie was placed `ridgeY - (ridgeY - H)/3` — one third down from the ridge measured off
+the PLATE — while its half-length `halfSpan/3` was derived from the RAFTER line. Those are the
+same number only when the rafter line starts at the plate, which it never should have. It reads
+off `eaveDatum` now, and the tie's ends land on the rafters they are nailed to.
+
+The heel was being cut **square across the board** rather than plumb. A plumb line is not a line
+of constant local x on a pitched member, and cutting it that way leans the face out of the plate
+and eats 1/cos²θ more rafter than the joint needs. The apex is solved as the one point on both
+world planes at once — the plate's top and its outer face — which is a rotation and inverts in
+closed form with no case analysis for the slope's sign.
+
+**Blast radius, both golden sets:** 1024 lines in the compat matrix, **nothing added and nothing
+removed**. Every changed member is a rafter, ridge, roof panel, collar tie or gable stud, and
+every delta is either the lift or exactly half of it — half for the gable studs, whose base stays
+on the plate while their top follows the rake. A pure vertical translation of the roof plane is
+what this should look like, and it is what it looks like.
+
+**Two tests were pinning the old datum** by re-deriving the roof plane from `wallHeightFt`. They
+assert real relationships — the ridge top is flush with the rafter tops, the sheathing sits on the
+rafter plane along its normal — so they now read the datum from the same rule the engine does
+instead of restating an elevation. A test that recomputes the thing it is checking cannot fail
+when the thing is wrong.
+
+## 2026-08-07 — Work that was finished but never merged, and the bridging it brought back (a compat-lock event)
+
+Five branches were editing this repository and only one of them was reaching the deployed app.
+`main` builds the Replit autoscale deployment, so anything not merged into `main` is, from the
+user's side, work that does not exist. An audit of every branch against `main` found:
+
+- **`claude/woodframe-model-improvements-stogju` — 100 commits, none of them merged.** PR #10
+  was *squash*-merged on 08-03, which left `main` with the squashed content but none of the
+  branch's history as an ancestor. The branch was then rebased onto the new `main` and kept
+  going for another five days: the TIMBER-2 model-fidelity sweep, the 1371 LEARNING trainer
+  (`src/timber/train/`, `src/ui/learn/`), and the command-packet document
+  (`src/timber/packet/`). Because the merge-base was `main`'s own head, this fast-forwards —
+  there was never a conflict to resolve, only a merge nobody had performed.
+- **`claude/basement-stair-bracing-s9cnbl` — one commit, orphaned.** See below.
+- **`claude/survivability-app-audit-h0yyt9` — one commit past PR #9.** Recorded separately.
+- **`claude/project-description-bbzjvj` — superseded.** Its 1371 rebrand routed the suite through
+  an `src/ui/survivability.html` shim; PR #2 reached the same place by a better road
+  (`scripts/build-suite.mjs` assembles SAP-2 into `dist/survivability/`). Nothing to port.
+- **`renders`** — Blender stills and a flyover for an LED house, a different project's artifacts.
+  Not app code and deliberately left where it is.
+
+**The bridging fix, recovered.** `claude/basement-stair-bracing-s9cnbl` fixed a real defect and
+was never merged: bridging rows were laid out by walking the *nominal joist layout grid*, but the
+stair opening edits that layout after the fact — it suppresses grid positions near each opening
+face, adds doubled trimmers just outside them, and cuts the joists it crosses down to tails that
+stop at a header. The grid walk could see none of that. In the shipped demo basement it emitted
+**eight 31 3/16-inch cross braces centred on x = 6'-8" and x = 16'-0"** — the two stairwell
+trimmer lines, whose plies sit at 6.231/6.356 and 16.063/16.188 — so each stick ran from the last
+field joist, straight through both plies, and out into the tail-joist field beyond. Geometry that
+cannot be built, on a cut list that told a crew to build it.
+
+Bays are now derived from the runs **actually emitted at stage 3** — joists, tail joists and
+trimmers all register themselves as they are placed — so a change to the framing moves the bay
+boundaries and the bridging follows by construction. Two questions the old code conflated are now
+separate: whether a run is physically present at the row line (which makes it a bay boundary
+bridging can never jump), and whether the row lands inside one of that run's own span segments
+and that segment is long enough to want a row. Measuring the second one per-run also retires the
+building-wide `W / 2 >= 7.5` gate, so the short tail joists hung between a header and the near
+wall no longer collect a line of blocking a couple of inches off their header.
+
+**This is a compat-lock event, taken deliberately.** Both golden sets moved, and the blast radius
+is exactly what a stairwell-only fix should produce: `frame/basement-stairs` and
+`frame-compat/demo-basement` and nothing else — every other case in the 72-row matrix is
+unchanged, because no other foundation builds a stair. The demo basement goes from 52 bridging
+members to 46, the longest stick from 31 3/16 in to 19 3/8 in, and the pieces that die against
+the trimmers now carry a doctrine note saying they are cut to the stairwell rather than field
+bridging, so the short cut explains itself on the card.
+
+**The recovered test was pinning a building the engine no longer makes.** Its stairwell-void
+check asked `stairPlan` for the opening using the *raw* input width. TIMBER-2 has since bounded
+`dims.widthFt` to 4–24 ft (`spec.ts` — a wider span needs a second girder line, which is not
+built yet), so the matrix's 32-ft row is clamped to 24 and its stair sits four feet from where
+the unclamped math puts it: the check was looking for bridging in an empty band. It now reads the
+opening back off the doubled trimmers and headers the model actually framed. A test that derives
+its expectation from an input the engine discarded cannot fail when the engine is wrong.
+
+## 2026-08-07 — Four nailing schedules that were corrected once and never shipped (a compat-lock event)
+
+The same branch audit turned up one commit sitting past PR #9 on
+`claude/survivability-app-audit-h0yyt9`: a wood-frame values pass carrying owner direction that
+TIMBER may ship loaded values so long as there is a way to get at them and type them in. It did
+two things, and only one of them still applies.
+
+**What no longer applies.** Its `src/timber/data.ts` centralized 31 fastening specs, three labor
+rates and the lumber grade into one editable table, because at the time those values were inline
+string literals across `floor.ts` / `walls.ts` / `roof.ts` and the only way to change a nailing
+schedule was to edit TypeScript. TIMBER-2 has since built its own values layer — `doctrine.ts`
+with `doc(value, cite)`, `spans.ts`, `fasteners.ts` — so importing a second, parallel table would
+put two sources of truth in a tree whose whole discipline is that there is one. **It is not
+ported, and the requirement it was answering is still open**: nailing schedules remain inline
+literals with no editor behind them. `doctrine.ts` is where they belong when someone builds it.
+
+**What still applies.** Four of those specs were not merely uncentralized, they were wrong, and
+all four survived into the shipped engine. Three have live emission sites and are corrected here:
+
+| Spec | Was | Now | Why |
+|---|---|---|---|
+| cap plate, at laps | `2-16d at laps` | `8-16d in the lap, joints offset 24" min` | The lap **is** the splice — it carries the plate in tension. Two nails does not. |
+| collar tie to rafter | `4-8d ea end` | `3-10d face nail ea end` | Collar ties resist ridge separation and are specified as a 10d connection. |
+| sill anchorage | `1/2" anchor bolts @ ~6 ft` | adds `min 2 per plate, within 12" of each end` | The end distance and the two-per-piece minimum are the parts that actually get missed. |
+
+The fourth — a 16d ceiling-joist toenail, which splits the plate where the schedule calls for 8d
+— **has no live site**: this engine emits no `ceilingJoist` member at all. Nothing to correct, and
+correcting it in a table nobody reads would have looked like progress.
+
+**The `(PH)` marker comes off these three, and that is the point.** `(PH)` means *pending page
+verification*, and it had been flattening two different situations into one shrug: specs that
+need somebody to open a manual, and specs anyone can check against a published fastening
+schedule. Each corrected string now names its own source — IRC Table R602.3(1), R802.3.1,
+R403.1.6 — which is checkable by a reader who has never seen this repository. No page numbers
+were invented, and no FM 5-426 citation was overwritten: `doctrineRef` still carries the
+dimensional doctrine (collar tie every third rafter, ≤ 5 ft) untouched.
+
+**Blast radius, both golden sets: 114 members, `nailing` the only field that moved, nothing added
+and nothing removed.** Exactly four roles — capPlate (48), collarTie (50), foundationWall (8),
+sill (8). No geometry shifted, which is what a schedule correction should look like.
+
+**The hardware bill follows, and was checked rather than assumed.** `fasteners.ts` reads these
+strings to bill nails by the pound, so a reworded schedule can silently fall out of the takeoff
+into the `unparsed` list. All four were run through `fastenersForMember` before the goldens were
+touched: the cap plate goes from 10 to 14 16d on a 96-inch run (the lap billed once at 8, not
+twice at 2), the collar tie from 8 8d to 6 10d, and the sill bolts still bill one drift each. The
+phrasing is deliberate on one of them — "in the lap" rather than "in the lapped area", because
+the tail rule reads `ea\b` and *area* ends in one, which would have doubled the lap to 16 nails.
+
+## 2026-08-07 — The stop-the-line gate that had never once stopped the line
+
+Consolidating the unmerged branches meant reading CI properly, and the "legacy timber suites are
+immutable" step turns out to have been reporting success without checking anything — for its
+entire life.
+
+**How it failed.** `actions/checkout@v4` clones at depth 1. The step then fetched the base branch
+with `--depth=1` and asked for `git merge-base HEAD FETCH_HEAD`; two shallow histories share no
+commit, so there is no merge base, so `BASE` came back empty. The whole comparison sat inside
+`if [ -n "$BASE" ]`, and the line after it — `echo "legacy timber suites untouched"` — was
+unconditional. The run log for `2005e06` says it plainly:
+
+    * branch            main       -> FETCH_HEAD
+    legacy timber suites untouched
+
+That commit's range edits **both** `test/timber-features.test.ts` and `test/timber-frame.test.ts`.
+The step went green anyway, and every commit on the branch since has been merged past it. This is
+the same failure the offline gate had on 2026-08-02, in the same repository, three days later: a
+gate that cannot distinguish *checked and clean* from *checked nothing*. Depth is now `0` and an
+unresolvable base is a hard failure, so the check can never again go quiet.
+
+**And the rule it was guarding needed to change, not just start running.** Turning the old check
+on as written would have stopped three commits that are all correct: the stringer through the
+basement slab, the bird's mouth that moved the roof plane (both 2026-08-05), and the bridging
+through the stairwell trimmers (above). Every one of them replaced an assertion that pinned a
+**bug** — `hypot(runFt, totalRiseFt)` for a stringer, a roof datum measured off the plate top —
+with one that states the physical claim instead. That edit cannot be made from another file: the
+old assertion does not become true because a new test exists elsewhere, it just fails.
+
+Plan I-8 / TD31 wrote the acceptance as "git diff empty on `test/timber-*.test.ts`", full stop,
+and that holds exactly as long as the legacy engine's output never legitimately changes. Three
+compat-lock events say otherwise. **So the rule is no longer "never" — it is "never silently."**
+A legacy-suite edit is accepted only when the same range also moves `test/goldens/frame-compat/`
+(the actual contract, plan §9 K2) *and* records the reason in `DECISIONS.md`. An edit on its own
+— a deleted assertion, a loosened tolerance, anything with no engine change under it — still
+stops the line, which is the abuse the gate existed to catch.
+
+Both paths were exercised against real commit ranges before this shipped: the consolidated branch
+is accepted (suites edited, 13 golden files moved, entry written), and the bridging cherry-pick on
+its own, before its goldens and its entry existed, is refused.

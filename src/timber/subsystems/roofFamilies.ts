@@ -24,7 +24,8 @@ import { DRESSED } from '../types';
 import type { BuildingSpec, RoofSpec } from '../spec';
 import { makeEmitter } from '../emit';
 import { LUMBER, LAYOUT, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
-import type { WallsContract } from './wallSystem';
+import { surfaceYaw, type WallsContract } from './wallSystem';
+import { rafterSeatLiftFt } from '../birdsMouth';
 
 /** A roof surface in its own (u along the eave, v up the slope) coordinates. */
 export interface RoofPlane {
@@ -35,6 +36,28 @@ export interface RoofPlane {
   normal: [number, number, number]; // unit, outward (up)
   eaveLengthFt: number;
   slopeLengthFt: number;
+  /**
+   * How wide the plane is at its TOP edge, when that differs from the eave.
+   *
+   * A gable slope and a shed are rectangles and leave this undefined. A hip is not: its long
+   * slopes are trapezoids narrowing to the ridge, and its two ends are triangles narrowing to
+   * a point. The taper is centred on the eave, which is what an equal-pitch hip produces.
+   *
+   * Carrying it on the PLANE rather than special-casing the tiler is what lets one covering
+   * path serve every roof — the tiler clips each course to the plane's width at that height
+   * and a rectangle simply never gets clipped.
+   */
+  topLengthFt?: number;
+}
+
+/** Half-open [lo, hi) of the plane's own u at height v — the outline, evaluated. */
+export function planeSpanAt(p: RoofPlane, v: number): { lo: number; hi: number } {
+  const top = p.topLengthFt;
+  if (top === undefined || p.slopeLengthFt <= 0) return { lo: 0, hi: p.eaveLengthFt };
+  const t = Math.min(1, Math.max(0, v / p.slopeLengthFt));
+  const width = p.eaveLengthFt + (top - p.eaveLengthFt) * t;
+  const lo = (p.eaveLengthFt - width) / 2;
+  return { lo, hi: lo + width };
 }
 
 const cross = (a: number[], b: number[]): [number, number, number] => [
@@ -42,6 +65,60 @@ const cross = (a: number[], b: number[]): [number, number, number] => [
   a[2]! * b[0]! - a[0]! * b[2]!,
   a[0]! * b[1]! - a[1]! * b[0]!,
 ];
+
+/**
+ * The four faces of a square pyramid roof — a hip whose ridge has shrunk to a point.
+ *
+ * A guard tower's cab roof used to be drawn as four RECTANGLES, one per slope, each as wide at
+ * the peak as it was at the eave. Four 10-ft rectangles cannot meet at a point: they cross each
+ * other above the hip rafters and their upper corners hang out past the hips and below the eave
+ * line, which is the creased, folded roof the owner asked about. A pyramid face is a TRIANGLE,
+ * and the tiler already knows how to cut one — `topLengthFt: 0` is the whole answer, the same
+ * value the hip ends of a building roof carry. Once it goes through the shared covering path
+ * the cab also gets the roofing it was specified with, which the hand-rolled version dropped.
+ *
+ * `halfSideFt` is measured to the EAVE (overhang included), and `riseFt` is peak above eave.
+ */
+export function pyramidPlanes(
+  center: [number, number],
+  halfSideFt: number,
+  eaveY: number,
+  riseFt: number,
+): RoofPlane[] {
+  const side = halfSideFt * 2;
+  const slopeLengthFt = Math.hypot(halfSideFt, riseFt);
+  const cs = halfSideFt / Math.max(1e-9, slopeLengthFt);
+  const sn = riseFt / Math.max(1e-9, slopeLengthFt);
+  // Eave corners in plan order; each face spans one edge and rises to the peak over the middle.
+  const corner: [number, number][] = [
+    [center[0] - halfSideFt, center[1] - halfSideFt], [center[0] + halfSideFt, center[1] - halfSideFt],
+    [center[0] + halfSideFt, center[1] + halfSideFt], [center[0] - halfSideFt, center[1] + halfSideFt],
+  ];
+  const face = ['roof-S', 'roof-E', 'roof-N', 'roof-W'];
+  return corner.map((p, f) => {
+    const q = corner[(f + 1) % 4]!;
+    const len = Math.max(1e-9, Math.hypot(q[0] - p[0], q[1] - p[1]));
+    const alongEave: [number, number, number] = [(q[0] - p[0]) / len, 0, (q[1] - p[1]) / len];
+    // Uphill is square to the eave, toward the middle of the plan.
+    const mid: [number, number] = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+    const inLen = Math.max(1e-9, Math.hypot(center[0] - mid[0], center[1] - mid[1]));
+    const inward: [number, number] = [(center[0] - mid[0]) / inLen, (center[1] - mid[1]) / inLen];
+    const upSlope: [number, number, number] = [inward[0] * cs, sn, inward[1] * cs];
+    const n = cross(upSlope, alongEave);
+    return {
+      id: face[f]!,
+      origin: [p[0], eaveY, p[1]] as [number, number, number],
+      alongEave,
+      upSlope,
+      // Outward means UP on a roof; the cross product's sign depends on the corner winding, so
+      // it is checked rather than assumed.
+      normal: (n[1] < 0 ? [-n[0], -n[1], -n[2]] : n) as [number, number, number],
+      eaveLengthFt: side,
+      slopeLengthFt,
+      topLengthFt: 0,
+    };
+  });
+}
 
 /** Slope (rise per foot of run) and the framing-square length per foot of run. */
 export function slopeOf(roof: RoofSpec): { slope: number; lenPerFtRun: number; pitchRad: number } {
@@ -61,25 +138,101 @@ export function slopeOf(roof: RoofSpec): { slope: number; lenPerFtRun: number; p
 const slopeAlongZ = (highSide: WallId): boolean => highSide === 'N' || highSide === 'S';
 
 /**
+ * Where the rafter CENTRE plane sits at the building line — the datum every roof surface and
+ * every rafter in this file is measured from.
+ *
+ * It is not the plate top. Putting the rafter's centre line on the plate's outer top corner is
+ * how the roof used to be laid out here, and it drops the rafter half its own depth into the
+ * wall: the bird's mouth that would close that gap has to eat more than half the rafter, which
+ * is not a joint. `rafterSeatLiftFt` states the correction once — the height at which a
+ * plate-wide seat lands on the plate top — and gable, shed, flat and hip all read it from here
+ * so they cannot drift apart.
+ */
+export function rafterPlaneDatum(spec: BuildingSpec, plateTopY: number): number {
+  const { slope } = slopeOf(spec.roof);
+  const rafter = DRESSED[LUMBER.rafterNominal.value as keyof typeof DRESSED] ?? DRESSED['2x6']!;
+  const plate = DRESSED[LUMBER.plateNominal.value as keyof typeof DRESSED] ?? DRESSED['2x4']!;
+  return plateTopY + rafterSeatLiftFt(rafter.d, plate.d, slope);
+}
+
+/**
  * The roof's surfaces, for any roof kind. Gable returns two planes, shed/flat one, pyramid
  * four. Every plane's `origin` is at the EAVE, so tiling from v=0 upward lays courses the way
  * a roofer works: from the bottom up, each course lapping the one below.
  */
-export function roofPlanes(spec: BuildingSpec, plateTopY: number): RoofPlane[] {
+export function roofPlanes(spec: BuildingSpec, plateTopYRaw: number): RoofPlane[] {
   const { lengthFt: L, widthFt: W } = spec.dims;
   const roof = spec.roof;
   if (roof.kind === 'none') return [];
   const { slope, lenPerFtRun } = slopeOf(roof);
   const oh = roof.overhangFt; // 'none' returned above, so every remaining kind has one
+  // Not the plate top — the seated rafter plane. See `rafterPlaneDatum`.
+  const plateTopY = rafterPlaneDatum(spec, plateTopYRaw);
 
-  // KNOWN LIMITATION, stated rather than left to be discovered: a hip is treated here as a
-  // gable, which gives the two long slopes and NOT the two triangular hip ends. The FRAMING is
-  // complete (see `generateHip` — commons, hips and jacks are all emitted and the jack sequence
-  // is asserted in `timber2-hip`); what is missing is covering over the two ends, so a hip roof
-  // shows deck and roofing on its long slopes and bare framing on its hip ends. Closing it means
-  // returning four planes here, two of them triangular, which the rectangular tiler in
-  // `coverings.ts` cannot lay out yet.
-  if (roof.kind === 'gable' || roof.kind === 'hip') {
+  // A HIP HAS FOUR SURFACES, and for a long time this returned two — a hip was treated as a
+  // gable, so its long slopes got deck and roofing and its two triangular ends showed bare
+  // framing. The framing was always complete (`generateHip` emits commons, hips and jacks, and
+  // the jack sequence is asserted in `timber2-hip`); it was the skin that stopped at the hips.
+  //
+  // Geometry, for an equal-pitch hip on an L × W plan with L > W: the ridge runs along X at
+  // z = W/2, from x = W/2 to x = L - W/2, so it is (L - W) long. Both long slopes are
+  // trapezoids from a full-length eave up to that ridge. Both ends are triangles from a
+  // W-wide eave up to a single point at the ridge end. Every one of the four rises
+  // (W/2 + overhang) of run, so all four share the pitch — which is what makes it a hip
+  // rather than four unrelated planes.
+  //
+  // EVERY EAVE IS `2 * oh` LONGER THAN ITS WALL. A hip has no rake — all four sides are eaves,
+  // and each one overhangs its neighbours' overhang as well as its own. This read `L` and `W`,
+  // the bare wall lengths, so each plane stopped exactly above its wall corner while the four
+  // hip rafters ran on to the true eave corner at (-oh, -oh). The result was a square notch at
+  // all four corners of the roof, one overhang on a side, with the hip rafter tail standing bare
+  // in the middle of it — plainly visible from above, and the fascia (which takes its cut length
+  // from `eaveLengthFt`) was short by the same amount on all four sides.
+  //
+  // The taper is the check: with the eave `L + 2*oh` and the ridge `L - W`, each end draws in by
+  // (W + 2*oh)/2 over the climb — exactly the W/2 + oh of horizontal run a 45-degree hip covers,
+  // so the plane's edge IS the hip line rather than something parallel to it.
+  if (roof.kind === 'hip') {
+    const run = W / 2 + oh;
+    const yEave = plateTopY - oh * slope;
+    const slopeLengthFt = run * lenPerFtRun;
+    const planes: RoofPlane[] = [];
+    // Long slopes: same convention as the gable — u runs +X on the south side, -X on the
+    // north, so both normals point up and outward.
+    for (const side of [-1, 1] as const) {
+      const zEave = side === -1 ? -oh : W + oh;
+      planes.push({
+        id: side === -1 ? 'roof-S' : 'roof-N',
+        origin: [side === -1 ? -oh : L + oh, yEave, zEave],
+        alongEave: side === -1 ? [1, 0, 0] : [-1, 0, 0],
+        upSlope: [0, slope / lenPerFtRun, (side === -1 ? 1 : -1) / lenPerFtRun],
+        normal: cross([0, slope / lenPerFtRun, (side === -1 ? 1 : -1) / lenPerFtRun],
+          side === -1 ? [1, 0, 0] : [-1, 0, 0]),
+        eaveLengthFt: L + 2 * oh,
+        slopeLengthFt,
+        topLengthFt: Math.max(0, L - W),
+      });
+    }
+    // Hip ends. At x = -oh uphill is +X and u runs -Z; at x = L + oh it is mirrored. Both taper
+    // to a point, so `topLengthFt` is 0 and the tiler cuts every course to the triangle.
+    for (const end of [-1, 1] as const) {
+      const upSlope: [number, number, number] = [end === -1 ? 1 / lenPerFtRun : -1 / lenPerFtRun, slope / lenPerFtRun, 0];
+      const alongEave: [number, number, number] = end === -1 ? [0, 0, -1] : [0, 0, 1];
+      planes.push({
+        id: end === -1 ? 'roof-W' : 'roof-E',
+        origin: [end === -1 ? -oh : L + oh, yEave, end === -1 ? W + oh : -oh],
+        alongEave,
+        upSlope,
+        normal: cross(upSlope, alongEave),
+        eaveLengthFt: W + 2 * oh,
+        slopeLengthFt,
+        topLengthFt: 0,
+      });
+    }
+    return planes;
+  }
+
+  if (roof.kind === 'gable') {
     const halfSpan = W / 2;
     const run = halfSpan + oh;
     const yEave = plateTopY - oh * slope;
@@ -139,6 +292,86 @@ export function roofPlanes(spec: BuildingSpec, plateTopY: number): RoofPlane[] {
   }];
 }
 
+/**
+ * What each wall has to close in ABOVE its cap plate, as a height at every station along the
+ * run. This is the outline the framing already follows — gable studs, a shed's pony wall and
+ * its rake studs — stated once so the covering pass can skin it instead of leaving it open.
+ *
+ * Which walls get one is the roof's own geometry, and a hip is the proof that "always" would
+ * be wrong: all four of its slopes come down to the plate, so a hip has no infill anywhere,
+ * which is exactly why its walls looked right while every gable end did not.
+ */
+export function wallInfillProfiles(
+  spec: BuildingSpec,
+  walls: WallsContract,
+): { wall: WallId; topAt: (u: number) => number }[] {
+  const roof = spec.roof;
+  if (roof.kind === 'none' || roof.kind === 'hip' || roof.kind === 'pyramid') return [];
+  const { lengthFt: L, widthFt: W } = spec.dims;
+  const { slope } = slopeOf(roof);
+  const out: { wall: WallId; topAt: (u: number) => number }[] = [];
+  // The whole roof plane sits one seat above the plate (see `rafterPlaneDatum`), so the wall
+  // that closes in under it rises by the same amount — otherwise the siding stops short of the
+  // rake by an inch and three quarters and daylight shows through the gable.
+  const lift = rafterPlaneDatum(spec, 0);
+
+  if (roof.kind === 'gable') {
+    // The ridge runs along X over z = W/2, so the two walls that run along Z — E and W — carry
+    // a triangle rising to the ridge over the middle of the span. N and S bear the rafters and
+    // stop at the plate.
+    for (const wall of ['E', 'W'] as const) {
+      const s = walls.surfaces.find((q) => q.wall === wall);
+      if (!s) continue;
+      out.push({
+        wall,
+        topAt: (u) => {
+          const z = s.origin[1] + s.along[1] * u;
+          return Math.max(0, lift + (W / 2 - Math.abs(z - W / 2)) * slope);
+        },
+      });
+    }
+    return out;
+  }
+
+  // Shed and flat: one slope. The high wall carries a full-height pony wall, the two walls
+  // parallel to the slope carry a rake rising from the low side, and the low wall stops at
+  // the plate.
+  const highSide: WallId = roof.kind === 'shed' ? roof.highSide : 'N';
+  const alongZ = slopeAlongZ(highSide);
+  const span = alongZ ? W : L;
+  const up = highSide === 'N' || highSide === 'E' ? 1 : -1;
+  const high = walls.surfaces.find((q) => q.wall === highSide);
+  if (high) {
+    // THE HIGH WALL'S TOP IS ITS OWN PLATE, not the roof plane. `lift` is the rafter CENTRE
+    // plane's datum, which is the right line for a RAKE — there the siding runs up BESIDE the end
+    // rafter and stopping at its underside would leave a wedge of daylight. The high wall is the
+    // one the rafters CROSS: every one of them lands on this wall's pony plate and runs on out to
+    // the eave, so siding taken up to their centre line buries each one to half its depth.
+    //
+    //   gp-frame + shed     48 rafter x infill pairs at 2.750 in — half a 2x6, on every rafter
+    //
+    // The figure is the pony wall's own height, which `generateShed` already computes and states:
+    // "(span − plateWidth)·slope, NOT span·slope … the seat at the LOW wall lands at the plate's
+    // inner face and the seat at the HIGH wall at its outer face". Its plate top IS the rafters'
+    // underside there, to the last thousandth, so the siding stops exactly where they start.
+    const plateWidthFt = DRESSED[LUMBER.plateNominal.value as string]!.d / IN_PER_FT;
+    out.push({ wall: highSide, topAt: () => Math.max(0, (span - plateWidthFt) * slope) });
+  }
+  for (const wall of (alongZ ? ['E', 'W'] : ['S', 'N']) as WallId[]) {
+    const s = walls.surfaces.find((q) => q.wall === wall);
+    if (!s) continue;
+    out.push({
+      wall,
+      topAt: (u) => {
+        const across = alongZ ? s.origin[1] + s.along[1] * u : s.origin[0] + s.along[0] * u;
+        const fromLow = up === 1 ? across : span - across;
+        return Math.max(0, lift + fromLow * slope);
+      },
+    });
+  }
+  return out;
+}
+
 export interface ShedInput {
   spec: BuildingSpec;
   walls: WallsContract;
@@ -177,16 +410,21 @@ export function generateShed(input: ShedInput): Member[] {
   for (let s = oc; s < ridgeRun - 1.5 * t; s += oc) centers.push(s);
   centers.push(ridgeRun - t / 2);
 
-  const yLowEave = H - oh * slope;
+  // H is the cap plate top — where the pony wall and the rake infill start. The RAFTERS start
+  // one seat higher, so they bear on the plate instead of running through it.
+  const yLowEave = rafterPlaneDatum(spec, H) - oh * slope;
   const yMid = yLowEave + ((span + 2 * oh) / 2) * slope;
 
   for (const c of centers) {
-    // Rafter centerline midpoint, lifted half its depth so its TOP is the roof plane.
+    // ON the plane, full stop. `roofPlanes` returns the rafter CENTRE plane — the deck is placed
+    // off it by rafterHalf + panelHalf along the normal — so a rafter's centre line IS yMid.
+    // This used to subtract a PERPENDICULAR half-depth and add back a VERTICAL one, which is not
+    // a correction of anything: it left every shed rafter 0.085 in below its own roof plane, so
+    // the deck floated a sixteenth of an inch off the rafters carrying it.
     const midAcross = (up === 1 ? -oh : span + oh) + up * ((span + 2 * oh) / 2);
-    const lift = (rafterD / 2) / Math.cos(pitchRad);
     const pos: [number, number, number] = alongZ
-      ? [c, yMid - lift + rafterD / 2, midAcross]
-      : [midAcross, yMid - lift + rafterD / 2, c];
+      ? [c, yMid, midAcross]
+      : [midAcross, yMid, c];
     emit('rafter', LUMBER.rafterNominal.value as string, {
       cutLengthFt: rafterLen,
       position: pos,
@@ -206,9 +444,23 @@ export function generateShed(input: ShedInput): Member[] {
   // ── TD6: the pony wall. The high wall is a normal rectangular wall; the height difference
   // is framed HERE as studs above its cap plate, so `generateWalls` is never asked for an
   // unequal wall.
-  const ponyHeight = span * slope;
-  if (ponyHeight > TOLERANCE.minSliverFt) {
-    const studLen = ponyHeight;
+  //
+  // IT HAD NO PLATE, and its studs were the wrong length. Thirty-seven studs stood free at the
+  // top with the rafters running straight over their bare ends and 1.4 in INTO them — the same
+  // defect the bird's mouth fixed at the low wall, except here there was no plate for the notch
+  // to find, so nothing could even detect it. A pony wall is a wall: it gets a plate, the
+  // rafters bear on that plate, and the studs are cut to leave room for it.
+  //
+  // The height is (span − plateWidth)·slope, NOT span·slope. The seat at the LOW wall lands at
+  // the plate's inner face and the seat at the HIGH wall at its outer face, so the rise between
+  // the two plate tops is one plate short of the full span. Using span·slope stands the pony
+  // wall 7/8 in proud of where the rafters actually want to sit.
+  const ponyPlateNominal = LUMBER.plateNominal.value as string;
+  const ponyPlateThick = DRESSED[ponyPlateNominal]!.w / IN_PER_FT;
+  const plateWidthFt = DRESSED[ponyPlateNominal]!.d / IN_PER_FT;
+  const ponyHeight = (span - plateWidthFt) * slope;
+  if (ponyHeight > TOLERANCE.minSliverFt + ponyPlateThick) {
+    const studLen = ponyHeight - ponyPlateThick;
     const studNominal = LUMBER.studNominal.value as string;
     const highSurface = walls.surfaces.find((s) => s.wall === highSide)!;
     const ocStud = spec.spacing.studSpacingIn / IN_PER_FT;
@@ -222,13 +474,38 @@ export function generateShed(input: ShedInput): Member[] {
       emit('ponyStud', studNominal, {
         cutLengthFt: studLen,
         position: [x, H + studLen / 2, z],
-        rotation: [0, 0, Math.PI / 2],
+        // A STUD'S FACE GOES ACROSS ITS WALL, and a bare `[0, 0, π/2]` only says so when the wall
+        // happens to run along Z. On a high side of N or S these stood 1½ in across a 3½-in wall
+        // with their 3½-in face along the run — the gable rake studs' quarter turn (fixed in
+        // `roof.ts`, a compat-lock event) in the sibling generator, and never caught because no
+        // shipped card has a shed roof. It reads as a stud that does not fill its own wall, does
+        // not stack on the stud below, and pushes 1 in past the building line at each corner.
+        //
+        // `surfaceYaw` is the yaw that lays a member ALONG a wall; a stud is turned across it, so
+        // the quarter turn belongs here rather than nowhere. E and W come out at the yaw they
+        // already had, so a high side that was right stays byte-identical in extent.
+        rotation: [0, surfaceYaw(highSurface) + Math.PI / 2, Math.PI / 2],
         stage: stageRoofFrame,
         wall: highSide,
         nailing: 'toenail 2-8d each end (PH)',
         doctrineRef: `${citeOf(LUMBER.studNominal)} — shed pony wall carrying the high plate`,
       });
     }
+    // The plate itself: flat on the stud tops, running the wall, and the surface the rafters'
+    // upper bird's mouth is cut against.
+    emit('capPlate', ponyPlateNominal, {
+      cutLengthFt: highSurface.runFt,
+      position: [
+        highSurface.origin[0] + (highSurface.along[0] * highSurface.runFt) / 2,
+        H + studLen + ponyPlateThick / 2,
+        highSurface.origin[1] + (highSurface.along[1] * highSurface.runFt) / 2,
+      ],
+      rotation: alongZ ? [-Math.PI / 2, 0, 0] : [-Math.PI / 2, Math.PI / 2, 0],
+      stage: stageRoofFrame,
+      wall: highSide,
+      nailing: '16d @ 16" to the studs; rafters bird’s-mouth toenail 3-8d (PH)',
+      doctrineRef: `${citeOf(LUMBER.plateNominal)} — the pony wall's bearing plate for the rafters`,
+    });
   }
 
   // ── Rake infill: the two walls parallel to the slope get studs stepping up to the rafter
@@ -243,7 +520,9 @@ export function generateShed(input: ShedInput): Member[] {
       // Distance uphill from the low plate at this station.
       const across = alongZ ? z : x;
       const fromLow = up === 1 ? across : span - across;
-      const riseHere = fromLow * slope - (rafterD / 2) / Math.cos(pitchRad);
+      // Measured from the cap plate up to the rafter underside, off the rafter plane's own
+      // datum — the same correction the gable studs take.
+      const riseHere = rafterPlaneDatum(spec, H) - H + fromLow * slope - (rafterD / 2) / Math.cos(pitchRad);
       if (riseHere < TOLERANCE.minInfillStudFt) continue;
       emit('rakeStud', LUMBER.studNominal.value as string, {
         cutLengthFt: riseHere,
@@ -260,24 +539,51 @@ export function generateShed(input: ShedInput): Member[] {
   return emit.members;
 }
 
-/** Purlin deck (SEA-hut pattern): 2x4 flat, spaced up the slope, for corrugated roofing. */
-export function generatePurlins(planes: RoofPlane[], stage: number): Member[] {
+/**
+ * Purlin deck (SEA-hut pattern): 2x4 flat, spaced up the slope, for corrugated roofing.
+ *
+ * Three placement rules, each earned by a screenshot of the roof doing without it:
+ *
+ *   CLIPPED TO THE PLANE. A course is only as long as the plane is wide at its UP-SLOPE edge
+ *   (`planeSpanAt`) — on a hip that edge is the narrow one, so the stick is mitered back to
+ *   the hip lines instead of running full eave length and lancing out over the neighbouring
+ *   slope, which is exactly what the first cut of this drew.
+ *
+ *   ON the rafters. `rafterHalfFt` lifts the underside to the rafter tops, the same lift the
+ *   sheet deck gets; without it the purlins sat embedded in the upper half of the rafters.
+ *
+ *   PITCHED with the slope, the `roofTilePlacement` rotation convention — flat but lying IN
+ *   the plane, not floating horizontal with one edge dug in.
+ */
+export function generatePurlins(planes: RoofPlane[], stage: number, rafterHalfFt: number): Member[] {
   const emit = makeEmitter('RF');
   const nominal = LUMBER.purlinNominal.value as string;
   const spacing = (LAYOUT.purlinSpacingMaxIn.value as number) / IN_PER_FT;
-  const thick = DRESSED[nominal]!.w / IN_PER_FT;
+  const thick = DRESSED[nominal]!.w / IN_PER_FT; // laid flat: the 1½-in way is the thickness
+  const face = DRESSED[nominal]!.d / IN_PER_FT; // the 3½-in face lies along the slope
+  const lift = rafterHalfFt + thick / 2;
   for (const p of planes) {
-    const rows = Math.max(2, Math.ceil(p.slopeLengthFt / spacing) + 1);
+    // The top course stops half a face short of the ridge or peak, so nothing crosses it —
+    // the two long slopes of a hip otherwise both put a stick exactly ON the ridge line.
+    const vTop = p.slopeLengthFt - face / 2;
+    if (vTop <= 0) continue;
+    const rows = Math.max(2, Math.ceil(vTop / spacing) + 1);
     for (let i = 0; i < rows; i++) {
-      const v = Math.min(p.slopeLengthFt, i * (p.slopeLengthFt / (rows - 1)));
-      const cx = p.origin[0] + p.upSlope[0] * v + p.alongEave[0] * (p.eaveLengthFt / 2) + p.normal[0] * thick / 2;
-      const cy = p.origin[1] + p.upSlope[1] * v + p.alongEave[1] * (p.eaveLengthFt / 2) + p.normal[1] * thick / 2;
-      const cz = p.origin[2] + p.upSlope[2] * v + p.alongEave[2] * (p.eaveLengthFt / 2) + p.normal[2] * thick / 2;
+      const v = Math.min(vTop, i * (vTop / (rows - 1)));
+      const span = planeSpanAt(p, v + face / 2);
+      const len = span.hi - span.lo;
+      // A stub shorter than its own face is layout noise, not a purlin.
+      if (len < face) continue;
+      const uMid = (span.lo + span.hi) / 2;
+      const cx = p.origin[0] + p.upSlope[0] * v + p.alongEave[0] * uMid + p.normal[0] * lift;
+      const cy = p.origin[1] + p.upSlope[1] * v + p.alongEave[1] * uMid + p.normal[1] * lift;
+      const cz = p.origin[2] + p.upSlope[2] * v + p.alongEave[2] * uMid + p.normal[2] * lift;
       const yaw = Math.atan2(-p.alongEave[2]!, p.alongEave[0]!);
+      const pitch = Math.asin(Math.max(-1, Math.min(1, p.upSlope[1]!)));
       emit('purlin', nominal, {
-        cutLengthFt: p.eaveLengthFt,
+        cutLengthFt: len,
         position: [cx, cy, cz],
-        rotation: [-Math.PI / 2, yaw, 0],
+        rotation: [Math.PI / 2 - pitch, yaw, 0],
         stage,
         nailing: '2-16d each rafter (PH)',
         doctrineRef: citeOf(LAYOUT.purlinSpacingMaxIn),
@@ -306,6 +612,7 @@ export function generatePurlins(planes: RoofPlane[], stage: number): Member[] {
 export interface HipInput {
   spec: BuildingSpec;
   walls: WallsContract;
+  stageCeiling: number;
   stageRoofFrame: number;
 }
 
@@ -314,14 +621,48 @@ export function hipLenPerFtRun(slope: number): number {
   return Math.sqrt(2 + slope * slope);
 }
 
+/**
+ * How far to DROP a hip rafter so the sheathing lies flat across it, in feet of VERTICAL fall.
+ *
+ * A common rafter is square to the plane it carries: centre it on that plane and its top face IS
+ * the plane. A hip is not. It lies under the FOLD between two slopes, canted to both, so a plain
+ * rectangular stick centred on the hip line has its two top ARRISES standing proud of both planes
+ * — measured on a 16 x 12 4-in-12 hip, 2.848 in above the plane where a common reaches 2.750.
+ *
+ * A framer has two ways out, and both are named jobs: BACK the hip (bevel its top edge to the two
+ * planes, leaving a shallow ridge down the middle) or DROP it — set it low enough that the arrises
+ * land ON the planes and the sheathing bears on them. Dropping is the common choice because it is
+ * one saw setting on the seat cut instead of a rip down twelve feet, and it is what this models.
+ *
+ * Perpendicular to a plane, the arris of a stick `d` deep and `w` thick sits at
+ *
+ *     (d/2)·(√2/2)·√(2+t²)/√(1+t²)  +  (w/2)·(√2/2)·t/√(1+t²)
+ *
+ * for slope `t` — the first term from the depth, the second from the half-thickness the cant swings
+ * up. Subtract the `d/2` a common reaches, then divide by cos(pitch) to turn a perpendicular
+ * excess into the vertical fall you actually cut. Both roof planes give the same answer, which is
+ * what makes ONE drop serve a hip that carries two slopes.
+ *
+ * At 4-in-12 with a 2x6 that is 0.103 in — three thirty-seconds, small and not nothing: without it
+ * a roof with no deck clears the arrises by 0.022 in and they z-fight through the roofing.
+ */
+export function hipDropFt(rafterDIn: number, rafterWIn: number, slope: number): number {
+  const halfD = rafterDIn / 2;
+  const halfW = rafterWIn / 2;
+  // Perpendicular excess over what a common rafter reaches, times cos(pitch) already cancelled:
+  // proj·√(1+t²) − (d/2)·√(1+t²) is the vertical fall directly.
+  const vertical = (Math.SQRT2 / 2) * (halfD * Math.sqrt(2 + slope * slope) + halfW * slope)
+    - halfD * Math.sqrt(1 + slope * slope);
+  return Math.max(0, vertical) / IN_PER_FT;
+}
+
 /** The constant by which each successive jack rafter shortens, in feet. */
 export function jackDifference(slope: number, spacingFt: number): number {
-  return spacingFt * Math.sqrt(1 + slope * slope);
-}
+  return spacingFt * Math.sqrt(1 + slope * slope);}
 
 export function generateHip(input: HipInput): Member[] {
   const emit = makeEmitter('HP');
-  const { spec, walls, stageRoofFrame: stage } = input;
+  const { spec, walls, stageCeiling, stageRoofFrame: stage } = input;
   const roof = spec.roof;
   if (roof.kind !== 'hip') return emit.members;
   const { slope, lenPerFtRun } = slopeOf(roof);
@@ -330,10 +671,30 @@ export function generateHip(input: HipInput): Member[] {
   const oh = roof.overhangFt;
   const halfSpan = W / 2;
   const plateTopY = walls.plateTopY;
-  const ridgeY = plateTopY + halfSpan * slope;
+  // Ceiling joists bear ON the plate top; the roof frame starts one seat above it, so the
+  // commons and jacks have a bird's mouth to cut instead of running through the plate.
+  const roofY = rafterPlaneDatum(spec, plateTopY);
+  const ridgeY = roofY + halfSpan * slope;
   const rafterNominal = LUMBER.rafterNominal.value as string;
   const ridgeNominal = LUMBER.ridgeNominal.value as string;
   const spacingFt = spec.spacing.rafterSpacingIn / IN_PER_FT;
+
+  // Ceiling joists first — a hip thrusts on its plates no less than a gable, and the tie is
+  // the same one the frozen gable path lays: joists on edge across the width, bearing on both
+  // cap plates, interior stations only. Emitted before the roof frame because they are BUILT
+  // before it, and they are why the plan's ceiling stage is never an empty stop on a hip.
+  const cjNominal = LUMBER.ceilingJoistNominal.value as string;
+  const cjD = DRESSED[cjNominal]!.d / IN_PER_FT;
+  for (let x = spacingFt; x < L - spacingFt / 2 - TOLERANCE.epsFt; x += spacingFt) {
+    emit('joist', cjNominal, {
+      cutLengthFt: W,
+      position: [x, plateTopY + cjD / 2, W / 2],
+      rotation: [0, -Math.PI / 2, 0],
+      stage: stageCeiling,
+      nailing: '3-16d toenail ea plate + 16d to rafter (PH)',
+      doctrineRef: citeOf(LUMBER.ceilingJoistNominal),
+    });
+  }
 
   // The ridge runs the length, stopping halfSpan short of each end — that is where the hips
   // converge on it, and it is why a hip roof's ridge is shorter than its building.
@@ -348,14 +709,28 @@ export function generateHip(input: HipInput): Member[] {
   });
 
   // Common rafters along the ridge's length, both slopes.
+  //
+  // A RAFTER'S PITCH IS THE ROOF'S PITCH — `atan(slope)`, the same figure the jacks below use and
+  // the same one the frozen gable path uses. This read `atan2(halfSpan * slope, halfSpan + oh)`,
+  // which measures the RISE from the wall plate and the RUN from the eave: the numerator forgets
+  // that the eave is `oh` further out and therefore `oh * slope` further down. On a 12-ft-wide
+  // 4-in-12 hip that is 15.945 degrees against a true 18.435, and the piece's own `angles` block
+  // two lines below was already reporting the right number — the rotation and the cut list
+  // disagreed about the same rafter.
+  //
+  // Length and midpoint were always right, so a too-flat rafter pivots about its middle: at the
+  // eave it rides 1.84 in ABOVE the roof plane, standing proud of the deck and showing through
+  // the roofing (the tan bars along both long slopes, seen from overhead), and at the ridge it
+  // hangs 1.84 in BELOW the ridge board it is supposed to be nailed to. The jacks and the hips
+  // land on the eave exactly; only the commons floated between them.
   const commonLen = (halfSpan + oh) * lenPerFtRun;
   for (let x = L / 2 - ridgeLen / 2; x <= L / 2 + ridgeLen / 2 + 1e-6; x += spacingFt) {
     for (const side of [-1, 1] as const) {
       const zEave = side === -1 ? -oh : W + oh;
       emit('rafter', rafterNominal, {
         cutLengthFt: commonLen,
-        position: [x, (plateTopY - oh * slope + ridgeY) / 2, (zEave + W / 2) / 2],
-        rotation: [0, side === -1 ? -Math.PI / 2 : Math.PI / 2, Math.atan2(halfSpan * slope, halfSpan + oh)],
+        position: [x, (roofY - oh * slope + ridgeY) / 2, (zEave + W / 2) / 2],
+        rotation: [0, side === -1 ? -Math.PI / 2 : Math.PI / 2, Math.atan(slope)],
         stage,
         angles: { plumbCut: 90 - (Math.atan(slope) * 180) / Math.PI, seatCut: (Math.atan(slope) * 180) / Math.PI },
         nailing: '3-16d at ridge, bird’s-mouth toenail 3-8d (PH)',
@@ -365,17 +740,28 @@ export function generateHip(input: HipInput): Member[] {
   }
 
   // Four hips, corner to ridge end. The run is the DIAGONAL, which is the whole difference.
+  //
+  // AND THE HIP IS DROPPED. A common rafter is square to the plane it carries, so centring it on
+  // that plane puts its top face exactly on the roof. A hip is canted to BOTH slopes it lies
+  // under, so a plain stick on the hip line stands its two top arrises proud of both — 0.098 in
+  // on a 4-in-12 2x6, which is why a roof with no deck showed the arrises z-fighting through the
+  // roofing in a line of specks down every hip. `hipDropFt` states the fall that lands them on
+  // the planes; the alternative a framer has is to BACK the hip, and the cut list says which.
   const hipLen = (halfSpan + oh) * hipLenPerFtRun(slope);
+  const rafterD = DRESSED[rafterNominal]!.d;
+  const rafterW = DRESSED[rafterNominal]!.w;
+  const drop = hipDropFt(rafterD, rafterW, slope);
   for (const [cx, cz] of [[-oh, -oh], [L + oh, -oh], [L + oh, W + oh], [-oh, W + oh]] as [number, number][]) {
     const rx = cx < L / 2 ? L / 2 - ridgeLen / 2 : L / 2 + ridgeLen / 2;
     const run = Math.hypot(rx - cx, W / 2 - cz);
     emit('hipRafter', rafterNominal, {
       cutLengthFt: hipLen,
-      position: [(cx + rx) / 2, (plateTopY - oh * slope + ridgeY) / 2, (cz + W / 2) / 2],
-      rotation: [0, Math.atan2(-(W / 2 - cz), rx - cx), Math.atan2(ridgeY - (plateTopY - oh * slope), run)],
+      position: [(cx + rx) / 2, (roofY - oh * slope + ridgeY) / 2 - drop, (cz + W / 2) / 2],
+      rotation: [0, Math.atan2(-(W / 2 - cz), rx - cx), Math.atan2(ridgeY - (roofY - oh * slope), run)],
       stage,
       nailing: '3-16d at the ridge; jacks bear on it both sides (PH)',
-      doctrineRef: `${citeOf(LUMBER.rafterNominal)} — hip run is the diagonal: ${hipLenPerFtRun(slope).toFixed(3)} ft per ft of common run`,
+      doctrineRef: `${citeOf(LUMBER.rafterNominal)} — hip run is the diagonal: ${hipLenPerFtRun(slope).toFixed(3)} ft per ft of common run`
+        + `; DROP the hip ${(drop * IN_PER_FT).toFixed(3)} in (or back it) so the sheathing lies flat`,
     });
   }
 
@@ -395,8 +781,8 @@ export function generateHip(input: HipInput): Member[] {
   ] as [number, number, number, number][]) {
     for (let back = spacingFt; back < halfSpan - 1e-6; back += spacingFt) {
       const lenFt = (back + oh) * lenPerFtRun;
-      const yEave = plateTopY - oh * slope;
-      const yHip = plateTopY + back * slope;
+      const yEave = roofY - oh * slope;
+      const yHip = roofY + back * slope;
       const pitch = Math.atan(slope);
       // Jack on the LONG wall: fixed x, running in z from the eave up to the hip.
       emit('jackRafter', rafterNominal, {

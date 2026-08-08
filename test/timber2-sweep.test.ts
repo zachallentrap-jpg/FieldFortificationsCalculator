@@ -10,11 +10,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateStructure } from '../src/timber/families/index';
+import { STAIR } from '../src/timber/doctrine';
+import { solveFlight } from '../src/timber/subsystems/access';
 import { bomSummary } from '../src/timber/bom';
 import { thumbnailFor } from '../src/timber/thumbnails';
 import { specToJson } from '../src/timber/normalize';
 import type { BuildingSpec, FoundationSpec, RoofSpec, WallOpenings } from '../src/timber/spec';
 import type { WallId } from '../src/timber/types';
+import type { Member } from '../src/timber/types';
+import { FAMILY_TABLE } from '../src/timber/catalog';
 
 /** mulberry32 — small, fast, and deterministic across runs and platforms. */
 function mulberry32(seed: number): () => number {
@@ -155,8 +159,23 @@ test('AABB stays inside the footprint plus its spec-derived allowances (C-7)', (
     const model = generateStructure(spec);
     const s = model.spec as BuildingSpec;
     const oh = s.roof.kind === 'none' ? 0 : s.roof.overhangFt;
-    // Allowances: the eave overhang, the cap-plate corner lap, and a skid's own width.
-    const slack = oh + 1.5;
+    // Allowances: the eave overhang, the cap-plate corner lap, and a skid's own width — plus,
+    // now, the entry stair, which is the one thing here that is SUPPOSED to leave the footprint.
+    // A flight to a raised threshold runs out from the wall by roughly its rise over the stair
+    // pitch; the floor is never more than a storey up, so one flight's run is the bound and it
+    // is derived from the same figures the stair is cut to rather than picked to make this pass.
+    // The entry stair is the one thing here that is SUPPOSED to leave the footprint, and how far
+    // it leaves by is the rise it climbs. That rise is measured to the THRESHOLD, not to the
+    // floor: the fuzzer writes doors with a sill on them, and a door 3 ft 6 in up needs a flight
+    // that much longer. `solveFlight` is the same solver the stair is cut with, so this is the
+    // real run rather than an estimate — the first cut used the doctrine target riser and the
+    // unit run and under-read whenever the solver adds a riser to stay under the maximum.
+    const floorRise = Math.max(0, (model.levels.subfloorTop ?? 0) - (model.levels.gradeY ?? 0));
+    const sills = (s.stories[0]?.openings ? Object.values(s.stories[0].openings) : [])
+      .flatMap((list) => (list ?? []).filter((o) => o.kind === 'door').map((o) => o.sillHeightFt));
+    const rise = floorRise + Math.max(0, ...sills, 0);
+    const stairRun = solveFlight(rise).runFt + (STAIR.minTreadIn.value as number) / 12;
+    const slack = oh + 1.5 + stairRun;
     for (const m of model.members) {
       const half = m.cutLength / 12 / 2;
       assert.ok(
@@ -185,4 +204,40 @@ test('the whole sweep runs inside its wall-clock budget', () => {
   for (let i = 0; i < 60; i++) generateStructure(randomSpec(rng));
   const ms = performance.now() - t0;
   assert.ok(ms < 10_000, `60 models took ${ms.toFixed(0)} ms`);
+});
+
+test('no member is emitted twice in the same place — one post per hole', () => {
+  // FOUND BY SWEEP, NOT BY EYE. Coincident duplicates are invisible in a render: two identical
+  // meshes at the same coordinates look exactly like one. They are not invisible on the CUT
+  // LIST, which is what a crew orders and builds from — 96.5 board feet of stock that does not
+  // exist, 65.5 of it 6x6 timber on the crib bunker.
+  //
+  // The cause was the same in all three families: a perimeter run places its posts inclusive of
+  // both ends, which is right for one edge and wrong for a closed loop, so every corner got one
+  // post from the side arriving and another from the side leaving.
+  //
+  // Two members of the same stock, the same length, at the same place and the same angle are one
+  // member counted twice. No tolerance, no bounding boxes — this test cannot report a false
+  // positive, which is why it can be this blunt.
+  const signature = (m: Member): string =>
+    [m.role, m.nominal, m.cutLength.toFixed(6),
+     ...m.position.map((v) => v.toFixed(6)), ...m.rotation.map((v) => v.toFixed(6))].join('|');
+
+  const offenders: string[] = [];
+  for (const fam of FAMILY_TABLE) {
+    const model = generateStructure(fam.preset);
+    const seen = new Map<string, Member[]>();
+    for (const m of model.members) {
+      const k = signature(m);
+      seen.set(k, [...(seen.get(k) ?? []), m]);
+    }
+    for (const group of seen.values()) {
+      if (group.length < 2) continue;
+      const m = group[0]!;
+      offenders.push(
+        `${fam.id}: ${group.length}x ${m.role} ${m.nominal} at (${m.position.map((v) => v.toFixed(2)).join(', ')}) — ${group.map((g) => g.id).join(', ')}`,
+      );
+    }
+  }
+  assert.deepEqual(offenders, [], `members emitted more than once in the same place:\n  ${offenders.join('\n  ')}`);
 });

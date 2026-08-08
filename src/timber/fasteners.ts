@@ -67,6 +67,9 @@ const SPEC_LABEL: Record<string, string> = {
   roofing: '1 1/4 in roofing nail (galv, large head)',
   drift: 'drift pin / post-cap anchor',
   lead: 'lead-head nail (corrugated roofing)',
+  staple: '1/2 in staple (screen cloth)',
+  bolt: 'machine bolt + washers (tower connections)',
+  spike: 'timber spike (crib wall, overhead cover)',
 };
 
 /** Supports under sheathing are on the framing grid; 16 in is this engine's standard. */
@@ -89,13 +92,27 @@ export function fastenersForMember(m: Member, tally: Tally): boolean {
   const lenIn = Math.max(1, m.cutLength);
   let matched = false;
 
-  // Concrete and earth are not nailed to anything.
-  if (/poured|undisturbed soil|backfill|tamped/i.test(s)) return true;
+  // NOTHING TO FASTEN, and that is an answer rather than a gap: concrete, earth, massing, and
+  // the crib bunker's pieces that stand by their own embedment or by bearing against the wall
+  // they cap. Listed explicitly — `return true` here means "read, and the count is none", which
+  // must never be reached by a pattern loose enough to swallow something real.
+  if (/poured|undisturbed soil|backfill|tamped|massing only|free-standing|set in the ground|set against the end/i.test(s)) return true;
+
+  // SPIKED. A crib wall and its overhead cover are spiked, not nailed, and none of it reached
+  // the bill for the same reason the tower's bolts did not: the honesty check walked one card.
+  // Two spikes at each end is the modest reading, the same one the bare-schedule default takes.
+  if (/\bspiked\b/i.test(s)) {
+    tally.add('spike', 4, use);
+    return true;
+  }
 
   // A schedule that names SOMEONE ELSE as the thing being fastened describes a joint from its
   // other side — the ridge's "rafters 3-16d ea" is the same nails the rafter's own "3-16d at
   // ridge" already bought. Counting both would double the ridge line.
-  if (/^(rafters|joists|studs|purlins)\b/i.test(s)) return true;
+  // `boards` joined the list with the built openings: a door's ledges and a shutter's battens
+  // are fastened BY the boards nailed through them and clenched over, so the joint is bought
+  // once, on the boards.
+  if (/^(rafters|joists|studs|purlins|boards)\b/i.test(s)) return true;
 
   // Sheathing and roof deck: edges around the perimeter, field on intermediate supports.
   const panel = /(\d+d)\s*@\s*(\d+)"\s*edges\s*\/\s*(\d+)"\s*field/i.exec(s);
@@ -111,6 +128,18 @@ export function fastenersForMember(m: Member, tally: Tally): boolean {
     const edgeNails = Math.ceil(perimeter / edgeIn);
     const fieldNails = supports * Math.ceil(h / fieldIn);
     tally.add(size, edgeNails + fieldNails, use);
+    return true;
+  }
+
+  // SCREEN CLOTH, stapled round its frame and battened. This rule is here because the sea-hut's
+  // screened band has carried `staples @ 4" + batten` since T5 and NOTHING read it — the test
+  // that makes this bill honest only ever walked `gp-frame`, which has no screen band, so four
+  // members per hut fell through the one check whose job is to catch exactly that. The test now
+  // walks every shipped card.
+  const staples = /staples\s*@\s*(\d+)"/i.exec(s);
+  if (staples) {
+    const perimeter = 2 * (lenIn + Math.max(1, m.actual.d));
+    tally.add('staple', Math.ceil(perimeter / Number(staples[1])), use);
     return true;
   }
 
@@ -169,6 +198,16 @@ export function fastenersForMember(m: Member, tally: Tally): boolean {
     matched = true;
   }
 
+  // BOLTED CONNECTIONS. A guard tower is bolted, not nailed — its braces, girts, legs and deck
+  // frame all say so — and none of it reached the hardware bill, because the check that would
+  // have caught it walked `gp-frame` and stopped. Two bolts per connection is the modest
+  // reading, and "both ends" or "each leg" says how many connections there are.
+  if (!matched && /\bbolted\b/i.test(s)) {
+    const ends = /both ends|each leg|ea leg|every bay|at every bay/i.test(s) ? 2 : 1;
+    tally.add('bolt', 2 * ends, use);
+    matched = true;
+  }
+
   // The engine's generic default. Posts, pads and anything without a written schedule land
   // here; a post is toenailed top and bottom, so two nails each end is the modest reading.
   const bare = /^(\d+d) common/i.exec(s);
@@ -209,7 +248,7 @@ export function fastenerTakeoff(members: Member[]): FastenerTakeoff {
 
   // Heaviest fastener first: that is the order a supply request is written in, and it puts the
   // line somebody has to carry at the top.
-  const order = ['20d', '16d', '12d', '10d', '8d', '6d', 'roofing', 'lead', 'drift'];
+  const order = ['20d', '16d', '12d', '10d', '8d', '6d', 'roofing', 'lead', 'spike', 'drift', 'bolt', 'staple'];
   const lines: FastenerLine[] = [...counts.entries()]
     .sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]))
     .map(([kind, count]) => ({

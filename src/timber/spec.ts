@@ -94,17 +94,27 @@ export interface StorySpec {
 export interface CoveringSpec {
   wallSheathing: 'none' | 'plywood' | 'boards';
   siding: 'none' | 'plywood' | 'boards' | 'boardAndBatten';
-  roofDeck: 'none' | 'plywood' | 'boards' | 'skip' | 'purlins';
+  roofDeck: 'none' | 'plywood' | 'boards' | 'purlins';
   roofing: 'none' | 'roll' | 'rollDouble' | 'corrugated';
   buildingPaper?: boolean;
 }
 
 /** What every family branch shares (plan §3.1 SpecCommon). */
+/**
+ * Ground observed at the site. RECORDED, not consumed: FM 5-426 sizes post footers per soil
+ * class, and until those tables are page-checked nothing in the engine is allowed to read this
+ * — so it travels with the spec and prints on the command packet, where the reviewing engineer
+ * can act on it, and the panel says exactly that. An input that silently did nothing would be a
+ * lie; an input that states what it feeds is a site record.
+ */
+export type SoilKind = 'sand' | 'gravel' | 'loam' | 'clay' | 'rock';
+
 export interface SpecCommon {
   dims: Dims;
   spacing: SpacingSpec;
   coverings: CoveringSpec;
   label?: string; // the user's name for a saved config
+  site?: { soil?: SoilKind };
 }
 
 export interface PartitionSpec {
@@ -122,6 +132,12 @@ export interface BuildingSpec extends SpecCommon {
   atticAccess?: boolean;
   interiorStairs?: boolean; // default true at 2 stories; false is LEGAL (ladder instead)
   openFront?: WallId; // storage shed: posts + header; that wall takes no openings
+  /**
+   * Whether the windows get shutters, and how. Lives here as well as on `HutSpec` because the
+   * hut translates itself into a `BuildingSpec` and the covering pass runs inside the building
+   * generator — a field the translation drops is a field the generator cannot see.
+   */
+  shutters?: 'none' | 'side' | 'propped';
   /**
    * Full-run horizontal bands the wall covering is cut around — the hut family's screened band.
    * Heights are above the sole-plate top, like an opening's sill.
@@ -152,7 +168,10 @@ export interface TowerSpec extends SpecCommon {
   cab: {
     walls: 'open-rail' | 'half-wall' | 'half-wall-screen';
     roof: 'pyramid' | 'shed';
-    roofing: 'corrugated' | 'roll';
+    // NO `roofing` HERE. The cab is the tower's only roof, so what covers it is
+    // `coverings.roofing` — which is what the panel writes and what `tower.ts` reads. A second
+    // field saying the same thing was declared, written by the preset and read by nothing: set
+    // it to 'roll' through a link and the cab still came out corrugated, byte for byte.
   };
   footing: 'timber-mudsill' | 'concrete-pad';
 }
@@ -209,6 +228,47 @@ export interface SpecPathDef {
   cite?: string;
 }
 
+/**
+ * A well-formed value for every SECTION a building-shaped spec must have.
+ *
+ * Used for one thing only: repairing a spec that arrived without one. A share link is any JSON
+ * with a `family` key (see `decodeSpec`), so a spec can reach the generator missing a whole
+ * structural section, and a generator handed `undefined` where `dims` should be does not warn —
+ * it throws, and a thrown generator is a workbench that renders its chrome and then sits on
+ * "Laying out the frame…" forever with no canvas and nothing said.
+ *
+ * These are not a second catalog. They are the smallest description of a building this tool can
+ * draw: one 8-ft story with no openings, a gable, piers. The numbers sit inside the bounds
+ * declared below, and `timber2-shared-link` proves it the only way that cannot drift — by
+ * normalizing a spec built from them and asserting it raises no issues at all.
+ *
+ * It lives here rather than in `normalize.ts` because `normalize.ts` cannot reach the catalog:
+ * catalog → families/hut → families/building → normalize is already a chain, and importing back
+ * would close it into a cycle.
+ */
+export const SPEC_SECTION_FALLBACK = {
+  dims: { lengthFt: 24, widthFt: 16 } as Dims,
+  spacing: { studSpacingIn: 16, joistSpacingIn: 16, rafterSpacingIn: 16 } as SpacingSpec,
+  coverings: { wallSheathing: 'none', siding: 'plywood', roofDeck: 'plywood', roofing: 'roll' } as CoveringSpec,
+  stories: [{ wallHeightFt: 8, openings: {} }] as StorySpec[],
+  roof: { kind: 'gable', risePer12: 4, overhangFt: 1 } as RoofSpec,
+  foundation: { kind: 'piers', crawlFt: 1.5 } as FoundationSpec,
+} as const;
+
+/**
+ * Which sections a spec must actually have, by family — and they are NOT the same set.
+ *
+ * `SpecCommon` is the three every family extends. A `BuildingSpec` adds three more. A `HutSpec`
+ * adds none of them: it carries `wallHeightFt` and optional `roof`/`foundation`, and the hut
+ * generator derives the rest from its variant — which is why the shipped sea-hut preset has no
+ * `stories` key at all and is perfectly correct. Requiring the building's list of every family
+ * would "repair" a shipped card, which is a bug with a warning attached.
+ */
+export const SPEC_SECTIONS_COMMON = ['dims', 'spacing', 'coverings'] as const;
+export const SPEC_SECTIONS_BUILDING = [...SPEC_SECTIONS_COMMON, 'stories', 'roof', 'foundation'] as const;
+export const SPEC_SECTIONS = SPEC_SECTIONS_BUILDING;
+export type SpecSection = typeof SPEC_SECTIONS_BUILDING[number];
+
 export const SPEC_PATH_DEFS: readonly SpecPathDef[] = [
   { path: 'dims.lengthFt', label: 'Length', min: 4, max: 60, step: 0.5, cite: '4–60 ft — what this generator will lay out' },
   { path: 'dims.widthFt', label: 'Width', min: 4, max: 24, step: 0.5, cite: '4–24 ft — a wider span needs a second girder line, which is not built yet' },
@@ -229,7 +289,22 @@ export const SPEC_PATH_DEFS: readonly SpecPathDef[] = [
   { path: 'interiorWidthFt', label: 'Interior width', min: 6, max: 12, step: 1, cite: 'bunker envelope (PH)' },
   { path: 'clearHeightFt', label: 'Clear height', min: 4.5, max: 7, step: 0.5, cite: 'bunker envelope (PH)' },
   { path: 'designCoverDepthFt', label: 'Stated cover depth', min: 0, max: 4, step: 0.5, cite: 'load-table row range (PH, LS, SME)' },
-  { path: 'deckHeightFt', label: 'Deck height', min: 0.5, max: 5, step: 0.25, cite: 'TM 5-302 loading platform (PH)' },
+  // Floored at 1.75 ft, not 0.5, for the same reason `foundation.crawlFt` is floored at 1: the
+  // frame hangs UNDER the walking surface and there has to be room for it. `deckHeightFt` is the
+  // surface you stand on, and below it the platform stacks a runner (5½ in, lying on grade), a
+  // post, a sill (5½), a joist (7¼) and the decking (1½) — 1.746 ft before the post is anything
+  // at all, and the next step up from that is 1.75. Every setting the picker used to offer below
+  // it was broken, each in its own way:
+  //
+  //   on skids   0.5, 1.0    no posts, and the sill 8¼ / 2¼ in UNDERGROUND
+  //              1.25, 1.5   no posts, and the sill 4¾ / 1¾ in INSIDE the runner
+  //   on piers   0.5, 1.0    no posts, and the sill 8¼ / 2¼ in UNDERGROUND
+  //              1.25        no posts, and the sill floating ¾ in over grade on nothing
+  //
+  // Rendered, a 0.5-ft platform is a slab of decking sunk into the ground with no legs at all.
+  // `timber2-platform-low-deck` re-derives this figure from the lumber and fails if the stock
+  // changes under it. The bound is geometry, not preference, and it is stated once here.
+  { path: 'deckHeightFt', label: 'Deck height', min: 1.75, max: 5, step: 0.25, cite: 'TM 5-302 loading platform (PH); floored by the frame depth under the deck' },
   { path: 'ramp.widthFt', label: 'Ramp width', min: 4, max: 12, step: 0.5, cite: 'TM 5-302 (PH)' },
   { path: 'temperBays', label: 'TEMPER bays', min: 2, max: 8, step: 1, cite: 'TM 10-8340 (PH)' },
   { path: 'latrine.depthFt', label: 'Pit depth', min: 4, max: 8, step: 0.5, cite: 'TM 5-302 latrine (PH — sheet pending)' },

@@ -18,6 +18,9 @@ export type MemberRole =
   // emitted → PLAIN/WHAT, never the reverse, so declaring the vocabulary early is free.
   | 'sidingBoard' | 'batten' | 'buildingPaper'          // T2 coverings
   | 'purlin' | 'roofingCourse' | 'felt' | 'skid'        // T2 coverings / foundations
+  | 'ridgeCap'                                          // the bent piece over a ridge or a hip
+  | 'fascia'                                            // the board that closes an eave over the rafter tails
+  | 'bargeBoard'                                        // the same board up a RAKE, closing a gable end
   | 'ponyStud' | 'rakeStud'                             // T2 shed roof (TD6)
   | 'railPost' | 'railTop' | 'railMid' | 'toeBoard'     // T4 railings (EM 385-1-1)
   | 'ladderRail' | 'ladderRung'                         // T4 access
@@ -26,7 +29,7 @@ export type MemberRole =
   | 'bentPost' | 'bentRafter' | 'bentCollar'            // T6 tent frames
   | 'screenFrame' | 'screenPanel'                       // T5 screen bands
   | 'doorBoard' | 'doorLedge' | 'doorBrace' | 'shutter' | 'riserBox' // T5 built openings
-  | 'cribLog' | 'lagging' | 'ohcStringer' | 'baffleWall' | 'soilGhost' // T7 bunker
+  | 'cribLog' | 'lagging' | 'ohcStringer' | 'ohcBlocking' | 'baffleWall' | 'soilGhost' // T7 bunker
   | 'hardware';                                          // T8 counted items
 
 export type WallId = 'N' | 'S' | 'E' | 'W';

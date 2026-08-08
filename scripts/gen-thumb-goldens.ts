@@ -16,15 +16,21 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FAMILY_TABLE } from '../src/timber/catalog';
 import { thumbnailFor } from '../src/timber/thumbnails';
+import { portraitFor } from '../src/timber/portrait';
 
 const OUT = fileURLToPath(new URL('../test/goldens/thumbs/', import.meta.url));
 mkdirSync(OUT, { recursive: true });
 for (const f of readdirSync(OUT)) if (f.endsWith('.svg')) rmSync(join(OUT, f));
 
+// TWO drawings per family, because the toolkit now has two ways of drawing a structure and both
+// are shipped art. The line drawing goes on the printed packet cover, where a solid render would
+// be a page of toner; the SOLID one is every card on screen. Pinning only one would leave the
+// other free to drift, and the solid one is the one people look at.
 let count = 0;
 for (const family of FAMILY_TABLE) {
   if (!family.shipped) continue;
   writeFileSync(join(OUT, `${family.id}.svg`), thumbnailFor(family.preset) + '\n');
-  count++;
+  writeFileSync(join(OUT, `${family.id}.solid.svg`), portraitFor(family.preset, { width: 300, height: 200 }) + '\n');
+  count += 2;
 }
 console.log(`gen-thumb-goldens: wrote ${count} SVG golden(s) → test/goldens/thumbs/`);

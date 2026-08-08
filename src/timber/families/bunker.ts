@@ -29,10 +29,18 @@ import type { Member } from '../types';
 import { DRESSED } from '../types';
 import type { BunkerSpec } from '../spec';
 import { makeEmitter } from '../emit';
-import { BUNKER, LUMBER, IN_PER_FT, citeOf, COVER_DEPTH_NOTE } from '../doctrine';
+import { BUNKER, TOLERANCE, IN_PER_FT, citeOf, COVER_DEPTH_NOTE } from '../doctrine';
 import { stagePlan, requireOrdinal, type StagePlanEntry } from '../stagePlan';
-import { generateCribWall } from '../subsystems/cribwork';
+import { generateCribWall, cribWallTopFt } from '../subsystems/cribwork';
 import type { FloorLevels } from '../floor';
+
+/**
+ * Clear width of the doorway, in feet. Geometry, not doctrine: the header used to be cut to a
+ * flat 4 ft with no stated opening at all, so there was no number anywhere saying how wide the
+ * way in was. Four feet is that same figure, named — wide enough for a man with a casualty on a
+ * litter, which is the load that sets a bunker entrance.
+ */
+const ENTRY_WIDTH_FT = 4;
 
 export interface BunkerResult {
   members: Member[];
@@ -42,18 +50,40 @@ export interface BunkerResult {
   deadLoadPsf: number;
   /** Set when the stated depth needs a span past the last reviewed table row. */
   pastReviewedTable: string | null;
+  /** Things the family had to decide that the operator should see. */
+  notes: { path: string; message: string }[];
 }
 
-export function bunkerStagePlan(wallType: BunkerSpec['wallType'], showSoil: boolean): StagePlanEntry[] {
-  const rows: { key: Parameters<typeof stagePlan>[0][number]['key']; label: string; detail: string }[] = [
-    { key: 'layout', label: 'Layout & excavation lines', detail: 'The hole is a survivability task; what is staked here is the wood that goes in it.' },
+export function bunkerStagePlan(
+  wallType: BunkerSpec['wallType'],
+  showSoil: boolean,
+  entrance: BunkerSpec['entrance'] = 'baffle',
+): StagePlanEntry[] {
+  const rows: Parameters<typeof stagePlan>[0] = [
+    // The hole itself is not modelled — staking its lines is real work that puts no member in
+    // the model, which is what `noMembers` declares. Without it this row is indistinguishable
+    // from a stage nothing was ever written for.
+    { key: 'layout', label: 'Layout & excavation lines', detail: 'The hole is a survivability task; what is staked here is the wood that goes in it.', noMembers: true },
     wallType === 'crib'
       ? { key: 'cribwork', label: 'Cribwork', detail: 'Courses laid at right angles to each other so every log bears across the two below it. The corner is the whole idea.' }
       : { key: 'walls', label: 'Posts & lagging', detail: 'Posts on the spacing, lagging behind them holding the face.' },
     { key: 'plates', label: 'Caps', detail: 'Caps across the post tops, spreading the load off the stringers into the walls.' },
     { key: 'roof-frame', label: 'Overhead stringers', detail: 'Stringers across the clear span, sized for the stated depth of soil as a dead load.' },
     { key: 'roof-deck', label: 'Lagging over', detail: 'Lagging over the stringers, so nothing above falls between them.' },
-    { key: 'openings-built', label: 'Entrance', detail: 'Straight through, or offset so the way in is not a straight line.' },
+    // WHAT IS LEFT TO BUILD HERE once the opening is framed with the wall it is a hole in.
+    // The jambs are two of the wall's posts and the header is the cap continued across them, so
+    // both belong to the stages named for those pieces — they used to be stamped here, three
+    // stages after the cap they line up with and two after the overhead cover that bears on
+    // them. What remains is the baffle, and a straight entrance has none: the doorway is the gap
+    // left in the wall as it went up, which is a real stop on the scrubber and no material.
+    entrance === 'baffle'
+      ? { key: 'openings-built', label: 'Entrance', detail: 'The baffle: a short wall standing off the doorway and overlapping it, so the way in is not a straight line.' }
+      : {
+        key: 'openings-built',
+        label: 'Entrance',
+        detail: 'Open — straight in. The doorway was framed with the wall and capped with it, so what happens here is checking that the opening is where it should be.',
+        noMembers: true,
+      },
   ];
   if (showSoil) {
     rows.push({ key: 'soil-ghost', label: 'Cover (massing only)', detail: COVER_DEPTH_NOTE });
@@ -75,7 +105,7 @@ export function stringerFor(clearSpanFt: number): { nominal: string; reviewed: b
 
 export function generateBunker(spec: BunkerSpec): BunkerResult {
   const emit = makeEmitter('BK');
-  const plan = bunkerStagePlan(spec.wallType, spec.showSoilCover !== false);
+  const plan = bunkerStagePlan(spec.wallType, spec.showSoilCover !== false, spec.entrance);
   const sLayout = requireOrdinal(plan, 'layout');
   const sWall = spec.wallType === 'crib' ? requireOrdinal(plan, 'cribwork') : requireOrdinal(plan, 'walls');
   const sCap = requireOrdinal(plan, 'plates');
@@ -90,9 +120,26 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
   const capNominal = BUNKER.capNominal.value as string;
   const lagNominal = BUNKER.laggingNominal.value as string;
   const postSpacing = BUNKER.postSpacingFt.value as number;
+  // A POST-AND-PLANK WALL IS TWO LAYERS, and it was modelled as one.
+  //
+  // The planks were laid on the posts' own centreline, so at every post station the plank ran
+  // straight THROUGH the post: 176 overlapping pairs on the shipped card, the deepest 59.8 in³
+  // of one solid inside another. And it is not a question of which side looks tidier. The earth
+  // is OUTSIDE and it pushes in, so the planks belong on the outer face and the posts behind
+  // them: the load then bears the planks onto the posts, which is the whole reason a soldier-pile
+  // wall is built that way round. On the posts' line the planks were retaining nothing.
+  //
+  // So the wall band is the plank plus the post. The clear interior is unchanged — it is measured
+  // from the posts' inner face either way — and the bunker's outside grew by the plank.
+  const postThick = DRESSED[postNominal]!.w / IN_PER_FT;
+  const lagThick = DRESSED[lagNominal]!.w / IN_PER_FT;
   const wallThick = spec.wallType === 'crib'
     ? DRESSED[BUNKER.cribLogNominal.value as string]!.w / IN_PER_FT * 3
-    : DRESSED[postNominal]!.w / IN_PER_FT;
+    : postThick + lagThick;
+  /** Inset of the POST line from the outer face — the plank is outboard of it. */
+  const postInset = spec.wallType === 'crib' ? wallThick / 2 : lagThick + postThick / 2;
+  /** How far outboard of the post line a plank's own centre sits, face to face. */
+  const lagStandoff = spec.wallType === 'crib' ? 0 : (postThick + lagThick) / 2;
 
   // The clear span the overhead has to cross is the interior width, and the stated depth of
   // soil is what it carries. Both are printed rather than assumed.
@@ -109,13 +156,63 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
   // ── Walls
   const outerL = L + 2 * wallThick;
   const outerW = W + 2 * wallThick;
+  // THE WALL IS BUILT ON ITS OWN CENTRELINE, not on the outer face.
+  //
+  // `outerL = L + 2·wallThick` makes the rectangle [0, outerL] × [0, outerW] the bunker's OUTER
+  // FACE, and the walls were built ON that rectangle — centred on it. So half of every post and
+  // half of every lagging board stood OUTSIDE the structure, the clear interior came out 5½ in
+  // wider each way than the spec asked for (10 ft 5½ in of a stated 10 ft), and the cap beam —
+  // which is placed at `wallThick / 2`, correctly on the wall band — bore on exactly half its
+  // width, with the inner half over open air.
+  //
+  // The entrance framing was already right: its jambs and header sit at `wallThick / 2`. The wall
+  // was the one piece that disagreed, which is what made it hard to see: everything it was
+  // supposed to meet was in the right place.
+  // The corners are the POST line. On a crib that is the wall's centreline; on a post-and-plank
+  // wall the planks stand a plank's thickness outboard of it, at `lagStandoff`.
+  const halfWall = postInset;
   const corners: [number, number][] = [
-    [0, 0], [outerL, 0], [outerL, outerW], [0, outerW],
+    [halfWall, halfWall],
+    [outerL - halfWall, halfWall],
+    [outerL - halfWall, outerW - halfWall],
+    [halfWall, outerW - halfWall],
   ];
+
+  // ── THE DOORWAY IS A HOLE, and the wall pass has to be told so.
+  //
+  // Resolved here rather than fifty lines down where it is framed, because the framing was the
+  // only thing that knew about it. Jambs, a header and a baffle were all placed correctly around
+  // an opening that was then LAGGED SHUT: eleven full-width courses ran straight across it, and
+  // two of the wall's own posts stood inside the clear span, each overlapping a jamb by 0.6 in.
+  // Every point sampled inside the doorway rectangle came back solid. The bunker had no way in.
+  const doorWidth = Math.min(ENTRY_WIDTH_FT, outerW - 2 * wallThick);
+  const doorZ0 = outerW / 2 - doorWidth / 2;
+  const doorZ1 = outerW / 2 + doorWidth / 2;
+  const jambNominal = postNominal;
+  const jambT = DRESSED[jambNominal]!.w / IN_PER_FT;
+  /** What the wall must leave clear, in world z: the opening plus the jambs that frame it. */
+  const doorClear: [number, number] = [doorZ0 - jambT, doorZ1 + jambT];
+
+  // HOW HIGH THE WALL ACTUALLY COMES. Posts are cut to the height asked for; a crib is stacked in
+  // whole courses and stops at the last one that fits. Everything above the wall used to be set
+  // at `H` regardless, so on a crib bunker the cap beam — carrying the overhead stringers, the
+  // roof lagging and two feet of earth — bore on a 5½-in air gap the whole way round, with only
+  // the two door jambs crossing it.
+  const wallTopY = spec.wallType === 'crib' ? cribWallTopFt(H) : H;
+  const shortByFt = H - wallTopY;
   if (spec.wallType === 'crib') {
+    // ONE POST PER CORNER. Each side runs its posts inclusive of both ends, so every corner of
+    // the crib got a 6x6 from the side arriving and another from the side leaving — four doubled
+    // posts, 65 board feet of heavy timber on the cut list that does not exist.
     for (let i = 0; i < 4; i++) {
       const a = corners[i]!;
       const b = corners[(i + 1) % 4]!;
+      // The entrance is in the -X end wall, and a stack does not know about a door unless it is
+      // told. Its u axis runs from `a`, so the opening's world z maps straight onto it.
+      const onEntryWall = Math.abs(a[0] - halfWall) < 1e-9 && Math.abs(b[0] - halfWall) < 1e-9;
+      const uz = (b[1] - a[1]) / Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const uAt = (pz: number): number => (pz - a[1]) * uz;
+      const ends = onEntryWall ? [uAt(doorClear[0]), uAt(doorClear[1])].sort((p, q) => p - q) : null;
       emit.members.push(...generateCribWall({
         from: [a[0], a[1]],
         to: [b[0], b[1]],
@@ -124,46 +221,87 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
         depthFt: wallThick,
         stage: sWall,
         prefix: `BKC${i}`,
+        ...(ends ? { gap: [ends[0]!, ends[1]!] as [number, number] } : {}),
       }));
     }
   } else {
+    // ONE POST PER CORNER. Each side runs its posts inclusive of both ends, so every corner of
+    // the crib got a 6x6 from the side arriving and another from the side leaving — four doubled
+    // posts, 65 board feet of heavy timber on the cut list that does not exist.
+    const setPosts = new Set<string>();
     for (let i = 0; i < 4; i++) {
       const a = corners[i]!;
       const b = corners[(i + 1) % 4]!;
       const run = Math.hypot(b[0] - a[0], b[1] - a[1]);
       const ux = (b[0] - a[0]) / run;
       const uz = (b[1] - a[1]) / run;
+      // The entrance is in the -X end wall, so that is the side with something to leave out.
+      const onEntryWall = Math.abs(a[0] - halfWall) < 1e-9 && Math.abs(b[0] - halfWall) < 1e-9;
+      const uOf = (pz: number): number => (pz - a[1]) * uz;
+      const gap: [number, number] | null = onEntryWall
+        ? (uOf(doorClear[0]) < uOf(doorClear[1])
+          ? [uOf(doorClear[0]), uOf(doorClear[1])]
+          : [uOf(doorClear[1]), uOf(doorClear[0])])
+        : null;
+      const halfPost = DRESSED[postNominal]!.d / IN_PER_FT / 2;
       const n = Math.max(2, Math.round(run / postSpacing) + 1);
       for (let k = 0; k < n; k++) {
         const d = (run * k) / (n - 1);
+        // A post that would stand in the doorway is not built; the jamb is its replacement.
+        if (gap && d + halfPost > gap[0] + 1e-9 && d - halfPost < gap[1] - 1e-9) continue;
+        const px = a[0] + ux * d;
+        const pz = a[1] + uz * d;
+        const spot = `${px.toFixed(6)}|${pz.toFixed(6)}`;
+        if (setPosts.has(spot)) continue;
+        setPosts.add(spot);
         emit('post', postNominal, {
           cutLengthFt: H,
-          position: [a[0] + ux * d, H / 2, a[1] + uz * d],
+          position: [px, H / 2, pz],
           rotation: [0, 0, Math.PI / 2],
           stage: sWall,
           nailing: 'set against the cut face; capped and drift-pinned (PH)',
           doctrineRef: citeOf(BUNKER.postNominal),
         });
       }
-      // Lagging behind the posts, holding the face between them.
+      // Lagging on the OUTER face of the posts, holding the earth off them. The outward normal
+      // of a side is its own direction turned right: the corners run counter-clockwise in plan,
+      // so `(uz, -ux)` points away from the bunker on every one of the four.
+      const nx = uz * lagStandoff;
+      const nz = -ux * lagStandoff;
       const lagH = DRESSED[lagNominal]!.d / IN_PER_FT;
-      for (let y = lagH / 2; y < H; y += lagH) {
-        emit('lagging', lagNominal, {
-          cutLengthFt: run,
-          position: [(a[0] + b[0]) / 2, y, (a[1] + b[1]) / 2],
-          rotation: [0, Math.atan2(-uz, ux), 0],
-          stage: sWall,
-          nailing: 'spiked to each post (PH)',
-          doctrineRef: citeOf(BUNKER.laggingNominal),
-        });
+      // One course is one board unless the doorway interrupts it, in which case it is the two
+      // boards either side of the opening — which is what you would cut, and what leaves a hole.
+      const spans: [number, number][] = gap
+        ? ([[0, gap[0]], [gap[1], run]] as [number, number][]).filter((sp) => sp[1] - sp[0] > TOLERANCE.minSliverFt)
+        : [[0, run]];
+      // THE LAST BOARD OF A RUN IS RIPPED TO FIT, which is what you do with a remainder and
+      // what none of this family's three board runs did. Six foot six of wall is 10.759 courses
+      // of a 7¼-in plank: laying eleven whole ones stood the top course 1¾ in proud of the posts
+      // and 1¾ in INTO the cap beam, the whole way round, on the shipped card.
+      for (let v = 0; v < H - TOLERANCE.epsFt; v += lagH) {
+        const cut = Math.min(lagH, H - v);
+        for (const [u0, u1] of spans) {
+          const mid = (u0 + u1) / 2;
+          emit('lagging', lagNominal, {
+            cutLengthFt: u1 - u0,
+            position: [a[0] + ux * mid + nx, v + cut / 2, a[1] + uz * mid + nz],
+            rotation: [0, Math.atan2(-uz, ux), 0],
+            stage: sWall,
+            actual: { w: DRESSED[lagNominal]!.w, d: cut * IN_PER_FT },
+            nailing: 'spiked to each post (PH)',
+            doctrineRef: citeOf(BUNKER.laggingNominal),
+          });
+        }
       }
     }
   }
 
   // ── Caps along the two long walls, carrying the stringers.
   const capD = DRESSED[capNominal]!.d / IN_PER_FT;
-  const capY = H + capD / 2;
-  for (const z of [wallThick / 2, outerW - wallThick / 2]) {
+  const capY = wallTopY + capD / 2;
+  // ON THE POSTS. A cap centred on the whole band would hang a plank's width out over the
+  // lagging and miss as much of the post it is supposed to bear on.
+  for (const z of [postInset, outerW - postInset]) {
     emit('capBeam', capNominal, {
       cutLengthFt: outerL,
       position: [outerL / 2, capY, z],
@@ -174,55 +312,226 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
     });
   }
 
+  // ── And a cap on the TWO END WALLS, which had none.
+  //
+  // "Caps along the two long walls, carrying the stringers" was the whole rule, and as a statement
+  // about what carries the overhead it is right: the stringers span the width and land on those
+  // two. But a cap is not only a bearing — it is the course that closes the top of a wall, and
+  // without one the end walls stopped 7¼ in below the overhead. That is a slot the width of the
+  // bunker at each end, between the top of the lagging and the underside of the stringers, with
+  // two feet of earth on top of it:
+  //
+  //   wall lagging tops out 6.5000   stringer soffit 7.1042   5 ft 4 in of the 10-ft width open
+  //
+  // THE HEADER ALREADY SAID SO. It is emitted as `capNominal` and documented as "the cap continued
+  // across the doorway" — which presupposes a cap on that wall for it to continue. There was none
+  // either side of it: the entrance end was a header hanging between two lengths of nothing.
+  //
+  // BUTTED BETWEEN THE LONG CAPS, the same way the end walls butt between the long walls, and
+  // interrupted by the doorway exactly as the wall below it is — the header is that course's
+  // middle piece.
+  const capW = DRESSED[capNominal]!.w / IN_PER_FT;
+  const endCapZ: [number, number] = [postInset + capW / 2, outerW - postInset - capW / 2];
+  for (const x of [postInset, outerL - postInset]) {
+    const onEntry = Math.abs(x - postInset) < 1e-9;
+    const runs: [number, number][] = onEntry
+      ? [[endCapZ[0], doorClear[0]], [doorClear[1], endCapZ[1]]]
+      : [endCapZ];
+    for (const [z0, z1] of runs) {
+      if (z1 - z0 <= TOLERANCE.minSliverFt) continue;
+      emit('capBeam', capNominal, {
+        cutLengthFt: z1 - z0,
+        position: [x, capY, (z0 + z1) / 2],
+        rotation: [0, Math.PI / 2, 0],
+        stage: sCap,
+        nailing: 'drift-pinned to every post or crib course; butted to the side caps (PH)',
+        doctrineRef: citeOf(BUNKER.capNominal),
+      });
+    }
+  }
+
   // ── Overhead stringers across the clear span, then lagging over them.
   const stringerD = DRESSED[stringer.nominal]!.d / IN_PER_FT;
   const stringerY = capY + capD / 2 + stringerD / 2;
   const stringerSpacing = BUNKER.stringerSpacingFt.value as number;
-  const nStringers = Math.max(2, Math.floor(outerL / stringerSpacing) + 1);
+  // THE STRINGERS ARE LAID INSIDE THE BUILDING, on a run that is the building less one stringer.
+  //
+  // They were placed at `outerL · i / (n − 1)` — the first and last CENTRED ON the end faces, so
+  // half of each 8x8 hung 3⅝ in out past the end wall, past the end of the cap it bears on, and
+  // out from under both the roof lagging and the earth cover. Two beams cantilevered over open
+  // air at the two ends of the overhead, and in a front elevation the end one plainly sticks out
+  // beyond the wall below it. Same mistake as the wall itself: a member placed ON a face instead
+  // of INSIDE it.
+  //
+  // And the count went with it. `floor(outerL / spacing) + 1` gives the number of stringers that
+  // fit at LEAST the doctrine spacing apart, which is the wrong side of a maximum: the shipped
+  // card came out at 25⅜ in on centre against a 2 ft figure the doctrine table flags life-safety.
+  // The run is what has to be divided, and it has to be divided into ENOUGH bays.
+  const stringerW = DRESSED[stringer.nominal]!.w / IN_PER_FT;
+  const stringerRun = Math.max(0, outerL - stringerW);
+  const stringerBays = Math.max(1, Math.ceil(stringerRun / stringerSpacing - 1e-9));
+  const nStringers = stringerBays + 1;
   for (let i = 0; i < nStringers; i++) {
     emit('ohcStringer', stringer.nominal, {
       cutLengthFt: outerW,
-      position: [(outerL * i) / (nStringers - 1), stringerY, outerW / 2],
+      position: [stringerW / 2 + (stringerRun * i) / stringerBays, stringerY, outerW / 2],
       rotation: [0, Math.PI / 2, 0],
       stage: sStringer,
       nailing: 'bearing on the caps both ends; drift-pinned (PH)',
       doctrineRef: citeOf(BUNKER.stringerBySpan),
     });
   }
+  // ── Blocking between the stringers, over each side cap.
+  //
+  // THE BAY BETWEEN TWO STRINGERS IS A HOLE IN THE WALL. The stringers cross the side caps and
+  // the lagging goes over them, so between one stringer and the next there is a course as deep as
+  // a stringer, open at the wall face and leading straight down into the bunker:
+  //
+  //   stringer soffit 7.1042   roof lagging 7.7083   7020 sight lines clean through, every bay
+  //
+  // The two ENDS are already closed, and by the same rule: the outermost stringers sit flush with
+  // the end walls, so there is no bay there to fill. It is only the two long walls that have one.
+  //
+  // Cut from the STRINGER'S own stock, so it fills the course exactly however the dead-load table
+  // sizes the stringer, and set with its outer face on the wall's — which also closes the strip
+  // above the wall lagging that the cap, being narrower than the wall, does not reach.
+  for (let i = 0; i < stringerBays; i++) {
+    const x0 = stringerW / 2 + (stringerRun * i) / stringerBays + stringerW / 2;
+    const x1 = stringerW / 2 + (stringerRun * (i + 1)) / stringerBays - stringerW / 2;
+    if (x1 - x0 <= TOLERANCE.minSliverFt) continue;
+    for (const z of [stringerW / 2, outerW - stringerW / 2]) {
+      emit('ohcBlocking', stringer.nominal, {
+        cutLengthFt: x1 - x0,
+        position: [(x0 + x1) / 2, stringerY, z],
+        rotation: [0, 0, 0],
+        stage: sStringer,
+        nailing: 'toenailed to the stringer each side; spiked to the cap (PH)',
+        doctrineRef: `${citeOf(BUNKER.stringerBySpan)} — blocking, cut from the stringer stock`,
+      });
+    }
+  }
+
   const lagW = DRESSED[lagNominal]!.d / IN_PER_FT;
   const lagT = DRESSED[lagNominal]!.w / IN_PER_FT;
   const lagY = stringerY + stringerD / 2 + lagT / 2;
-  for (let z = lagW / 2; z < outerW; z += lagW) {
+  // Ripped to fit at the far side, like the wall. Clamping the last board's CENTRE back inside
+  // the building — which is what `Math.min` did here — leaves the run short by the remainder
+  // instead: 3½ in of overhead with the earth straight onto the stringers, down one long side.
+  for (let v = 0; v < outerW - TOLERANCE.epsFt; v += lagW) {
+    const cut = Math.min(lagW, outerW - v);
     emit('lagging', lagNominal, {
       cutLengthFt: outerL,
-      position: [outerL / 2, lagY, Math.min(z, outerW - lagW / 2)],
-      rotation: [0, 0, 0],
+      position: [outerL / 2, lagY, v + cut / 2],
+      // Lagging is the roof DECK — laid flat, edge to edge. The spacing loop steps by face
+      // width and the height by thickness, so at [0,0,0] the two disagreed and the roof came
+      // out as a rank of boards on edge with daylight between them.
+      rotation: [-Math.PI / 2, 0, 0],
       stage: sLag,
+      actual: { w: DRESSED[lagNominal]!.w, d: cut * IN_PER_FT },
       nailing: 'spiked to every stringer (PH)',
       doctrineRef: citeOf(BUNKER.laggingNominal),
     });
   }
 
   // ── Entrance: straight through, or offset so the way in turns.
-  if (spec.entrance === 'baffle') {
-    const offset = BUNKER.baffleOffsetFt.value as number;
-    emit('baffleWall', postNominal, {
-      cutLengthFt: Math.min(offset * 2, outerW),
-      position: [-offset / 2, H / 2, outerW / 2],
-      rotation: [0, Math.PI / 2, Math.PI / 2],
-      stage: sEntry,
-      nailing: 'framed as a free-standing wall; braced back (PH)',
-      doctrineRef: citeOf(BUNKER.baffleOffsetFt),
+  //
+  // The doorway is in the -X end wall, on the centreline. Two pieces frame it and both used to
+  // be placed by hand against no datum at all:
+  //
+  //   THE BAFFLE was one 6x6, eight feet long, rotated so its LENGTH stood vertical — a single
+  //   post out in the open two feet clear of the bunker, a quarter of it underground and a foot
+  //   of it over the cap. A baffle is a WALL you have to walk around, and a wall is posts with
+  //   something spanning them, standing on the ground and no taller than what it shields.
+  //   THE HEADER spanned the doorway a foot and a half inboard of it, bearing on nothing. Over
+  //   a crib bunker — whose ends are open by construction — it hung in mid-air.
+  // Jambs first: the header has to land on something, and on a crib bunker there is no end wall
+  // for it to land on.
+  for (const z of [doorZ0 - jambT / 2, doorZ1 + jambT / 2]) {
+    emit('post', jambNominal, {
+      cutLengthFt: wallTopY,
+      position: [postInset, wallTopY / 2, z],
+      rotation: [0, 0, Math.PI / 2],
+      // WITH THE WALL, not with the entrance. A jamb IS one of the wall's posts — the comment
+      // above says it replaces the post that would have stood in the doorway — and it carries the
+      // header the overhead cover bears on. Stamped into the entrance stage it appeared three
+      // stages after the caps it lines up with and two after that cover, so the scrubber ran the
+      // stringers across the opening on nothing at all.
+      stage: sWall,
+      nailing: 'set against the end of the wall run; capped (PH)',
+      doctrineRef: citeOf(BUNKER.postNominal),
     });
   }
-  emit('header', LUMBER.headerNominal.value as string, {
-    cutLengthFt: 4,
-    position: [wallThick / 2, H, outerW / 2],
+  // THE HEADER IS THE CAP CONTINUED ACROSS THE DOORWAY. It was sized from `LUMBER.headerNominal`
+  // — the 2x6 a stud wall puts over a window — while everything else holding this structure up is
+  // 6x6 and 6x8 out of the ATP 3-37.34 dead-load table. Two things followed from that. The wall's
+  // cap beam is 7¼ in deep and the header was 5½, both starting at the wall top, so the doorway
+  // finished 1¾ in BELOW the line the overhead cover bears on: a slot the full 5-ft width of the
+  // opening, running clean through the end wall into the bunker, in both wall types. And a 2x6
+  // spanning five feet under a foot and a half of soil is not a header, it is a shim.
+  //
+  // Made of the cap stock it is in line with, its top lands on the cap's top and the stringers
+  // come down onto a continuous bearing line.
+  const headerNominal = capNominal;
+  emit('header', headerNominal, {
+    cutLengthFt: doorWidth + 2 * jambT,
+    position: [postInset, wallTopY + DRESSED[headerNominal]!.d / IN_PER_FT / 2, outerW / 2],
     rotation: [0, Math.PI / 2, 0],
-    stage: sEntry,
-    nailing: '3-16d ea end (PH)',
-    doctrineRef: 'FM 5-426 header table by span (PH)',
+    // And WITH THE CAPS, for the same reason: this piece is that course, and the two cap beams
+    // on either side of the doorway stop dead at the jambs waiting for it.
+    stage: sCap,
+    nailing: 'drift-pinned to each jamb; carries the cover over the opening (PH)',
+    doctrineRef: citeOf(BUNKER.capNominal),
   });
+
+  if (spec.entrance === 'baffle') {
+    const offset = BUNKER.baffleOffsetFt.value as number;
+    // A short wall standing off the doorway, overlapping it far enough that you cannot see or
+    // shoot straight in. Posts to the ground, lagging across them — the same two pieces the
+    // bunker's own walls are made of, so it reads as part of the same structure.
+    //
+    // IT STARTED AT THE DOORWAY'S CENTRE. `outerW / 2` is the middle of the opening, not its
+    // edge, so the baffle covered the outer half and left the inner half — two feet of a
+    // five-foot doorway — with a clear straight line in from outside. The comment above has said
+    // "you cannot see or shoot straight in" since the day it was written, and you could.
+    //
+    // The rule now, stated so it can be tested: cover the doorway from JAMB to JAMB, and run
+    // past the far jamb by the standoff distance so the 45° sightline round the far end is shut
+    // too. The near end stays open — that is not a gap, that is the way in: you come down the
+    // slot between the baffle and the wall and turn through the door.
+    const baffleZ0 = outerW / 2 - doorWidth / 2 - jambT;
+    const baffleZ1 = outerW / 2 + doorWidth / 2 + jambT + offset;
+    const run = baffleZ1 - baffleZ0;
+    const posts = Math.max(2, Math.round(run / postSpacing) + 1);
+    for (let i = 0; i < posts; i++) {
+      emit('baffleWall', postNominal, {
+        cutLengthFt: H,
+        position: [-offset, H / 2, baffleZ0 + (run * i) / (posts - 1)],
+        rotation: [0, 0, Math.PI / 2],
+        stage: sEntry,
+        nailing: 'free-standing: set in the ground and braced back to the entrance (PH)',
+        doctrineRef: citeOf(BUNKER.baffleOffsetFt),
+      });
+    }
+    const lagH = DRESSED[lagNominal]!.d / IN_PER_FT;
+    // And the baffle, which handled its own remainder a third way: it clamped the last course's
+    // centre down to `H − lagH/2`, so the top board lay 1¾ in ON TOP OF the one below it — the
+    // same figure again, as duplicated material instead of an overshoot.
+    for (let v = 0; v < H - TOLERANCE.epsFt; v += lagH) {
+      const cut = Math.min(lagH, H - v);
+      emit('baffleWall', lagNominal, {
+        cutLengthFt: run,
+        actual: { w: DRESSED[lagNominal]!.w, d: cut * IN_PER_FT },
+        // Face to face with the baffle's posts. Standing off by HALF a post put the plank's own
+        // centre on the post's face, so half of every board was inside the post — the same
+        // mistake as the wall's lagging, at half the depth.
+        position: [-offset - (DRESSED[postNominal]!.w + DRESSED[lagNominal]!.w) / IN_PER_FT / 2, v + cut / 2, (baffleZ0 + baffleZ1) / 2],
+        rotation: [0, Math.PI / 2, 0],
+        stage: sEntry,
+        nailing: 'spiked to each post (PH)',
+        doctrineRef: citeOf(BUNKER.baffleOffsetFt),
+      });
+    }
+  }
 
   // ── Soil, as MASSING. Zero board-feet, never material: it is here so a person can see what
   // the structure sits under, and its label is the boundary sentence itself.
@@ -232,7 +541,14 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       position: [outerL / 2, lagY + lagT / 2 + spec.designCoverDepthFt / 2, outerW / 2],
       rotation: [0, 0, 0],
       stage: requireOrdinal(plan, 'soil-ghost'),
-      actual: { w: spec.designCoverDepthFt * IN_PER_FT, d: outerW * IN_PER_FT },
+      // THE SAME CONVENTION AS EVERY OTHER MEMBER: `d` is the face width — local Y, and with
+      // rotation [0,0,0] that is the VERTICAL one — and `w` is the thickness on local Z. These
+      // two were swapped, and the 3D viewer carried a private swap of its own to undo it, so the
+      // pair looked right and nothing else did. `thumbnails.ts` reads the convention straight, so
+      // the picker card drew the earth cover 10.92 ft tall and 2 ft deep instead of 2 ft tall and
+      // 10.92 deep: a monolith standing on edge on the bunker's roof, engulfing the structure,
+      // on the first thing anyone sees of this family.
+      actual: { w: outerW * IN_PER_FT, d: spec.designCoverDepthFt * IN_PER_FT },
       nailing: 'not built — massing only (PH)',
       doctrineRef: COVER_DEPTH_NOTE,
     });
@@ -244,5 +560,13 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
     stagePlan: plan,
     deadLoadPsf: Math.round(deadLoadPsf),
     pastReviewedTable,
+    notes: shortByFt > 1e-6
+      ? [{
+        path: 'clearHeightFt',
+        message: `A crib is built in whole courses and there is no half a log: ${H} ft of wall comes out at `
+          + `${wallTopY.toFixed(2)} ft, ${Math.round(wallTopY / (DRESSED[BUNKER.cribLogNominal.value as string]!.d / IN_PER_FT))} `
+          + `courses of ${BUNKER.cribLogNominal.value}. The cap and everything it carries bear on that, not on the figure asked for.`,
+      }]
+      : [],
   };
 }

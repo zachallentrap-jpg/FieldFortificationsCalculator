@@ -55,6 +55,21 @@ test('normalizeSpec is idempotent and reports nothing on an in-bounds spec', () 
   assert.deepEqual(second.issues, []);
 });
 
+test('a story this engine cannot frame is dropped LOUDLY, not silently', () => {
+  // The engine frames stories[0] and nothing else — the story loop and the second-floor
+  // bearing are parked (TIMBER2_PLAN T6b, on its own descope ladder). Parking that is fine.
+  // What was not fine: a two-story spec normalized with ZERO issues and then generated a
+  // model byte-identical to the one-story it was not, so the picture, the cut list and the
+  // packet all described a different building than the one asked for and nothing said so.
+  const two = { ...spec(), stories: [(spec() as BuildingSpec).stories[0]!, { wallHeightFt: 8, openings: {} }] };
+  const { spec: out, issues } = normalizeSpec(two as BuildingSpec);
+  assert.equal((out as BuildingSpec).stories.length, 1, 'kept the story it can build');
+  const told = issues.filter((i) => i.path === 'stories');
+  assert.equal(told.length, 1, 'and said so exactly once');
+  assert.equal(told[0]!.severity, 'warn');
+  assert.match(told[0]!.message, /one story/i);
+});
+
 test('clamping is always VISIBLE — an out-of-range value comes back with an issue naming it', () => {
   const wild = { ...spec(), dims: { lengthFt: 400, widthFt: 1 } };
   const { spec: out, issues } = normalizeSpec(wild);

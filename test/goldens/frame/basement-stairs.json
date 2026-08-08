@@ -35,7 +35,7 @@
    ],
    "stage": 1,
    "grade": "No. 2 common",
-   "nailing": "1/2\" anchor bolts @ ~6 ft into sill (PH)",
+   "nailing": "1/2\" anchor bolts @ 6 ft max o.c. into sill, min 2 per plate, within 12\" of each end (IRC R403.1.6)",
    "doctrineRef": "FM 5-426 continuous-wall foundation (PH ch./page)"
   },
   {
@@ -83,7 +83,7 @@
    ],
    "stage": 1,
    "grade": "No. 2 common",
-   "nailing": "1/2\" anchor bolts @ ~6 ft into sill (PH)",
+   "nailing": "1/2\" anchor bolts @ 6 ft max o.c. into sill, min 2 per plate, within 12\" of each end (IRC R403.1.6)",
    "doctrineRef": "FM 5-426 continuous-wall foundation (PH ch./page)"
   },
   {
@@ -131,7 +131,7 @@
    ],
    "stage": 1,
    "grade": "No. 2 common",
-   "nailing": "1/2\" anchor bolts @ ~6 ft into sill (PH)",
+   "nailing": "1/2\" anchor bolts @ 6 ft max o.c. into sill, min 2 per plate, within 12\" of each end (IRC R403.1.6)",
    "doctrineRef": "FM 5-426 continuous-wall foundation (PH ch./page)"
   },
   {
@@ -179,7 +179,7 @@
    ],
    "stage": 1,
    "grade": "No. 2 common",
-   "nailing": "1/2\" anchor bolts @ ~6 ft into sill (PH)",
+   "nailing": "1/2\" anchor bolts @ 6 ft max o.c. into sill, min 2 per plate, within 12\" of each end (IRC R403.1.6)",
    "doctrineRef": "FM 5-426 continuous-wall foundation (PH ch./page)"
   },
   {
@@ -299,7 +299,7 @@
    ],
    "stage": 2,
    "grade": "No. 2 common",
-   "nailing": "1/2\" anchor bolts @ ~6 ft (PH)",
+   "nailing": "1/2\" anchor bolts @ 6 ft max o.c., min 2 per plate, within 12\" of each end (IRC R403.1.6)",
    "doctrineRef": "FM 5-426 ch. 6 (PH page)"
   },
   {
@@ -323,7 +323,7 @@
    ],
    "stage": 2,
    "grade": "No. 2 common",
-   "nailing": "1/2\" anchor bolts @ ~6 ft (PH)",
+   "nailing": "1/2\" anchor bolts @ 6 ft max o.c., min 2 per plate, within 12\" of each end (IRC R403.1.6)",
    "doctrineRef": "FM 5-426 ch. 6 (PH page)"
   },
   {
@@ -347,7 +347,7 @@
    ],
    "stage": 2,
    "grade": "No. 2 common",
-   "nailing": "1/2\" anchor bolts @ ~6 ft (PH)",
+   "nailing": "1/2\" anchor bolts @ 6 ft max o.c., min 2 per plate, within 12\" of each end (IRC R403.1.6)",
    "doctrineRef": "FM 5-426 ch. 6 (PH page)"
   },
   {
@@ -371,7 +371,7 @@
    ],
    "stage": 2,
    "grade": "No. 2 common",
-   "nailing": "1/2\" anchor bolts @ ~6 ft (PH)",
+   "nailing": "1/2\" anchor bolts @ 6 ft max o.c., min 2 per plate, within 12\" of each end (IRC R403.1.6)",
    "doctrineRef": "FM 5-426 ch. 6 (PH page)"
   },
   {
@@ -1174,7 +1174,7 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.221806725878501,
+   "cutLength": 14.300579427309849,
    "position": [
     0.6979166666666666,
     -0.3645833333333333,
@@ -1183,7 +1183,7 @@
    "rotation": [
     0,
     0,
-    -0.4433741601473803
+    -0.2783886280357674
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1198,7 +1198,7 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.221806725878501,
+   "cutLength": 14.300579427309849,
    "position": [
     0.6979166666666666,
     -0.3645833333333333,
@@ -1207,7 +1207,7 @@
    "rotation": [
     0,
     0,
-    0.4433741601473803
+    0.2783886280357674
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1222,7 +1222,7 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665766,
+   "cutLength": 15.02560171892538,
    "position": [
     2,
     -0.3645833333333333,
@@ -1231,7 +1231,7 @@
    "rotation": [
     0,
     0,
-    -0.42314064803350465
+    -0.26527824219514623
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1246,7 +1246,7 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665766,
+   "cutLength": 15.02560171892538,
    "position": [
     2,
     -0.3645833333333333,
@@ -1255,7 +1255,7 @@
    "rotation": [
     0,
     0,
-    0.42314064803350465
+    0.26527824219514623
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1270,7 +1270,7 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665766,
+   "cutLength": 15.025601718925383,
    "position": [
     3.333333333333333,
     -0.3645833333333333,
@@ -1279,7 +1279,7 @@
    "rotation": [
     0,
     0,
-    -0.4231406480335046
+    -0.26527824219514623
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1294,7 +1294,7 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665766,
+   "cutLength": 15.025601718925383,
    "position": [
     3.333333333333333,
     -0.3645833333333333,
@@ -1303,7 +1303,7 @@
    "rotation": [
     0,
     0,
-    0.4231406480335046
+    0.26527824219514623
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1318,7 +1318,7 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665763,
+   "cutLength": 15.025601718925376,
    "position": [
     4.666666666666666,
     -0.3645833333333333,
@@ -1327,7 +1327,7 @@
    "rotation": [
     0,
     0,
-    -0.42314064803350476
+    -0.26527824219514634
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1342,7 +1342,7 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665763,
+   "cutLength": 15.025601718925376,
    "position": [
     4.666666666666666,
     -0.3645833333333333,
@@ -1351,7 +1351,7 @@
    "rotation": [
     0,
     0,
-    0.42314064803350476
+    0.26527824219514634
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1366,21 +1366,21 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 31.191199079227456,
+   "cutLength": 10.033136938407502,
    "position": [
-    6.666666666666666,
+    5.782296901172529,
     -0.3645833333333333,
     3.96
    ],
    "rotation": [
     0,
     0,
-    -0.21091419799995997
+    -0.39120772829235145
    ],
    "stage": 3,
    "grade": "No. 2 common",
    "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+   "doctrineRef": "FM 5-426 cross bridging — short bay cut to the stairwell trimmer (PH page)"
   },
   {
    "id": "FL-bridging-10",
@@ -1390,21 +1390,21 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 31.191199079227456,
+   "cutLength": 10.033136938407502,
    "position": [
-    6.666666666666666,
+    5.782296901172529,
     -0.3645833333333333,
     4.04
    ],
    "rotation": [
     0,
     0,
-    0.21091419799995997
+    0.39120772829235145
    ],
    "stage": 3,
    "grade": "No. 2 common",
    "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+   "doctrineRef": "FM 5-426 cross bridging — short bay cut to the stairwell trimmer (PH page)"
   },
   {
    "id": "FL-bridging-11",
@@ -1414,21 +1414,21 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665763,
+   "cutLength": 18.652547769565025,
    "position": [
-    8.666666666666666,
+    7.178130234505861,
     -0.3645833333333333,
     3.96
    ],
    "rotation": [
     0,
     0,
-    -0.42314064803350476
+    -0.2145533763644466
    ],
    "stage": 3,
    "grade": "No. 2 common",
    "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+   "doctrineRef": "FM 5-426 cross bridging — short bay cut to the stairwell trimmer (PH page)"
   },
   {
    "id": "FL-bridging-12",
@@ -1438,21 +1438,21 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665763,
+   "cutLength": 18.652547769565025,
    "position": [
-    8.666666666666666,
+    7.178130234505861,
     -0.3645833333333333,
     4.04
    ],
    "rotation": [
     0,
     0,
-    0.42314064803350476
+    0.2145533763644466
    ],
    "stage": 3,
    "grade": "No. 2 common",
    "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+   "doctrineRef": "FM 5-426 cross bridging — short bay cut to the stairwell trimmer (PH page)"
   },
   {
    "id": "FL-bridging-13",
@@ -1462,16 +1462,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.90254382166577,
+   "cutLength": 15.025601718925376,
    "position": [
-    10,
+    8.666666666666666,
     -0.3645833333333333,
     3.96
    ],
    "rotation": [
     0,
     0,
-    -0.4231406480335045
+    -0.26527824219514634
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1486,16 +1486,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.90254382166577,
+   "cutLength": 15.025601718925376,
    "position": [
-    10,
+    8.666666666666666,
     -0.3645833333333333,
     4.04
    ],
    "rotation": [
     0,
     0,
-    0.4231406480335045
+    0.26527824219514634
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1510,16 +1510,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.90254382166577,
+   "cutLength": 15.025601718925383,
    "position": [
-    11.333333333333332,
+    10,
     -0.3645833333333333,
     3.96
    ],
    "rotation": [
     0,
     0,
-    -0.4231406480335045
+    -0.2652782421951461
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1534,16 +1534,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.90254382166577,
+   "cutLength": 15.025601718925383,
    "position": [
-    11.333333333333332,
+    10,
     -0.3645833333333333,
     4.04
    ],
    "rotation": [
     0,
     0,
-    0.4231406480335045
+    0.2652782421951461
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1558,16 +1558,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.90254382166577,
+   "cutLength": 15.025601718925383,
    "position": [
-    12.666666666666668,
+    11.333333333333332,
     -0.3645833333333333,
     3.96
    ],
    "rotation": [
     0,
     0,
-    -0.4231406480335045
+    -0.2652782421951461
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1582,16 +1582,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.90254382166577,
+   "cutLength": 15.025601718925383,
    "position": [
-    12.666666666666668,
+    11.333333333333332,
     -0.3645833333333333,
     4.04
    ],
    "rotation": [
     0,
     0,
-    0.4231406480335045
+    0.2652782421951461
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1606,16 +1606,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.90254382166577,
+   "cutLength": 15.025601718925383,
    "position": [
-    14,
+    12.666666666666668,
     -0.3645833333333333,
     3.96
    ],
    "rotation": [
     0,
     0,
-    -0.4231406480335045
+    -0.2652782421951461
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1630,16 +1630,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.90254382166577,
+   "cutLength": 15.025601718925383,
    "position": [
-    14,
+    12.666666666666668,
     -0.3645833333333333,
     4.04
    ],
    "rotation": [
     0,
     0,
-    0.4231406480335045
+    0.2652782421951461
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1654,16 +1654,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 31.191199079227435,
+   "cutLength": 15.025601718925383,
    "position": [
-    16,
+    14,
     -0.3645833333333333,
     3.96
    ],
    "rotation": [
     0,
     0,
-    -0.2109141979999601
+    -0.2652782421951461
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1678,16 +1678,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 31.191199079227435,
+   "cutLength": 15.025601718925383,
    "position": [
-    16,
+    14,
     -0.3645833333333333,
     4.04
    ],
    "rotation": [
     0,
     0,
-    0.2109141979999601
+    0.2652782421951461
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1702,21 +1702,21 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665752,
+   "cutLength": 15.752651548633445,
    "position": [
-    18,
+    15.364583333333334,
     -0.3645833333333333,
     3.96
    ],
    "rotation": [
     0,
     0,
-    -0.42314064803350504
+    -0.2532989085708451
    ],
    "stage": 3,
    "grade": "No. 2 common",
    "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+   "doctrineRef": "FM 5-426 cross bridging — short bay cut to the stairwell trimmer (PH page)"
   },
   {
    "id": "FL-bridging-24",
@@ -1726,21 +1726,21 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665752,
+   "cutLength": 15.752651548633445,
    "position": [
-    18,
+    15.364583333333334,
     -0.3645833333333333,
     4.04
    ],
    "rotation": [
     0,
     0,
-    0.42314064803350504
+    0.2532989085708451
    ],
    "stage": 3,
    "grade": "No. 2 common",
    "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+   "doctrineRef": "FM 5-426 cross bridging — short bay cut to the stairwell trimmer (PH page)"
   },
   {
    "id": "FL-bridging-25",
@@ -1750,21 +1750,21 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.22180672587853,
+   "cutLength": 12.857653396731173,
    "position": [
-    19.302083333333332,
+    16.760416666666664,
     -0.3645833333333333,
     3.96
    ],
    "rotation": [
     0,
     0,
-    -0.4433741601473795
+    -0.3086650942529239
    ],
    "stage": 3,
    "grade": "No. 2 common",
    "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+   "doctrineRef": "FM 5-426 cross bridging — short bay cut to the stairwell trimmer (PH page)"
   },
   {
    "id": "FL-bridging-26",
@@ -1774,21 +1774,21 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.22180672587853,
+   "cutLength": 12.857653396731173,
    "position": [
-    19.302083333333332,
+    16.760416666666664,
     -0.3645833333333333,
     4.04
    ],
    "rotation": [
     0,
     0,
-    0.4433741601473795
+    0.3086650942529239
    ],
    "stage": 3,
    "grade": "No. 2 common",
    "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+   "doctrineRef": "FM 5-426 cross bridging — short bay cut to the stairwell trimmer (PH page)"
   },
   {
    "id": "FL-bridging-27",
@@ -1798,16 +1798,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.221806725878501,
+   "cutLength": 15.025601718925365,
    "position": [
-    0.6979166666666666,
+    18,
     -0.3645833333333333,
-    11.96
+    3.96
    ],
    "rotation": [
     0,
     0,
-    -0.4433741601473803
+    -0.26527824219514656
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1822,16 +1822,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.221806725878501,
+   "cutLength": 15.025601718925365,
    "position": [
-    0.6979166666666666,
+    18,
     -0.3645833333333333,
-    12.04
+    4.04
    ],
    "rotation": [
     0,
     0,
-    0.4433741601473803
+    0.26527824219514656
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1846,16 +1846,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665766,
+   "cutLength": 14.300579427309877,
    "position": [
-    2,
+    19.302083333333332,
     -0.3645833333333333,
-    11.96
+    3.96
    ],
    "rotation": [
     0,
     0,
-    -0.42314064803350465
+    -0.27838862803576686
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1870,16 +1870,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665766,
+   "cutLength": 14.300579427309877,
    "position": [
-    2,
+    19.302083333333332,
     -0.3645833333333333,
-    12.04
+    4.04
    ],
    "rotation": [
     0,
     0,
-    0.42314064803350465
+    0.27838862803576686
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1894,16 +1894,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665766,
+   "cutLength": 14.300579427309849,
    "position": [
-    3.333333333333333,
+    0.6979166666666666,
     -0.3645833333333333,
     11.96
    ],
    "rotation": [
     0,
     0,
-    -0.4231406480335046
+    -0.2783886280357674
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1918,16 +1918,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665766,
+   "cutLength": 14.300579427309849,
    "position": [
-    3.333333333333333,
+    0.6979166666666666,
     -0.3645833333333333,
     12.04
    ],
    "rotation": [
     0,
     0,
-    0.4231406480335046
+    0.2783886280357674
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1942,16 +1942,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665763,
+   "cutLength": 15.02560171892538,
    "position": [
-    4.666666666666666,
+    2,
     -0.3645833333333333,
     11.96
    ],
    "rotation": [
     0,
     0,
-    -0.42314064803350476
+    -0.26527824219514623
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1966,16 +1966,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665763,
+   "cutLength": 15.02560171892538,
    "position": [
-    4.666666666666666,
+    2,
     -0.3645833333333333,
     12.04
    ],
    "rotation": [
     0,
     0,
-    0.42314064803350476
+    0.26527824219514623
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -1990,16 +1990,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 31.191199079227456,
+   "cutLength": 15.025601718925383,
    "position": [
-    6.666666666666666,
+    3.333333333333333,
     -0.3645833333333333,
     11.96
    ],
    "rotation": [
     0,
     0,
-    -0.21091419799995997
+    -0.26527824219514623
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -2014,16 +2014,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 31.191199079227456,
+   "cutLength": 15.025601718925383,
    "position": [
-    6.666666666666666,
+    3.333333333333333,
     -0.3645833333333333,
     12.04
    ],
    "rotation": [
     0,
     0,
-    0.21091419799995997
+    0.26527824219514623
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -2038,16 +2038,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665763,
+   "cutLength": 15.025601718925376,
    "position": [
-    8.666666666666666,
+    4.666666666666666,
     -0.3645833333333333,
     11.96
    ],
    "rotation": [
     0,
     0,
-    -0.42314064803350476
+    -0.26527824219514634
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -2062,16 +2062,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.902543821665763,
+   "cutLength": 15.025601718925376,
    "position": [
-    8.666666666666666,
+    4.666666666666666,
     -0.3645833333333333,
     12.04
    ],
    "rotation": [
     0,
     0,
-    0.42314064803350476
+    0.26527824219514634
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -2086,21 +2086,21 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.90254382166577,
+   "cutLength": 10.033136938407502,
    "position": [
-    10,
+    5.782296901172529,
     -0.3645833333333333,
     11.96
    ],
    "rotation": [
     0,
     0,
-    -0.4231406480335045
+    -0.39120772829235145
    ],
    "stage": 3,
    "grade": "No. 2 common",
    "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+   "doctrineRef": "FM 5-426 cross bridging — short bay cut to the stairwell trimmer (PH page)"
   },
   {
    "id": "FL-bridging-40",
@@ -2110,21 +2110,21 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.90254382166577,
+   "cutLength": 10.033136938407502,
    "position": [
-    10,
+    5.782296901172529,
     -0.3645833333333333,
     12.04
    ],
    "rotation": [
     0,
     0,
-    0.4231406480335045
+    0.39120772829235145
    ],
    "stage": 3,
    "grade": "No. 2 common",
    "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+   "doctrineRef": "FM 5-426 cross bridging — short bay cut to the stairwell trimmer (PH page)"
   },
   {
    "id": "FL-bridging-41",
@@ -2134,21 +2134,21 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.90254382166577,
+   "cutLength": 12.857653396731173,
    "position": [
-    11.333333333333332,
+    16.760416666666664,
     -0.3645833333333333,
     11.96
    ],
    "rotation": [
     0,
     0,
-    -0.4231406480335045
+    -0.3086650942529239
    ],
    "stage": 3,
    "grade": "No. 2 common",
    "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+   "doctrineRef": "FM 5-426 cross bridging — short bay cut to the stairwell trimmer (PH page)"
   },
   {
    "id": "FL-bridging-42",
@@ -2158,21 +2158,21 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.90254382166577,
+   "cutLength": 12.857653396731173,
    "position": [
-    11.333333333333332,
+    16.760416666666664,
     -0.3645833333333333,
     12.04
    ],
    "rotation": [
     0,
     0,
-    0.4231406480335045
+    0.3086650942529239
    ],
    "stage": 3,
    "grade": "No. 2 common",
    "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
+   "doctrineRef": "FM 5-426 cross bridging — short bay cut to the stairwell trimmer (PH page)"
   },
   {
    "id": "FL-bridging-43",
@@ -2182,16 +2182,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.90254382166577,
+   "cutLength": 15.025601718925365,
    "position": [
-    12.666666666666668,
+    18,
     -0.3645833333333333,
     11.96
    ],
    "rotation": [
     0,
     0,
-    -0.4231406480335045
+    -0.26527824219514656
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -2206,16 +2206,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.90254382166577,
+   "cutLength": 15.025601718925365,
    "position": [
-    12.666666666666668,
+    18,
     -0.3645833333333333,
     12.04
    ],
    "rotation": [
     0,
     0,
-    0.4231406480335045
+    0.26527824219514656
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -2230,16 +2230,16 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.90254382166577,
+   "cutLength": 14.300579427309877,
    "position": [
-    14,
+    19.302083333333332,
     -0.3645833333333333,
     11.96
    ],
    "rotation": [
     0,
     0,
-    -0.4231406480335045
+    -0.27838862803576686
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -2254,151 +2254,7 @@
     "w": 0.75,
     "d": 2.5
    },
-   "cutLength": 15.90254382166577,
-   "position": [
-    14,
-    -0.3645833333333333,
-    12.04
-   ],
-   "rotation": [
-    0,
-    0,
-    0.4231406480335045
-   ],
-   "stage": 3,
-   "grade": "No. 2 common",
-   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
-  },
-  {
-   "id": "FL-bridging-47",
-   "role": "bridging",
-   "nominal": "1x3",
-   "actual": {
-    "w": 0.75,
-    "d": 2.5
-   },
-   "cutLength": 31.191199079227435,
-   "position": [
-    16,
-    -0.3645833333333333,
-    11.96
-   ],
-   "rotation": [
-    0,
-    0,
-    -0.2109141979999601
-   ],
-   "stage": 3,
-   "grade": "No. 2 common",
-   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
-  },
-  {
-   "id": "FL-bridging-48",
-   "role": "bridging",
-   "nominal": "1x3",
-   "actual": {
-    "w": 0.75,
-    "d": 2.5
-   },
-   "cutLength": 31.191199079227435,
-   "position": [
-    16,
-    -0.3645833333333333,
-    12.04
-   ],
-   "rotation": [
-    0,
-    0,
-    0.2109141979999601
-   ],
-   "stage": 3,
-   "grade": "No. 2 common",
-   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
-  },
-  {
-   "id": "FL-bridging-49",
-   "role": "bridging",
-   "nominal": "1x3",
-   "actual": {
-    "w": 0.75,
-    "d": 2.5
-   },
-   "cutLength": 15.902543821665752,
-   "position": [
-    18,
-    -0.3645833333333333,
-    11.96
-   ],
-   "rotation": [
-    0,
-    0,
-    -0.42314064803350504
-   ],
-   "stage": 3,
-   "grade": "No. 2 common",
-   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
-  },
-  {
-   "id": "FL-bridging-50",
-   "role": "bridging",
-   "nominal": "1x3",
-   "actual": {
-    "w": 0.75,
-    "d": 2.5
-   },
-   "cutLength": 15.902543821665752,
-   "position": [
-    18,
-    -0.3645833333333333,
-    12.04
-   ],
-   "rotation": [
-    0,
-    0,
-    0.42314064803350504
-   ],
-   "stage": 3,
-   "grade": "No. 2 common",
-   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
-  },
-  {
-   "id": "FL-bridging-51",
-   "role": "bridging",
-   "nominal": "1x3",
-   "actual": {
-    "w": 0.75,
-    "d": 2.5
-   },
-   "cutLength": 15.22180672587853,
-   "position": [
-    19.302083333333332,
-    -0.3645833333333333,
-    11.96
-   ],
-   "rotation": [
-    0,
-    0,
-    -0.4433741601473795
-   ],
-   "stage": 3,
-   "grade": "No. 2 common",
-   "nailing": "2-8d ea end; bottom ends nailed after subfloor (PH)",
-   "doctrineRef": "FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)"
-  },
-  {
-   "id": "FL-bridging-52",
-   "role": "bridging",
-   "nominal": "1x3",
-   "actual": {
-    "w": 0.75,
-    "d": 2.5
-   },
-   "cutLength": 15.22180672587853,
+   "cutLength": 14.300579427309877,
    "position": [
     19.302083333333332,
     -0.3645833333333333,
@@ -2407,7 +2263,7 @@
    "rotation": [
     0,
     0,
-    0.4433741601473795
+    0.27838862803576686
    ],
    "stage": 3,
    "grade": "No. 2 common",
@@ -2686,10 +2542,10 @@
     "w": 1.5,
     "d": 11.25
    },
-   "cutLength": 155.8853745545104,
+   "cutLength": 149.00932653238397,
    "position": [
-    11.284901633204894,
-    -4.518066622947768,
+    11.354569917793269,
+    -4.145833333333333,
     8.35
    ],
    "rotation": [
@@ -2710,10 +2566,10 @@
     "w": 1.5,
     "d": 11.25
    },
-   "cutLength": 155.8853745545104,
+   "cutLength": 149.00932653238397,
    "position": [
-    11.284901633204894,
-    -4.518066622947768,
+    11.354569917793269,
+    -4.145833333333333,
     9.915
    ],
    "rotation": [
@@ -2734,10 +2590,10 @@
     "w": 1.5,
     "d": 11.25
    },
-   "cutLength": 155.8853745545104,
+   "cutLength": 149.00932653238397,
    "position": [
-    11.284901633204894,
-    -4.518066622947768,
+    11.354569917793269,
+    -4.145833333333333,
     11.48
    ],
    "rotation": [
@@ -3110,7 +2966,7 @@
    "stage": 6,
    "wall": "S",
    "grade": "No. 2 common",
-   "nailing": "16d @ 16\" + 2-16d at laps (PH)",
+   "nailing": "16d @ 16\" + 8-16d in the lap, joints offset 24\" min (IRC Table R602.3(1))",
    "doctrineRef": "FM 5-426: cap plate laps at corners tie the walls (PH page)"
   },
   {
@@ -3635,7 +3491,7 @@
    "stage": 6,
    "wall": "N",
    "grade": "No. 2 common",
-   "nailing": "16d @ 16\" + 2-16d at laps (PH)",
+   "nailing": "16d @ 16\" + 8-16d in the lap, joints offset 24\" min (IRC Table R602.3(1))",
    "doctrineRef": "FM 5-426: cap plate laps at corners tie the walls (PH page)"
   },
   {
@@ -4160,7 +4016,7 @@
    "stage": 6,
    "wall": "E",
    "grade": "No. 2 common",
-   "nailing": "16d @ 16\" + 2-16d at laps (PH)",
+   "nailing": "16d @ 16\" + 8-16d in the lap, joints offset 24\" min (IRC Table R602.3(1))",
    "doctrineRef": "FM 5-426: cap plate laps at corners tie the walls (PH page)"
   },
   {
@@ -4610,7 +4466,7 @@
    "stage": 6,
    "wall": "W",
    "grade": "No. 2 common",
-   "nailing": "16d @ 16\" + 2-16d at laps (PH)",
+   "nailing": "16d @ 16\" + 8-16d in the lap, joints offset 24\" min (IRC Table R602.3(1))",
    "doctrineRef": "FM 5-426: cap plate laps at corners tie the walls (PH page)"
   },
   {
@@ -5335,7 +5191,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     0.0625,
-    9.15625,
+    9.300590654596196,
     3.46875
    ],
    "rotation": [
@@ -5363,7 +5219,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     0.0625,
-    9.15625,
+    9.300590654596196,
     12.53125
    ],
    "rotation": [
@@ -5391,7 +5247,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     1.3333333333333333,
-    9.15625,
+    9.300590654596196,
     3.46875
    ],
    "rotation": [
@@ -5419,7 +5275,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     1.3333333333333333,
-    9.15625,
+    9.300590654596196,
     12.53125
    ],
    "rotation": [
@@ -5447,7 +5303,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     2.6666666666666665,
-    9.15625,
+    9.300590654596196,
     3.46875
    ],
    "rotation": [
@@ -5475,7 +5331,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     2.6666666666666665,
-    9.15625,
+    9.300590654596196,
     12.53125
    ],
    "rotation": [
@@ -5503,7 +5359,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     4,
-    9.15625,
+    9.300590654596196,
     3.46875
    ],
    "rotation": [
@@ -5531,7 +5387,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     4,
-    9.15625,
+    9.300590654596196,
     12.53125
    ],
    "rotation": [
@@ -5559,7 +5415,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     5.333333333333333,
-    9.15625,
+    9.300590654596196,
     3.46875
    ],
    "rotation": [
@@ -5587,7 +5443,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     5.333333333333333,
-    9.15625,
+    9.300590654596196,
     12.53125
    ],
    "rotation": [
@@ -5615,7 +5471,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     6.666666666666666,
-    9.15625,
+    9.300590654596196,
     3.46875
    ],
    "rotation": [
@@ -5643,7 +5499,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     6.666666666666666,
-    9.15625,
+    9.300590654596196,
     12.53125
    ],
    "rotation": [
@@ -5671,7 +5527,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     7.999999999999999,
-    9.15625,
+    9.300590654596196,
     3.46875
    ],
    "rotation": [
@@ -5699,7 +5555,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     7.999999999999999,
-    9.15625,
+    9.300590654596196,
     12.53125
    ],
    "rotation": [
@@ -5727,7 +5583,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     9.333333333333332,
-    9.15625,
+    9.300590654596196,
     3.46875
    ],
    "rotation": [
@@ -5755,7 +5611,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     9.333333333333332,
-    9.15625,
+    9.300590654596196,
     12.53125
    ],
    "rotation": [
@@ -5783,7 +5639,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     10.666666666666666,
-    9.15625,
+    9.300590654596196,
     3.46875
    ],
    "rotation": [
@@ -5811,7 +5667,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     10.666666666666666,
-    9.15625,
+    9.300590654596196,
     12.53125
    ],
    "rotation": [
@@ -5839,7 +5695,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     12,
-    9.15625,
+    9.300590654596196,
     3.46875
    ],
    "rotation": [
@@ -5867,7 +5723,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     12,
-    9.15625,
+    9.300590654596196,
     12.53125
    ],
    "rotation": [
@@ -5895,7 +5751,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     13.333333333333334,
-    9.15625,
+    9.300590654596196,
     3.46875
    ],
    "rotation": [
@@ -5923,7 +5779,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     13.333333333333334,
-    9.15625,
+    9.300590654596196,
     12.53125
    ],
    "rotation": [
@@ -5951,7 +5807,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     14.666666666666668,
-    9.15625,
+    9.300590654596196,
     3.46875
    ],
    "rotation": [
@@ -5979,7 +5835,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     14.666666666666668,
-    9.15625,
+    9.300590654596196,
     12.53125
    ],
    "rotation": [
@@ -6007,7 +5863,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     16,
-    9.15625,
+    9.300590654596196,
     3.46875
    ],
    "rotation": [
@@ -6035,7 +5891,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     16,
-    9.15625,
+    9.300590654596196,
     12.53125
    ],
    "rotation": [
@@ -6063,7 +5919,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     17.333333333333332,
-    9.15625,
+    9.300590654596196,
     3.46875
    ],
    "rotation": [
@@ -6091,7 +5947,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     17.333333333333332,
-    9.15625,
+    9.300590654596196,
     12.53125
    ],
    "rotation": [
@@ -6119,7 +5975,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     18.666666666666664,
-    9.15625,
+    9.300590654596196,
     3.46875
    ],
    "rotation": [
@@ -6147,7 +6003,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     18.666666666666664,
-    9.15625,
+    9.300590654596196,
     12.53125
    ],
    "rotation": [
@@ -6175,7 +6031,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     19.9375,
-    9.15625,
+    9.300590654596196,
     3.46875
    ],
    "rotation": [
@@ -6203,7 +6059,7 @@
    "cutLength": 113.05142635101956,
    "position": [
     19.9375,
-    9.15625,
+    9.300590654596196,
     12.53125
    ],
    "rotation": [
@@ -6231,7 +6087,7 @@
    "cutLength": 240,
    "position": [
     10,
-    10.60614621015175,
+    10.750486864747945,
     8
    ],
    "rotation": [
@@ -6255,7 +6111,7 @@
    "cutLength": 64,
    "position": [
     4.125,
-    9.777777777777777,
+    9.922118432373972,
     8
    ],
    "rotation": [
@@ -6265,7 +6121,7 @@
    ],
    "stage": 8,
    "grade": "No. 2 common",
-   "nailing": "4-8d ea end (PH)",
+   "nailing": "3-10d face nail ea end (IRC R802.3.1)",
    "doctrineRef": "FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)"
   },
   {
@@ -6279,7 +6135,7 @@
    "cutLength": 64,
    "position": [
     8.125,
-    9.777777777777777,
+    9.922118432373972,
     8
    ],
    "rotation": [
@@ -6289,7 +6145,7 @@
    ],
    "stage": 8,
    "grade": "No. 2 common",
-   "nailing": "4-8d ea end (PH)",
+   "nailing": "3-10d face nail ea end (IRC R802.3.1)",
    "doctrineRef": "FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)"
   },
   {
@@ -6303,7 +6159,7 @@
    "cutLength": 64,
    "position": [
     12.125,
-    9.777777777777777,
+    9.922118432373972,
     8
    ],
    "rotation": [
@@ -6313,7 +6169,7 @@
    ],
    "stage": 8,
    "grade": "No. 2 common",
-   "nailing": "4-8d ea end (PH)",
+   "nailing": "3-10d face nail ea end (IRC R802.3.1)",
    "doctrineRef": "FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)"
   },
   {
@@ -6327,7 +6183,7 @@
    "cutLength": 64,
    "position": [
     16.125,
-    9.777777777777777,
+    9.922118432373972,
     8
    ],
    "rotation": [
@@ -6337,7 +6193,7 @@
    ],
    "stage": 8,
    "grade": "No. 2 common",
-   "nailing": "4-8d ea end (PH)",
+   "nailing": "3-10d face nail ea end (IRC R802.3.1)",
    "doctrineRef": "FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)"
   },
   {
@@ -6348,15 +6204,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 2.434578811512317,
+   "cutLength": 5.08333333333335,
    "position": [
-    0.1875,
-    8.101440783813013,
-    1.3333333333333333
+    0.14583333333333334,
+    8.211805555555557,
+    14.375
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6372,15 +6228,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 7.767912144845648,
+   "cutLength": 10.416666666666664,
    "position": [
-    0.1875,
-    8.323663006035236,
-    2.6666666666666665
+    0.14583333333333334,
+    8.434027777777779,
+    13.041666666666668
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6396,15 +6252,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 13.101245478178985,
+   "cutLength": 15.75,
    "position": [
-    0.1875,
-    8.545885228257458,
-    4
+    0.14583333333333334,
+    8.65625,
+    11.708333333333334
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6420,15 +6276,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 18.434578811512317,
+   "cutLength": 21.083333333333336,
    "position": [
-    0.1875,
-    8.768107450479679,
-    5.333333333333333
+    0.14583333333333334,
+    8.878472222222221,
+    10.375
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6444,15 +6300,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 23.767912144845646,
+   "cutLength": 26.41666666666667,
    "position": [
-    0.1875,
-    8.990329672701902,
-    6.666666666666666
+    0.14583333333333334,
+    9.100694444444445,
+    9.041666666666668
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6468,15 +6324,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 29.101245478178978,
+   "cutLength": 29.41666666666667,
    "position": [
-    0.1875,
-    9.212551894924124,
-    7.999999999999999
+    0.14583333333333334,
+    9.225694444444445,
+    7.708333333333335
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6492,15 +6348,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 23.767912144845653,
+   "cutLength": 24.083333333333357,
    "position": [
-    0.1875,
-    8.990329672701902,
-    9.333333333333332
+    0.14583333333333334,
+    9.003472222222223,
+    6.375000000000002
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6516,15 +6372,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 18.43457881151232,
+   "cutLength": 18.75000000000002,
    "position": [
-    0.1875,
-    8.76810745047968,
-    10.666666666666666
+    0.14583333333333334,
+    8.78125,
+    5.041666666666668
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6540,15 +6396,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 13.101245478178985,
+   "cutLength": 13.416666666666686,
    "position": [
-    0.1875,
-    8.545885228257458,
-    12
+    0.14583333333333334,
+    8.559027777777779,
+    3.708333333333334
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6564,15 +6420,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 7.767912144845648,
+   "cutLength": 8.08333333333335,
    "position": [
-    0.1875,
-    8.323663006035236,
-    13.333333333333334
+    0.14583333333333334,
+    8.336805555555557,
+    2.375
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6588,15 +6444,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 2.434578811512314,
+   "cutLength": 2.750000000000014,
    "position": [
-    0.1875,
-    8.101440783813013,
-    14.666666666666668
+    0.14583333333333334,
+    8.114583333333334,
+    1.041666666666666
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6612,15 +6468,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 2.434578811512317,
+   "cutLength": 5.08333333333335,
    "position": [
-    19.8125,
-    8.101440783813013,
-    1.3333333333333333
+    19.854166666666668,
+    8.211805555555557,
+    1.625
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6636,15 +6492,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 7.767912144845648,
+   "cutLength": 10.416666666666686,
    "position": [
-    19.8125,
-    8.323663006035236,
-    2.6666666666666665
+    19.854166666666668,
+    8.434027777777779,
+    2.958333333333333
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6660,15 +6516,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 13.101245478178985,
+   "cutLength": 15.75,
    "position": [
-    19.8125,
-    8.545885228257458,
-    4
+    19.854166666666668,
+    8.65625,
+    4.291666666666667
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6684,15 +6540,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 18.434578811512317,
+   "cutLength": 21.083333333333336,
    "position": [
-    19.8125,
-    8.768107450479679,
-    5.333333333333333
+    19.854166666666668,
+    8.878472222222221,
+    5.625
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6708,15 +6564,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 23.767912144845646,
+   "cutLength": 26.41666666666667,
    "position": [
-    19.8125,
-    8.990329672701902,
-    6.666666666666666
+    19.854166666666668,
+    9.100694444444445,
+    6.958333333333333
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6732,15 +6588,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 29.101245478178978,
+   "cutLength": 29.41666666666667,
    "position": [
-    19.8125,
-    9.212551894924124,
-    7.999999999999999
+    19.854166666666668,
+    9.225694444444445,
+    8.291666666666666
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6756,15 +6612,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 23.767912144845653,
+   "cutLength": 24.083333333333357,
    "position": [
-    19.8125,
-    8.990329672701902,
-    9.333333333333332
+    19.854166666666668,
+    9.003472222222223,
+    9.624999999999998
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6780,15 +6636,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 18.43457881151232,
+   "cutLength": 18.75000000000002,
    "position": [
-    19.8125,
-    8.76810745047968,
-    10.666666666666666
+    19.854166666666668,
+    8.78125,
+    10.958333333333332
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6804,15 +6660,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 13.101245478178985,
+   "cutLength": 13.416666666666686,
    "position": [
-    19.8125,
-    8.545885228257458,
-    12
+    19.854166666666668,
+    8.559027777777779,
+    12.291666666666666
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6828,15 +6684,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 7.767912144845648,
+   "cutLength": 8.08333333333335,
    "position": [
-    19.8125,
-    8.323663006035236,
-    13.333333333333334
+    19.854166666666668,
+    8.336805555555557,
+    13.625
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6852,15 +6708,15 @@
     "w": 1.5,
     "d": 3.5
    },
-   "cutLength": 2.434578811512314,
+   "cutLength": 2.750000000000014,
    "position": [
-    19.8125,
-    8.101440783813013,
-    14.666666666666668
+    19.854166666666668,
+    8.114583333333334,
+    14.958333333333334
    ],
    "rotation": [
     0,
-    1.5707963267948966,
+    0,
     1.5707963267948966
    ],
    "stage": 8,
@@ -6879,7 +6735,7 @@
    "cutLength": 96,
    "position": [
     4,
-    8.53629302321297,
+    8.680633677809166,
     0.818309654596818
    ],
    "rotation": [
@@ -6903,7 +6759,7 @@
    "cutLength": 96,
    "position": [
     12,
-    8.53629302321297,
+    8.680633677809166,
     0.818309654596818
    ],
    "rotation": [
@@ -6927,7 +6783,7 @@
    "cutLength": 48,
    "position": [
     18,
-    8.53629302321297,
+    8.680633677809166,
     0.818309654596818
    ],
    "rotation": [
@@ -6951,7 +6807,7 @@
    "cutLength": 96,
    "position": [
     4,
-    9.801204087280322,
+    9.945544741876517,
     4.613042846798874
    ],
    "rotation": [
@@ -6975,7 +6831,7 @@
    "cutLength": 96,
    "position": [
     12,
-    9.801204087280322,
+    9.945544741876517,
     4.613042846798874
    ],
    "rotation": [
@@ -6999,7 +6855,7 @@
    "cutLength": 48,
    "position": [
     18,
-    9.801204087280322,
+    9.945544741876517,
     4.613042846798874
    ],
    "rotation": [
@@ -7023,7 +6879,7 @@
    "cutLength": 96,
    "position": [
     4,
-    10.668748555246646,
+    10.813089209842841,
     7.215676250697847
    ],
    "rotation": [
@@ -7047,7 +6903,7 @@
    "cutLength": 96,
    "position": [
     12,
-    10.668748555246646,
+    10.813089209842841,
     7.215676250697847
    ],
    "rotation": [
@@ -7071,7 +6927,7 @@
    "cutLength": 48,
    "position": [
     18,
-    10.668748555246646,
+    10.813089209842841,
     7.215676250697847
    ],
    "rotation": [
@@ -7095,7 +6951,7 @@
    "cutLength": 96,
    "position": [
     4,
-    8.53629302321297,
+    8.680633677809166,
     15.181690345403181
    ],
    "rotation": [
@@ -7119,7 +6975,7 @@
    "cutLength": 96,
    "position": [
     12,
-    8.53629302321297,
+    8.680633677809166,
     15.181690345403181
    ],
    "rotation": [
@@ -7143,7 +6999,7 @@
    "cutLength": 48,
    "position": [
     18,
-    8.53629302321297,
+    8.680633677809166,
     15.181690345403181
    ],
    "rotation": [
@@ -7167,7 +7023,7 @@
    "cutLength": 96,
    "position": [
     4,
-    9.801204087280322,
+    9.945544741876517,
     11.386957153201127
    ],
    "rotation": [
@@ -7191,7 +7047,7 @@
    "cutLength": 96,
    "position": [
     12,
-    9.801204087280322,
+    9.945544741876517,
     11.386957153201127
    ],
    "rotation": [
@@ -7215,7 +7071,7 @@
    "cutLength": 48,
    "position": [
     18,
-    9.801204087280322,
+    9.945544741876517,
     11.386957153201127
    ],
    "rotation": [
@@ -7239,7 +7095,7 @@
    "cutLength": 96,
    "position": [
     4,
-    10.668748555246646,
+    10.813089209842841,
     8.784323749302153
    ],
    "rotation": [
@@ -7263,7 +7119,7 @@
    "cutLength": 96,
    "position": [
     12,
-    10.668748555246646,
+    10.813089209842841,
     8.784323749302153
    ],
    "rotation": [
@@ -7287,7 +7143,7 @@
    "cutLength": 48,
    "position": [
     18,
-    10.668748555246646,
+    10.813089209842841,
     8.784323749302153
    ],
    "rotation": [

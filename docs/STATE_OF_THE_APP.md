@@ -114,6 +114,14 @@ large VBIED) resolve to `engineered_required`; unknown munitions fail safe.
 
 Design decisions are logged as **D1–D35** in `DECISIONS.md` (D33 intentionally skipped).
 
+> **This table stops at 2026-07-12 and the repository does not.** Everything after it — TIMBER-2
+> (`docs/TIMBER2_PLAN.md`), the trainer and the command packet
+> (`docs/TRAINING_AND_PACKETS_PLAN.md`), and the model-fidelity work of 2026-08-03
+> (`docs/MODEL_FIDELITY_LOG.md`) — landed after this audit was taken and is NOT reflected in the
+> ground-truth block at the top of this file or in the findings below. Read those three
+> documents alongside this one; a stale audit that does not say it is stale is worse than no
+> audit.
+
 ---
 
 ## 3. Architecture and data flow
@@ -350,6 +358,66 @@ FieldFortificationsCalculator/
 ## 5. What works today (verified)
 
 Everything in this section was re-verified during this audit, not taken from docs.
+
+### 5.0 1371 LEARNING — the toolkit-level trainer (added after the audit above)
+
+A fourth page on the hub, `learn.html`, beside SAP-2 and the two wood-frame apps. It is
+toolkit-level rather than a tab inside a tool because the vocabulary is what transfers between
+jobs: a Marine who knows what a jack stud is knows it in a hut, a tower and a bunker.
+
+| Surface | What it is |
+|---|---|
+| **Decks** | Fourteen decks — one per shipped structure, plus a cross-family "Framing pieces" deck that teaches each of the ~49 roles in the simplest structure that has one. Scheduled by session (Leitner, clock-free), modes escalate from flip to identify / point-at-it / stage-order as a card is learned. |
+| **Pieces** | The whole framing dictionary, searchable, with which structures each piece appears in. |
+| **Sequence** | Every structure's build order, with a drawing of the structure as it stood at the end of each step — all frames at the finished building's scale, so it reads as one building growing. |
+| **Paper deck** | The same cards, four to a sheet, duplex, cut on the cell borders. Three duplex modes ship (long-edge, short-edge, manual re-feed) because company printers are configured either way and plenty are simplex — one wrong guess puts somebody else's answer on the back of every card. |
+
+Three properties are worth stating because they are what the tests protect:
+
+- **Nothing is hand-authored.** Decks, card art and sequences all compile from the same
+  `Member[]` the planners use (FD1). Change the building — swap a gable for a shed, switch a
+  bunker to crib walls — and the deck changes with it.
+- **The art is the model, drawn.** Card fronts are runtime SVG from `thumbnails.ts`, so there
+  are no image files, no build step, and no three.js on this page — 21 kB of app code.
+- **"Known" means something.** A self-graded flip cannot promote a card past "learning"; a card
+  has to be produced under a mode that could have caught a wrong answer (FD10).
+
+Pinned: `test/fixtures/train-vectors.json` fixes the PRNG, the shuffle and the session builder,
+so a learner's card order is reproducible across builds. Regenerate only via
+`npm run gen:train-vectors`, in the same PR as the change that moved it.
+
+### 5.0b The command packet — the Planning app's deliverable
+
+`src/timber/packet/**`, compiled pure and rendered pure; `src/ui/woodframe/sheet.ts` is a thin
+adapter that draws the cover art and opens the print frame. Five sections in print order —
+cover, executive summary, materials, labor and schedule, assumptions and citations — with
+drawings in an opt-in annex at the back. Nine sheets for the GP frame, ten for the guard tower.
+
+**The bill is orderable now**, which it was not:
+
+| Was | Is |
+|---|---|
+| Subfloor, roof sheathing and siding all billed as `4x8 panel` — three products, one order line | Thickness in the order nominal, taken from the member's own `actual.w` |
+| `Member.grade` dropped by `cutList` entirely | Part of the key; a No. 2 and a select-structural 2x6 are two lines |
+| No treatment anywhere — sills and posts bear on soil | Derived by role with a cite; a role with no rule prints blank, never a guess |
+| Cut lengths only: `2x4, 12 ft, 37 pieces` | First-fit stock purchase table over the lengths the operator's supply point carries, with exact cut-fit waste, kerf ignored and said so |
+| — | Sheets by the sheet, roll goods by the 100-sf square, concrete by the cubic yard off the member's own section |
+| — | Runs longer than stock surfaced with their roles, never silently spliced |
+| — | `.materials.csv` export, RFC 4180, fitted to the same stock lengths as the packet |
+
+**Regime rules the tests enforce.** No signature theater — the tool never says a design was
+verified or approved, and the approval block prints what a signature does and does not cover.
+The honesty strip rides a `<tfoot>` so it repeats on every sheet in both Chrome and Firefox
+(margin boxes render nowhere in Chrome; `position: fixed` prints once in Firefox). The
+life-safety table is scoped to what *this* build consumes, by role and by family, gated by a
+test that every one of the 53 LS constants declares its consumers. Type floors at 9 pt because
+this document gets photocopied in grey. Byte-identical output for identical input, no script,
+no external URL, no clock.
+
+**Operator inputs, not doctrine.** Crew sizes, productive hours (6, not 8 — "excludes security,
+details, travel and tool contention") and stock lengths are asked before anything generates,
+and clamped rather than validated. A crew larger than the work can absorb is *suppressed with a
+reason*, never given a smaller number.
 
 ### Verification runs (2026-08-01)
 
@@ -706,6 +774,35 @@ Plus three build gates: `tsc --noEmit` (extra-strict), `check-offline` (zero ext
 ---
 
 ## 8. Recommended priorities
+
+### 8.0 What's actually next (supersedes the list below where they disagree)
+
+The list in §8.1 predates the TIMBER-2 rebuild and the retirement of SAP-1; several of its
+items no longer exist (TIMBER-1's "it's a demo until the building is parameterized" was closed
+by the catalog and the config panel). The live queue is:
+
+1. **A real doctrine fill.** Every framing number the toolkit prints is `(PH)` — pending a
+   manual page check — and the packet says so on every sheet. One verified table would prove
+   the burn-down path end to end and would be the single largest jump in what this tool is
+   allowed to claim. This is a documents-and-review task, not a code task, and nothing in the
+   code can substitute for it.
+2. **Span checking that computes rather than warns.** Member sizes come from the standard
+   drawing for the family; the packet prints that limitation verbatim and the approval block
+   scopes signatures away from it. Real span arithmetic against a cited table is what would let
+   the "reviewed by unit engineer" line come back.
+3. **The training plan's remaining phases** (`docs/TRAINING_AND_PACKETS_PLAN.md` F5–F9):
+   printable paper decks and worksheets, hip-pocket class mode, records, and the post-T3
+   integration. F1 (training core), F2 (the trainer), F3 (the command packet) and F4 (quiz
+   modes) have shipped.
+4. **SAP-2's own trainer** (F7/F8) — the training core is app-agnostic and already carries the
+   regime enum for it.
+5. **The rest of F5** — stage posters and label-the-diagram worksheets. The paper flashcard deck
+   has shipped; these two are the same machinery pointed at different sheets.
+
+*(The hip roof's covering, listed here previously, is closed: `roofPlanes` returns four planes
+and the deck and roofing clip differently — see `subsystems/coverings.ts`.)*
+
+### 8.1 Earlier audit ordering (historical)
 
 If the next effort is a fix pass, this order maximizes trust-per-hour (consolidations from the
 audit plan, updated by what's already fixed):
