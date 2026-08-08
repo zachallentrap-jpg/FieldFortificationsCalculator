@@ -1068,7 +1068,7 @@
    "stage": 6,
    "wall": "S",
    "grade": "No. 2 common",
-   "nailing": "16d @ 16\" + 2-16d at laps (PH)",
+   "nailing": "16d @ 16\" + 8-16d in the lap, joints offset 24\" min (IRC Table R602.3(1))",
    "doctrineRef": "FM 5-426: cap plate laps at corners tie the walls (PH page)"
   },
   {
@@ -1468,7 +1468,7 @@
    "stage": 6,
    "wall": "N",
    "grade": "No. 2 common",
-   "nailing": "16d @ 16\" + 2-16d at laps (PH)",
+   "nailing": "16d @ 16\" + 8-16d in the lap, joints offset 24\" min (IRC Table R602.3(1))",
    "doctrineRef": "FM 5-426: cap plate laps at corners tie the walls (PH page)"
   },
   {
@@ -1868,7 +1868,7 @@
    "stage": 6,
    "wall": "E",
    "grade": "No. 2 common",
-   "nailing": "16d @ 16\" + 2-16d at laps (PH)",
+   "nailing": "16d @ 16\" + 8-16d in the lap, joints offset 24\" min (IRC Table R602.3(1))",
    "doctrineRef": "FM 5-426: cap plate laps at corners tie the walls (PH page)"
   },
   {
@@ -2168,7 +2168,7 @@
    "stage": 6,
    "wall": "W",
    "grade": "No. 2 common",
-   "nailing": "16d @ 16\" + 2-16d at laps (PH)",
+   "nailing": "16d @ 16\" + 8-16d in the lap, joints offset 24\" min (IRC Table R602.3(1))",
    "doctrineRef": "FM 5-426: cap plate laps at corners tie the walls (PH page)"
   },
   {
@@ -3273,7 +3273,7 @@
    ],
    "stage": 8,
    "grade": "No. 2 common",
-   "nailing": "4-8d ea end (PH)",
+   "nailing": "3-10d face nail ea end (IRC R802.3.1)",
    "doctrineRef": "FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)"
   },
   {
@@ -3297,7 +3297,7 @@
    ],
    "stage": 8,
    "grade": "No. 2 common",
-   "nailing": "4-8d ea end (PH)",
+   "nailing": "3-10d face nail ea end (IRC R802.3.1)",
    "doctrineRef": "FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)"
   },
   {
@@ -3321,7 +3321,7 @@
    ],
    "stage": 8,
    "grade": "No. 2 common",
-   "nailing": "4-8d ea end (PH)",
+   "nailing": "3-10d face nail ea end (IRC R802.3.1)",
    "doctrineRef": "FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)"
   },
   {

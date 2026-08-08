@@ -119,7 +119,7 @@ export function generateWalls(input: WallsInput): Member[] {
     const capLap = f.wall === 'S' || f.wall === 'N' ? -2 * dFt : 2 * dFt;
     emit('capPlate', '2x4', f.runFt + capLap, f.runFt / 2, H - t / 2, 'flat', {
       stage: 6,
-      nailing: '16d @ 16" + 2-16d at laps (PH)',
+      nailing: '16d @ 16" + 8-16d in the lap, joints offset 24" min (IRC Table R602.3(1))',
       doctrineRef: 'FM 5-426: cap plate laps at corners tie the walls (PH page)',
     });
 

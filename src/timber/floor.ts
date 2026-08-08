@@ -219,7 +219,7 @@ export function generateFloor(input: FloorInput): Member[] {
     for (const wr of wallRuns) {
       emit('foundationWall', `conc wall ${CONC_WALL_T}"`, wr.len, wr.pos, wr.rot, 1, {
         actual: { w: CONC_WALL_T, d: wallH * FT },
-        nailing: '1/2" anchor bolts @ ~6 ft into sill (PH)',
+        nailing: '1/2" anchor bolts @ 6 ft max o.c. into sill, min 2 per plate, within 12" of each end (IRC R403.1.6)',
         doctrineRef: 'FM 5-426 continuous-wall foundation (PH ch./page)',
       });
       emit('footing', `conc footing ${FOOTING_W}x${FOOTING_H}`, wr.len, [wr.pos[0], wallBottom - FOOTING_H / FT / 2, wr.pos[2]], wr.rot, 1, {
@@ -254,7 +254,12 @@ export function generateFloor(input: FloorInput): Member[] {
 
   // ── Stage 2: sills (2x6 flat, outside face flush with the frame line) + center girder
   // (built-up 3-2x10 on edge, top flush with the sills so joists bear level everywhere).
-  const sillAnchor = foundation === 'piers' ? 'anchor/drift per post cap (PH)' : '1/2" anchor bolts @ ~6 ft (PH)';
+  // The end distance and the two-per-piece minimum are the parts that actually get missed in
+  // the field, so the schedule says them rather than leaving the spacing to imply them.
+  const sillAnchor =
+    foundation === 'piers'
+      ? 'anchor/drift per post cap (PH)'
+      : '1/2" anchor bolts @ 6 ft max o.c., min 2 per plate, within 12" of each end (IRC R403.1.6)';
   for (const z of [sillCtr, W - sillCtr]) {
     emit('sill', '2x6', L, [L / 2, lv.sillTop - sillT / 2, z], [-Math.PI / 2, 0, 0], 2, { nailing: sillAnchor });
   }
@@ -279,14 +284,25 @@ export function generateFloor(input: FloorInput): Member[] {
   const joistY = lv.joistTop - joistD / 2;
   const joistLen = W - 2 * t; // fits between the front/rear rim joists
   const joistXs = layoutCenters(L, oc, t);
-  const joistAt = (x: number, z0: number, z1: number, role: MemberRole, extras?: Partial<Member>): void =>
+
+  // Every spanning member emitted at stage 3 — plain joists, tail joists AND the doubled
+  // trimmers — registers its run here as it is placed. Bridging (below) is derived from this
+  // list and nothing else, so a change to the framing moves the bay boundaries and the
+  // bridging re-derives itself instead of having to be patched in parallel.
+  // `bearings` is where the run is carried: its two ends, plus the center girder when it
+  // crosses one — that is what decides whether a span segment is long enough to need a row.
+  interface JoistRun { x: number; z0: number; z1: number; bearings: number[] }
+  const joistRuns: JoistRun[] = [];
+  const joistAt = (x: number, z0: number, z1: number, role: MemberRole, extras?: Partial<Member>): void => {
+    const overGirder = z0 < W / 2 - 0.01 && z1 > W / 2 + 0.01;
+    joistRuns.push({ x, z0, z1, bearings: overGirder ? [z0, W / 2, z1] : [z0, z1] });
     emit(role, '2x8', z1 - z0, [x, joistY, (z0 + z1) / 2], [0, -Math.PI / 2, 0], 3, {
       nailing: '3-16d toenail ea bearing (PH)',
       doctrineRef: 'FM 5-426 Table 6-2 joist span (PH: 2x8 fixed, span check pending)',
       ...extras,
     });
+  };
 
-  const emittedJoistXs: number[] = [];
   for (const x of joistXs) {
     if (stair) {
       // Grid positions at/near the opening faces are absorbed by the double trimmers.
@@ -305,12 +321,10 @@ export function generateFloor(input: FloorInput): Member[] {
             doctrineRef: 'tail joist at stair opening, hangs on double header — FM 5-426 framing at openings (PH page)',
           });
         }
-        emittedJoistXs.push(x);
         continue;
       }
     }
     joistAt(x, t, W - t, 'joist');
-    emittedJoistXs.push(x);
   }
   if (stair) {
     // Double trimmer joists run full span just outside each opening face.
@@ -341,18 +355,58 @@ export function generateFloor(input: FloorInput): Member[] {
     emit('rimJoist', '2x8', L, [L / 2, joistY, z], [0, 0, 0], 3, { nailing: '3-16d ea joist end (PH)' });
   }
 
-  // Bridging rows at each half-span midpoint once the half-span reaches ~8 ft
+  // Bridging rows at each half-span midpoint once a span segment reaches ~8 ft
   // (FM 5-426: rows not more than 8 ft apart). Cross bridging is the default; solid
   // bridging (full-depth blocking) is the alternative.
-  if (W / 2 >= 7.5) {
+  //
+  // Design principle: a bay is whatever sits between two ADJACENT RUNS THAT WERE ACTUALLY
+  // FRAMED at that row line — never the nominal layout grid. The grid is only a proposal;
+  // the stair opening edits it (suppressing grid positions, adding doubled trimmers just
+  // outside each face, cutting joists down to tails that stop at a header), and bridging read
+  // off the grid could not see any of that. It drove one 2'-6" block straight through both
+  // trimmer plies at each end of the stairwell and out the far side. Deriving the bays from
+  // `joistRuns` means the opening — or any future change to the layout — fixes the bridging
+  // by construction rather than needing a matching edit here.
+  {
+    // Two separate questions, and conflating them is what put a stick of lumber through the
+    // trimmers in the first place:
+    //   crosses() — is this run physically present at the row line? Present runs bound the
+    //     bays, whether or not they want bridging themselves. Bridging can never jump one.
+    //   holdsRow() — does the row land inside one of THIS run's own span segments, and is
+    //     that segment long enough to want bridging? The >=8 ft rule applied per run, so the
+    //     short tail joists hung between a header and the near wall are left alone instead of
+    //     collecting a line of blocking a couple of inches off their header.
+    // A bay is bridged only when BOTH of the runs bounding it hold the row. There is no
+    // separate building-wide size gate: a narrow building simply has no segment that
+    // qualifies, so this measures one thing (the clear run between bearings) in one place.
+    const ROW_SPAN_FT = 7.5; // (PH) a segment shorter than this wants no row
+    const crosses = (r: JoistRun, z: number): boolean => z > r.z0 + 0.01 && z < r.z1 - 0.01;
+    const holdsRow = (r: JoistRun, z: number): boolean => {
+      for (let k = 0; k < r.bearings.length - 1; k++) {
+        const a = r.bearings[k]!;
+        const b = r.bearings[k + 1]!;
+        if (z > a + 0.01 && z < b - 0.01) return b - a >= ROW_SPAN_FT;
+      }
+      return false; // the row misses this run entirely, or lands on a bearing
+    };
     for (const zMid of [W / 4, (3 * W) / 4]) {
-      const inOpening = stair && zMid > stair.z1 && zMid < stair.z2;
-      for (let i = 0; i < emittedJoistXs.length - 1; i++) {
-        const xa = emittedJoistXs[i]!;
-        const xb = emittedJoistXs[i + 1]!;
-        if (inOpening && stair && xb > stair.x0 && xa < stair.x1) continue; // bay opens into the stairwell
+      const rowRuns = joistRuns.filter((r) => crosses(r, zMid)).sort((a, b) => a.x - b.x);
+      const rowInOpening = stair !== null && zMid > stair.z1 && zMid < stair.z2;
+      for (let i = 0; i < rowRuns.length - 1; i++) {
+        const xa = rowRuns[i]!.x;
+        const xb = rowRuns[i + 1]!.x;
+        if (!holdsRow(rowRuns[i]!, zMid) || !holdsRow(rowRuns[i + 1]!, zMid)) continue;
+        // Mated plies of a doubled trimmer are face to face — there is no bay between them.
         const gap = xb - xa - t;
         if (gap < 0.15) continue;
+        // At a row that crosses the stairwell, the bay between the two trimmer pairs is the
+        // opening itself: nothing to bridge to.
+        if (rowInOpening && stair && xb > stair.x0 + 0.01 && xa < stair.x1 - 0.01) continue;
+        // Bays that die against the stairwell trimmers are odd-width fillers, not field
+        // bridging — say so on the card so the short cut in the BOM explains itself.
+        const atTrimmer =
+          stair !== null &&
+          [stair.x0, stair.x1].some((f) => Math.abs(xa - f) < 2 * t || Math.abs(xb - f) < 2 * t);
         const xc = (xa + xb) / 2;
         if (bridging === 'cross') {
           // The rise is what fits the BOARD between the joists, not just its centreline — see
@@ -365,13 +419,17 @@ export function generateFloor(input: FloorInput): Member[] {
           for (const s of [-1, 1] as const) {
             emit('bridging', '1x3', len, [xc, joistY, zMid + s * 0.04], [0, 0, s * ang], 3, {
               nailing: '2-8d ea end; bottom ends nailed after subfloor (PH)',
-              doctrineRef: 'FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)',
+              doctrineRef: atTrimmer
+                ? 'FM 5-426 cross bridging — short bay cut to the stairwell trimmer (PH page)'
+                : 'FM 5-426 cross bridging at midspan, rows <=8 ft apart (PH page)',
             });
           }
         } else {
           emit('bridging', '2x8', gap, [xc, joistY, zMid + (i % 2 === 0 ? 0.125 : -0.125)], [0, 0, 0], 3, {
             nailing: '3-16d ea end, staggered line (PH)',
-            doctrineRef: 'FM 5-426 solid bridging (full-depth blocking), rows <=8 ft apart (PH page)',
+            doctrineRef: atTrimmer
+              ? 'FM 5-426 solid bridging — short block cut to the stairwell trimmer (PH page)'
+              : 'FM 5-426 solid bridging (full-depth blocking), rows <=8 ft apart (PH page)',
           });
         }
       }
