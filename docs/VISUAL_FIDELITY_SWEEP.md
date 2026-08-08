@@ -118,6 +118,7 @@ screenshots get read.
 | **A number that is not a number** | **Fixed** — `clampPath` clamps an out-of-range NUMBER into the path's stated range and warns. A NON-number — missing, `null`, a string, `NaN`, all of which a share link carries — returned **0**, which is below the minimum of most of those paths. 25 of 66 card × knob combinations framed members with a NON-POSITIVE cut length: 112 on the gp-frame's wall height, 94 on the squad hut's width, 51 on the platform's ramp. A bare `{kind:'basement'}` came back at depth 0 against a stated 6–9, framed five posts at −7.8 in, and collapsed the basement flat onto the slab. And the tower's `platformHeightFt` was never clamped at all, so the life-safety cage-threshold rule compared the raw value — `"deep" > 20` is false, and the switch to a stair never fired. |
 | **The platform's runners** | **Fixed** — the base block says the two bases differ in *"what is UNDER the post — a concrete pad you pour, or a timber runner you can drag the whole thing on"*, and no runner was under a post. `generateSkids` spreads three evenly across the width, which is right under a floor deck where the joists cross every one; a platform's load comes down two lines of posts. The middle runner carried NOTHING — 22.41 in clear of every member in the model — and the outer two missed the posts they were under by 1.00 in, each post bearing 2.50 of its 3.50. |
 | **A platform lower than its own frame** | **Fixed** — `deckHeightFt` is the surface you stand on and the frame hangs UNDER it: a runner, a post, a sill, a joist and the decking, 1.746 ft before the post is anything at all. The registry offered 0.5. Every setting below the floor was broken — on skids 0.5 and 1.0 put the sill 8¼ and 2¼ in UNDERGROUND with no posts, 1.25 and 1.5 put it 4¾ and 1¾ in INSIDE the runner, and on piers 1.25 left it floating ¾ in over grade on nothing. Rendered, a 0.5-ft platform is a slab of decking sunk into the ground with no legs. Floored at 1.75 the same way `foundation.crawlFt` is floored at 1. |
+| Below grade, and per-role orientation | **Checked, nothing wrong.** Two fresh lenses across all fourteen cards. Every member that reaches below its family's own `levels.gradeY` is explained — entry-step stringers 4.36 in, the tower's ladder rail 0.18, the platform ramp's stringers 11.08 with `bedded at grade` written on the member. Every role whose members disagree about which axis stands up is explained by design — a narrow end bay's bridging, the platform's flat concrete pads, raked stair rails, the latrine bench's flat top over upright sides, the platform's sill as a beam on edge centred on its posts, board-and-ledge shutters, bunker lagging. |
 
 ## The shed that had no walls above the plate
 
@@ -5565,3 +5566,84 @@ registry's min to max on its step — × two bases × two deck materials.
 
 All four fail on the old registry. The shipped platform is at 4 ft, so all fourteen presets are
 byte-identical and no golden moved.
+
+## Two lenses that found nothing — below grade, and per-role orientation
+
+No target was carried in from the pass before, so this one swept two lenses that had not been run
+systematically. **Neither found a defect.** Recorded here so they are not run again from scratch,
+and because the residues each of them leaves are worth having written down.
+
+### Below grade
+
+Which members reach below ground, and by how much. The first run of this asked against `y = 0` and
+lit up half the catalog — sills 9½ in under, posts 27½, girders 17¼ — which is not a finding but a
+wrong datum: a building on piers has its grade at `y = −2.292`, and every family reports its own
+`levels.gradeY`. Re-run against that, the whole catalog comes down to three residues:
+
+```
+  gp-frame, sea-hut, swa-hut, b-hut, squad-hut, latrine
+      stringer      6 pieces, worst 4.36 in   ES1-stringer-01, the entry steps
+  tower
+      ladderRail    2 pieces, worst 0.18 in   already documented
+  platform
+      stringer      7 pieces, worst 11.08 in  PF-stringer-01, the ramp
+```
+
+The entry steps are raked boxes with square ends near grade — the same class as the documented
+"square end on a raked leg". The ladder rail's 0.18 in was recorded several passes ago.
+
+The ramp's 11.08 in is the largest in the catalog and the only one worth arguing about, so it got
+measured properly rather than assumed:
+
+```
+  platform  PF stringers  2x12, pitch  9.5°, 23.57 ft   lowest corner 11.08 in below grade
+                          a SQUARE end at that pitch would bury only 1.85 in
+  platform  AC stringers  2x12, pitch 38.7°,  5.75 ft   lowest corner  3.91 in
+                          a square end at that pitch would bury 7.03 in
+  gp-frame  ES stringers  2x12, pitch 35.9°,  3.44 ft   lowest corner  4.36 in
+                          a square end at that pitch would bury 6.60 in
+```
+
+So the ramp is not a square-end residue: it is six times deeper than its own end cut explains, and
+`platform.ts` names the symptom in its own words — *"THE RAMP SITS ON THE GROUND, IT IS NOT SUNK
+INTO IT … the stringers ran a foot deep for the last six feet of the run"* — while fixing only the
+walking surface, which now starts one deck thickness up so the toe board lies on the earth.
+
+**It is still not called a defect here, and the reason is on the member.** Its nailing note reads
+*"bolted at the deck; bedded at grade (PH)"*: a bedded stringer is one set into the earth, and a
+timber ramp's stringer is either bedded or ripped to a taper, neither of which a box can be. The
+alternatives all make it worse — cutting the stringers where their undersides reach grade drops the
+last 24% of the run (5.6 ft of a 23.6-ft ramp) with nothing under the decking, and raising them onto
+grade puts the walking surface 12¾ in up at the toe, which is a step and not a ramp. Rendered in
+profile the ground plane hides the buried part; what you see is a ramp running into the earth.
+
+Written down as the catalog's largest below-grade residue, with the figure, in case the modelling
+convention for tapered pieces ever changes.
+
+### Per-role orientation
+
+Which of a member's three local axes stands vertical, tallied by role across all fourteen cards. A
+role where nearly every member agrees and a handful do not is a mis-rotation — that is exactly what
+the cab's high plate was, 3½ in tall where the building's identical plate is 1½. Seven roles
+disagree with themselves, and every one is explained:
+
+```
+  bridging   694 upright, 4 raked at 31.9°   the squad hut's 7-in remainder bay, bridged steeper
+  footing    114 on edge,  8 flat            the platform's concrete pads, laid flat on purpose
+  railTop/Mid 11 on edge,  2 raked           the platform stair's rails, which follow the flight
+  riserBox     6 upright,  1 flat            the latrine bench: a flat seat over upright sides
+  sill        49 flat,     2 on edge         the platform's beam between posts, centred on them
+  stringer    36 raked,    4 "on edge"       the ramp at 9.5°, under the 0.95 cosine threshold
+  shutter    232 upright,116 on edge         boards and ledges, which is what a shutter is
+```
+
+The two that were worth a second look both came back clean. The platform's sill is 1½ in across a
+3½-in post, but it is CENTRED on it — 2 in of post top bare on each side, symmetric, which is a beam
+on a post and not the off-centre hang the cab's plate had — and all sixteen joists bear on its top.
+The latrine's riser box is a bench: one flat 10-ft × 24-in seat, one upright front, five upright
+dividers.
+
+The lens has a known blind spot worth stating: it finds DISAGREEMENT, so a role that is uniformly
+wrong passes it. The full table was read against the convention each role should have — plates,
+subfloor, decking, treads and ridge caps flat; joists, rim joists, headers, girders, ridges and
+fascia on edge; studs, posts and rail posts standing — and nothing is out of place.
