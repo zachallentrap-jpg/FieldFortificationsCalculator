@@ -110,6 +110,7 @@ screenshots get read.
 | **A thirty-foot fixed ladder** | **Fixed** — the rule that forces a stair past the cage threshold was written as `platformHeightFt === 24 \|\| === 32`, the picker's two tall options. A 26-, 28- or 30-ft tower — reachable from a saved spec or a link — came back with a ladder, against `LADDER.cageThresholdFt` and the card's own help text. |
 | **Two posts in one hole on a tall tower's stair** | **Fixed** — a switchback is four railed surfaces meeting, and each flight's rail post shared its hole with the landing's: 10 pairs at 3.500 in on a 32-ft tower, 8 on a 24. Plus the bridge's own end post a quarter inch inside the deck rail's. |
 | **The shed roof's pony wall** | **Fixed, twice.** No shipped card has a shed or flat roof and neither had ever been measured. Its siding ran up to the rafters' CENTRE line and buried all 48 of them to half their depth (2.750 in); and its studs were a quarter turn out on a N or S high side — 1½ in across a 3½-in wall, the gable rake studs' defect in the sibling generator. |
+| **A hut with a shed roof, which threw** | **Fixed** — `normalize.ts`'s roof repair lived inside `normalizeBuilding` and `normalizeHut` ran none of it. All six hut cards declare `shed` in their own `roofs` list; the spec threw on `walls.surfaces.find(…)!` and the workbench sat on "Laying out the frame…" for ever. Four other malformed roofs came back with NO ROOF and zero issues. |
 
 ## The shed that had no walls above the plate
 
@@ -4923,5 +4924,82 @@ configurations, 4,000+ rafter/infill pairs. All four fail on the old generator.
 `timber2-coverings.test.ts` needed one of its assertions restated: it pinned the pony wall's infill
 area at `L·(W·slope + lift)`, which is the old figure — the assertion that encoded the defect. The
 `lift` still belongs on the two rakes below it, and those are unchanged.
+
+Nothing on any shipped card moves: all fourteen presets byte-identical, no golden touched.
+
+## A hut with a shed roof, which never finished loading
+
+The option sweep that found the pony wall ran on every family, and on the hut cards it did not
+report an overlap — it reported a **crash**:
+
+```
+  sea-hut  roof.kind=shed   THREW  TypeError: Cannot read properties of undefined (reading 'runFt')
+  swa-hut  b-hut  squad-hut  guard-shack  latrine     the same, all six
+```
+
+Every hut card declares `roofs: ["gable","hip","shed"]`. `generateShed` looks its high wall up with
+`walls.surfaces.find(…)!` and takes the answer as given; with `highSide` undefined there is nothing
+to find.
+
+### The repair existed. It was in the other branch
+
+`normalize.ts` states the contract at the head of the block this is about:
+
+> *A thrown generator is the worst of the three: the shell renders, the spinner never stops, and the
+> user is looking at a page that appears to be working. Everything below repairs and SAYS SO.*
+
+That block is inside `normalizeBuilding`. `normalizeHut` is a different arm of the same switch and
+ran none of it. Nine malformed roofs, sea hut against gp-frame:
+
+| roof handed in | gp-frame | sea hut |
+|---|---|---|
+| not an object | gable, warned | 0 rafters, **nothing said** |
+| `kind` missing | gable, warned | 0 rafters, **nothing said** |
+| `kind` not in the union | gable, warned | 0 rafters, **nothing said** |
+| `pyramid` (the cab's roof) | hip, warned | 0 rafters, **nothing said** |
+| `shed`, no `highSide` | shed/N, warned | **THREW** |
+| `shed`, bad `highSide` | shed/N, warned | **THREW** |
+| `risePer12: 99` | clamped to 12, warned | 99 kept, **nothing said** |
+| `overhangFt: -5` | clamped to 0, warned | −5 kept, **nothing said** |
+
+A hut IS a building (TD2) — `generateHut` translates the spec and hands the same `RoofSpec` to the
+same generator. The repair now follows it there: `repairRoofShape` and `checkRoofingSlope` are
+shared functions called from both arms.
+
+### What it looked like
+
+Rendered from a hand-made share link — `#/build/sea-hut?c=<payload>`, which is exactly how one of
+these reaches the generator, since `decodeSpec` takes any JSON with a `family` key:
+
+```
+  before   the shell, the header, the doctrine note, and a spinner reading
+           "Laying out the frame…" with no canvas behind it — for ever
+  after    a sea hut with a single-slope roof: pony wall on the high side,
+           screened band round the walls, shutters, entry steps, all of it
+```
+
+That is the one entry in this sweep where the before picture is the whole finding.
+
+### What stays different, on purpose
+
+An ABSENT roof. A building has to have one and gets a gable with a warning; a hut variant supplies
+its own (`generateHut`: `spec.roof ?? { kind: 'gable', risePer12: 4, overhangFt: 1 }`) and is right
+to, so the hut's call is guarded on presence rather than repairing `undefined` into a gable twice.
+
+### The five things asserted
+
+`test/timber2-hut-roof-repair.test.ts`, over all six hut cards plus the gp-frame as a control. Four
+of the five fail on the old normalizer.
+
+1. **No roof a share link can carry throws the generator** — and a roof means RAFTERS; four of these
+   used to frame a building open to the sky.
+2. **And it says so** — a repair the operator is not told about is a different building.
+3. **A hut repairs it into exactly the roof a building would** — `deepEqual` on the resolved roof,
+   which is what makes this one contract rather than two that agree today.
+4. **The roofing-slope note is shared too** — it sat in the same function and was skipped the same
+   way: a 1-in-12 hut under exposed-nail roll came back clean while the identical building was told.
+5. **And what must not change** — an absent roof on a hut is still the variant's, still unwarned;
+   a building with none is still told; and every shipped card still normalizes with nothing said
+   about its roof.
 
 Nothing on any shipped card moves: all fourteen presets byte-identical, no golden touched.

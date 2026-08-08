@@ -16,7 +16,7 @@
 // issue the workbench renders. Silent correction is how a tool teaches the wrong number.
 
 import type {
-  BuildingSpec, HutSpec, OpeningSpec, StructureSpec, StructureFamily, SpecSection, WallOpenings,
+  BuildingSpec, HutSpec, OpeningSpec, RoofSpec, StructureSpec, StructureFamily, SpecSection, WallOpenings,
 } from './spec';
 import { SPEC_PATH_DEFS, SPEC_SECTION_FALLBACK, SPEC_SECTIONS_BUILDING, SPEC_SECTIONS_COMMON, WALL_ORDER, specPath } from './spec';
 import type { WallId } from './types';
@@ -173,59 +173,24 @@ function normalizeOpenings(
   return out;
 }
 
-function normalizeBuilding(spec: BuildingSpec, issues: SpecIssue[]): BuildingSpec {
-  const lengthFt = clampPath(spec.dims.lengthFt, 'dims.lengthFt', issues);
-  const widthFt = clampPath(spec.dims.widthFt, 'dims.widthFt', issues);
-
-  let stories = spec.stories;
-  if (stories.length === 0) {
-    issues.push({ path: 'stories', kind: 'clamped', message: 'A building needs at least one story; added one.', severity: 'warn' });
-    stories = [{ wallHeightFt: 8, openings: {} }];
-  }
-  // A SECOND STORY IS NOT BUILT, AND SAYING SO IS THE POINT. `generateBuilding` frames
-  // `stories[0]` and nothing else — the story loop, the second floor bearing on the cap plates
-  // and the interior stairwell are T6b, which the plan parks on its own descope ladder. What
-  // was wrong was not the parking, it was the silence: a two-story spec normalized with ZERO
-  // issues and then generated a model byte-identical to the one-story it was not. The picture,
-  // the cut list and the packet all quietly described a different building than the one asked
-  // for, and nothing anywhere said so. Clamped and warned, like every other out-of-scope input.
-  if (stories.length > 1) {
-    issues.push({
-      path: 'stories',
-      kind: 'clamped',
-      message: 'This engine frames one story; the upper stories were dropped.',
-      severity: 'warn',
-    });
-    stories = stories.slice(0, 1);
-  }
-
-  const runFor = (w: WallId): number => (w === 'S' || w === 'N' ? lengthFt : widthFt);
-  const normStories = stories.map((s, i) => {
-    // Clamp the wall height FIRST: an opening's headroom is measured against the wall the
-    // model will actually build, not the one that was asked for.
-    const wallHeightFt = clampPath(s.wallHeightFt, `stories.${Math.min(i, 1)}.wallHeightFt`, issues);
-    return {
-      ...s,
-      wallHeightFt,
-      openings: normalizeOpenings(s.openings, runFor, `stories.${i}.openings`, issues, wallHeightFt),
-    };
-  });
-
-  // openFront (storage shed): that wall is posts + header, so it can carry no openings.
-  if (spec.openFront) {
-    for (const s of normStories) {
-      if (s.openings[spec.openFront]?.length) {
-        issues.push({
-          path: `stories.0.openings.${spec.openFront}`,
-          kind: 'dropped',
-          message: `Wall ${spec.openFront} is the open front — its openings were dropped (the whole wall is the opening).`,
-          severity: 'warn',
-        });
-        delete s.openings[spec.openFront];
-      }
-    }
-  }
-
+/**
+ * Repair a roof that arrived from outside into a well-formed member of the union, saying so.
+ *
+ * SHARED, because the contract is not the building's alone. This lived inside `normalizeBuilding`,
+ * and `normalizeHut` — a different branch of the same switch, for six cards that each declare
+ * gable, hip AND shed in their own `roofs` list — ran none of it. Measured on the sea hut against
+ * the gp-frame, same nine malformed roofs:
+ *
+ *   shed with no highSide / a bad one    THREW; the workbench spins for ever
+ *   kind missing, not in the union,
+ *     not an object, or `pyramid`        a building with NO ROOF — 0 rafters — and nothing said
+ *   risePer12 99, overhangFt -5          kept verbatim, unclamped, nothing said
+ *
+ * A hut IS a building (TD2) and its roof goes to the same generator; the repair follows it there.
+ * An ABSENT roof stays the caller's business: a building has to have one and gets a gable with a
+ * warning, while a hut variant supplies its own and is right to.
+ */
+export function repairRoofShape(raw: unknown, issues: SpecIssue[]): RoofSpec {
   // THE ROOF ARRIVES FROM OUTSIDE. `decodeSpec` accepts any JSON with a `family` key, so the
   // roof this function is handed is whatever a share link said it was — and until this block ran
   // it was trusted to be a well-formed member of the union. Three ways it was not, all of them
@@ -242,7 +207,7 @@ function normalizeBuilding(spec: BuildingSpec, issues: SpecIssue[]): BuildingSpe
   // the user is looking at a page that appears to be working. Everything below repairs and SAYS
   // SO, which is this file's whole contract.
   const ROOF_KINDS = new Set(['gable', 'shed', 'flat', 'hip', 'pyramid', 'none']);
-  let roof = spec.roof;
+  let roof = raw as RoofSpec;
   if (!roof || typeof roof !== 'object' || typeof (roof as { kind?: unknown }).kind !== 'string') {
     issues.push({
       path: 'roof',
@@ -309,7 +274,17 @@ function normalizeBuilding(spec: BuildingSpec, issues: SpecIssue[]): BuildingSpe
     const drain = clampPath(roof.drainPer12 ?? 1, 'roof.drainPer12', issues);
     roof = { ...roof, overhangFt: clampPath(roof.overhangFt, 'roof.overhangFt', issues), drainPer12: drain };
   }
+  return roof;
+}
 
+/**
+ * Warn when the roofing asked for is rated above the slope it is going on. SHARED for the same
+ * reason `repairRoofShape` is: `normalizeHut` ran none of it, so a 1-in-12 hut under exposed-nail
+ * roll came back clean while the identical building was told. A hut whose roof is ABSENT gets the
+ * variant's own 4-in-12 gable, which clears every minimum — nothing to check.
+ */
+function checkRoofingSlope(roof: RoofSpec | undefined, roofing: string, issues: SpecIssue[]): void {
+  if (!roof) return;
   // ROLL ROOFING HAS A MINIMUM SLOPE, and the toolkit was printing it on every course of roofs
   // that broke it. `rollMinSlopePer12` (2) and `rollDoubleMinSlopePer12` (1) sat in doctrine used
   // for nothing but the `doctrineRef` string stamped on each piece — so a 1-in-12 gable under
@@ -329,12 +304,12 @@ function normalizeBuilding(spec: BuildingSpec, issues: SpecIssue[]): BuildingSpe
   const risePer12 = roof.kind === 'flat' ? (roof.drainPer12 ?? 1)
     : roof.kind === 'none' ? Infinity
     : roof.risePer12;
-  const minFor = spec.coverings.roofing === 'roll' ? rollMin
-    : spec.coverings.roofing === 'rollDouble' ? rollDoubleMin
+  const minFor = roofing === 'roll' ? rollMin
+    : roofing === 'rollDouble' ? rollDoubleMin
     : 0;
   if (minFor > 0 && risePer12 < minFor - 1e-9) {
-    const label = spec.coverings.roofing === 'roll' ? 'Exposed-nail roll roofing' : 'Double-coverage roll roofing';
-    const remedy = spec.coverings.roofing === 'roll'
+    const label = roofing === 'roll' ? 'Exposed-nail roll roofing' : 'Double-coverage roll roofing';
+    const remedy = roofing === 'roll'
       ? ` Double coverage is rated to ${rollDoubleMin} in 12, or raise the pitch.`
       : ' Raise the pitch — nothing rolled goes lower.';
     issues.push({
@@ -345,6 +320,64 @@ function normalizeBuilding(spec: BuildingSpec, issues: SpecIssue[]): BuildingSpe
       severity: 'warn',
     });
   }
+}
+
+function normalizeBuilding(spec: BuildingSpec, issues: SpecIssue[]): BuildingSpec {
+  const lengthFt = clampPath(spec.dims.lengthFt, 'dims.lengthFt', issues);
+  const widthFt = clampPath(spec.dims.widthFt, 'dims.widthFt', issues);
+
+  let stories = spec.stories;
+  if (stories.length === 0) {
+    issues.push({ path: 'stories', kind: 'clamped', message: 'A building needs at least one story; added one.', severity: 'warn' });
+    stories = [{ wallHeightFt: 8, openings: {} }];
+  }
+  // A SECOND STORY IS NOT BUILT, AND SAYING SO IS THE POINT. `generateBuilding` frames
+  // `stories[0]` and nothing else — the story loop, the second floor bearing on the cap plates
+  // and the interior stairwell are T6b, which the plan parks on its own descope ladder. What
+  // was wrong was not the parking, it was the silence: a two-story spec normalized with ZERO
+  // issues and then generated a model byte-identical to the one-story it was not. The picture,
+  // the cut list and the packet all quietly described a different building than the one asked
+  // for, and nothing anywhere said so. Clamped and warned, like every other out-of-scope input.
+  if (stories.length > 1) {
+    issues.push({
+      path: 'stories',
+      kind: 'clamped',
+      message: 'This engine frames one story; the upper stories were dropped.',
+      severity: 'warn',
+    });
+    stories = stories.slice(0, 1);
+  }
+
+  const runFor = (w: WallId): number => (w === 'S' || w === 'N' ? lengthFt : widthFt);
+  const normStories = stories.map((s, i) => {
+    // Clamp the wall height FIRST: an opening's headroom is measured against the wall the
+    // model will actually build, not the one that was asked for.
+    const wallHeightFt = clampPath(s.wallHeightFt, `stories.${Math.min(i, 1)}.wallHeightFt`, issues);
+    return {
+      ...s,
+      wallHeightFt,
+      openings: normalizeOpenings(s.openings, runFor, `stories.${i}.openings`, issues, wallHeightFt),
+    };
+  });
+
+  // openFront (storage shed): that wall is posts + header, so it can carry no openings.
+  if (spec.openFront) {
+    for (const s of normStories) {
+      if (s.openings[spec.openFront]?.length) {
+        issues.push({
+          path: `stories.0.openings.${spec.openFront}`,
+          kind: 'dropped',
+          message: `Wall ${spec.openFront} is the open front — its openings were dropped (the whole wall is the opening).`,
+          severity: 'warn',
+        });
+        delete s.openings[spec.openFront];
+      }
+    }
+  }
+
+  const roof = repairRoofShape(spec.roof, issues);
+
+  checkRoofingSlope(roof, spec.coverings.roofing, issues);
 
   let foundation = spec.foundation;
   // WHAT IT STANDS ON, when the link named something this tool does not pour. `generateBuilding`
@@ -424,6 +457,13 @@ function normalizeHut(spec: HutSpec, issues: SpecIssue[]): HutSpec {
     dims: { lengthFt, widthFt },
     openings: normalizeOpenings(named, runFor, 'openings', issues, hutWallHeightFt),
   };
+  // AND ITS ROOF, through the same repair the building branch has always had. A hut IS a
+  // building (TD2) and hands the same `RoofSpec` to the same generator; this branch ran none of
+  // it, so a malformed roof on any of the six hut cards either threw or came back roofless with
+  // nothing said. Absent stays the variant's own business — `generateHut` supplies a gable —
+  // which is why this is guarded on presence rather than repairing `undefined` into a gable here.
+  if (spec.roof !== undefined) out.roof = repairRoofShape(spec.roof, issues);
+  checkRoofingSlope(out.roof, spec.coverings.roofing, issues);
   if (spec.variant === 'latrine') {
     const seats = spec.latrine?.seats === 2 ? 2 : 4;
     const depthFt = clampPath(spec.latrine?.depthFt ?? 6, 'latrine.depthFt', issues);
