@@ -104,6 +104,8 @@ screenshots get read.
 | Bending members on edge, and openings vs their skin | **Checked, nothing wrong.** 1,500+ bending members across 106 role/family groups, every one on edge; every framed opening in the catalog cut out of the skin over it, 0.0% covered. Both landed as guards. |
 | **The b-hut's girts at its partitions** | **Fixed** — carried as "measured, not fixed" through three passes. The girt ran clean through all six partition end studs, 1.50 in each — its whole thickness — on the only card in the catalog with interior walls. Cut by reading the partitions off the members already emitted. |
 | **Plywood sheet joints on a gable end** | **Fixed** — a sheet edge is nailed to a stud, which is why 4x8 goods stand on end on a 16-in layout, and the generator says so twice. On the E and W walls it was not: the skin's corner wrap moved the tiling datum half a wall thickness off the frame's, so 32 of 193 field joints butted 2.75 in clear of the nearest wood. |
+| Roof-deck joints, and the roofing over them | **Checked, nothing wrong.** Every deck sheet joint on every card lands on a rafter, and no roofing course reaches past the deck under it except the documented ⅛-in lap over the ridge and the hip's 'cover' clip. |
+| **A shutter on a board-and-batten wall** | **Fixed** — it hung at the BOARD face and occupied exactly the shell the battens are in, so every batten a window crossed passed clean through both leaves: 32 pairs at 0.750 in on the b-hut, its whole thickness. The standoff was a sum of layer thicknesses, which leaves the batten out by design; a hung piece needs the finished wall. |
 
 ## The shed that had no walls above the plate
 
@@ -4645,3 +4647,83 @@ are guards and hold both before and after.
 
 Seven solid thumbnails moved, one per clad card. No frame or compat golden moved — they carry no
 coverings.
+
+## A shutter hangs on the wall. Which wall face, though?
+
+The pass started on the sibling of the last one — if a wall sheet's joints must land on a stud, a
+ROOF deck sheet's must land on a rafter, and the deck's tiling starts at the roof plane's own end
+rather than at the framing. **That one is clean.** Every deck joint on every card lands on a
+rafter, because the gable deck runs the building's own length and does not extend over a rake:
+
+```
+  b-hut   deck joints at x = 8, 16, 24, 32     rafters at 7.937..8.063, 15.938..16.063, ...
+```
+
+And the roofing over it: no course reaches past the deck under it except by 0.12 in at the ridge —
+the top course's lap, which the ridge cap covers — and 0.20 in on the tower's hip, which is the
+documented `'cover'` clip. Both recorded, neither a defect. **The first probe of it was wrong and
+worth recording**: including `ridge` and `purlin` among the members that can back a joint made
+every joint pass, because those run ALONG the eave and their boxes span the whole length. A member
+only backs a joint parallel to itself.
+
+### What the same question found one layer down
+
+`timber2-built-openings` has stated the rule since T5: *"a door leaf sits in the rough opening… a
+shutter is fastened to the finished wall and stands proud of the siding."* What it checks is that
+the shutter is outboard of the FRAMING line. On board-and-batten it was not outboard of the siding:
+
+```
+  b-hut + board-and-batten     32 shutter x batten pairs at 0.750 in
+  sea hut  18                  guard shack  32
+```
+
+0.750 in is the batten's whole thickness. The leaves stood at the BOARD face and occupied exactly
+the shell the battens are in, so every batten a window crossed passed clean through both leaves —
+three or four per window.
+
+### The figure handed in was the wrong one, and the right one already existed
+
+`wallLayerThicknessFt` answers *how thick is ONE layer* — the standoff the layer over it needs —
+and it omits the batten on purpose, because a batten has nothing over it. `finishedWallThicknessFt`
+answers *where does the wall stop*, batten included. It was written three passes ago for the rake's
+barge board, whose own comment says *"the rake's barge board is the piece that needs the whole
+stack: it is nailed over the finished gable end, not over the studs."* A shutter is the same kind
+of piece and `building.ts` was handing it the other number:
+
+```
+  before   skinThickFt = wallLayerThicknessFt(sheathing) + wallLayerThicknessFt(siding)
+  after    skinThickFt = finishedWallThicknessFt(sheathing, siding)
+```
+
+Identical on every siding but board-and-batten, where it differs by exactly one 1x2. The entry
+steps take the same figure — their top landing is struck on the wall's outer face — so they moved
+with it.
+
+### Nothing on any shipped card moves
+
+All fourteen presets, every member's position and cut length: **zero lines differ.** None of them
+pairs board-and-batten with a shutter or a door — the storage shed, which is the one card with
+battens, has an open front. The combination is one click away in the planning card, which is where
+it was found and how it was rendered: `coverings.siding=boardAndBatten` on the b-hut.
+
+Rendered before and after from the same camera, the leaf goes from sharing one plane with the
+battens — the wall's grain running unbroken across it — to reading as its own assembly with an edge
+of its own. At a straight-on elevation a ¾-in step is a shadow line either way; the collision is
+what the measurement is for.
+
+### The four things asserted
+
+`test/timber2-hung-on-the-finished-wall.test.ts`, over 4 cards x 3 sidings x 2 sheathings. The
+first and third fail on the old standoff with the defect in the message.
+
+1. **Nothing hung on a wall is inside its skin** — 24 covering combinations, 400+ hung pieces.
+2. **And it is ON the assembly** — every piece touches something, and on each wall the innermost
+   layer of shutter touches the skin. SOME of it, not all: on a battened wall the skin's outer face
+   is the battens, so a leaf board landing between two is correctly clear of both.
+3. **The standoff IS the finished wall, read off the model** — the shutters' inner face and the
+   skin's outer face are the same plane, and that plane is `finishedWallThicknessFt`.
+4. **The two thicknesses are different questions** — they agree on every kind but board-and-batten
+   and differ there by exactly 0.75 in. This is why the bug existed, stated so the next caller
+   picks the right one.
+
+No golden moved — not the frame set, not the compat set, not one thumbnail.

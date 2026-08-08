@@ -396,18 +396,19 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
   // right: it is a framing drawing, and its openings are meant to read as holes.
   const closingIn = ordinalOf(stagePlan, 'siding');
   if (closingIn !== undefined) {
-    const sheathingThick = spec.coverings.wallSheathing !== 'none'
-      ? wallLayerThicknessFt(spec.coverings.wallSheathing === 'boards' ? 'boards' : 'plywood')
-      : 0;
-    const sidingThick = spec.coverings.siding !== 'none'
-      ? wallLayerThicknessFt(spec.coverings.siding === 'boardAndBatten' ? 'boardAndBatten'
-        : spec.coverings.siding === 'boards' ? 'boards' : 'plywood')
-      : 0;
+    // THE FINISHED wall, batten and all. A shutter hangs ON the wall and a flight of steps lands
+    // AGAINST it, so what both of them need is where the wall stops — not how thick its last
+    // layer is. `wallLayerThicknessFt` answers the second question, which is right for a layer
+    // being laid over another layer and wrong for anything hung on the stack: it leaves out the
+    // batten, because a batten has nothing over it. Given that figure, a shutter on a
+    // board-and-batten wall stood at the BOARD face and occupied exactly the shell the battens
+    // are in — its leaves 0.75 in inside every batten they crossed, which is the whole thickness.
+    const skinThickFt = finishedWallThicknessFt(spec.coverings.wallSheathing, spec.coverings.siding);
     members.push(...generateBuiltOpenings({
       surfaces: skinSurfaces,
       openings: story.openings,
       stage: closingIn,
-      skinThickFt: sheathingThick + sidingThick,
+      skinThickFt,
       ...(spec.shutters ? { shutters: spec.shutters } : {}),
     }));
     // And something to stand on. `entrySteps` defaults ON: a door the floor has lifted out of
@@ -420,7 +421,7 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
         stage: closingIn,
         thresholdY: levels.subfloorTop,
         gradeY: levels.gradeY,
-        skinThickFt: sheathingThick + sidingThick,
+        skinThickFt,
       }));
     }
   }
