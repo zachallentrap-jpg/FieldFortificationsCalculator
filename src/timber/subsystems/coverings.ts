@@ -98,6 +98,13 @@ export function tileSurface(
   stagger = 0,
   span?: (v: number) => { lo: number; hi: number },
   clip: TaperClip = 'cover',
+  /**
+   * Rip the FIRST piece of every course to this width, so the module grid downstream of it is
+   * struck from somewhere other than the surface's own start. `stagger` cannot do this job: it
+   * offsets alternate courses only, which is what a running bond wants and the opposite of what
+   * a wall wants — a wall's joints have to line up with the studs on every course.
+   */
+  firstCutFt = 0,
 ): Tile[] {
   const tiles: Tile[] = [];
   let row = 0;
@@ -127,7 +134,9 @@ export function tileSurface(
       const lo = Math.min(...edges.map((e) => e.lo));
       const hi = Math.max(...edges.map((e) => e.hi));
       if (hi - lo <= EPS) continue; // the point at the top of a hip end — nothing to cut
-      const off = row % 2 === 1 ? stagger : 0;
+      // A rip as wide as the module is not a rip — it is the first full sheet, and flagging it
+      // otherwise would put `full: false` on a whole sheet and bill it as an offcut.
+      const off = (row % 2 === 1 ? stagger : 0) + (firstCutFt >= sheetWFt - EPS ? 0 : firstCutFt);
       let u = lo;
       if (off > 0) {
         const first = Math.min(lo + off, hi);
@@ -308,13 +317,42 @@ export function generateInfillCovering(input: InfillCoveringInput): Member[] {
 // convention from the same module — see `wallTilePlacement`.
 export type { WallSurface };
 
+/**
+ * A wall surface as the SKIN sees it: the frame's run, plus however far the covering reaches past
+ * it to close the corner. `gridLeadFt` is that reach at the run's start, and it is the difference
+ * between a sheet grid struck from the frame and one struck from thin air.
+ */
+export interface SkinSurface extends WallSurface {
+  gridLeadFt?: number;
+}
+
 export interface WallCoveringInput {
-  surfaces: WallSurface[];
+  surfaces: SkinSurface[];
   kind: 'plywood' | 'boards' | 'boardAndBatten';
   role: 'sheathingPanel' | 'siding';
   stage: number;
   /** Outward offset from the wall face — sheathing sits on it, siding sits on the sheathing. */
   standoffFt: number;
+  /** Stud spacing, so a sheet's joints can be landed on one. Omitted, they fall where they fall. */
+  nailerSpacingFt?: number;
+}
+
+/**
+ * How wide to rip the first sheet of a wall so every joint after it lands on a stud.
+ *
+ * The studs are laid out from the FRAME's run; the skin starts `leadFt` before that, wrapping the
+ * corner to the through wall's outer face. Tiling straight from the skin's own start therefore
+ * puts every 4-ft joint `leadFt` short of a stud — half a wall thickness less half a stud face,
+ * 2¾ in on a 2x4 wall, which is a sheet edge nailed to nothing.
+ *
+ * So the first sheet is ripped to the last nailer that fits inside one sheet. That is what a
+ * framer does at a corner and it costs one rip; starting the grid at `leadFt` instead would land
+ * the joints just as well and leave a 3½-in ribbon of plywood down every corner.
+ */
+export function firstSheetFt(leadFt: number, sheetWFt: number, nailerFt: number): number {
+  if (!(leadFt > EPS) || !(nailerFt > EPS)) return sheetWFt;
+  const n = Math.floor((sheetWFt - leadFt) / nailerFt + EPS);
+  return n >= 1 ? leadFt + n * nailerFt : leadFt;
 }
 
 /**
@@ -389,7 +427,7 @@ export function finishedWallThicknessFt(
 
 export function generateWallCovering(input: WallCoveringInput): Member[] {
   const emit = makeEmitter('CV');
-  const { surfaces, kind, role, stage, standoffFt } = input;
+  const { surfaces, kind, role, stage, standoffFt, nailerSpacingFt } = input;
 
   for (const s of surfaces) {
     const cutouts: Rect[] = s.cutouts.map((c) => ({ u0: c.u0, u1: c.u1, v0: c.v0, v1: c.v1 }));
@@ -398,8 +436,12 @@ export function generateWallCovering(input: WallCoveringInput): Member[] {
       const thick = wallLayerThicknessFt('plywood');
       const sheetW = PANEL.widthFt.value as number;
       const sheetH = PANEL.lengthFt.value as number;
-      // Sheets stand on end (4 ft wide, 8 ft tall) so joints land on studs.
-      for (const t of tileSurface(s.runFt, s.heightFt, sheetW, sheetH)) {
+      // Sheets stand on end (4 ft wide, 8 ft tall) so joints land on studs — and the FIRST one is
+      // ripped so that they do. See `firstSheetFt`: a wall whose skin wraps a corner starts half a
+      // wall thickness before its own studs do, and a grid struck from the skin's end misses every
+      // one of them.
+      const first = firstSheetFt(s.gridLeadFt ?? 0, sheetW, nailerSpacingFt ?? 0);
+      for (const t of tileSurface(s.runFt, s.heightFt, sheetW, sheetH, 0, undefined, 'cover', first)) {
         for (const piece of subtractCutouts(t, cutouts)) {
           const p = wallTilePlacement(s, piece, standoffFt, thick);
           emit(role, `${PANEL.widthFt.value}x${PANEL.lengthFt.value} panel`, {

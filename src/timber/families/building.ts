@@ -24,7 +24,7 @@ import { generateWalls, type Opening } from '../walls';
 import { generateRoof } from '../roof';
 import { wallContract, type WallsContract, type WallSurface } from '../subsystems/wallSystem';
 import { roofPlanes, generateShed, generatePurlins, generateHip, wallInfillProfiles } from '../subsystems/roofFamilies';
-import { generateRoofCovering, generateWallCovering, generateInfillCovering, generateSkids, generateSlabOnGrade, wallLayerThicknessFt, finishedWallThicknessFt, type InfillSurface } from '../subsystems/coverings';
+import { generateRoofCovering, generateWallCovering, generateInfillCovering, generateSkids, generateSlabOnGrade, wallLayerThicknessFt, finishedWallThicknessFt, type InfillSurface, type SkinSurface } from '../subsystems/coverings';
 import { generateFloorOnBearings, joistNominalFor } from '../subsystems/floorSystem';
 import { generatePartitions } from '../subsystems/partitions';
 import { generateOpenFront, removeClosedWall } from '../subsystems/openFront';
@@ -308,7 +308,7 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
     ? walls.surfaces.filter((s) => s.wall !== spec.openFront)
     : walls.surfaces;
 
-  const skinSurfaces = openSkin.map((s) => {
+  const skinSurfaces: SkinSurface[] = openSkin.map((s) => {
     const { lead, tail } = skinReach(s, walls);
     if (lead === 0 && tail === 0) return s;
     return {
@@ -317,8 +317,12 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
       origin: [s.origin[0] - s.along[0] * lead, s.origin[1] - s.along[1] * lead] as [number, number],
       // Shifted with the origin, so an opening stays where it was cut.
       cutouts: s.cutouts.map((c) => ({ ...c, u0: c.u0 + lead, u1: c.u1 + lead })),
+      // And carried, because the STUDS did not move: the frame's run still starts `lead` along
+      // this surface, and that is where the sheet grid has to be struck from.
+      gridLeadFt: lead,
     };
   });
+  const nailerSpacingFt = spec.spacing.studSpacingIn / IN_PER_FT;
 
   // What each wall must close in above its cap plate — a gable end's triangle, a shed's pony
   // wall and rakes. Resolved once here and skinned by whichever coverings are on, so the
@@ -353,6 +357,7 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
         role: 'sheathingPanel',
         stage: requireOrdinal(stagePlan, 'siding'),
         standoffFt: 0,
+        nailerSpacingFt,
       }),
       ...generateInfillCovering({
         surfaces: infill, kind, role: 'sheathingPanel',
@@ -376,6 +381,7 @@ export function generateBuilding(spec: BuildingSpec): BuildingResult {
         role: 'siding',
         stage: requireOrdinal(stagePlan, 'siding'),
         standoffFt: sheathingThick,
+        nailerSpacingFt,
       }),
       ...generateInfillCovering({
         surfaces: infill, kind, role: 'siding',

@@ -103,6 +103,7 @@ screenshots get read.
 | **Two let-in braces on one wall** | **Fixed** — each ran out to the stud height from its own corner, so on any wall shorter than twice that they CROSSED, both boards in the one ¾-in let-in slot: 5.64 ft of shared board on the latrine's end walls. |
 | Bending members on edge, and openings vs their skin | **Checked, nothing wrong.** 1,500+ bending members across 106 role/family groups, every one on edge; every framed opening in the catalog cut out of the skin over it, 0.0% covered. Both landed as guards. |
 | **The b-hut's girts at its partitions** | **Fixed** — carried as "measured, not fixed" through three passes. The girt ran clean through all six partition end studs, 1.50 in each — its whole thickness — on the only card in the catalog with interior walls. Cut by reading the partitions off the members already emitted. |
+| **Plywood sheet joints on a gable end** | **Fixed** — a sheet edge is nailed to a stud, which is why 4x8 goods stand on end on a 16-in layout, and the generator says so twice. On the E and W walls it was not: the skin's corner wrap moved the tiling datum half a wall thickness off the frame's, so 32 of 193 field joints butted 2.75 in clear of the nearest wood. |
 
 ## The shed that had no walls above the plate
 
@@ -4553,3 +4554,94 @@ written for.
 
 Two thumbnails moved, both the b-hut's. No frame or compat golden moved — huts are not
 `generateFrame` fixtures.
+
+## A sheet edge is nailed to a stud
+
+Which is the whole reason 4x8 goods stand on end on a 16-in layout: 48 in is three studs. The
+generator says so twice — in a comment, *"Sheets stand on end (4 ft wide, 8 ft tall) so joints land
+on studs"*, and in every panel's own `doctrineRef`, *"joints on studs, cut around openings"*. On the
+N and S walls of every card it is true. On the gable ends it was not:
+
+```
+  b-hut E wall     joints at z = 4, 8, 12
+                   studs   at 4.229..4.354, 8.229..8.354, 12.229..12.354
+                   2.75 in clear, every one
+
+  32 of 193 field joints across the seven clad cards — all of them on an E or W wall,
+  all of them 2.75 in, one for one
+```
+
+### It was put there by a fix earlier in this sweep
+
+A rectangle is framed with one pair of walls running through and the other butting between them, so
+the butting pair's structural run stops a wall thickness short of the outside corner at each end.
+Tiling exactly that run *"left a 3½-in-wide strip of bare framing standing in every corner of every
+building, sole plate to cap plate"*, and the pass that found it extended the skin to the through
+wall's outer face. That is right and it stays.
+
+What went with it was the DATUM. The sheet grid is struck from the surface's own start; the studs
+are laid out from the frame's; and after the extension those two are half a wall thickness apart.
+Half of 3½ in, less half a stud face, is 2¾ in — which is why the figure is identical on every card
+regardless of its size, its spacing or its openings. It is not a rounding drift. It is one constant.
+
+### The rip
+
+The first sheet of each wall is ripped to the last nailer that fits inside one sheet:
+
+```
+  firstSheetFt(lead, sheet, nailer) = lead + floor((sheet - lead) / nailer) * nailer
+
+  lead 3½ in @ 16 in o.c.  ->  35½ in       @ 24 in o.c.  ->  27½ in       @ 12 in  ->  39½ in
+  lead 0 (a through wall)  ->  a full sheet, and the tiling is byte-for-byte what it was
+```
+
+That is what a framer does at a corner and it costs one rip. The alternative — striking the grid at
+the frame's datum and letting the lead stand as its own piece — lands the joints equally well and
+leaves a 3½-in ribbon of plywood down every corner of every building.
+
+The mechanism is a new trailing argument to `tileSurface`, `firstCutFt`, which rips the first piece
+of EVERY course. `stagger`, which was already there, cannot do this job: it offsets alternate
+courses, which is what a running bond wants and the opposite of what a wall wants.
+
+```
+  b-hut E wall   before   0..4       4..8       8..12      12..16
+                 after    0..2.958   ..6.958    ..10.958   ..14.958   ..16
+```
+
+### The area does not move
+
+Every card comes out to the square foot it did before — 963.80, 559.75, 750.00, 750.00, 1017.00,
+188.50, 243.75 — with four more pieces on it (two on the two cards with a short gable end). The same
+skin, cut in the right places. The narrowest piece in the catalog goes from 2½ in to 2 in, both of
+them opening-edge offcuts of the kind that was already there.
+
+### What was measured and what was looked at
+
+The finding is a MEASUREMENT, and it is worth being exact about that. A 2¾-in offset between a seam
+and the stud behind it is not something I could resolve by eye in a screenshot at model scale, and
+the siding is opaque, so from outside there is nothing to see but a seam in a plausible place. What
+the renders establish is the other half: the E gable end was rendered clad before and after from the
+same camera, the seams moved from 4/8/12 ft to 2.96/6.96/10.96, the wall is still covered corner to
+corner with no sliver at the arris, and the rake, the barge board and the roofing are untouched.
+
+### The four things asserted
+
+`test/timber2-sheet-joints.test.ts`. The first fails on the old grid with the defect in the message
+(*"gp-frame E: two sheets butt at z=4.0000, which is 2.750 in clear of the nearest stud"*); the rest
+are guards and hold both before and after.
+
+1. **Every field joint lands on a stud** — 201 across the catalog, none clear of wood. "Field"
+   because a sliver above a header or under a sill is part of the sheet that ran past the opening
+   and is backed by that header; only a joint both sheets run real height at needs a stud.
+2. **The wall is still covered corner to corner, with nothing doubled** — no gap between adjacent
+   pieces, both ends of every run on the building line, and no two sheets sharing a (u, v). This is
+   the guard a fix that merely started the grid later would fail: it would pass (1) and put the bare
+   corner strip back.
+3. **No piece is wider than the sheet it is cut from** — `firstSheetFt` returns a width, and a
+   width bigger than the stock is a piece nobody can cut.
+4. **The rip stated on its own** — the three spacings, the two degenerate cases, and the property
+   that buys it: struck from the rip, every joint is a whole number of nailers from the frame's own
+   datum. Plus a `deepEqual` that a through wall tiles exactly as it always did.
+
+Seven solid thumbnails moved, one per clad card. No frame or compat golden moved — they carry no
+coverings.
