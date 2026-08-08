@@ -117,6 +117,7 @@ screenshots get read.
 | **The shed cab's open walls** | **Fixed** — the cab wall is four panels tall to `TOWER.cabWallHeightFt`, which is the eave line of a PYRAMID. A shed leaves it behind on three sides: raycast up from the shipped 8-ft cab and the band of open sky above the screen ran 7.0 in on the low face, 7.0 rising to 40.4 on each rake, and 40.4 in across the whole high side. Closed with `tileRakedInfill`, to the rafter CENTRE plane on the rakes and their underside on the faces they cross — the building's own rule. |
 | **A number that is not a number** | **Fixed** — `clampPath` clamps an out-of-range NUMBER into the path's stated range and warns. A NON-number — missing, `null`, a string, `NaN`, all of which a share link carries — returned **0**, which is below the minimum of most of those paths. 25 of 66 card × knob combinations framed members with a NON-POSITIVE cut length: 112 on the gp-frame's wall height, 94 on the squad hut's width, 51 on the platform's ramp. A bare `{kind:'basement'}` came back at depth 0 against a stated 6–9, framed five posts at −7.8 in, and collapsed the basement flat onto the slab. And the tower's `platformHeightFt` was never clamped at all, so the life-safety cage-threshold rule compared the raw value — `"deep" > 20` is false, and the switch to a stair never fired. |
 | **The platform's runners** | **Fixed** — the base block says the two bases differ in *"what is UNDER the post — a concrete pad you pour, or a timber runner you can drag the whole thing on"*, and no runner was under a post. `generateSkids` spreads three evenly across the width, which is right under a floor deck where the joists cross every one; a platform's load comes down two lines of posts. The middle runner carried NOTHING — 22.41 in clear of every member in the model — and the outer two missed the posts they were under by 1.00 in, each post bearing 2.50 of its 3.50. |
+| **A platform lower than its own frame** | **Fixed** — `deckHeightFt` is the surface you stand on and the frame hangs UNDER it: a runner, a post, a sill, a joist and the decking, 1.746 ft before the post is anything at all. The registry offered 0.5. Every setting below the floor was broken — on skids 0.5 and 1.0 put the sill 8¼ and 2¼ in UNDERGROUND with no posts, 1.25 and 1.5 put it 4¾ and 1¾ in INSIDE the runner, and on piers 1.25 left it floating ¾ in over grade on nothing. Rendered, a 0.5-ft platform is a slab of decking sunk into the ground with no legs. Floored at 1.75 the same way `foundation.crawlFt` is floored at 1. |
 
 ## The shed that had no walls above the plate
 
@@ -5503,3 +5504,64 @@ deep, so below that the sills and joists go underground and the posts vanish ent
 
 `PLATFORM.minPostFt` drops a post below 0.1 ft and nothing takes its place. Separate from the
 runners, on both bases, and left for a later iteration.
+
+## A platform lower than the frame that holds it up
+
+Recorded at the end of the runners pass and taken up here. `deckHeightFt` is the surface you stand
+on — an earlier pass settled that, and moved the frame down by the decking's thickness because *"the
+rail asks `railRequired(deckY)` about a fall from it and the stair lands on it"*. Everything else
+hangs UNDER that surface, and the registry let the operator ask for half a foot of it.
+
+What hangs under the deck, worst case:
+
+```
+  runner lying on grade  5.50 in      the skid's own depth
+  the shortest post      0.10 ft      PLATFORM.minPostFt, below which a post is a shim
+  sill                   5.50 in
+  joist                  7.25 in
+  decking                1.50 in      plank; a panel deck is 0.75
+                         ─────────
+                         1.7458 ft    and the next step up from that is 1.75
+```
+
+Every setting the picker offered below that floor was broken, each in its own way:
+
+```
+  on skids   0.5, 1.0    no posts, and the sill 8¼ / 2¼ in UNDERGROUND
+             1.25, 1.5   no posts, and the sill 4¾ / 1¾ in INSIDE the runner
+  on piers   0.5, 1.0    no posts, and the sill 8¼ / 2¼ in UNDERGROUND
+             1.25        no posts, and the sill floating ¾ in over grade on nothing
+```
+
+Rendered, a 0.5-ft platform is a slab of decking sunk into the ground with no legs at all — no
+posts, no runners showing, no rail and no ramp, because at that height nothing is a fall.
+
+### The repair, which this codebase has made before
+
+`foundation.crawlFt` in the same registry, three lines up:
+
+> Floored at 1 ft, not 0.5: the built-up girder hangs a full 9 1/4 in BELOW the sill, so a
+> shallower crawl puts the girder posts underground — the sweep caught it as a negative post
+> length. **The bound is geometry, not preference, and it is stated once here.**
+
+So `deckHeightFt`'s min is now 1.75 with the derivation written next to it, and the cite says what
+the floor is: *"TM 5-302 loading platform (PH); floored by the frame depth under the deck"*. A saved
+plan or a link carrying 0.5 is clamped up and told, rather than drawn lying in a hole.
+
+### The four things asserted
+
+`test/timber2-platform-low-deck.test.ts`, over every height the picker's own input offers — the
+registry's min to max on its step — × two bases × two deck materials.
+
+1. **No platform the picker offers puts its frame underground**, and every one of them has posts.
+2. **The sill bears on what is under it** — clear of the runner on skids with a post between them,
+   and off the pad at grade on piers.
+3. **The floor is the lumber, re-derived here** — the registry's min is at or above
+   `runner + shortest post + sill + joist + decking`, and TIGHT: one step lower would not clear it,
+   so the bound is the geometry and not a round number. If the stock ever gets shallower this fires
+   and the registry can come down.
+4. **What must not change** — an in-range height untouched and silent, an out-of-range one clamped
+   and warned at the same severity, and the shipped card at 4 ft silent and still on its posts.
+
+All four fail on the old registry. The shipped platform is at 4 ft, so all fourteen presets are
+byte-identical and no golden moved.

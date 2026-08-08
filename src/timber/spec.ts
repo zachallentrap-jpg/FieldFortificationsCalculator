@@ -289,7 +289,22 @@ export const SPEC_PATH_DEFS: readonly SpecPathDef[] = [
   { path: 'interiorWidthFt', label: 'Interior width', min: 6, max: 12, step: 1, cite: 'bunker envelope (PH)' },
   { path: 'clearHeightFt', label: 'Clear height', min: 4.5, max: 7, step: 0.5, cite: 'bunker envelope (PH)' },
   { path: 'designCoverDepthFt', label: 'Stated cover depth', min: 0, max: 4, step: 0.5, cite: 'load-table row range (PH, LS, SME)' },
-  { path: 'deckHeightFt', label: 'Deck height', min: 0.5, max: 5, step: 0.25, cite: 'TM 5-302 loading platform (PH)' },
+  // Floored at 1.75 ft, not 0.5, for the same reason `foundation.crawlFt` is floored at 1: the
+  // frame hangs UNDER the walking surface and there has to be room for it. `deckHeightFt` is the
+  // surface you stand on, and below it the platform stacks a runner (5½ in, lying on grade), a
+  // post, a sill (5½), a joist (7¼) and the decking (1½) — 1.746 ft before the post is anything
+  // at all, and the next step up from that is 1.75. Every setting the picker used to offer below
+  // it was broken, each in its own way:
+  //
+  //   on skids   0.5, 1.0    no posts, and the sill 8¼ / 2¼ in UNDERGROUND
+  //              1.25, 1.5   no posts, and the sill 4¾ / 1¾ in INSIDE the runner
+  //   on piers   0.5, 1.0    no posts, and the sill 8¼ / 2¼ in UNDERGROUND
+  //              1.25        no posts, and the sill floating ¾ in over grade on nothing
+  //
+  // Rendered, a 0.5-ft platform is a slab of decking sunk into the ground with no legs at all.
+  // `timber2-platform-low-deck` re-derives this figure from the lumber and fails if the stock
+  // changes under it. The bound is geometry, not preference, and it is stated once here.
+  { path: 'deckHeightFt', label: 'Deck height', min: 1.75, max: 5, step: 0.25, cite: 'TM 5-302 loading platform (PH); floored by the frame depth under the deck' },
   { path: 'ramp.widthFt', label: 'Ramp width', min: 4, max: 12, step: 0.5, cite: 'TM 5-302 (PH)' },
   { path: 'temperBays', label: 'TEMPER bays', min: 2, max: 8, step: 1, cite: 'TM 10-8340 (PH)' },
   { path: 'latrine.depthFt', label: 'Pit depth', min: 4, max: 8, step: 0.5, cite: 'TM 5-302 latrine (PH — sheet pending)' },
