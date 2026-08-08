@@ -103,7 +103,14 @@ test('THE HIGH SIDE OF A SHED CAB STANDS ON SOMETHING', () => {
   const under = m.members.filter((x) => x.role === 'post'
     && Math.abs(box(x).y[1]! - pb.y[0]!) < 1e-9);
   assert.equal(under.length, 2, `${under.length} posts under the high plate`);
-  const cabTop = Math.max(...m.members.filter((x) => x.role === 'screenPanel').map((x) => box(x).y[1]!));
+  // THE CAB WALL'S TOP, not the tallest screen there is. Those were the same thing while the four
+  // wall panels were the only screen in the model; the pass that closed the shed cab in put more
+  // screen ABOVE them, cut to the rake, and "the highest screen" then meant the roof line — 25.999
+  // against the 23.000 the posts actually stand on. The wall panels are the ones that start down
+  // at the half-wall; the infill starts on their tops.
+  const screens = m.members.filter((x) => x.role === 'screenPanel');
+  const base = Math.min(...screens.map((x) => box(x).y[0]!));
+  const cabTop = Math.max(...screens.filter((x) => box(x).y[0]! < base + 0.01).map((x) => box(x).y[1]!));
   for (const p of under) {
     assert.ok(Math.abs(box(p).y[0]! - cabTop) < 1e-9,
       `${p.id} starts at ${box(p).y[0]!.toFixed(4)} and the cab wall tops out at ${cabTop.toFixed(4)}`);

@@ -114,6 +114,7 @@ screenshots get read.
 | **The beam over an open front** | **Fixed** — laid `bayFt + postD` long and centred on its bay, each beam reached half a post past BOTH ends: at every interior post the two beams meeting there each covered the whole post (5 pairs at 1.500 in on a 48-ft front), and the two end beams stood 1¾ in past the building line into the side wall's siding. |
 | The let-in brace against what it is let into | **Checked, not a defect.** A brace let ¾ in into the studs' outer faces shares 0.700 in with every one it crosses — 364 pairs at a flat 0.700 across the seven braced cards, and the same 0.700 against an open front's corner post. The notch is not a mesh cut; sixth documented approximation. |
 | **The shed cab's high plate** | **Fixed, three ways.** The tower card's other roof, one click from the shipped pyramid. The plate stood ON EDGE (3½ in tall, 1½ across — the building's pony plate has laid flat since T2); its top was set to the roof plane, which `rafterPlaneDatum` states at the rafters' CENTRE, so it stood half a rafter inside all seven — 2.987 in against the building's 1.107, and that 1.107 is the bird's mouth; and it ran post-CENTRE to post-centre, leaving 1¾ in of each post top bare and half of each end rafter off the plate. |
+| **The shed cab's open walls** | **Fixed** — the cab wall is four panels tall to `TOWER.cabWallHeightFt`, which is the eave line of a PYRAMID. A shed leaves it behind on three sides: raycast up from the shipped 8-ft cab and the band of open sky above the screen ran 7.0 in on the low face, 7.0 rising to 40.4 on each rake, and 40.4 in across the whole high side. Closed with `tileRakedInfill`, to the rafter CENTRE plane on the rakes and their underside on the faces they cross — the building's own rule. |
 
 ## The shed that had no walls above the plate
 
@@ -5182,3 +5183,108 @@ but the two corner posts:
 The building's shed closes the same band with a pony wall — studs on the stud spacing and the wall
 covering carried up over them. The cab gets two posts. Recorded here, measured, and left for the
 next iteration rather than folded into this one.
+
+## The shed cab's walls, which stopped where the pyramid's roof used to be
+
+Last pass gave the shed cab's high side a plate the rafters actually land on, and recorded that the
+side itself was open. Measured properly, it was worse than that: it was open on THREE faces.
+
+The cab wall is four panels tall to `TOWER.cabWallHeightFt` — the corner posts' height, and the
+eave line of a PYRAMID, which is why nobody had looked. A shed leaves that line behind. Raycasting
+straight up from each face of the shipped 8-ft cab, sampled across the run:
+
+```
+                    open band above the screen, across the face
+  low face (−Z)     7.0 7.0 7.2 7.2 7.0 0.5 7.0 7.2 7.2 7.0 7.0 in
+  rake (+X)         7.0 10.3 13.6 16.9 20.2 23.6 26.9 30.2 33.5 37.1 40.4 in
+  high face (+Z)    40.4 40.4 40.7 40.7 40.4 33.7 40.4 40.7 40.7 40.4 40.4 in
+  rake (−X)         7.0 10.3 13.6 16.9 20.2 23.6 26.9 30.2 33.5 37.1 40.4 in
+```
+
+Rendered from outside the cab's rear corner it is exactly that: the screen stops in a straight
+horizontal line and the roof goes on up without it, with a triangle of open sky on each rake and
+eight feet of it across the back.
+
+### What closes it, and where it stops
+
+`half-wall-screen` is the only cab that claims to close to the top — `open-rail` has no wall at all
+and `half-wall` stops at the half-wall on purpose — so it is the only one that gets infill.
+`tileRakedInfill` cuts the rake into strips, the same call the building's gable and shed ends use.
+
+Where the screen STOPS follows the building's own rule, which distinguishes the two kinds of wall a
+sloped roof makes:
+
+- a **rake** runs up beside the end rafter and goes to the rafter CENTRE plane — stopping at the
+  underside there would leave a wedge of daylight next to the rafter, which is what the lift in
+  `rafterPlaneDatum` exists for;
+- the two faces the rafters **cross** stop at their underside, because going higher is the burial
+  the last pass took out of the high plate.
+
+One detail the audit found and the code now states: read the plane at the screen's LOW-Z edge, not
+its centre line. The plane rises with z and the cloth has a thickness, so cutting to the centre
+leaves the inboard top arris a hundredth of an inch proud of the rafters — 6 pairs at 0.009 in,
+where the building's rake infill shares wood with nothing at all.
+
+After:
+
+```
+                    open band above the screen, across the face
+  low face (−Z)     7.0 7.0 7.2 7.2 7.0 0.5 7.0 7.2 7.2 7.0 7.0 in     unchanged — see below
+  rake (+X)         7.0 2.0 2.1 2.1 2.3 2.5 2.6 2.7 2.7 3.2 6.7 in
+  high face (+Z)    6.7 6.7 7.0 7.0 6.7 0.0 6.7 7.0 7.0 6.7 6.7 in
+  rake (−X)         7.0 4.2 4.4 4.5 4.5 4.6 4.8 5.0 5.1 5.4 6.7 in
+
+  screen infill sharing wood with anything at all:  0 pairs, both cab plans
+```
+
+Nothing anywhere is now worse than the 7.2 in the PYRAMID cab has had all along, and no face has
+open sky.
+
+### The band that is left, which is not this defect
+
+Above the top of the wall and between two rafters there is still a band up to the deck's underside,
+because the toolkit models no blocking between rafters anywhere. Measured between two rafters over
+the high wall:
+
+```
+  gp-frame + shed, high wall   skin tops at 14.5694   deck underside 15.0595   →  5.88 in
+  tower cab + shed, high face  skin tops at 25.8079   deck underside 26.2910   →  5.80 in
+```
+
+Same figure, same reason. The cab is now closed to exactly the standard the building is closed to.
+
+### The four things asserted
+
+`test/timber2-cab-shed-walls.test.ts`, over cab plans 6/8/10 × rafters 16/24 in oc, three cab wall
+kinds and both roofs.
+
+1. **The shed cab is closed in** — walking each face at 41 stations, wherever the roof leaves the
+   wall top behind there is a strip over that station and its top is within one rake step of the
+   roof line. Fails on the old generator with "NOTHING closes the cab in above the wall".
+2. **And it does not stand INTO the roof** — the infill shares wood with nothing. This is the guard
+   a wrong fix fails, and it catches both of the ones tried: reading the plane at the screen's
+   centre (0.009 in into the rafters) and skipping the seat drop on the crossed faces (2.560 in).
+3. **The rake reads as a rake** — no step bigger than the one the BUILDING's own rake takes. Not a
+   number picked here: `tileRakedInfill` merges cells while the top stays inside one `rakeStepFt`
+   and then runs to the cell boundary past the one that broke the range, so the real bound is a
+   step plus a cell. The gp-frame's gable and shed rakes come out at 3.250 in and so does the cab's.
+   And consecutive strips abut, because a slot between them is daylight.
+4. **What must not change** — the pyramid cab gets no infill; `open-rail` and `half-wall` cabs have
+   no screen at all and gain none; and the four original wall panels top out where they always did,
+   the same under a shed as under a pyramid.
+
+`timber2-cab-shed` had to be restated once more, and for the same kind of reason as last pass: it
+read the cab wall's top as "the tallest screen panel", which was true while the four wall panels
+were the only screen in the model and became the ROOF LINE — 25.999 against 23.000 — the moment
+there was screen above them.
+
+The shipped tower is `pyramid`, so all fourteen presets are byte-identical and no golden moved.
+
+### Checked this pass and recorded, NOT a defect fixed here
+
+**The pyramid cab has the same 7-in band.** Raycast the shipped cab and every face reads 7.0–7.2 in
+of open band between the screen top and the roof deck, closing to 0.6 in only at the corners where
+a hip rafter dips. It is not visible from outside — the 1-ft eave and its fascia stand in front of
+it in every exterior view, which two elevation renders confirm — and it is the same between-rafter
+band the building has. It is the shipped card, so it is left alone and written down here rather
+than folded into a shed fix.

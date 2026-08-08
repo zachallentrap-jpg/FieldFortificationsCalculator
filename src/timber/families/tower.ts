@@ -25,7 +25,7 @@ import { generateRailing, railRequired, type RailEdge } from '../subsystems/rail
 import { generateLadder, generateStair } from '../subsystems/access';
 import { pyramidPlanes, type RoofPlane } from '../subsystems/roofFamilies';
 import { rafterSeatLiftFt } from '../birdsMouth';
-import { generateRoofCovering } from '../subsystems/coverings';
+import { generateRoofCovering, tileRakedInfill } from '../subsystems/coverings';
 import type { FloorLevels } from '../floor';
 
 /** Guard against a divide-by-zero on a degenerate height. Arithmetic, not doctrine. */
@@ -651,20 +651,31 @@ export function generateTower(spec: TowerSpec): TowerResult {
     [cx + deckHalf, cx + deckHalf], [cx - deckHalf, cx + deckHalf],
   ];
   const cabPostHalfFt = DRESSED['4x4']!.w / 2 / IN_PER_FT;
-  const cabPanel = (f: number, thickFt: number): { cutLengthFt: number; x: number; z: number; yaw: number } => {
+  const cabPanel = (f: number, thickFt: number): {
+    cutLengthFt: number; x: number; z: number; yaw: number;
+    /** The u = 0 end of the emitted piece, and the unit direction it runs — for `topAt`. */
+    origin: [number, number]; along: [number, number];
+  } => {
     const p = cabCorners[f]!;
     const q = cabCorners[(f + 1) % 4]!;
     const run = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    const ax = (q[0] - p[0]) / run;
+    const az = (q[1] - p[1]) / run;
     // Outward normal of a face wound this way is the run direction turned a quarter right.
-    const nx = (q[1] - p[1]) / run;
-    const nz = -(q[0] - p[0]) / run;
+    const nx = az;
+    const nz = -ax;
     const out = cabPostHalfFt + thickFt / 2;
     const overrun = cabPostHalfFt + (f % 2 === 0 ? thickFt : 0);
+    const cutLengthFt = run + 2 * overrun;
+    const x = (p[0] + q[0]) / 2 + nx * out;
+    const z = (p[1] + q[1]) / 2 + nz * out;
     return {
-      cutLengthFt: run + 2 * overrun,
-      x: (p[0] + q[0]) / 2 + nx * out,
-      z: (p[1] + q[1]) / 2 + nz * out,
+      cutLengthFt,
+      x,
+      z,
       yaw: Math.atan2(-(q[1] - p[1]), q[0] - p[0]),
+      origin: [x - (ax * cutLengthFt) / 2, z - (az * cutLengthFt) / 2],
+      along: [ax, az],
     };
   };
   const cabWallH = spec.cab.walls === 'open-rail'
@@ -849,6 +860,66 @@ export function generateTower(spec: TowerSpec): TowerResult {
         nailing: 'toenail 3-8d ea plate (PH)',
         doctrineRef: citeOf(TOWER.cabRisePer12),
       });
+    }
+
+    // ── AND THE CAB HAS TO REACH IT.
+    //
+    // The cab wall is four panels tall to `TOWER.cabWallHeightFt` — the corner posts' height, and
+    // the eave line of a PYRAMID, which is why nobody noticed. A shed's roof leaves that line
+    // behind on three sides. Raycast straight up from each face of the shipped 8-ft cab, sampled
+    // across the run, and the open band above the screen came out:
+    //
+    //   low face (−Z)   7.0 in the whole way          the eave, and it is the pyramid's band too
+    //   rake (±X)       7.0 rising to 40.4 in         open sky in a triangle, both sides
+    //   high face (+Z)  40.4 in the whole way         open sky, 8 ft wide
+    //
+    // Rendered from outside the cab's rear corner it is exactly that: the screen stops in a
+    // straight horizontal line and the roof goes on up without it.
+    //
+    // `half-wall-screen` is the only cab that claims to close to the top — `open-rail` has no
+    // wall at all and `half-wall` stops at the half-wall on purpose — so it is the only one that
+    // gets infill. `tileRakedInfill` cuts the rake into strips no more than `TOLERANCE.rakeStepFt`
+    // off the true line, the same way the building's gable and shed ends are closed in.
+    //
+    // WHERE IT STOPS follows the building's rule, which distinguishes the two kinds of wall a
+    // sloped roof makes. A RAKE is run up beside the end rafter and goes to the rafter CENTRE
+    // plane: stopping at the underside there would leave a wedge of daylight next to the rafter.
+    // The two faces the rafters CROSS stop at their underside instead, because going higher is
+    // the burial this pass has just taken out of the high plate.
+    if (spec.cab.walls === 'half-wall-screen') {
+      const screenT = (HUT.screenClothThickIn.value as number) / IN_PER_FT;
+      const seatDrop = DRESSED['2x6']!.d / IN_PER_FT / 2 / cs; // plumb half-depth of a rafter
+      const wallTop = cabBaseY + (TOWER.cabWallHeightFt.value as number);
+      for (let f = 0; f < 4; f++) {
+        const w = cabPanel(f, screenT);
+        const rake = Math.abs(w.along[1]) > 0.5; // runs along Z, so the slope runs along it
+        // Read the plane at the screen's LOW-Z edge, not its centre line. The plane rises with z
+        // and the cloth has a thickness, so cutting to the centre leaves the inboard top arris
+        // standing a hundredth of an inch proud of the rafters above it — 6 pairs at 0.009 in,
+        // where the building's rake infill has none at all.
+        const topAt = (u: number): number => {
+          const z = w.origin[1] + w.along[1] * u - screenT / 2;
+          return Math.max(0, eaveY + (z - (cx - half)) * (fall / (half * 2))
+            - (rake ? 0 : seatDrop) - wallTop);
+        };
+        for (const t of tileRakedInfill(w.cutLengthFt, topAt, PANEL.widthFt.value as number)) {
+          const uMid = (t.u0 + t.u1) / 2;
+          const h = t.v1 - t.v0;
+          emit('screenPanel', 'screen cloth', {
+            cutLengthFt: t.u1 - t.u0,
+            position: [
+              w.origin[0] + w.along[0] * uMid,
+              wallTop + h / 2,
+              w.origin[1] + w.along[1] * uMid,
+            ],
+            rotation: [0, w.yaw, 0],
+            stage: sRoof,
+            actual: { w: HUT.screenClothThickIn.value as number, d: h * IN_PER_FT },
+            nailing: 'staples @ 4" + batten (PH)',
+            doctrineRef: `${citeOf(TOWER.cabWallHeightFt)} — cut to the shed roof above the cab wall`,
+          });
+        }
+      }
     }
   }
 
