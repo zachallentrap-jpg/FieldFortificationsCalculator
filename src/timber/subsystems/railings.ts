@@ -92,11 +92,17 @@ export function generateRailing(input: RailingInput): Member[] {
   // De-duplicated by POSITION rather than by clever topology: `coveredSpans` can split an edge
   // around a gate or a ladder, so "is this the end of an edge" does not answer "is a post
   // already standing here". Where two posts land on the same spot, there is one post.
-  const placed = new Set<string>();
+  //
+  // WITHIN A POST'S WIDTH IS THE SAME SPOT. Exact equality answers the corner where two edges
+  // meet at a point and nothing else: a bridge landing's rails deliberately stop half a rail's
+  // thickness short of the deck's rail line so they butt its face, and its end post then landed
+  // ¾ in from the deck's own — two 4x4s a quarter of an inch inside each other, twice, on every
+  // tower tall enough to have a stair. Two posts cannot be closer together than one post is wide.
+  const placed: [number, number][] = [];
   const spotTaken = (x: number, z: number): boolean => {
-    const k = `${x.toFixed(6)}|${z.toFixed(6)}`;
-    if (placed.has(k)) return true;
-    placed.add(k);
+    const near = DRESSED[RAIL.postNominal.value as string]!.w / IN_PER_FT;
+    if (placed.some(([px, pz]) => Math.hypot(px - x, pz - z) < near - 1e-9)) return true;
+    placed.push([x, z]);
     return false;
   };
   const standing = input.standing ?? [];

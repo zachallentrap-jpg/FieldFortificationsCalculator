@@ -30,6 +30,7 @@ import assert from 'node:assert/strict';
 import { generateStructure } from '../src/timber/families/index';
 import { familyById } from '../src/timber/catalog';
 import { TOWER, RAIL, IN_PER_FT } from '../src/timber/doctrine';
+import { DRESSED } from '../src/timber/types';
 import type { Member } from '../src/timber/types';
 
 type V3 = [number, number, number];
@@ -185,11 +186,24 @@ test('and that landing is railed on both open sides, like any walking surface at
     const deckTop = Math.max(...bridge.map((b) => b.y[1]));
     // A rail run alongside the bridge: level, at the doctrine height over it, reaching back out
     // to where the stair arrives.
+    //
+    // TO WITHIN HALF A POST, not to the last inch of decking. The last flight sets a rail post at
+    // each side of its head, on this bridge, and the bridge's rail now BUTTS that post's face
+    // rather than running through it — `RailingInput.standing`, the same joint the cab's corner
+    // posts make. `< near` was written when nothing stood there and the rail ran to the end.
+    const postW = DRESSED[RAIL.postNominal.value as string]!.w / IN_PER_FT;
     const along = model.members.filter((m) => m.role === 'railTop' && m.id.startsWith('RL-')
       && Math.abs(m.rotation[2]) < 1e-9
       && Math.abs(m.position[1] - (deckTop + topH)) < 1e-6
-      && box(m).z[0] < near + 1e-6);
+      && box(m).z[0] < near + postW / 2 + 1e-6);
     assert.equal(along.length, 2,
       `${label}: ${along.length} rails run the bridge's open sides, not the two it has`);
+    // And it does stop ON that post, not short of it and not through it.
+    for (const m of along) {
+      const short = box(m).z[0] - near;
+      assert.ok(short >= -1e-9 && short <= postW / 2 + 1e-9,
+        `${label}: ${m.id} stops ${(short * IN_PER_FT).toFixed(3)} in inside the bridge's far end, `
+        + `and the flight's post there is ${(postW * IN_PER_FT).toFixed(1)} in across`);
+    }
   }
 });

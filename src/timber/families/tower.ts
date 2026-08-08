@@ -470,6 +470,13 @@ export function generateTower(spec: TowerSpec): TowerResult {
 
   /** Open edges of the stair's top landing, railed with the platform's own pass. */
   const bridgeEdges: RailEdge[] = [];
+  /**
+   * Where the stair's own rail lines run out at deck level — the deck's railing has to be told,
+   * for the same reason it is told about the cab's corner posts. The last flight sets a post at
+   * each side of its head, on the deck, and the guardrail put a second 4x4 in both holes: 4 pairs
+   * entirely inside each other on a 24-ft tower, 4 on a 32.
+   */
+  const stairRailEnds: { at: [number, number]; y: number }[] = [];
   // ── Access. Which edge it lands on is fixed (the front, -Z), so the railing knows where the
   // gap goes without a second convention to keep in sync.
   const accessWidth = TOWER.accessWidthFt.value as number;
@@ -560,6 +567,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
     }
     const bridge = cx - deckHalf - arriveZ;
     emit.members.push(...stair.members);
+    stairRailEnds.push(...stair.railEnds);
     // AND A LANDING BRIDGES BACK TO THE DECK. Standing the well outside the frame leaves that
     // much air between the top nosing and the platform, and a stair that stops short of what it
     // serves is not one. Decked in the same planks the stair's own landings use, and railed on
@@ -615,7 +623,12 @@ export function generateTower(spec: TowerSpec): TowerResult {
       edges: [...edges, ...bridgeEdges],
       deckY: walkY,
       stage: sRail,
-      standing: corners.map((at) => ({ at, widthFt: DRESSED[CAB_POST_NOMINAL]!.w / IN_PER_FT })),
+      standing: [
+        ...corners.map((at) => ({ at, widthFt: DRESSED[CAB_POST_NOMINAL]!.w / IN_PER_FT })),
+        // And the stair's last flight, which stands its own posts on this deck.
+        ...stairRailEnds.filter((e) => Math.abs(e.y - walkY) < 1)
+          .map((e) => ({ at: e.at, widthFt: DRESSED[RAIL.postNominal.value as string]!.w / IN_PER_FT })),
+      ],
     }));
   }
 

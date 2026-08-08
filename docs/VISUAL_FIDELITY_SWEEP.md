@@ -106,6 +106,9 @@ screenshots get read.
 | **Plywood sheet joints on a gable end** | **Fixed** — a sheet edge is nailed to a stud, which is why 4x8 goods stand on end on a 16-in layout, and the generator says so twice. On the E and W walls it was not: the skin's corner wrap moved the tiling datum half a wall thickness off the frame's, so 32 of 193 field joints butted 2.75 in clear of the nearest wood. |
 | Roof-deck joints, and the roofing over them | **Checked, nothing wrong.** Every deck sheet joint on every card lands on a rafter, and no roofing course reaches past the deck under it except the documented ⅛-in lap over the ridge and the hip's 'cover' clip. |
 | **A shutter on a board-and-batten wall** | **Fixed** — it hung at the BOARD face and occupied exactly the shell the battens are in, so every batten a window crossed passed clean through both leaves: 32 pairs at 0.750 in on the b-hut, its whole thickness. The standoff was a sum of layer thicknesses, which leaves the batten out by design; a hung piece needs the finished wall. |
+| Duplicate members, and anything below grade | **Checked, nothing wrong.** No two members anywhere in the catalog share a role, size, position and rotation. Nothing stands below grade but the tower ladder's raked foot, 0.175 in — measured, recorded, below the visual threshold. |
+| **A thirty-foot fixed ladder** | **Fixed** — the rule that forces a stair past the cage threshold was written as `platformHeightFt === 24 \|\| === 32`, the picker's two tall options. A 26-, 28- or 30-ft tower — reachable from a saved spec or a link — came back with a ladder, against `LADDER.cageThresholdFt` and the card's own help text. |
+| **Two posts in one hole on a tall tower's stair** | **Fixed** — a switchback is four railed surfaces meeting, and each flight's rail post shared its hole with the landing's: 10 pairs at 3.500 in on a 32-ft tower, 8 on a 24. Plus the bridge's own end post a quarter inch inside the deck rail's. |
 
 ## The shed that had no walls above the plate
 
@@ -4727,3 +4730,112 @@ first and third fail on the old standoff with the defect in the message.
    picks the right one.
 
 No golden moved — not the frame set, not the compat set, not one thumbnail.
+
+## The tall tower's way up, which no preset builds
+
+The pass opened with two catalog-wide scans that found nothing and are worth having anyway.
+**No two members share a role, a size, a position and a rotation** — zero duplicate pairs across all
+fourteen cards. **And nothing stands below grade** but the tower ladder's raked foot, whose square
+end dips 0.175 in at its low corner and stands 0.175 proud at its high one. That is the tower
+brace's defect (1.93 in, fixed with `levelFootProfile`) at a tenth the size and on a member nobody
+would see it on; recorded, not fixed.
+
+What the second scan did surface is that `platformHeightFt` is a knob, and the tower it builds at 24
+and 32 ft — a switchback stair, three landings, its own railings, a bridge back to the deck, 446
+members against the shipped tower's 280 — **is in no golden and had never been swept.** Two things
+were wrong in it.
+
+### A thirty-foot fixed ladder
+
+```
+  asked 26, 28, 30 ft      access = ladder      2 rails, 26/28/30 rungs, no stair anywhere
+```
+
+`normalizeSpec` forces the stair with `platformHeightFt === 24 || platformHeightFt === 32`. Those
+are the two tall options the picker's select offers — not the rule. The rule is a THRESHOLD; the
+doctrine figure is `LADDER.cageThresholdFt`, 20 ft, life-safety flagged; and the card's own help
+text states it in words: *"Above 20 ft a fixed ladder is not an acceptable sole means of access
+(EM 385-1-1) — the tool switches to a stair and tells you."* Everything was right except the test.
+
+A spec reaches the generator from more places than the select: a saved plan, a shared link, the
+custom card, the fuzzer. Any of them could ask for 30 ft and get thirty rungs of fixed ladder with
+no warning attached. It is `> cage` now, and the message carries the figure.
+
+### And two posts in one hole, ten times
+
+`RailingInput.standing` exists for exactly this and says so — *"two posts entirely inside each other
+over 3 ft 8 in of height"* was the cab's, fixed passes ago. A switchback stair is four railed
+surfaces meeting each other:
+
+```
+  32-ft tower     10 railPost x railPost pairs at 3.500 in — a 4x4's whole width
+  24-ft tower      8
+```
+
+Each flight sets a post where its rail line runs out. The landing it runs out ON set its own 4x4 in
+the same hole — twice per landing, once for the flight arriving and once for the flight leaving —
+and at the top the last flight and the platform's guardrail did it again. Two more pairs came from
+the bridge: its rails deliberately stop half a rail's thickness short of the deck's rail line so
+they butt its face, and its end post then landed ¾ in from the deck's own — a quarter inch inside
+it.
+
+**Three changes, all of them the module's own idea applied where it had not reached:**
+
+- `generateStair` holds its landings' railings back until every flight has set its posts, and hands
+  each one the flight rail ends standing on it. Held back because half of what stands on a landing
+  is built on the NEXT pass round the flight loop — the departing flight's foot posts.
+- The RAIL LINE, not the post: `generateRailing` asks "is something standing here" at the line and
+  steps its own post back off it, exactly as the flight does. The first attempt handed it post
+  centres and changed nothing, because it was answering the question a post's width from where it
+  is asked.
+- `spotTaken` compares by proximity rather than by exact equality. Its own comment already says
+  *"where two posts land on the same spot, there is one post"*; two 4x4s a quarter inch apart are
+  the same spot, and now read as one.
+
+`StairResult` gained `railEnds` so the deck at the top — which is not the stair's to build — can be
+told the same thing the landings are.
+
+```
+  32-ft tower, posts per level     before   landing 6, platform 8      after   landing 4, platform 6
+  rail posts, every height 10..40  all at distinct spots
+```
+
+Nothing on any shipped card moves: the tower ships at 16 ft with a ladder, and all fourteen presets
+come out byte-identical. No golden moved.
+
+### Invisible, and worth saying so
+
+Two exactly coincident 4x4s render as one 4x4. The renders before and after this fix are the same
+picture, and the honest statement of what it buys is: eight posts of 4x4 off a cut list nobody
+could cut, and a model that no longer says a joint is something it is not. The thirty-foot ladder is
+the half of this pass that shows.
+
+### Measured, not fixed
+
+- **The platform guardrail runs into the cab's siding** — `railTop`, `railMid` and `toeBoard`, two
+  each, 1.500 in, on every tower tall enough to have a stair. The rail line is the deck edge and the
+  cab's siding stands outboard of its posts; one of the two has to give and which one is a covering
+  decision, not a railing one.
+- **A switchback's two rails cross at the turn** — the arriving flight's top rail and the departing
+  flight's mid rail, 3 pairs at 1.500 in, plus the same against the stringers. Several of those are
+  the stringer's documented box-vs-mesh margin; the rail-to-rail crossing is real and wants a trim
+  at the newel.
+- **The ladder rail's foot**, 0.175 in below grade, above.
+
+### The four things asserted
+
+`test/timber2-tower-tall-access.test.ts`, over every height from 10 to 40 ft in two-foot steps.
+Three of the four fail on the old generator.
+
+1. **A climb past the cage threshold is not a ladder** — access, ladder rails, stair stringers and
+   the forced-issue warning, at sixteen heights.
+2. **And below it a ladder is still a ladder** — the guard: widening the rule until every tower gets
+   a stair would pass (1) and delete the ladder from the toolkit.
+3. **One post per hole** — 2,000+ post pairs, none sharing wood.
+4. **And every corner is still posted** — at each landing exactly four posts on four distinct spots,
+   two from the flights and two of its own; at the platform the flight's two among the guardrail's,
+   with every edge still railed. Suppressing the landing railing outright would pass (3).
+
+`timber2-tower-stair.test.ts` needed one of its four restated: the bridge's rail now BUTTS the
+flight's post at its far end instead of running to the last inch of decking, so `< near` became
+`< near + half a post`, with the other half of the joint asserted alongside it.

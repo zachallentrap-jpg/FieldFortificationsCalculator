@@ -21,7 +21,7 @@ import type {
 import { SPEC_PATH_DEFS, SPEC_SECTION_FALLBACK, SPEC_SECTIONS_BUILDING, SPEC_SECTIONS_COMMON, WALL_ORDER, specPath } from './spec';
 import type { WallId } from './types';
 import { DRESSED } from './types';
-import { SPAN, LUMBER, ROOFING, IN_PER_FT } from './doctrine';
+import { SPAN, LUMBER, ROOFING, LADDER, IN_PER_FT } from './doctrine';
 import { defaultOpenings } from './openings';
 import { hutDims } from './families/hut';
 
@@ -659,12 +659,20 @@ function normalizeSpec2(raw: StructureSpec, issues: SpecIssue[]): NormalizeResul
       // EM 385-1-1 (plan TD32): above the cage threshold a fixed ladder is not an acceptable
       // sole means of access, and the cage is IN-later — so the tall towers get a stair. This
       // is a FORCE, not a bounds clamp: the user asked for something unsafe and is told.
-      if ((spec.platformHeightFt === 24 || spec.platformHeightFt === 32) && spec.access === 'ladder') {
+      //
+      // AGAINST THE THRESHOLD, not against the two heights the picker happens to offer. The rule
+      // was written as `=== 24 || === 32`, which covers the select's own options and nothing else
+      // — so a 26-, 28- or 30-ft tower, reachable from a saved spec, a link or the custom card,
+      // came back with a thirty-foot fixed ladder on it. The card's own help text states the real
+      // rule ("Above 20 ft a fixed ladder is not an acceptable sole means of access") and
+      // `LADDER.cageThresholdFt` is the figure; both were already right.
+      const cage = LADDER.cageThresholdFt.value as number;
+      if (spec.platformHeightFt > cage && spec.access === 'ladder') {
         out.access = 'stair';
         issues.push({
           path: 'access',
           kind: 'forced',
-          message: `A ${spec.platformHeightFt}-ft climb is past the fixed-ladder cage threshold (EM 385-1-1, PH) — switched to a switchback stair.`,
+          message: `A ${spec.platformHeightFt}-ft climb is past the ${cage}-ft fixed-ladder cage threshold (EM 385-1-1, PH) — switched to a switchback stair.`,
           severity: 'warn',
         });
       }

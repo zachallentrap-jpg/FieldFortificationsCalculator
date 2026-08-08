@@ -24,6 +24,15 @@ import { generateRailing, railRequired, type RailEdge } from './railings';
 /** Divide-by-zero guard on a degenerate run. Arithmetic, not doctrine. */
 const EPS_FT = 1e-6;
 
+/**
+ * How far off a landing's deck a flight's rail end still counts as standing ON that landing.
+ *
+ * A flight's rail runs along the WALKING line, which is one riser up at the flight's foot — so the
+ * departing flight's rail meets the landing 7½ in above it while the arriving flight's meets it
+ * dead level. One foot is above any riser and far below the rise between two landings.
+ */
+const POST_FOOT_TOL_FT = 1;
+
 export interface LadderInput {
   /** Foot of the ladder, in plan. */
   base: [x: number, z: number];
@@ -240,6 +249,13 @@ export interface StairResult {
   flights: StairSolution[];
   /** Landing centres, for the railing pass. */
   landings: { at: [number, number]; y: number }[];
+  /**
+   * Where each flight's rail line runs out, and the walking height there — what any OTHER railed
+   * surface this stair meets has to be told about, so it does not put a second post in the hole.
+   * The landings' own railings are handed these inside this module; the deck at the top is not
+   * ours to build, so its builder gets them here.
+   */
+  railEnds: { at: [number, number]; y: number }[];
 }
 
 export function generateStair(input: StairInput): StairResult {
@@ -259,6 +275,16 @@ export function generateStair(input: StairInput): StairResult {
 
   const flights: StairSolution[] = [];
   const landings: { at: [number, number]; y: number }[] = [];
+  /** Landing railings, held back until every flight has set its posts. See the second pass below. */
+  const landingRails: { edges: RailEdge[]; deckY: number; idPrefix: string }[] = [];
+  /**
+   * Where each flight's rail RUNS OUT — its line's two ends and the walking height there.
+   *
+   * The line, not the post: `generateRailing` asks "is something standing here" at the rail line
+   * and steps its own post back off it, exactly as the flight does. Handing it post centres would
+   * ask the question a post's width away from where it is asked.
+   */
+  const railEnds: { at: [number, number]; y: number }[] = [];
   const mode = input.turn ?? 'quarter';
   const stepFt = widthFt;
   // Every flight carries the same rise, so every flight has the same run.
@@ -412,6 +438,11 @@ export function generateStair(input: StairInput): StairResult {
             doctrineRef: citeOf(RAIL.postSpacingMaxFt),
           });
         }
+        // The two ends of this rail line, for whatever railed surface it runs into.
+        railEnds.push(
+          { at: [px(0), pz(0)], y: walkY(0) },
+          { at: [px(sol.runFt), pz(sol.runFt)], y: walkY(sol.runFt) },
+        );
         const mid = sol.runFt / 2;
         for (const [h, role, cite] of [
           [railTopH, 'railTop', citeOf(RAIL.topHeightIn)],
@@ -504,11 +535,23 @@ export function generateStair(input: StairInput): StairResult {
           const leaves = e.out[0] * nextDir[0] + e.out[1] * nextDir[1] > 0.5;
           if (!arrives && !leaves) edges.push({ id: `L${f}-${i}`, from: e.from, to: e.to });
         });
-        emit.members.push(...generateRailing({
-          edges, deckY: y, stage, idPrefix: `${input.idPrefix ?? 'AC'}L${f + 1}`,
-        }));
+        // DEFERRED, because half of what stands on this landing is not built yet. The flight
+        // ARRIVING here has set its head posts on two of these corners already; the flight
+        // LEAVING sets its foot posts on the other two, and it is emitted next time round this
+        // loop. A railing told about neither puts its own 4x4 in all four holes — which is the
+        // cab's defect exactly (`RailingInput.standing`, *"two posts entirely inside each other
+        // over 3 ft 8 in of height"*), and on a 32-ft tower it happened ten times.
+        landingRails.push({ edges, deckY: y, idPrefix: `${input.idPrefix ?? 'AC'}L${f + 1}` });
       }
     }
   }
-  return { members: emit.members, flights, landings };
+
+  // ── The landings' railings, now that both flights at each one have set their posts.
+  const postW = DRESSED[railPostNominal]!.w / IN_PER_FT;
+  for (const r of landingRails) {
+    const standing = railEnds.filter((e) => Math.abs(e.y - r.deckY) < POST_FOOT_TOL_FT)
+      .map((e) => ({ at: e.at, widthFt: postW }));
+    emit.members.push(...generateRailing({ ...r, stage, standing }));
+  }
+  return { members: emit.members, flights, landings, railEnds };
 }
