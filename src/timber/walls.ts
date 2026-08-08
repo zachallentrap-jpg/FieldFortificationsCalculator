@@ -201,11 +201,31 @@ export function generateWalls(input: WallsInput): Member[] {
     // no room). The brace face sits a hair proud of the stud faces so the let-in reads.
     if (input.letInBracing) {
       const braceT = DRESSED['1x4']!.w / FT;
+      /** The face a let-in brace shows on the wall — what its box spans along the run. */
+      const braceD = DRESSED['1x4']!.d / FT;
       const clearL = walls.length ? Math.min(...walls.map((o) => o.offsetFt)) - 0.5 : f.runFt - 1;
       const clearR = walls.length ? f.runFt - Math.max(...walls.map((o) => o.offsetFt + o.widthFt)) - 0.5 : f.runFt - 1;
       const lat = -((dFt - braceT) / 2 + 0.05 / FT); // outside face, slightly proud
       for (const [end, clear] of [['L', clearL], ['R', clearR]] as const) {
-        const run = Math.min(clear, studLen);
+        // AND NOT PAST THE MIDDLE. Two braces on one wall, each run out to `studLen`, CROSS on any
+        // wall shorter than twice the stud height — and a let-in brace is let into the stud faces,
+        // so both boards sit in the same 3/4-in slot wherever they meet. Measured on the shipped
+        // latrine: 3.5 ft of shared board on the 12-ft walls and 5.6 ft on the 8-ft ends, and the
+        // render shows an X in a single plane on both end walls. The storage shed has the same on
+        // its two 12-ft ends. Held to half the wall the pair meets at the top plate instead of
+        // crossing, which is a brace pair somebody can actually cut.
+        //
+        // Half the wall LESS THE OVERSHOOT. A raked board's box reaches `d·sin(ang)/2` further
+        // along the wall than the centreline it is drawn on, so two braces run exactly to the
+        // middle still share that twice over at the apex — 2.7 in on the latrine. The angle
+        // depends on the run and the run on the angle, and each pass of the substitution gains
+        // about two decimal places: four take the joint to a ten-millionth of an inch, which is
+        // exact as far as anything downstream is concerned.
+        let run = Math.min(clear, studLen, f.runFt / 2);
+        for (let k = 0; k < 4; k++) {
+          const over = (braceD / 2) * (studLen / Math.hypot(run, studLen));
+          run = Math.min(clear, studLen, f.runFt / 2 - over);
+        }
         if (run < 3) continue;
         const ang = Math.atan2(studLen, run);
         const len = Math.hypot(run, studLen);

@@ -100,6 +100,7 @@ screenshots get read.
 | Build order, catalog-wide | **Checked, clean.** Nothing wrong. 2,777 borne members and 8,794 bearing pairs across all fourteen cards, none of them standing on something built later. Landed as a permanent guard, with its blind spot written down. |
 | **The ends of a tent frame** | **Fixed** — the bents and the floor joists were both laid out as `L·i/(n−1)`, which puts the first and last CENTRELINE on the deck's own ends: 1¾ in of every end post, and of every end-door jamb, standing over air, plus ¾ in of bare joist at each end. |
 | Standing on a deck and reaching past it, catalog-wide | **Checked, nothing wrong.** The tent's was the only real one. The tower cab's posts DO overhang the decking by 1¾ in and it is a joint, not a defect — they land on the leg heads with an inch to spare. Pinned. |
+| **Two let-in braces on one wall** | **Fixed** — each ran out to the stud height from its own corner, so on any wall shorter than twice that they CROSSED, both boards in the one ¾-in let-in slot: 5.64 ft of shared board on the latrine's end walls. |
 
 ## The shed that had no walls above the plate
 
@@ -4389,3 +4390,52 @@ figures it rests on can move. Two tests: every cab post lands inside a leg's hea
 variant; and it does overhang the decking, by exactly half its own width, which is the honest half
 and the one that has to be re-checked if the cab plan and the leg square ever stop being struck
 from one figure. A test that asserted only the good news would have hidden that.
+
+## An X that cannot be cut
+
+The latrine was the target — a shipped card this sweep had only ever poked at through its riser
+box. Rendered at the bracing stage, both end walls carry a full **X**, and the two diagonals are in
+the same plane.
+
+A let-in brace is let INTO the stud faces, so every brace on a wall lives in one ¾-in slot.
+`walls.ts` puts one at each end of the wall and runs each out to `min(clear, studLen)` — which on
+any wall shorter than twice the stud height means the two cross, and both boards are then in that
+slot along the whole crossing:
+
+```
+  latrine 12 x 8       N/S walls  3.46 ft of shared board     E/W walls  5.64 ft
+  storage shed 20 x 12 E/W walls  4.04 ft
+```
+
+It is the guard tower's X-brace defect — *"both diagonals were drawn on the legs' own centre
+plane… inside EACH OTHER at the crossing"* — one module along, and it cannot be fixed the same way.
+The tower laid one diagonal on the other; a LET-IN brace has nowhere to go. It has to stop.
+
+So the run is held to half the wall **less the overshoot a square end puts past its own centreline**
+— a raked board's box reaches `d·sin(ang)/2` further along the wall than the line it is drawn on,
+and two braces run exactly to the middle would still share that twice over (2.7 in on the latrine).
+The angle depends on the run and the run on the angle; four passes of the substitution take the
+joint to a ten-millionth of an inch. The pair now butts at the top plate's centre — a Λ instead of
+an X, which is a brace pair somebody can actually cut, and the wall is still braced both ways.
+
+**COMPAT-LOCK EVENT**, `walls.ts` being the frozen C-10 branch, and the blast radius is as narrow
+as this kind of change gets:
+
+```
+  25 of 84 frame fixtures touched
+  148 members changed        0 added, 0 removed
+  every one of them role `brace`
+  fields that moved          cutLength, position, rotation, and nothing else
+  worst deltas               18.52 in of length, 14.95° of pitch
+```
+
+One compat golden actually moved — `demo-braced-attic`, the only curated fixture short enough to
+cross — plus the index hash and four thumbnails. **The seventeen frame goldens did not change at
+all**, and no test was pinning the crossing.
+
+Four tests in `test/timber2-let-in-brace.test.ts`; two fail on the old generator. The other two are
+the guards on what must NOT change, and both matter here because the fix touches a rule the
+doctrine states: **a clear, long wall still braces at 45°** — the cap is a detail of short walls,
+and `walls.ts`'s own test still asserts the 45 — and **a wall with no room still gets none**, the
+existing three-foot floor below which the piece is a stud and the sheathing braces the wall
+instead. Halving the run brings more walls to that line, so the floor had to keep holding at it.
