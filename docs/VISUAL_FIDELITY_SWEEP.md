@@ -101,6 +101,7 @@ screenshots get read.
 | **The ends of a tent frame** | **Fixed** — the bents and the floor joists were both laid out as `L·i/(n−1)`, which puts the first and last CENTRELINE on the deck's own ends: 1¾ in of every end post, and of every end-door jamb, standing over air, plus ¾ in of bare joist at each end. |
 | Standing on a deck and reaching past it, catalog-wide | **Checked, nothing wrong.** The tent's was the only real one. The tower cab's posts DO overhang the decking by 1¾ in and it is a joint, not a defect — they land on the leg heads with an inch to spare. Pinned. |
 | **Two let-in braces on one wall** | **Fixed** — each ran out to the stud height from its own corner, so on any wall shorter than twice that they CROSSED, both boards in the one ¾-in let-in slot: 5.64 ft of shared board on the latrine's end walls. |
+| Bending members on edge, and openings vs their skin | **Checked, nothing wrong.** 1,500+ bending members across 106 role/family groups, every one on edge; every framed opening in the catalog cut out of the skin over it, 0.0% covered. Both landed as guards. |
 
 ## The shed that had no walls above the plate
 
@@ -4439,3 +4440,50 @@ doctrine states: **a clear, long wall still braces at 45°** — the cap is a de
 and `walls.ts`'s own test still asserts the 45 — and **a wall with no room still gets none**, the
 existing three-foot floor below which the piece is a stud and the sheathing braces the wall
 instead. Halving the run brings more walls to that line, so the floor had to keep holding at it.
+
+## Two things that turned out to be right
+
+The latrine's crossed braces came out of looking at a card at its FRAMING stages, where the
+coverings are not yet hiding anything. So this pass asked two more framing questions of the whole
+catalog, and the answer to both was no.
+
+**Is anything laid FLAT that should be on edge?** A joist, a rafter, a header, a stringer carries
+its load on its DEPTH; laid flat it is a different piece with a fraction of the strength, and it
+reads as one on screen. The sweep's very first entry was *"flat pieces on edge"* on the loading
+platform and the question has never been put to the catalog as a whole.
+
+```
+  106 role/family groups, 1,500+ members    every one on edge
+```
+
+**Is any framed opening clad over?** A door or a window is a hole in the frame AND a hole in the
+skin, cut by a different pass from a different datum, and the two have drifted before — *"the
+siding's hole is 1½ in above the frame… it shows as the siding lapping the screen by 1.50 in along
+the bottom"* is a live entry against the screened band.
+
+```
+  every framed opening in the catalog        skin covers 0.0% of it
+```
+
+### Reading it off the model is the point, and two attempts at this got it wrong first
+
+Both are worth recording, because both produced a confident, specific, WRONG finding:
+
+- **Pairing jack studs by sorting them along the wall** pairs the right jack of one opening with the
+  left jack of the next. That measures the solid wall BETWEEN two windows and reports it half
+  covered — which it is, being a wall.
+- **Mapping the spec's `offsetFt` straight to world x** is wrong on the N and E walls, whose runs go
+  the other way. That one reported a gp-frame window buried under two feet of siding; the window
+  was at the far end of the wall and perfectly cut.
+
+The version that stands finds each opening from its own HEADER and the two jacks under it, so no
+assumption about handedness or ordering enters. The lesson is the one this sweep keeps relearning:
+a measurement that restates the generator's own convention is not a measurement.
+
+Both invariants land as guards in `test/timber2-skin-openings.test.ts`, each **validated by
+breaking something** — laying the floor joists flat fails the first with *"FL-joist-01 (joist, 2x8)
+is laid FLAT — its 1.5 in thickness stands more upright than its 7.25 in depth"*, and stubbing
+`subtractCutouts` to return the whole tile fails the second and the third. The third is the guard
+on the second: a skin that vanished entirely would also cover 0% of every opening.
+
+No source changed and no goldens moved.
