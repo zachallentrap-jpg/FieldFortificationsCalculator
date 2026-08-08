@@ -11,6 +11,10 @@
 //
 // And there were THREE rafters, at the two edges and the middle: 48 in on centre across an 8-ft
 // cab, on a card whose own `spacing.rafterSpacingIn` says 16.
+//
+// The plate that pass added was the right member in the wrong place, and this test said so in the
+// wrong words — see the note on the bearing line below, and `timber2-cab-shed-roof` for the joint
+// it makes now.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -74,11 +78,21 @@ test('THE HIGH SIDE OF A SHED CAB STANDS ON SOMETHING', () => {
   // end. A shed's rafters run past their high wall by the cab's overhang, exactly as they run
   // past the low one, so "the high end sits on the plate" is the wrong claim and was the first
   // version of this test: it failed at 1.00 ft, which is `TOWER.cabOverhangFt`.
+  //
+  // AND THE BEARING LINE IS THE RAFTER'S UNDERSIDE, NOT ITS CENTRE. `rafterPlaneDatum` states the
+  // rule for the whole toolkit: every roof surface is given at the rafter's CENTRE plane and the
+  // covering is lifted off it by `rafterHalfFt`. Reading the centreline here and asking the plate
+  // to reach it is asking for the plate to be buried half a rafter deep, and it was — 2.987 in of
+  // shared wood on every rafter, where the building's identical pony plate shares 1.107 and that
+  // 1.107 is the bird's mouth. The seat lands on the plate's UP-SLOPE face, the far one going up
+  // the roof, which is where a rafter running on past the wall last touches it.
   for (const r of rafters) {
     const [a, b] = ends(r);
     const t = (plate.position[2] - a[2]) / (b[2] - a[2]);
     assert.ok(t > 0 && t < 1, `${r.id} does not cross the plate at all`);
-    const yAt = a[1] + (b[1] - a[1]) * t;
+    const dn = rotate(r, [0, -r.actual.d / 24, 0]); // centreline → underside, square to the slope
+    const s = (pb.z[1]! - (a[2] + dn[2])) / (b[2] - a[2]);
+    const yAt = a[1] + dn[1] + (b[1] - a[1]) * s;
     assert.ok(Math.abs(yAt - pb.y[1]!) < 1e-9,
       `${r.id}: over the plate its bearing line is at ${yAt.toFixed(4)} and the plate tops out at `
       + `${pb.y[1]!.toFixed(4)} — ${((yAt - pb.y[1]!) * IN_PER_FT).toFixed(2)} in of daylight`);

@@ -24,6 +24,7 @@ import { stagePlan, requireOrdinal, type StagePlanEntry } from '../stagePlan';
 import { generateRailing, railRequired, type RailEdge } from '../subsystems/railings';
 import { generateLadder, generateStair } from '../subsystems/access';
 import { pyramidPlanes, type RoofPlane } from '../subsystems/roofFamilies';
+import { rafterSeatLiftFt } from '../birdsMouth';
 import { generateRoofCovering } from '../subsystems/coverings';
 import type { FloorLevels } from '../floor';
 
@@ -779,15 +780,43 @@ export function generateTower(spec: TowerSpec): TowerResult {
     // high edge: the rafters run past the wall by the cab's overhang, exactly as they do at the
     // eave. `eaveY + fall` is the height over the overhang's far edge and put the plate 4 in
     // above the bearing line the rafters actually cross.
+    //
+    // AND THAT PLANE IS THE RAFTERS' CENTRE LINE, NOT THEIR UNDERSIDE. `roofPlanes` says so in
+    // `rafterPlaneDatum`: every surface in the toolkit is stated at the rafter's centre and the
+    // covering is lifted off it by `rafterHalfFt`. Setting the plate top to the plane put its top
+    // face exactly on the rafters' centres, which buries the plate half a rafter deep — measured
+    // 2.987 in on every one of them, against the 1.107 in the building's identical pony plate
+    // gives, and that 1.107 is the bird's mouth. The plate has to drop by the seat: the underside
+    // of a pitched rafter is `(rafterFace/2)/cos θ` below its centre, measured plumb.
+    //
+    // The far face is the one the seat lands on, and it is half a plate BEYOND the post line —
+    // the building's pony plate is flush to its wall's outer face, but this one straddles the cab
+    // posts it stands on, so the plane has to be read at `+plateD/2`. `rafterSeatLiftFt` with a
+    // zero-width plate states the plumb half-depth once, so the cab and the building cannot drift
+    // apart on the pitch convention.
+    //
+    // AND IT WAS ON EDGE. `[0, 0, 0]` stood a 2x4 up 3½ in tall and 1½ in across the wall, so the
+    // plate was narrower in plan than the rafters were deep — the building's pony plate has laid
+    // flat since T2 (`[-π/2, 0, 0]`, 1½ tall by 3½ across) and a plate on edge is not a plate.
+    //
+    // AND IT STOPPED ON THE POST CENTRES. `deckHalf * 2` runs centre to centre, which left 1¾ in
+    // of each post top bare and hung half of each end rafter — 0.750 of its 1.500 in — off the
+    // end of the wood it is supposed to bear on. A cap plate runs to the outer faces of the posts
+    // under it, which is also the cab's own plan line, so nothing moves outboard of the cab.
     const highY = eaveY + (fall * (deckHalf * 2 + overhang)) / (half * 2);
     const plateNom = LUMBER.plateNominal.value as string;
-    const plateD = DRESSED[plateNom]!.d / IN_PER_FT;
+    const plateD = DRESSED[plateNom]!.d / IN_PER_FT; // across the wall, in plan
+    const plateT = DRESSED[plateNom]!.w / IN_PER_FT; // its thickness, laid flat
+    const slopeR = fall / (half * 2);
+    const plateTopY = highY + (plateD / 2) * slopeR
+      - rafterSeatLiftFt(DRESSED['2x6']!.d, 0, slopeR);
+    const cabPostD = DRESSED[CAB_POST_NOMINAL]!.d / IN_PER_FT;
     for (const x of [cx - deckHalf, cx + deckHalf]) {
       emit('post', '4x4', {
         // Up to the UNDERSIDE of the plate, not to the top of the wall: a plate sits ON its
         // posts, and running them both to the same height buries it in them.
-        cutLengthFt: highY - plateD - eaveY,
-        position: [x, (eaveY + highY - plateD) / 2, cx + deckHalf],
+        cutLengthFt: plateTopY - plateT - eaveY,
+        position: [x, (eaveY + plateTopY - plateT) / 2, cx + deckHalf],
         rotation: [0, 0, Math.PI / 2],
         stage: sRoof,
         nailing: 'bolted to the cab post below (PH)',
@@ -795,11 +824,11 @@ export function generateTower(spec: TowerSpec): TowerResult {
       });
     }
     emit('capPlate', plateNom, {
-      cutLengthFt: deckHalf * 2,
-      position: [cx, highY - plateD / 2, cx + deckHalf],
-      rotation: [0, 0, 0],
+      cutLengthFt: deckHalf * 2 + cabPostD,
+      position: [cx, plateTopY - plateT / 2, cx + deckHalf],
+      rotation: [-Math.PI / 2, 0, 0],
       stage: sRoof,
-      nailing: '2-16d ea post (PH)',
+      nailing: '2-16d ea post; rafters bird’s-mouth toenail 3-8d (PH)',
       doctrineRef: citeOf(TOWER.cabRisePer12),
     });
     // Rafters span the slope, so they are spaced ACROSS it — along X — and run toward +Z going

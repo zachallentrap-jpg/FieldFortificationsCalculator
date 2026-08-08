@@ -113,6 +113,7 @@ screenshots get read.
 | **A hut with a shed roof, which threw** | **Fixed** — `normalize.ts`'s roof repair lived inside `normalizeBuilding` and `normalizeHut` ran none of it. All six hut cards declare `shed` in their own `roofs` list; the spec threw on `walls.surfaces.find(…)!` and the workbench sat on "Laying out the frame…" for ever. Four other malformed roofs came back with NO ROOF and zero issues. |
 | **The beam over an open front** | **Fixed** — laid `bayFt + postD` long and centred on its bay, each beam reached half a post past BOTH ends: at every interior post the two beams meeting there each covered the whole post (5 pairs at 1.500 in on a 48-ft front), and the two end beams stood 1¾ in past the building line into the side wall's siding. |
 | The let-in brace against what it is let into | **Checked, not a defect.** A brace let ¾ in into the studs' outer faces shares 0.700 in with every one it crosses — 364 pairs at a flat 0.700 across the seven braced cards, and the same 0.700 against an open front's corner post. The notch is not a mesh cut; sixth documented approximation. |
+| **The shed cab's high plate** | **Fixed, three ways.** The tower card's other roof, one click from the shipped pyramid. The plate stood ON EDGE (3½ in tall, 1½ across — the building's pony plate has laid flat since T2); its top was set to the roof plane, which `rafterPlaneDatum` states at the rafters' CENTRE, so it stood half a rafter inside all seven — 2.987 in against the building's 1.107, and that 1.107 is the bird's mouth; and it ran post-CENTRE to post-centre, leaving 1¾ in of each post top bare and half of each end rafter off the plate. |
 
 ## The shed that had no walls above the plate
 
@@ -5069,3 +5070,115 @@ the old generator.
 
 No shipped card sets `openFront` — the storage-shed card offers it in words and ships a doorway
 instead — so all fourteen presets are byte-identical and no golden moved.
+
+## The shed cab's high plate — on edge, in the rafters, and short at both ends
+
+`cab.roof` is a two-way control on the guard tower card (`roofs: ['pyramid', 'shed']`). The card
+ships `pyramid`, so `shed` is one click away and had never been measured. It is hand-rolled inside
+`tower.ts` rather than going through `roofFamilies.ts`, and an earlier pass of this sweep gave it
+the plate its high side was missing — the right member, put in by eye from the building's pony
+plate. Measured against that pony plate, side by side:
+
+```
+                             vertical extent   across the wall   rafter underside at the seat
+  gp-frame + shed (reference)     1.50 in          3.50 in       ON the plate top    (0.000)
+  tower cab + shed, plan 6        3.50 in          1.50 in       2.649 in BELOW it
+  tower cab + shed, plan 8        3.50 in          1.50 in       2.649 in BELOW it
+```
+
+Three things wrong with one member.
+
+**IT WAS ON EDGE.** `rotation: [0, 0, 0]` stands a 2x4 up — 3½ in tall and 1½ in across the wall,
+so the plate was narrower in plan than the rafters crossing it were deep. The building's pony plate
+has been `[-π/2, 0, 0]` since T2. A plate on edge is not a plate.
+
+**THE RAFTERS DID NOT BEAR ON IT.** Its top was set to `highY`, the roof plane at the wall. But
+`rafterPlaneDatum` states the rule for the whole toolkit: *"Where the rafter CENTRE plane sits at
+the building line — the datum every roof surface and every rafter in this file is measured from"*,
+with the covering lifted off it by `rafterHalfFt`. Putting the plate's top face on that plane
+buries the plate half a rafter deep:
+
+```
+  cabPlan 6   plate y 25.0417..25.3333 (3.50 in)   rafter centre at the wall 25.3333
+  cabPlan 8   plate y 25.7083..26.0000 (3.50 in)   rafter centre at the wall 26.0000
+  worst capPlate x rafter, both plans:  2.987 in   —  the building's identical joint: 1.107 in
+```
+
+and 1.107 is the bird's mouth. Every rafter on the cab shared nearly three inches of wood with the
+plate it was supposed to sit on.
+
+**AND IT STOPPED ON THE POST CENTRES.** `cutLengthFt: deckHalf * 2` runs centre to centre:
+
+```
+  plate x 1.5000..7.5000        post TW-post-05 x 1.3542..1.6458   1.750 in of its top bare
+                                post TW-post-06 x 7.3542..7.6458   1.750 in of its top bare
+  rafter TW-rafter-01 x 1.4375..1.5625 — 0.750 of its 1.500 in hangs off the plate's end
+  rafter TW-rafter-06 x 7.4375..7.5625 — the same at the other end
+```
+
+### The fix
+
+The plane is read at the plate's FAR face and dropped by the plumb half-depth. The cab's plate
+straddles the posts it stands on, where the building's is flush to a wall's outer face, so the
+seat is half a plate beyond the post line rather than on it — `rafterSeatLiftFt` with a zero-width
+plate states the half-depth once so the two families cannot drift apart on the pitch convention:
+
+```ts
+const plateTopY = highY + (plateD / 2) * slopeR - rafterSeatLiftFt(DRESSED['2x6']!.d, 0, slopeR);
+```
+
+laid flat (`[-π/2, 0, 0]`, 1½ tall by 3½ across), run out to the posts' outer faces
+(`deckHalf * 2 + cabPostD`), with the two posts under it shortened to its new underside. After:
+
+```
+  tower cab + shed, plan 6   plate 1.50 in tall, 3.50 across   underside at the seat  0.000
+  tower cab + shed, plan 8   plate 1.50 in tall, 3.50 across   underside at the seat  0.000
+  worst capPlate x rafter, both plans: 1.107 in — the building's figure, to the thousandth
+  bare post top: 0 in     rafter hanging off the plate: 0 in
+```
+
+Rendered at the roof-frame stage the plate reads as a thin flat member with the rafters standing
+on it; before, it was a fat band with the rafters buried to their centre lines and their ends
+poking out the top.
+
+### An existing test had the defect written into it
+
+`timber2-cab-shed`'s first assertion took the rafter's CENTRELINE at the plate as its "bearing
+line" and required the plate top to reach it — which is asking for exactly the burial that was
+there. Restated on the rafter's UNDERSIDE, read at the plate's up-slope face. It fails on the old
+generator too, now reporting the real 2.65 in.
+
+### The five things asserted
+
+`test/timber2-cab-shed-roof.test.ts`, over cab plans 6/8/10 × platform 16/24 ft × rafters 16/24 in
+oc × two footings. Tests 1–4 fail on the old generator; test 5 passes on both, which is its job.
+
+1. **The plate is laid FLAT** — vertical extent is the stock's thickness, plan extent its face width.
+2. **The rafters bear on it** — the un-notched underside meets the plate top at its up-slope face to
+   1e-9, and dips below it at the near face, which is the notch. Both directions at once: the defect
+   put the plate above that line, and an arbitrary drop would put it below and leave them floating.
+3. **Nothing hangs off its ends** — every rafter and every post top inside the plate's run, and the
+   plate stopping exactly on the posts' outer faces rather than running out past the cab.
+4. **It is the SAME JOINT the building makes** — the cab's worst `capPlate x rafter` equals the
+   gp-frame shed's to 1e-9, across two families and two generators; and the rafters are the only
+   thing it shares wood with, so a plate dropped onto its seat was not dropped into its posts.
+5. **What must not change** — the pyramid cab has no high plate and still has its four hips, and the
+   shed's rafter count still comes from `spacing.rafterSpacingIn`.
+
+The shipped tower is `pyramid`, so all fourteen presets are byte-identical and no golden moved.
+
+### Found this pass, NOT fixed — the next target
+
+The cab's high side is open. Between the cab wall's top and the plate's underside there is nothing
+but the two corner posts:
+
+```
+  cab wall (screen panels, girts) tops out at   23.0000
+  the high plate's underside                    25.6820
+  members standing in that band                 TW-post-05, TW-post-06 — and nothing else
+  open: 32.2 in tall by the full 8 ft of the cab
+```
+
+The building's shed closes the same band with a pony wall — studs on the stud spacing and the wall
+covering carried up over them. The cab gets two posts. Recorded here, measured, and left for the
+next iteration rather than folded into this one.
