@@ -102,6 +102,7 @@ screenshots get read.
 | Standing on a deck and reaching past it, catalog-wide | **Checked, nothing wrong.** The tent's was the only real one. The tower cab's posts DO overhang the decking by 1¾ in and it is a joint, not a defect — they land on the leg heads with an inch to spare. Pinned. |
 | **Two let-in braces on one wall** | **Fixed** — each ran out to the stud height from its own corner, so on any wall shorter than twice that they CROSSED, both boards in the one ¾-in let-in slot: 5.64 ft of shared board on the latrine's end walls. |
 | Bending members on edge, and openings vs their skin | **Checked, nothing wrong.** 1,500+ bending members across 106 role/family groups, every one on edge; every framed opening in the catalog cut out of the skin over it, 0.0% covered. Both landed as guards. |
+| **The b-hut's girts at its partitions** | **Fixed** — carried as "measured, not fixed" through three passes. The girt ran clean through all six partition end studs, 1.50 in each — its whole thickness — on the only card in the catalog with interior walls. Cut by reading the partitions off the members already emitted. |
 
 ## The shed that had no walls above the plate
 
@@ -4487,3 +4488,68 @@ is laid FLAT — its 1.5 in thickness stands more upright than its 7.25 in depth
 on the second: a skin that vanished entirely would also cover 0% of every opening.
 
 No source changed and no goldens moved.
+
+## A girt is left running past an opening on purpose. A partition is not an opening.
+
+The one entry this sweep had carried, unchanged, through three passes. `generateGirts` says in its
+own comment that a girt is CUT ON SITE at an opening and that the take-off bills the stock it is cut
+from — which is right, and which is why two earlier girt passes left it alone. But a partition is
+not a hole in the wall. It is a stud wall standing in the girt's own plane, and the girt went
+straight through every one of them:
+
+```
+  b-hut 36 x 16, partitions at x = 9, 18, 27
+    6 pairs   girt x PT-stud   1.500 in   the girt's whole thickness, six times
+```
+
+Six, and only six, because the b-hut is the only shipped card with interior walls. That is why it
+survived the two passes that did look at girts: *"a girt is nailed to the studs; it is not in the
+same plane as them"* moved the plane off the wall centreline, *"a girt is cut at the corner"*
+trimmed the butting pair's ends, and neither had anything in front of it but four exterior walls.
+
+### The reason it was carried, and the way through
+
+The entry read: *"Both directions of the fix need something the modules do not have —
+`generateGirts` is handed only the wall contract, and `partitions.ts` is a building subsystem that
+knows nothing about a hut's girts."* That was true of both directions **as stated**, and the way
+through is neither of them. It is the repo's own third idiom, the one `tower.ts` uses to find the
+ground under its ladder: **read the obstructions off the members already emitted.**
+
+By the time `generateHut` calls `generateGirts`, the partitions are in `base.members`. They are
+handed over as `Member[]` and the girt is cut at whatever of them stands in its plane band, at its
+height, and inside its run — measured with the same `halfExtentAlong` the file already uses to
+clip its cripples. No second derivation of where a partition is, and no new coupling: pass the
+list, or pass nothing and get the old single run.
+
+```
+  S wall before   x  0.292 .. 35.708                                        one piece
+  S wall after    x  0.292..8.854   9.146..17.854   18.146..26.854   27.146..35.708
+```
+
+Each break is 3½ in — the stud's own face, no clearance added — and both new ends butt it. The run
+is untouched at both corners; only the three bites the partitions take out of it are gone. Rendered
+at the framing stage with the far wall cut away, the girt now arrives at each partition, stops on
+its face, and starts again on the other side.
+
+### The four things asserted
+
+`test/timber2-hut-girt-partition.test.ts`, three of which fail on the old generator with the defect
+in the message:
+
+1. **No girt shares wood with any partition member** — the defect, stated as a collision.
+2. **Each break is filled, and filled exactly** — something of the partition spans it, and the break
+   is that piece's width to 1e-9. A girt shortened by an arbitrary clearance would pass (1) and
+   leave a gap at every partition with nothing bearing across it.
+3. **A girt still runs PAST an opening** — 62 framed openings across the six hut cards, every one
+   still crossed, and any wall with nothing standing in it still gets its run in ONE piece. This is
+   the guard that the fix aimed at studs and not at holes; it passes both before and after.
+4. **The run is unchanged** — run = wood + breaks to 1e-9 on every wall, and no piece under a foot.
+
+`test/timber2-hut-girt.test.ts` needed two of its four restated, because they were written when a
+wall's run and one girt's `cutLength` were the same number: the corner assertions now ask about the
+piece at each END of each wall, and the matched-pair assertion measures each wall's RUN rather than
+a member's length. Neither invariant changed; both still fail on the corner defect they were
+written for.
+
+Two thumbnails moved, both the b-hut's. No frame or compat golden moved — huts are not
+`generateFrame` fixtures.

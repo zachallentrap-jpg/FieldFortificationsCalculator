@@ -91,6 +91,34 @@ function hutted(): { id: string; girts: Member[]; members: Member[] }[] {
   return out;
 }
 
+/** Which plan axis a wall's girts run along. */
+const runAxis = (m: Member): 'x' | 'z' => (Math.abs(rotate(m, [1, 0, 0])[0]) > 0.5 ? 'x' : 'z');
+
+/** Each wall's girt run, end to end, however many pieces it arrives in. */
+function wallRuns(girts: Member[]): Map<string, [number, number]> {
+  const out = new Map<string, [number, number]>();
+  for (const g of girts) {
+    const k = g.wall ?? '?';
+    const e = box(g)[runAxis(g)];
+    const cur = out.get(k);
+    out.set(k, cur ? [Math.min(cur[0], e[0]), Math.max(cur[1], e[1])] : [e[0], e[1]]);
+  }
+  return out;
+}
+
+/** The one piece at each end of each wall — the two that arrive at that wall's corners. */
+function wallEnds(girts: Member[]): Map<string, Member[]> {
+  const byWall = new Map<string, Member[]>();
+  for (const g of girts) byWall.set(g.wall ?? '?', [...(byWall.get(g.wall ?? '?') ?? []), g]);
+  const out = new Map<string, Member[]>();
+  for (const [k, ms] of byWall) {
+    const a = runAxis(ms[0]!);
+    const sorted = [...ms].sort((p, q) => box(p)[a][0] - box(q)[a][0]);
+    out.set(k, [...new Set([sorted[0]!, sorted[sorted.length - 1]!])]);
+  }
+  return out;
+}
+
 test('TWO GIRTS AT A CORNER — one runs through, the other butts its face', () => {
   for (const { id, girts } of hutted()) {
     for (let i = 0; i < girts.length; i++) {
@@ -106,19 +134,23 @@ test('TWO GIRTS AT A CORNER — one runs through, the other butts its face', () 
 test('and the corner is CLOSED — the butting girt touches the through one, it does not stop short', () => {
   // The other half of a butt joint, and the one a blunt "no overlap" fix would break: trimming
   // BOTH girts leaves a 1½ in hole at every corner with nothing bracing it.
+  //
+  // Asked of the piece that REACHES the corner, not of every piece on the wall: a later pass cuts
+  // a girt where a partition stands in it, so a wall's run can arrive at its corner as the last of
+  // several segments. The one at each end of each wall is the one this is about.
   for (const { id, girts } of hutted()) {
-    for (const a of girts) {
-      const perpendicular = girts.filter((b) => {
-        const ua = rotate(a, [1, 0, 0]);
-        const ub = rotate(b, [1, 0, 0]);
-        return Math.abs(dot(ua, ub)) < 1e-6;
-      });
-      assert.equal(perpendicular.length, 2, `${id}: ${a.id} meets ${perpendicular.length} girts at right angles`);
-      for (const b of perpendicular) {
-        const g = gap(a, b);
+    for (const [wall, ends] of wallEnds(girts)) {
+      for (const a of ends) {
+        const perpendicular = girts.filter((b) => {
+          const ua = rotate(a, [1, 0, 0]);
+          const ub = rotate(b, [1, 0, 0]);
+          return Math.abs(dot(ua, ub)) < 1e-6;
+        });
+        assert.ok(perpendicular.length >= 2, `${id}: ${a.id} meets ${perpendicular.length} girts at right angles`);
+        const g = Math.min(...perpendicular.map((b) => gap(a, b)));
         assert.ok(g < 1e-9,
-          `${id}: ${a.id} and ${b.id} stand ${(g * IN_PER_FT).toFixed(3)} in apart at their corner — `
-          + 'a butt joint touches');
+          `${id} ${wall}: ${a.id} stands ${(g * IN_PER_FT).toFixed(3)} in from the nearest girt it `
+          + 'crosses at right angles — a butt joint touches');
       }
     }
   }
@@ -126,18 +158,23 @@ test('and the corner is CLOSED — the butting girt touches the through one, it 
 
 test('and only the BUTTING pair got shorter — the through girts still run the wall', () => {
   // The guard on the trim. Both pairs were reaching the corner; exactly one pair had to give.
+  //
+  // Measured on each wall's RUN — the envelope from its first segment's end to its last one's —
+  // because the cut-at-a-partition pass means a wall's run and one girt's cutLength stopped being
+  // the same number.
   const girtT = DRESSED[HUT.girtNominal.value as string]!.w / IN_PER_FT;
   for (const { id, girts } of hutted()) {
-    const lengths = [...new Set(girts.map((m) => Math.round(m.cutLength * 1e6) / 1e6))].sort((a, b) => a - b);
-    assert.equal(lengths.length, 2, `${id}: ${lengths.length} girt lengths — a rectangle has two`);
+    const runs = [...wallRuns(girts).values()].map((r) => Math.round((r[1] - r[0]) * 1e6) / 1e6);
+    assert.equal(runs.length, 4, `${id}: ${runs.length} walled runs of girt — a rectangle has four`);
+    const lengths = [...new Set(runs)].sort((a, b) => a - b);
+    assert.equal(lengths.length, 2, `${id}: ${lengths.length} girt runs — a rectangle has two`);
     // The four are two matched pairs, and the pair that butts is short by a thickness at each end
     // of the run it would otherwise share with the other.
     for (const l of lengths) {
-      assert.equal(girts.filter((m) => Math.abs(m.cutLength - l) < 1e-6).length, 2,
-        `${id}: the ${l.toFixed(1)} in girts do not come in a pair`);
+      assert.equal(runs.filter((r) => Math.abs(r - l) < 1e-6).length, 2,
+        `${id}: the ${l.toFixed(2)} ft runs do not come in a pair`);
     }
-    const spans = girts.map((m) => { const b = box(m); return Math.max(b.x[1] - b.x[0], b.z[1] - b.z[0]); });
-    assert.ok(Math.max(...spans) > Math.min(...spans), `${id}: all four girts are the same length`);
+    assert.ok(Math.max(...runs) > Math.min(...runs), `${id}: all four runs are the same length`);
     void girtT;
   }
 });

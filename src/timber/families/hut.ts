@@ -114,7 +114,12 @@ const bandRect = (b: { sillFt: number; heightFt: number }) => ({ v0: b.sillFt, v
  * by its thickness — a covering-system change, written up in the sweep rather than guessed at
  * here.)
  */
-function generateGirts(walls: WallsContract, stage: number, wallHeightFt: number): Member[] {
+function generateGirts(
+  walls: WallsContract,
+  stage: number,
+  wallHeightFt: number,
+  obstacles: readonly Member[] = [],
+): Member[] {
   const emit = makeEmitter('HT');
   const nominal = HUT.girtNominal.value as string;
   const spacing = HUT.girtSpacingFt.value as number;
@@ -144,23 +149,58 @@ function generateGirts(walls: WallsContract, stage: number, wallHeightFt: number
       if (u + half >= u1 - e && u - half < u1 - e) u1 = u - half;
       else if (Math.abs(u - half - u1) <= e) u1 -= girtT;
     }
-    const runFt = u1 - u0;
-    if (runFt <= 0) continue;
+    if (u1 - u0 <= 0) continue;
+    const along3: [number, number, number] = [s.along[0], 0, s.along[1]];
+    const inward: [number, number, number] = [-s.normal[0], 0, -s.normal[1]];
     for (let v = spacing; v < wallHeightFt - d; v += spacing) {
-      const uMid = (u0 + u1) / 2;
-      emit('girt', nominal, {
-        cutLengthFt: runFt,
-        position: [
-          s.origin[0] + s.along[0] * uMid - s.normal[0] * inset,
-          v,
-          s.origin[1] + s.along[1] * uMid - s.normal[1] * inset,
-        ],
-        rotation: [0, surfaceYaw(s), 0],
-        stage,
-        wall: s.wall,
-        nailing: '2-16d ea stud (PH)',
-        doctrineRef: citeOf(HUT.girtSpacingFt),
-      });
+      // AND CUT AT WHATEVER STANDS IN IT. A girt is left running past an OPENING on purpose —
+      // the comment above says so, and a take-off bills the stock a runner cuts on site — but a
+      // partition is not a hole, it is a stud. The B-hut's three partitions each land an end stud
+      // in the girt's own plane, and the girt ran clean through all six: 1.50 in, its whole
+      // thickness, on the one card in the catalog with interior walls.
+      //
+      // The obstructions are READ OFF THE MEMBERS ALREADY EMITTED rather than re-derived from the
+      // spec — `generateGirts` is handed the wall contract and knows nothing about partitions, and
+      // a second derivation of where they are is a second thing to keep in step.
+      const cuts: [number, number][] = [];
+      for (const o of obstacles) {
+        const dx = o.position[0] - s.origin[0];
+        const dz = o.position[2] - s.origin[1];
+        // In the girt's own plane band, and at its own height?
+        const nOff = dx * inward[0] + dz * inward[2];
+        if (Math.abs(nOff - inset) > halfExtentAlong(o, inward) + girtT / 2) continue;
+        if (Math.abs(o.position[1] - v) > halfExtentAlong(o, [0, 1, 0]) + d / 2) continue;
+        const uc = dx * s.along[0] + dz * s.along[1];
+        const hu = halfExtentAlong(o, along3);
+        cuts.push([uc - hu, uc + hu]);
+      }
+      // What is left of the run once those are taken out of it.
+      cuts.sort((a, b) => a[0] - b[0]);
+      let cursor = u0;
+      const spans: [number, number][] = [];
+      for (const [a, b] of cuts) {
+        if (a > cursor) spans.push([cursor, Math.min(a, u1)]);
+        cursor = Math.max(cursor, b);
+      }
+      if (cursor < u1) spans.push([cursor, u1]);
+      for (const [a, b] of spans) {
+        const runFt = Math.min(b, u1) - Math.max(a, u0);
+        if (runFt <= TOLERANCE.minSliverFt) continue;
+        const uMid = (Math.max(a, u0) + Math.min(b, u1)) / 2;
+        emit('girt', nominal, {
+          cutLengthFt: runFt,
+          position: [
+            s.origin[0] + s.along[0] * uMid - s.normal[0] * inset,
+            v,
+            s.origin[1] + s.along[1] * uMid - s.normal[1] * inset,
+          ],
+          rotation: [0, surfaceYaw(s), 0],
+          stage,
+          wall: s.wall,
+          nailing: '2-16d ea stud (PH)',
+          doctrineRef: citeOf(HUT.girtSpacingFt),
+        });
+      }
     }
   }
   return emit.members;
@@ -422,7 +462,9 @@ export function generateHut(spec: HutSpec): HutResult {
     ]
     : base.stagePlan;
   const wallStage = requireOrdinal(stagePlan, 'walls');
-  members.push(...generateGirts(base.walls, wallStage, wallHeightFt));
+  // The partitions are already in `base.members`; a girt is cut where one of them stands.
+  members.push(...generateGirts(
+    base.walls, wallStage, wallHeightFt, base.members.filter((m) => m.id.startsWith('PT-'))));
 
   if (screened || hasRiser) {
     const finishStage = requireOrdinal(stagePlan, 'finish');
