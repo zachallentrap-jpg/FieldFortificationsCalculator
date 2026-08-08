@@ -91,13 +91,26 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
   // Grade is y = 0 for a platform, so the runners lie on it and the posts bear on their TOPS.
   // Standing the posts at 0 alongside a buried skid is what the pier base does, and on skids it
   // left the runners underground with the platform resting on the earth between them.
+  //
+  // AND THE RUNNER GOES UNDER THE POST, which is the sentence above stated as geometry. The
+  // runners came from `generateSkids`'s default — three, spread evenly across the width — while
+  // the load comes down two lines of posts under the two sills. Measured on the 20 x 12 card:
+  //
+  //   FL-skid-01  z 0.000..0.292   carries 4 posts, each 2.50 in of its 3.50 ON — 1.00 in OFF
+  //   FL-skid-02  z 5.854..6.146   carries NOTHING — 22.41 in to the nearest member in the model
+  //   FL-skid-03  z 11.708..12.000 the same 1.00 in off at the other side
+  //
+  // Rendered at the base stage it is three timbers on the ground with posts standing on two of
+  // them and the middle one bare. Even spacing is right where the JOISTS cross every runner — a
+  // building on skids and a tent floor both do that and both are clean — and wrong here.
+  const postLines = [sillDepth / 2, W - sillDepth / 2];
   const skidTop = spec.base === 'skids' ? DRESSED[LUMBER.skidNominal.value as string]!.d / IN_PER_FT : 0;
-  if (spec.base === 'skids') emit.members.push(...generateSkids(L, W, sBase, 0));
+  if (spec.base === 'skids') emit.members.push(...generateSkids(L, W, sBase, 0, postLines));
 
   const bays = Math.max(1, Math.round(L / (PLATFORM.pierSpacingFt.value as number)));
   for (let i = 0; i <= bays; i++) {
     const x = (L * i) / bays;
-    for (const z of [sillDepth / 2, W - sillDepth / 2]) {
+    for (const z of postLines) {
       if (spec.base === 'piers') {
         const padSide = PLATFORM.padSideIn.value as number;
         const padDepth = PLATFORM.padDepthIn.value as number;
@@ -132,7 +145,7 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
 
   // ── Sills and joists
   const sillY = frameTopY - joistDepth - sillDepth / 2;
-  for (const z of [sillDepth / 2, W - sillDepth / 2]) {
+  for (const z of postLines) {
     emit('sill', sillNominal, {
       cutLengthFt: L,
       position: [L / 2, sillY, z],

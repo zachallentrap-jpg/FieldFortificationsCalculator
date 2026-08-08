@@ -1217,13 +1217,30 @@ export function generateSlabOnGrade(lengthFt: number, widthFt: number, stageEdge
  * Told where grade is, the skid's bottom lands on it and its top lands exactly on the joist
  * underside, because `gradeY + skidDepth` is `joistTop − joistDepth` by that same definition.
  */
-export function generateSkids(lengthFt: number, widthFt: number, stage: number, gradeY: number, count = 3): Member[] {
+export function generateSkids(
+  lengthFt: number,
+  widthFt: number,
+  stage: number,
+  gradeY: number,
+  /**
+   * A COUNT spreads runners evenly across the width. That is right under a floor deck — the
+   * joists cross every one of them, so every one carries — and it is what a building and a tent
+   * floor pass.
+   *
+   * A LIST says where the load actually comes DOWN, which is what a platform needs. Its load
+   * arrives on two lines of posts rather than spread across the width, and three even runners put
+   * one of them under nothing at all while the other two missed the posts by an inch.
+   */
+  at: number | readonly number[] = 3,
+): Member[] {
   const emit = makeEmitter('FL');
   const nominal = LUMBER.skidNominal.value as string;
   const depth = DRESSED[nominal]!.d / IN_PER_FT; // on edge: the face width stands vertical
   const halfWide = DRESSED[nominal]!.w / IN_PER_FT / 2; // across Z — its THICKNESS, not its depth
-  for (let i = 0; i < count; i++) {
-    const z = (widthFt / (count - 1 || 1)) * i;
+  const zs = typeof at === 'number'
+    ? Array.from({ length: at }, (_, i) => (widthFt / (at - 1 || 1)) * i)
+    : at;
+  for (const z of zs) {
     emit('skid', nominal, {
       cutLengthFt: lengthFt,
       // Inset by the half-extent along Z, which is the thickness. Using the depth here held the

@@ -188,15 +188,23 @@ test('and the flight clears the frame it arrives at — joists, decking, sills, 
   // bolted to the rim rather than balanced on the planks. The stair's newel does the same thing
   // at the same edge; the test for that is below, and it compares the newel to the deck's own
   // posts rather than asserting against the module's convention.
-  const { model, stair } = platform();
-  const frame = model.members.filter((m) => !m.id.startsWith('AC-')
-    && ['joist', 'sill', 'deckPlank', 'subfloor', 'post', 'footing', 'skid'].includes(m.role));
-  assert.ok(frame.length > 20, 'the platform has a frame to clear');
-  for (const s of stair.filter((m) => m.role !== 'railPost')) {
-    for (const f of frame) {
-      const gap = stairGap(s, f);
-      assert.ok(gap > -TOL,
-        `${s.id} (${s.role}) runs ${(-gap * IN_PER_FT).toFixed(2)} in into ${f.id} (${f.role})`);
+  //
+  // ON BOTH BASES. This ran on the pier base only, and the skid test below carried the runners —
+  // by leaning on one of them happening to lie under the flight's centre line. A later pass moved
+  // the runners under the lines of posts where the load actually comes down, so that accident is
+  // gone; running this on both bases puts the runners back in the frame this clears, on purpose
+  // rather than by luck, and covers the pads as well.
+  for (const base of ['piers', 'skids'] as const) {
+    const { model, stair } = platform({ base });
+    const frame = model.members.filter((m) => !m.id.startsWith('AC-')
+      && ['joist', 'sill', 'deckPlank', 'subfloor', 'post', 'footing', 'skid'].includes(m.role));
+    assert.ok(frame.length > 20, `on ${base}: the platform has a frame to clear`);
+    for (const s of stair.filter((m) => m.role !== 'railPost')) {
+      for (const f of frame) {
+        const gap = stairGap(s, f);
+        assert.ok(gap > -TOL,
+          `on ${base}: ${s.id} (${s.role}) runs ${(-gap * IN_PER_FT).toFixed(2)} in into ${f.id} (${f.role})`);
+      }
     }
   }
 });
@@ -207,11 +215,25 @@ test('ON SKIDS THE FLIGHT CLEARS THE RUNNERS, which stand 5½ in proud of grade'
   // aimed from a guessed foot one foot off the deck, its middle stringer met the runner's end
   // corner 1¾ in below the top of it and carried straight through. A pier base hides the same
   // aiming error, because a pier base leaves nothing at grade to hit.
+  //
+  // THE RUNNERS MOVED, AND THIS TEST HAD THE OLD PLACE WRITTEN INTO IT. It asserted three runners
+  // with one on the centre line — which is `generateSkids`'s default, three spread evenly across
+  // the width — and that centre runner is the one a later sweep found carrying NOTHING, 22.41 in
+  // clear of every other member in the model, while the other two missed the posts they were
+  // under by an inch. A platform's load comes down two lines of posts rather than spread across
+  // the width, so the runners now go under those and there are two of them.
+  //
+  // What that leaves this test is the clearance, which is still the point and still runs. What it
+  // no longer leans on is a runner sitting in the flight's path by accident; the test above now
+  // clears the whole frame on BOTH bases, which covers the same ground on purpose.
   const { model, stair, L } = platform({ base: 'skids' });
   const skids = model.members.filter((m) => m.role === 'skid');
-  assert.equal(skids.length, 3, 'three runners under a platform on skids');
-  assert.ok(skids.some((s) => Math.abs(s.position[2] - platform().W / 2) < TOL),
-    'one runner is on the centre line the stair descends');
+  const posts = model.members.filter((m) => m.role === 'post' && m.id.startsWith('PF-'));
+  assert.equal(skids.length, 2, 'a runner under each line of posts');
+  for (const p of posts) {
+    assert.ok(skids.some((k) => Math.abs(k.position[2] - p.position[2]) < TOL),
+      `${p.id} stands at z ${p.position[2].toFixed(3)} and no runner is on that line`);
+  }
   for (const s of stair) {
     for (const k of skids) {
       const gap = stairGap(s, k);

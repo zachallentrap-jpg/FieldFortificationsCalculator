@@ -116,6 +116,7 @@ screenshots get read.
 | **The shed cab's high plate** | **Fixed, three ways.** The tower card's other roof, one click from the shipped pyramid. The plate stood ON EDGE (3½ in tall, 1½ across — the building's pony plate has laid flat since T2); its top was set to the roof plane, which `rafterPlaneDatum` states at the rafters' CENTRE, so it stood half a rafter inside all seven — 2.987 in against the building's 1.107, and that 1.107 is the bird's mouth; and it ran post-CENTRE to post-centre, leaving 1¾ in of each post top bare and half of each end rafter off the plate. |
 | **The shed cab's open walls** | **Fixed** — the cab wall is four panels tall to `TOWER.cabWallHeightFt`, which is the eave line of a PYRAMID. A shed leaves it behind on three sides: raycast up from the shipped 8-ft cab and the band of open sky above the screen ran 7.0 in on the low face, 7.0 rising to 40.4 on each rake, and 40.4 in across the whole high side. Closed with `tileRakedInfill`, to the rafter CENTRE plane on the rakes and their underside on the faces they cross — the building's own rule. |
 | **A number that is not a number** | **Fixed** — `clampPath` clamps an out-of-range NUMBER into the path's stated range and warns. A NON-number — missing, `null`, a string, `NaN`, all of which a share link carries — returned **0**, which is below the minimum of most of those paths. 25 of 66 card × knob combinations framed members with a NON-POSITIVE cut length: 112 on the gp-frame's wall height, 94 on the squad hut's width, 51 on the platform's ramp. A bare `{kind:'basement'}` came back at depth 0 against a stated 6–9, framed five posts at −7.8 in, and collapsed the basement flat onto the slab. And the tower's `platformHeightFt` was never clamped at all, so the life-safety cage-threshold rule compared the raw value — `"deep" > 20` is false, and the switch to a stair never fired. |
+| **The platform's runners** | **Fixed** — the base block says the two bases differ in *"what is UNDER the post — a concrete pad you pour, or a timber runner you can drag the whole thing on"*, and no runner was under a post. `generateSkids` spreads three evenly across the width, which is right under a floor deck where the joists cross every one; a platform's load comes down two lines of posts. The middle runner carried NOTHING — 22.41 in clear of every member in the model — and the outer two missed the posts they were under by 1.00 in, each post bearing 2.50 of its 3.50. |
 
 ## The shed that had no walls above the plate
 
@@ -5417,3 +5418,88 @@ skid-founded platform and the posts land on the outer two only:
 ```
 
 It is a real "touches nothing" hit and it is not this defect. Left for a later iteration.
+
+## The platform's runners, which were not under anything
+
+The second of the two hits the "touches nothing" lens turned up. `platform.ts`'s base block states
+the rule in its own words — *"The two bases differ in what is UNDER the post — a concrete pad you
+pour, or a timber runner you can drag the whole thing on"* — and an earlier pass of this sweep had
+already had to stop the runners being buried while the platform rested on the earth between them.
+Nobody had checked whether a runner ends up under a post at all.
+
+```
+  platform, 20 x 12, on skids — 3 skids
+    FL-skid-01  z 0.000..0.292    carries 4 posts   each 2.50 of its 3.50 in ON — 1.00 in OFF
+    FL-skid-02  z 5.854..6.146    carries NOTHING   22.41 in to the nearest member in the model
+    FL-skid-03  z 11.708..12.000  carries 4 posts   the same 1.00 in off at the other side
+```
+
+The same at every width, because the two numbers come from different places: the runner from
+`generateSkids`'s `widthFt/(count−1)·i`, clamped to half its own thickness, and the post from
+`sillDepth/2`. Rendered at the base stage it is three timbers lying on the ground with posts
+standing on two of them and the middle one bare.
+
+**Even spacing is not wrong; it is wrong HERE.** Under a floor deck the joists cross every runner,
+so every runner carries — and both other callers do exactly that and are clean:
+
+```
+  storage-shed on skids   3 runners, each carrying 16 joists
+  tent-floor on skids     3 runners, each carrying 23 joists
+```
+
+A platform's load does not spread. It arrives on two lines of posts under the two sills. So
+`generateSkids` now takes either a COUNT — spread evenly, which is what a building and a tent floor
+pass — or the LIST of lines the load comes down, which is what the platform passes. After:
+
+```
+  platform, 20 x 12, on skids — 2 skids
+    FL-skid-01  z 0.083..0.375    carries 4 posts   3.50 of its 3.50 in bears on the runner
+    FL-skid-02  z 11.625..11.917  carries 4 posts   3.50 of its 3.50 in bears on the runner
+```
+
+**The lens is now clean.** Across all fourteen shipped cards and every value the picker's own
+controls offer, no member touches nothing. The two hits it found were a basement stair tread, fixed
+in the pass before this one, and this runner.
+
+### The four things asserted
+
+`test/timber2-platform-skids.test.ts`, over four plan sizes × four deck heights.
+
+1. **Every runner carries a post** — no runner lies there for nothing.
+2. **Every post bears on its whole foot** — its full 3½ in inside one runner's width, its underside
+   exactly on the runner's top, and not inside it.
+3. **Nothing in a platform on skids touches nothing** — the audit itself, kept as a contract on the
+   card it was found on.
+4. **What must not change** — a building on skids and a tent floor still get three evenly-spread
+   runners each carrying joists; the pier base has no runners and its post lines are identical to
+   the skid base's; and the shipped card, which is on piers, has none.
+
+Tests 1–3 fail on the old generator. The shipped platform is on piers, so all fourteen presets are
+byte-identical and no golden moved.
+
+### A test that had the old place written into it
+
+`timber2-platform-steps` asserted three runners with one *on the centre line the stair descends* —
+which is the runner that carried nothing. Its substance is the clearance, and that still runs; what
+it leaned on was a runner sitting in the flight's path by accident. Restated to the new truth (a
+runner under each line of posts), and the test above it — the flight clearing the frame it arrives
+at — now runs on BOTH bases instead of the pier base only, so the runners are in the frame it
+clears on purpose rather than by luck, and the pads are covered too.
+
+### Checked this pass and recorded, NOT fixed
+
+**A low deck buries the platform's frame, on either base.** `deckHeightFt` is stated as 0.5–5 ft in
+the registry and the picker takes a number, but the frame that hangs under the deck is about 1.15 ft
+deep, so below that the sills and joists go underground and the posts vanish entirely:
+
+```
+  base    deck    posts   below grade
+  skids   0.5 ft    0     2 sill, 16 joist
+  skids   1.0 ft    0     2 sill
+  skids   1.5 ft    0     —            (still no posts: the frame rests on nothing)
+  piers   0.5 ft    0     2 sill, 16 joist
+  piers   1.0 ft    0     2 sill
+```
+
+`PLATFORM.minPostFt` drops a post below 0.1 ft and nothing takes its place. Separate from the
+runners, on both bases, and left for a later iteration.
