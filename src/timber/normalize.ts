@@ -16,7 +16,7 @@
 // issue the workbench renders. Silent correction is how a tool teaches the wrong number.
 
 import type {
-  BuildingSpec, HutSpec, OpeningSpec, RoofSpec, StructureSpec, StructureFamily, SpecSection, WallOpenings,
+  BuildingSpec, HutSpec, OpeningSpec, RoofSpec, StructureSpec, StructureFamily, SpecSection, TowerSpec, WallOpenings,
 } from './spec';
 import { SPEC_PATH_DEFS, SPEC_SECTION_FALLBACK, SPEC_SECTIONS_BUILDING, SPEC_SECTIONS_COMMON, WALL_ORDER, specPath } from './spec';
 import type { WallId } from './types';
@@ -44,13 +44,29 @@ const round = (n: number): number => Math.round(n * 1e6) / 1e6;
 /** Clamp one numeric knob against its registry entry, recording the adjustment. */
 function clampPath(value: number, path: string, issues: SpecIssue[], label?: string): number {
   const def = specPath(path);
-  if (!def || !Number.isFinite(value)) {
-    if (!Number.isFinite(value)) {
-      issues.push({ path, kind: 'clamped', message: `${label ?? path} was not a number — using 0.`, severity: 'error' });
-      return 0;
-    }
-    return value;
+  if (!Number.isFinite(value)) {
+    // NOT A NUMBER IS NOT ZERO. Every entry in the registry states a MIN, and several of those
+    // bounds are geometry rather than preference — the note on `foundation.crawlFt` says so in as
+    // many words: floored at 1 ft because the built-up girder hangs a full 9¼ in BELOW the sill,
+    // "so a shallower crawl puts the girder posts underground — the sweep caught it as a negative
+    // post length". Handing back 0 walked straight past every one of those bounds.
+    //
+    // The basement is the sharpest case. `{ kind: 'basement' }` off a share link carries no depth,
+    // came back at 0 against a stated range of 6–9, and framed FIVE POSTS AND THREE STRINGERS AT
+    // A NEGATIVE LENGTH with the basement itself collapsed flat onto the slab — while the same
+    // value written as the number 0 clamps to 6 and warns, and renders correctly.
+    //
+    // So repair into the path's own range, which is exactly what that number already gets.
+    const out = def?.min ?? 0;
+    issues.push({
+      path,
+      kind: 'clamped',
+      message: `${label ?? def?.label ?? path} was not a number — using ${out}.`,
+      severity: 'error',
+    });
+    return out;
   }
+  if (!def) return value;
   let out = value;
   if (def.min !== undefined && out < def.min) out = def.min;
   if (def.max !== undefined && out > def.max) out = def.max;
@@ -695,7 +711,25 @@ function normalizeSpec2(raw: StructureSpec, issues: SpecIssue[]): NormalizeResul
     case 'hut':
       return { spec: normalizeHut(spec, issues), issues };
     case 'tower': {
-      const out = { ...spec };
+      // THE REGISTRY IS NOT ADVISORY HERE. `platformHeightFt` (10–32 ft) and `cabPlanFt` (6–8 ft)
+      // both have entries in `SPEC_PATH_DEFS` and neither was ever clamped, so a share link's
+      // `platformHeightFt: "deep"` framed 17 members at a NaN length and `cabPlanFt: "deep"`
+      // framed 37 — and worse than the geometry, the cage-threshold rule immediately below
+      // compared the RAW value. `"deep" > 20` is false, so a platform height that is not a number
+      // silently failed the test and the life-safety switch to a stair never fired. Everything
+      // below now reads the repaired value.
+      //
+      // The casts are the honest ones. `TowerSpec` declares these as the picker's own literals —
+      // `10 | 16 | 24 | 32` and `6 | 8` — but the registry states continuous ranges and a link
+      // carries whatever it likes; the pass that fixed the cage rule found exactly that, a 26-,
+      // 28- or 30-ft tower "reachable from a saved spec, a link or the custom card". The clamp
+      // guarantees a finite number inside the registry's range, which is the real contract.
+      const out = {
+        ...spec,
+        platformHeightFt: clampPath(spec.platformHeightFt, 'platformHeightFt', issues) as
+          TowerSpec['platformHeightFt'],
+        cabPlanFt: clampPath(spec.cabPlanFt, 'cabPlanFt', issues) as TowerSpec['cabPlanFt'],
+      };
       // EM 385-1-1 (plan TD32): above the cage threshold a fixed ladder is not an acceptable
       // sole means of access, and the cage is IN-later — so the tall towers get a stair. This
       // is a FORCE, not a bounds clamp: the user asked for something unsafe and is told.
@@ -707,16 +741,16 @@ function normalizeSpec2(raw: StructureSpec, issues: SpecIssue[]): NormalizeResul
       // rule ("Above 20 ft a fixed ladder is not an acceptable sole means of access") and
       // `LADDER.cageThresholdFt` is the figure; both were already right.
       const cage = LADDER.cageThresholdFt.value as number;
-      if (spec.platformHeightFt > cage && spec.access === 'ladder') {
+      if (out.platformHeightFt > cage && out.access === 'ladder') {
         out.access = 'stair';
         issues.push({
           path: 'access',
           kind: 'forced',
-          message: `A ${spec.platformHeightFt}-ft climb is past the ${cage}-ft fixed-ladder cage threshold (EM 385-1-1, PH) — switched to a switchback stair.`,
+          message: `A ${out.platformHeightFt}-ft climb is past the ${cage}-ft fixed-ladder cage threshold (EM 385-1-1, PH) — switched to a switchback stair.`,
           severity: 'warn',
         });
       }
-      if (spec.footing === 'timber-mudsill' && spec.platformHeightFt >= 24) {
+      if (out.footing === 'timber-mudsill' && out.platformHeightFt >= 24) {
         issues.push({
           path: 'footing',
           kind: 'ls-note',

@@ -99,7 +99,10 @@ function undersideAt(r: Member, x: number, z: number): number {
 }
 
 /** Every combination of the tower card's own controls that reaches the shed cab. */
-const CABS = [6, 8, 10] as const;
+// The cab plans the registry allows: `cabPlanFt` is stated as 6–8 there, and a later pass
+// routed the tower's knobs through that entry — so a 10 asked for here now arrives as an 8
+// and the third case was a second run of the second. Two plans is the whole range.
+const CABS = [6, 8] as const;
 const HEIGHTS = [16, 24] as const;
 const OCS = [16, 24] as const;
 const FOOTINGS = ['timber-mudsill', 'concrete-pier'] as const;

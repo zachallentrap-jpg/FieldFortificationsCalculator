@@ -115,6 +115,7 @@ screenshots get read.
 | The let-in brace against what it is let into | **Checked, not a defect.** A brace let ¾ in into the studs' outer faces shares 0.700 in with every one it crosses — 364 pairs at a flat 0.700 across the seven braced cards, and the same 0.700 against an open front's corner post. The notch is not a mesh cut; sixth documented approximation. |
 | **The shed cab's high plate** | **Fixed, three ways.** The tower card's other roof, one click from the shipped pyramid. The plate stood ON EDGE (3½ in tall, 1½ across — the building's pony plate has laid flat since T2); its top was set to the roof plane, which `rafterPlaneDatum` states at the rafters' CENTRE, so it stood half a rafter inside all seven — 2.987 in against the building's 1.107, and that 1.107 is the bird's mouth; and it ran post-CENTRE to post-centre, leaving 1¾ in of each post top bare and half of each end rafter off the plate. |
 | **The shed cab's open walls** | **Fixed** — the cab wall is four panels tall to `TOWER.cabWallHeightFt`, which is the eave line of a PYRAMID. A shed leaves it behind on three sides: raycast up from the shipped 8-ft cab and the band of open sky above the screen ran 7.0 in on the low face, 7.0 rising to 40.4 on each rake, and 40.4 in across the whole high side. Closed with `tileRakedInfill`, to the rafter CENTRE plane on the rakes and their underside on the faces they cross — the building's own rule. |
+| **A number that is not a number** | **Fixed** — `clampPath` clamps an out-of-range NUMBER into the path's stated range and warns. A NON-number — missing, `null`, a string, `NaN`, all of which a share link carries — returned **0**, which is below the minimum of most of those paths. 25 of 66 card × knob combinations framed members with a NON-POSITIVE cut length: 112 on the gp-frame's wall height, 94 on the squad hut's width, 51 on the platform's ramp. A bare `{kind:'basement'}` came back at depth 0 against a stated 6–9, framed five posts at −7.8 in, and collapsed the basement flat onto the slab. And the tower's `platformHeightFt` was never clamped at all, so the life-safety cage-threshold rule compared the raw value — `"deep" > 20` is false, and the switch to a stair never fired. |
 
 ## The shed that had no walls above the plate
 
@@ -5288,3 +5289,131 @@ a hip rafter dips. It is not visible from outside — the 1-ft eave and its fasc
 it in every exterior view, which two elevation renders confirm — and it is the same between-rafter
 band the building has. It is the shipped card, so it is left alone and written down here rather
 than folded into a shed fix.
+
+## A number that is not a number, on any knob in the registry
+
+A different lens this pass. Overlaps have been mined hard; this one asks which members touch
+NOTHING — a stick whose SAT clearance to every other stick in the model is positive is either
+floating or missing the thing it should be fixed to. Self-tested by floating a stud ten feet up and
+confirming the probe sees it and not the stud it was copied from.
+
+**Catalog-wide on the shipped presets: clean.** Every member of all 6309 across the fourteen cards
+touches something within ⅛ in. Swept across every value the picker's own controls offer, two hits:
+
+```
+  gp-frame  foundation.kind=basement   FL-tread-01 — nothing at all within its own bounding box
+  platform  base=skids                 FL-skid-02  — 22.41 in to the nearest member
+```
+
+The first one opened up into something much bigger than a floating tread.
+
+### What was actually wrong
+
+`clampPath` is the one place every numeric knob is checked against `SPEC_PATH_DEFS`. An
+out-of-range NUMBER is clamped into the range and warned about. A NON-number returned **0**:
+
+```ts
+if (!Number.isFinite(value)) { issues.push({ … `was not a number — using 0.` }); return 0; }
+```
+
+and 0 is below the minimum of most of those paths. The registry says as much on the entry next
+door to the one that broke — the note on `foundation.crawlFt`, written by an earlier pass of this
+same sweep:
+
+> Floored at 1 ft, not 0.5: the built-up girder hangs a full 9 1/4 in BELOW the sill, so a
+> shallower crawl puts the girder posts underground — **the sweep caught it as a negative post
+> length**. The bound is geometry, not preference, and it is stated once here.
+
+Handing back 0 walked straight past every one of those bounds. Injecting a non-number into each
+knob of each shipped card, 25 of the 66 combinations framed members with a NON-POSITIVE length:
+
+```
+  gp-frame     stories.0.wallHeightFt   112     squad-hut     dims.widthFt   94
+  custom       stories.0.wallHeightFt    64     sea-hut       dims.widthFt   63
+  storage-shed stories.0.wallHeightFt    56     platform      ramp.widthFt   51
+  platform     dims.lengthFt             29     latrine       dims.widthFt   28
+  … nineteen more rows, on twelve of the fourteen cards
+```
+
+The basement is the case the floating tread pointed at, and the sharpest one. `{ kind: 'basement' }`
+off a share link carries no depth — `decodeSpec` takes any JSON, which is how this class of thing
+is reachable:
+
+```
+  depthFt          → normalized   members  neg-len  treads   said
+  undefined        → 0                918        8       5   error: was not a number — using 0.
+  0                → 6                924        0      14   warn: outside 6–9; using 6.
+  7.5              → 7.5              926        0      16   (none)
+```
+
+Five posts at −7.8 in and three stringers at −1.5 in, the stair down from sixteen treads to five,
+and the basement itself collapsed flat onto the slab. Rendered from a hand-made share link it is a
+building sitting on the ground with a stub of stair poking out of it, where the same spec written
+with the NUMBER 0 renders a basement.
+
+### And the tower's knobs were never clamped at all
+
+Injecting a STRING rather than `null` found the second half. `null` is caught by the `??` defaults
+on the way in; `"deep"` is not.
+
+```
+  tower  platformHeightFt = "deep"   17 members at a NaN length   AND NOTHING SAID
+  tower  cabPlanFt        = "deep"   37 members at a NaN length   AND NOTHING SAID
+```
+
+Both have registry entries — 10–32 ft and 6–8 ft — and `normalizeTower` clamped neither. Worse
+than the geometry: the cage-threshold rule in that same function compared the RAW value.
+
+```ts
+if (spec.platformHeightFt > cage && spec.access === 'ladder') { … switch to a stair … }
+```
+
+`"deep" > 20` is false, so a platform height that is not a number silently failed a LIFE-SAFETY
+test and the switch to a stair never fired. Everything in that block now reads the repaired value.
+
+Both knobs now go through the registry, which also means `cabPlanFt: 10` — which the two cab passes
+before this one were feeding the tower — clamps to the stated maximum of 8 and says so. Those two
+tests have been narrowed to the range that actually exists.
+
+### After
+
+```
+  non-number injected into every knob of every card:
+    null    42 bad combinations → 15, none of them a non-positive member
+    string  ...                → 13, none of them a non-positive member
+```
+
+Everything left is a knob some card never reads, which raises no issue on that path and frames
+nothing wrong. Zero members with a non-positive length anywhere.
+
+### The five things asserted
+
+`test/timber2-not-a-number.test.ts`, over fourteen cards × every non-`[]` knob in the registry ×
+`null`, a string, `NaN` and an object.
+
+1. **No knob handed a non-number frames a member with a non-positive length.** 168 combinations.
+2. **It is repaired INTO the range that path states** — between the entry's own min and max.
+3. **It lands where the NUMBER zero already landed** — the thesis, as an equality: same resolved
+   value, same member count. `NaN` is the probe rather than `null`, because `NaN` survives the `??`
+   defaults and so reaches `clampPath` wherever the number would.
+4. **The basement in full** — no non-positive member, depth inside 6–9, an issue raised, at least
+   fourteen treads, and the same model the number 0 gives, for four different kinds of non-number.
+5. **What must not change** — an in-range number is untouched and silent; an out-of-range NUMBER
+   still clamps to the same value at the same severity with the range in the message; and every
+   shipped preset still normalizes with nothing clamped at all.
+
+No shipped preset carries a non-number on any knob, so all fourteen are byte-identical and no
+golden moved.
+
+### Checked this pass and recorded, NOT fixed
+
+**The platform's middle skid touches nothing.** `generateSkids` lays three skids under a
+skid-founded platform and the posts land on the outer two only:
+
+```
+  FL-skid-01  z 0.00..0.29    PF-post-01/02 … at z 0.08..0.38 and 11.63..11.92
+  FL-skid-02  z 5.85..6.15    nothing on it — 22.41 in to the nearest member
+  FL-skid-03  z 11.71..12.00
+```
+
+It is a real "touches nothing" hit and it is not this defect. Left for a later iteration.
