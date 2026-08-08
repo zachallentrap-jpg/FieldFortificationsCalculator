@@ -1082,3 +1082,56 @@ stops the line, which is the abuse the gate existed to catch.
 Both paths were exercised against real commit ranges before this shipped: the consolidated branch
 is accepted (suites edited, 13 golden files moved, entry written), and the bridging cherry-pick on
 its own, before its goldens and its entry existed, is refused.
+
+## 2026-08-08 — The nailing schedules get a cited home, and why that is only half the requirement
+
+The 2026-08-07 entry above closed three wrong nailing schedules and left the requirement behind
+them open: *TIMBER may ship loaded values so long as there is a way to get at them and type them
+in.* The schedules were still inline string literals across `floor.ts` / `walls.ts` / `roof.ts`,
+with no single place to read them and nothing watching them. `doctrine.ts` is where that entry
+said they belong. They are there now — `NAILING`, 28 entries, each with a citation and a `ph`
+flag, wired into `allDoctrineEntries()` like every other table.
+
+**Mirrored, not moved.** The obvious reading of "centralize" is to delete the literals and have
+the generators read the table. That is precisely what C-10 forbids: `floor.ts` / `walls.ts` /
+`roof.ts` are the frozen branch, editing them is a stop-the-line event, and rerouting 28 emission
+sites through a new import would move the compat goldens for no behavioural reason — a
+compat-lock event whose entire content is "we moved some strings." So this follows the discipline
+`doctrine.ts` already documents for sizes and labor rates: the generators keep their literals, the
+values are mirrored, and a test watches the mirror. Nothing in `src/timber/{floor,walls,roof}.ts`
+changed, and no golden moved.
+
+**The set was enumerated, not grepped.** Reading `nailing:` out of the three modules finds 35
+sites; running every fixture in `FULL_FIXTURES` + `MATRIX_FIXTURES` through `generateFrame` and
+collecting what actually comes out finds 28 distinct strings — and two of them do not appear in
+that grep at all: a second sill-anchor variant that differs from the `foundationWall` one by the
+words `into sill,`, and `anchor/drift per post cap` on a pier-founded sill. A mirror built from
+reading the source would have been wrong on arrival, in the direction that matters least visibly.
+
+**Both directions are asserted**, because each failure is real and they are not the same failure.
+An emitted schedule with no entry is a value with no cited home — the thing the requirement is
+about. An entry nothing emits is a citation for work no crew is ever told to do, which is worse
+than no citation, because it reads as coverage. A second test pins `ph` to the literal `(PH)` in
+the string, so the register can never report a schedule as verified while the member card still
+prints it as pending. Both were mutation-tested before shipping — drift one mirrored value and
+test 10 fails naming the orphaned string and its roles; claim `ph: false` on a string that still
+prints `(PH)` and test 11 fails. This repo has shipped two gates that could not fail (the offline
+gate, 2026-08-02; the legacy-suite gate, 2026-08-07), and a third would be a pattern.
+
+**Deliberately not life-safety tagged.** A fastening schedule's failure mode is an overload, so
+LS-GATE arguably reaches it. But `lifeSafetyRegister()` is not a label — `test/timber2-packet.test.ts`
+asserts every id it carries appears in `LS_CONSUMERS`, i.e. that something actually surfaces the
+value to a user. Deciding how a nailing spec surfaces in the command packet is a design call about
+the packet, not a consequence of mirroring, and tagging without building the consumer would only
+break that gate. Left untagged, recorded here as the open follow-up.
+
+**What is still open, and why it is not a small job.** The requirement asks for two things and
+this is one of them: the values now have a home you can read. There is still no way to *type them
+in*. The instinct is to copy SAP-1's `exportDoctrine` / `importDoctrine` (`src/doctrine/io.ts`),
+which solves exactly this problem one tree over — but it does not transfer, and the reason is the
+mirror above. An imported value would land in `doctrine.ts` and change nothing the crew reads,
+because the generators hold their own copies; the test would then fail, correctly, reporting that
+the mirror drifted. Making the values genuinely editable means the frozen modules have to stop
+being the source of truth, which is a C-10 decision and a compat-lock event on every fixture, not
+an afternoon's plumbing. That is the shape of the remaining work, written down so the next person
+does not start with the import and discover this halfway.

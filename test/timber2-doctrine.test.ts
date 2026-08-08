@@ -11,9 +11,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  LUMBER, PANEL, LAYOUT, FOUNDATION, STAIR, LADDER, RAIL, RAMP, ROOFING, SIDING, LABOR,
+  LUMBER, PANEL, LAYOUT, FOUNDATION, STAIR, LADDER, RAIL, RAMP, ROOFING, SIDING, LABOR, NAILING,
   allDoctrineEntries, lifeSafetyRegister, citeOf,
 } from '../src/timber/doctrine';
+import { FULL_FIXTURES, MATRIX_FIXTURES } from './fixtures/frameFixtures';
 import { DRESSED } from '../src/timber/types';
 import { BF_PER_LF, classifyNominal, bomSummary } from '../src/timber/bom';
 import { generateFrame, specFromBuildingInput, type BuildingInput } from '../src/timber/frame';
@@ -178,4 +179,55 @@ test('SIDING/ROOFING/FOUNDATION tables are populated (the coverings phase reads 
   assert.equal(SIDING.boardNominal.value, '1x10');
   assert.equal(FOUNDATION.concreteWallThickIn.value, 8);
   assert.equal(LAYOUT.studSpacingIn.value, 16);
+});
+
+// ── Fastening schedules ──────────────────────────────────────────────────────
+// The mirror the NAILING table exists to be. Both directions matter: an unmirrored schedule is
+// a value with no cited home (the thing the requirement is about), and a dead mirror is a
+// citation for something no crew is ever told to do, which is worse than none.
+
+/** Every distinct `nailing` string the frozen generators emit, mapped to the roles carrying it. */
+function emittedNailing(): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const fx of [...FULL_FIXTURES, ...MATRIX_FIXTURES]) {
+    for (const m of generateFrame(fx.input).members) {
+      const n = (m as { nailing?: string }).nailing;
+      if (!n) continue;
+      if (!out.has(n)) out.set(n, new Set());
+      out.get(n)!.add(m.role);
+    }
+  }
+  return out;
+}
+
+test('doctrine mirrors every nailing schedule the FROZEN generators emit', () => {
+  const emitted = emittedNailing();
+  assert.ok(emitted.size > 20, `expected the real schedule set, got ${emitted.size}`);
+
+  const mirrored = new Map(Object.entries(NAILING).map(([k, d]) => [d.value as string, k]));
+  for (const [spec, roles] of emitted) {
+    assert.ok(
+      mirrored.has(spec),
+      `emitted nailing has no cited home in NAILING: ${JSON.stringify(spec)} (roles: ${[...roles].sort().join(', ')})`,
+    );
+  }
+  for (const [key, d] of Object.entries(NAILING)) {
+    assert.ok(emitted.has(d.value as string), `NAILING.${key} mirrors nothing any generator emits`);
+  }
+});
+
+test('the (PH) a crew reads and the ph the register reports cannot disagree', () => {
+  for (const [key, d] of Object.entries(NAILING)) {
+    const printsPending = (d.value as string).includes('(PH)');
+    assert.equal(
+      d.ph,
+      printsPending,
+      `NAILING.${key}: ph=${d.ph} but the emitted string ${printsPending ? 'does' : 'does not'} print (PH)`,
+    );
+  }
+  // The four corrected on 2026-08-07 are cited, not pending — the whole point of correcting them.
+  for (const key of ['capPlateLap', 'collarTie', 'sillAnchor', 'foundationWallAnchor'] as const) {
+    assert.equal(NAILING[key].ph, false, `NAILING.${key} should carry a real citation`);
+    assert.match(NAILING[key].cite, /^IRC /, `NAILING.${key} should cite the IRC section it was corrected against`);
+  }
 });
