@@ -1,304 +1,767 @@
-// TIMBER-1 render layer (see woodframe.html) — draws and cross-links every projection of the
-// engine's FrameModel: the 3D scene, the stage scrubber/panel (per-stage cut list + man-hours),
-// the tap-to-inspect Member Card, and the per-wall plate Layout Strips (design doc §2, §4, §5,
-// §11.4). The scene invents NO geometry: every mesh carries the id of the Member it projects.
-// Standalone by design (npm run build:woodframe); never imported by the app.
-import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { lumberPiece, plywoodSheet, onPropAssetsReady, disposeObject, toonGradient } from './three-viewer';
-import type { LumberSize } from './three-viewer';
-import { generateFrame, type BuildingInput } from '../timber/frame';
-import { bomSummary } from '../timber/bom';
+// TIMBER-2 — the boot file. Wires the router, the picker and the workbench together and owns
+// nothing else: every behavior lives in `src/ui/woodframe/*`, and everything that can be pure
+// is pure and node-tested (plan §4.1, R9).
+//
+// The app opens on the PICKER (mandate #3). Choosing a card, or resuming a saved build, routes
+// to the workbench, where the config panel edits a spec and the scene is regenerated from it —
+// the scene never edits itself, so the model on screen is always exactly what the spec says.
+
+import { generateStructure, type StructureModel } from '../timber/families/index';
+import type { StructureSpec, BuildingSpec, RoofSpec, FoundationSpec, OpeningSpec, OpeningKind, OpeningFill } from '../timber/spec';
+import { normalizeSpec } from '../timber/normalize';
+import { familyById, type FamilyId } from '../timber/catalog';
+import { onPropAssetsReady } from './three-viewer';
+import { renderPicker } from './woodframe/picker';
+import { createStudio, type StudioHandles } from './woodframe/studio';
+import { configSchemaFor, type PanelRow } from './woodframe/config';
+import { HUT } from '../timber/doctrine';
 import { layoutStrip } from '../timber/elevation';
-import { STAGES, type Member, type StageId } from '../timber/types';
+import {
+  loadSession, saveSession, commitBuild, buildFromFamily, findBuild, nextCustomId,
+  unlockToCustom, recentBuilds, type SessionState, type StoredBuild,
+} from './woodframe/store';
+import { parseRoute, routeToHash, decodeSpec, encodeSpec } from './woodframe/router';
+import { FEATURES, APP_NAME, MODE } from './woodframe/mode';
+import { askPacketOptions, downloadMaterialsCsv, openCommandSheet, PACKET_DEFAULTS } from './woodframe/sheet';
 
-// The demo building. This becomes user input when TIMBER-1 grows its control panel.
-const BUILDING: BuildingInput = {
-  lengthFt: 20,
-  widthFt: 16,
-  wallHeightFt: 8,
-  studSpacingIn: 16,
-  joistSpacingIn: 16,
-  rafterSpacingIn: 16,
-  risePer12: 4,
-  overhangFt: 1,
-  crawlFt: 1.5,
-  openings: [
-    { wall: 'S', offsetFt: 4, widthFt: 3, heightFt: 3.5, sillHeightFt: 3 }, // window
-    { wall: 'S', offsetFt: 13, widthFt: 3, heightFt: 6.7, sillHeightFt: 0 }, // door
-    { wall: 'N', offsetFt: 8.5, widthFt: 3, heightFt: 3.5, sillHeightFt: 3 }, // window
-  ],
-};
+const esc = (s: string): string =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-const MODEL = generateFrame(BUILDING);
-const BOM = bomSummary(MODEL.members);
-const PLAIN: Record<string, string> = {
-  post: 'post', sill: 'sill', girder: 'girder (built-up)', joist: 'joist', rimJoist: 'rim joist',
-  bridging: 'bridging', subfloor: 'subfloor panel', solePlate: 'sole plate', stud: 'stud',
-  cripple: 'cripple', jackStud: 'jack stud (trimmer)', kingStud: 'king stud',
-  header: 'header', topPlate: 'top plate', capPlate: 'cap plate (double top)',
-  rafter: 'rafter', ridge: 'ridge board', collarTie: 'collar tie', roofPanel: 'roof sheathing panel',
-};
+/** The screened band a hut gets when its toggle is switched on. */
+const HUT_BAND = { sillFt: HUT.screenBandSillFt.value as number, heightFt: HUT.screenBandHeightFt.value as number };
 
-// Carpenter-readable feet-inches: 92.625" → 7′-8 5/8″.
-function fmtFtIn(inches: number): string {
-  const eighths = Math.round(inches * 8);
-  const ft = Math.floor(eighths / (12 * 8));
-  let rem = eighths - ft * 12 * 8;
-  const inch = Math.floor(rem / 8);
-  rem -= inch * 8;
-  const frac = rem === 0 ? '' : rem % 4 === 0 ? ' 1/2' : rem % 2 === 0 ? ` ${rem / 2}/4` : ` ${rem}/8`;
-  return `${ft}'-${inch}${frac}"`;
+const app = document.getElementById('app')!;
+const noticeBar = document.getElementById('notices')!;
+
+let session: SessionState;
+let current: StoredBuild | null = null;
+let model: StructureModel | null = null;
+let studio: StudioHandles | null = null;
+let saveTimer = 0;
+
+// ── Session boot: stored bytes are revalidated, never trusted ────────────────
+{
+  const loaded = loadSession(window.localStorage);
+  session = loaded.state;
+  if (loaded.notices.length > 0) showNotices(loaded.notices);
 }
 
-// ── Renderer / scene ──────────────────────────────────────────────────────────
-const viewport = document.getElementById('viewport')!;
-const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-viewport.appendChild(renderer.domElement);
-
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xf4f2ec);
-const persp = new THREE.PerspectiveCamera(40, 1, 0.1, 500);
-const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 500);
-let camera: THREE.Camera = persp;
-let controls = new OrbitControls(persp, renderer.domElement);
-
-function fitViewport(): void {
-  const w = Math.max(1, viewport.clientWidth);
-  const h = Math.max(320, window.innerHeight - viewport.getBoundingClientRect().top - 8);
-  renderer.setSize(w, h);
-  persp.aspect = w / h;
-  persp.updateProjectionMatrix();
-  const halfW = orthoHalf;
-  ortho.left = -halfW; ortho.right = halfW;
-  ortho.top = halfW * (h / w); ortho.bottom = -halfW * (h / w);
-  ortho.updateProjectionMatrix();
-}
-let orthoHalf = Math.max(BUILDING.lengthFt, BUILDING.widthFt) * 0.75;
-window.addEventListener('resize', fitViewport);
-
-scene.add(new THREE.HemisphereLight(0xffffff, 0x4a3a22, 1.1), new THREE.AmbientLight(0xffffff, 0.55));
-const sun = new THREE.DirectionalLight(0xffffff, 1.0);
-sun.position.set(12, 20, 8);
-scene.add(sun);
-
-// Ground sits at the engine's grade line (posts stand on it).
-const ground = new THREE.Mesh(
-  new THREE.BoxGeometry(BUILDING.lengthFt * 3, 0.05, BUILDING.widthFt * 3.4),
-  new THREE.MeshToonMaterial({ color: 0x9dbd80, gradientMap: toonGradient() }),
-);
-ground.position.y = MODEL.levels.gradeY - 0.025;
-scene.add(ground);
-
-// ── Views (design doc §3.1): perspective isos, orthographic plan/elevations ──
-const CENTER = new THREE.Vector3(0, BUILDING.wallHeightFt * 0.45, 0);
-const R = Math.max(BUILDING.lengthFt, BUILDING.widthFt) * 1.35;
-
-function setCamera(next: THREE.Camera, pos: THREE.Vector3, up?: THREE.Vector3): void {
-  camera = next;
-  controls.dispose();
-  controls = new OrbitControls(camera as THREE.PerspectiveCamera, renderer.domElement);
-  camera.position.copy(pos);
-  camera.up.copy(up ?? new THREE.Vector3(0, 1, 0));
-  controls.target.copy(CENTER);
-  controls.update();
-}
-
-const VIEWS: [string, () => void][] = [
-  ['Iso NE', () => setCamera(persp, new THREE.Vector3(R, R * 0.62, -R).add(CENTER))],
-  ['Iso NW', () => setCamera(persp, new THREE.Vector3(-R, R * 0.62, -R).add(CENTER))],
-  ['Iso SE', () => setCamera(persp, new THREE.Vector3(R, R * 0.62, R).add(CENTER))],
-  ['Iso SW', () => setCamera(persp, new THREE.Vector3(-R, R * 0.62, R).add(CENTER))],
-  ['Plan', () => setCamera(ortho, new THREE.Vector3(0, R * 1.6, 0).add(CENTER), new THREE.Vector3(0, 0, -1))],
-  ['Front', () => setCamera(ortho, new THREE.Vector3(0, 0, R * 1.6).add(CENTER))],
-  ['Left', () => setCamera(ortho, new THREE.Vector3(-R * 1.6, 0, 0).add(CENTER))],
-];
-
-// ── FrameModel → meshes ───────────────────────────────────────────────────────
-function propFor(nominal: string): LumberSize {
-  if (nominal in { '2x4': 1, '2x6': 1, '4x4': 1 }) return nominal as LumberSize;
-  return nominal.startsWith('2x') ? '2x6' : '4x4'; // nearest prop; exact dims still applied
-}
-
-const group = new THREE.Group();
-scene.add(group);
-let currentStage: StageId = 11;
-let selectedId: string | null = null;
-
-function buildMember(m: Member): THREE.Group {
-  let p: THREE.Group;
-  if (m.nominal.includes('panel')) {
-    p = plywoodSheet(group);
-    p.scale.set(m.cutLength / 12, m.actual.d / 12, m.actual.w / 12);
-  } else {
-    p = lumberPiece(group, propFor(m.nominal), m.cutLength / 12, m.actual.d / 12, m.actual.w / 12);
+function showNotices(messages: string[]): void {
+  if (messages.length === 0) {
+    noticeBar.hidden = true;
+    return;
   }
-  p.rotation.order = 'YXZ';
-  p.rotation.set(...m.rotation);
-  p.position.set(m.position[0] - BUILDING.lengthFt / 2, m.position[1], m.position[2] - BUILDING.widthFt / 2);
-  p.userData.memberId = m.id;
-  return p;
+  noticeBar.hidden = false;
+  noticeBar.innerHTML = messages.map((m) => `<p>${esc(m)}</p>`).join('');
 }
 
-function tint(wrapper: THREE.Group, hex: number): void {
-  wrapper.traverse((o) => {
-    if (o instanceof THREE.Mesh && o.material instanceof THREE.MeshToonMaterial) o.material.color.setHex(hex);
+/** Debounced write, flushed synchronously when the page is going away. */
+function scheduleSave(): void {
+  window.clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => saveSession(window.localStorage, session), 300);
+}
+function flushSave(): void {
+  window.clearTimeout(saveTimer);
+  saveSession(window.localStorage, session);
+}
+window.addEventListener('pagehide', flushSave);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushSave();
+});
+
+// ── Routing ─────────────────────────────────────────────────────────────────
+
+function go(hash: string): void {
+  if (window.location.hash === hash) render();
+  else window.location.hash = hash;
+}
+
+window.addEventListener('hashchange', render);
+
+function render(): void {
+  const route = parseRoute(window.location.hash);
+  if (route.name === 'picker') {
+    renderPickerScreen();
+    return;
+  }
+  let build = findBuild(session, route.id);
+  if (route.shared) {
+    const spec = decodeSpec(route.shared.raw);
+    if (spec) {
+      const { state, id } = nextCustomId(session);
+      session = state;
+      build = { id, familyId: (spec as { family: string }).family === 'building' ? 'custom' : 'custom', label: 'Shared build', spec };
+      session = commitBuild(session, build).state;
+      scheduleSave();
+      // The shared entry leaves history: the user is now editing their own copy.
+      window.history.replaceState(null, '', `#/build/${id}`);
+    }
+  }
+  if (!build) {
+    const fromFamily = buildFromFamily(route.id as FamilyId);
+    if (fromFamily) {
+      build = fromFamily;
+      session = commitBuild(session, build).state;
+      scheduleSave();
+    }
+  }
+  if (!build) {
+    showNotices([`That build (${route.id}) is not on this device — showing the structure list.`]);
+    go('#/');
+    return;
+  }
+  renderWorkbench(build);
+}
+
+// ── Picker screen ───────────────────────────────────────────────────────────
+
+function renderPickerScreen(): void {
+  workbenchToken += 1; // cancel any workbench build still waiting on its paint frames
+  if (studio) {
+    studio.dispose();
+    studio = null;
+  }
+  current = null;
+  document.body.dataset.screen = 'picker';
+  app.innerHTML = '<div id="pickerRoot"></div>';
+  renderPicker(document.getElementById('pickerRoot')!, recentBuilds(session), {
+    onOpenFamily: (id) => go(routeToHash({ name: 'build', id })),
+    onOpenBuild: (id) => go(routeToHash({ name: 'build', id })),
   });
 }
 
-function rebuild(): void {
-  disposeObject(group);
-  group.clear();
-  for (const m of MODEL.members) {
-    if (m.stage > currentStage) continue;
-    const p = buildMember(m);
-    if (m.id === selectedId) tint(p, 0xff8844); // selection highlight
-    else if (m.stage === currentStage && currentStage < 11) tint(p, 0xffe9b0); // current-stage highlight
-  }
+// ── Workbench ───────────────────────────────────────────────────────────────
+
+function regenerate(): void {
+  if (!current) return;
+  const { spec, issues } = normalizeSpec(current.spec);
+  current.spec = spec;
+  model = generateStructure(spec);
+  studio?.setModel(model);
+  renderIssues(issues.map((i) => i.message));
+  renderStrips();
+  session = commitBuild(session, { ...current, updatedAt: Date.now() }).state;
+  scheduleSave();
 }
 
-// ── Selection → Member Card (design doc §4.1) ────────────────────────────────
-const raycaster = new THREE.Raycaster();
-renderer.domElement.addEventListener('click', (ev) => {
-  const r = renderer.domElement.getBoundingClientRect();
-  const ndc = new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
-  raycaster.setFromCamera(ndc, camera);
-  const hits = raycaster.intersectObjects(group.children, true);
-  let id: string | null = null;
-  for (const h of hits) {
-    let o: THREE.Object3D | null = h.object;
-    while (o && !o.userData.memberId) o = o.parent;
-    if (o?.userData.memberId) { id = o.userData.memberId as string; break; }
-  }
-  selectedId = id;
-  renderMemberCard();
-  rebuild();
-});
-
-function renderMemberCard(): void {
-  const card = document.getElementById('memberCard')!;
-  const m = MODEL.members.find((x) => x.id === selectedId);
-  if (!m) { card.style.display = 'none'; return; }
-  const identical = MODEL.members.filter((x) => x.role === m.role && x.nominal === m.nominal && Math.abs(x.cutLength - m.cutLength) < 0.06).length;
-  const angles = m.angles ? Object.entries(m.angles).map(([k, v]) => `${k} ${v.toFixed(1)}°`).join(' · ') : '';
-  card.style.display = 'block';
-  card.innerHTML = `
-    <strong>${PLAIN[m.role] ?? m.role}</strong> <span style="color:#6b6250">(${m.id})</span>
-    <dl style="margin:4px 0 0">
-      <dt>Size</dt><dd>${m.nominal} (actual ${m.actual.w}" × ${m.actual.d}")</dd>
-      <dt>Cut length</dt><dd>${fmtFtIn(m.cutLength)}${angles ? ' · ' + angles : ''}</dd>
-      <dt>Grade / nailing</dt><dd>${m.grade} · ${m.nailing}</dd>
-      <dt>Stage</dt><dd>${m.stage} — ${STAGES.find((s) => s.id === m.stage)?.name}</dd>
-      <dt>Identical members</dt><dd>${identical} pcs</dd>
-      <dt>Doctrine</dt><dd>${m.doctrineRef}</dd>
-    </dl>`;
+function renderIssues(messages: string[]): void {
+  const el = document.getElementById('issues');
+  if (!el) return;
+  el.hidden = messages.length === 0;
+  el.innerHTML = messages.map((m) => `<p>${esc(m)}</p>`).join('');
 }
 
-// ── Stage scrubber + stage panel (design doc §2.2) ───────────────────────────
-function renderStagePanel(): void {
-  const active = BOM.stages.filter((s) => s.stage <= currentStage);
-  const cur = BOM.stages.find((s) => s.stage === currentStage) ?? active[active.length - 1];
-  document.getElementById('stageTitle')!.textContent = cur ? `Stage ${cur.stage}: ${cur.name}` : 'Stages';
-  const runBf = active.reduce((a, s) => a + s.boardFeet, 0);
-  const runMh = active.reduce((a, s) => a + s.manHours, 0);
-  document.getElementById('stageNote')!.textContent = cur
-    ? `This stage: ${cur.memberCount} members · ${cur.boardFeet.toFixed(0)} BF · ${cur.manHours.toFixed(1)} MH (PH rates). ` +
-      `Through stage ${cur.stage}: ${runBf.toFixed(0)} BF · ${runMh.toFixed(1)} MH.`
+/**
+ * Guards the two-phase workbench open: bumped on every navigation, checked before the deferred
+ * heavy build runs. Clicking Back during the yield must win — a build that fires anyway would
+ * resurrect a screen the user already left.
+ */
+let workbenchToken = 0;
+
+function workbenchHtml(build: StoredBuild, family: ReturnType<typeof familyById>, opening: boolean): string {
+  return `
+    <div class="workbench">
+      <header class="wb-head">
+        <button class="back" id="backBtn" type="button">◀ Structures</button>
+        <h1>${esc(build.label ?? family?.name ?? build.id)}</h1>
+        <span class="lineage">${esc(family?.lineage ?? '')}</span>
+        <div class="wb-actions">
+          <button class="chip" id="shareBtn" type="button">Copy link</button>
+          <button class="chip" id="unlockBtn" type="button">Unlock everything</button>
+          ${FEATURES.commandOutputs
+            ? '<button class="chip chip--go" id="sheetBtn" type="button">Command packet</button>'
+            : '<a class="chip chip--go" href="learn.html">Flashcards</a>'}
+        </div>
+      </header>
+      <div id="issues" class="issues" hidden></div>
+      <div class="wb-toolbar">
+        <div class="grp"><b>View</b><span id="views"></span></div>
+        <div class="grp"><b>Stage</b><span id="stages"></span></div>
+        <div class="grp"><b>Cut</b><span id="cutAxes"></span></div>
+      </div>
+      <div id="cutDepthRow" class="cut-row" hidden></div>
+      <div id="stageName" class="stage-name"></div>
+      <main class="wb-main">
+        <section class="pane pane--config" aria-label="Configure">
+          <div id="configPanel"></div>
+        </section>
+        <div id="viewport" class="viewport">${opening
+          ? '<div class="opening" role="status"><span class="ring" aria-hidden="true"></span><p>Laying out the frame…</p></div>'
+          : ''}</div>
+        <aside class="pane pane--inspect" aria-label="Inspect">
+          <div id="memberCard" class="member-card" hidden></div>
+          <div id="stagePanel"></div>
+          <!-- The strips belong beside the model, not below the fold: the window itself no
+               longer scrolls, so anything parked under it would simply never be seen. -->
+          <section class="strips">
+            <h2>Plate layout — the marks to pencil (X stud · K king · J jack · C cripple)</h2>
+            <div id="stripsBody"></div>
+          </section>
+          <p class="doctrine">TO construction per FM 5-426 (public release); life-safety values cite
+            EM 385-1-1. Citations marked (PH) are pending a manual page check.</p>
+        </aside>
+      </main>
+    </div>`;
+}
+
+/**
+ * RESPOND FIRST, BUILD SECOND.
+ *
+ * Opening a structure used to be one synchronous run: generate the model, build seven hundred
+ * meshes, then paint — and the click did NOTHING VISIBLE for up to 1.7 seconds (measured,
+ * gp-frame, this machine). A press with no response for that long reads as a dead button, and
+ * people click again. So the workbench chrome — title, toolbar, an opening line where the model
+ * will be — paints immediately, the browser is given two frames to actually put it on screen
+ * (one is not enough: rAF fires BEFORE paint, so the heavy work would still beat the pixels),
+ * and the expensive part runs after. Back works during the wait, and navigating away cancels
+ * the deferred build via the token.
+ */
+function renderWorkbench(build: StoredBuild): void {
+  current = build;
+  document.body.dataset.screen = 'build';
+  const family = familyById(build.familyId);
+  const token = ++workbenchToken;
+
+  app.innerHTML = workbenchHtml(build, family, true);
+  document.getElementById('backBtn')!.addEventListener('click', () => go('#/'));
+
+  window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+    if (token !== workbenchToken) return; // the user already left
+    finishWorkbench(build, family);
+  }));
+}
+
+function finishWorkbench(build: StoredBuild, family: ReturnType<typeof familyById>): void {
+  model = generateStructure(build.spec);
+
+  app.innerHTML = workbenchHtml(build, family, false);
+  // THE PANEL HAD NEVER SPOKEN ON LOAD. `regenerate` is what renders normalize's report, and it
+  // runs only after the operator changes a control — so a build that arrived already needing
+  // repair opened silently. Every warning was there and none of it was on screen: a forwarded
+  // link carrying a roof this engine cannot frame, an opening moved back inside its wall, a
+  // second story dropped. It is said here, when the build opens, which is when it matters.
+  renderIssues(normalizeSpec(build.spec).issues.map((i) => i.message));
+
+  studio = createStudio(
+    {
+      viewport: document.getElementById('viewport')!,
+      views: document.getElementById('views')!,
+      stages: document.getElementById('stages')!,
+      stageName: document.getElementById('stageName')!,
+      cutAxes: document.getElementById('cutAxes')!,
+      cutDepthRow: document.getElementById('cutDepthRow')!,
+      memberCard: document.getElementById('memberCard')!,
+      stagePanel: document.getElementById('stagePanel')!,
+    },
+    model,
+  );
+
+  document.getElementById('backBtn')!.addEventListener('click', () => go('#/'));
+  document.getElementById('sheetBtn')?.addEventListener('click', () => {
+    // Ask for the three numbers the tool has no basis for before generating anything. A labor
+    // table built on defaults nobody chose is a labor table the unit gets held to anyway.
+    void askPacketOptions(PACKET_DEFAULTS).then((opts) => {
+      if (!opts) return;
+      // The packet carries a still of the view the operator set up, so the drawing on the page
+      // is the one they were looking at when they decided it was right. `preserveDrawingBuffer`
+      // is on for exactly this; a blocked pop-up falls back to printing the workbench itself.
+      const canvas = document.querySelector<HTMLCanvasElement>('#viewport canvas');
+      const input = {
+        model: model!,
+        title: current!.label ?? family?.name ?? current!.id,
+        lineage: family?.lineage ?? '',
+        viewImage: canvas ? canvas.toDataURL('image/png') : null,
+        ...opts,
+      };
+      if (opts.action === 'csv') {
+        // Fitted to the SAME stock lengths as the packet, from the same compile.
+        downloadMaterialsCsv(input);
+        showNotices(['Materials CSV saved. It carries the estimate\'s limits at the top — keep them with it.']);
+        return;
+      }
+      const opened = openCommandSheet(input);
+      if (!opened) showNotices(['This browser would not open a print frame — try Save as PDF from the browser menu.']);
+    });
+  });
+  document.getElementById('shareBtn')!.addEventListener('click', () => {
+    const url = `${window.location.origin}${window.location.pathname}#/build/${current!.id}?c=${encodeSpec(current!.spec)}`;
+    void navigator.clipboard?.writeText(url).then(
+      () => showNotices(['Link copied. It carries the design, not your saved builds.']),
+      () => showNotices([url]),
+    );
+  });
+  document.getElementById('unlockBtn')!.addEventListener('click', () => {
+    const { state, build: unlocked } = unlockToCustom(session, current!);
+    session = state;
+    scheduleSave();
+    go(routeToHash({ name: 'build', id: unlocked.id }));
+  });
+
+  renderConfigPanel();
+  renderStrips();
+  onPropAssetsReady(() => studio?.setModel(model!));
+}
+
+// ── Config panel ────────────────────────────────────────────────────────────
+
+function getPath(spec: StructureSpec, path: string): unknown {
+  let node: unknown = spec;
+  for (const key of path.split('.')) {
+    if (node === undefined || node === null) return undefined;
+    node = (node as Record<string, unknown>)[key];
+  }
+  return node;
+}
+
+function setPath(spec: StructureSpec, path: string, value: unknown): void {
+  const keys = path.split('.');
+  let node = spec as unknown as Record<string, unknown>;
+  for (let i = 0; i < keys.length - 1; i++) {
+    const k = keys[i]!;
+    if (node[k] === undefined || node[k] === null) node[k] = {};
+    node = node[k] as Record<string, unknown>;
+  }
+  node[keys[keys.length - 1]!] = value;
+}
+
+/** Roof and foundation are unions — switching kind rebuilds the branch with sane defaults. */
+function setRoofKind(spec: BuildingSpec, kind: RoofSpec['kind']): void {
+  const prev = spec.roof;
+  const rise = prev.kind === 'gable' || prev.kind === 'shed' || prev.kind === 'hip' || prev.kind === 'pyramid' ? prev.risePer12 : 4;
+  const oh = prev.kind === 'none' ? 1 : prev.overhangFt;
+  spec.roof =
+    kind === 'gable' ? { kind, risePer12: rise, overhangFt: oh }
+    : kind === 'shed' ? { kind, risePer12: rise || 3, overhangFt: oh, highSide: 'N' }
+    : kind === 'flat' ? { kind, overhangFt: oh, drainPer12: 1 }
+    : kind === 'hip' ? { kind, risePer12: rise, overhangFt: oh }
+    : kind === 'pyramid' ? { kind, risePer12: rise, overhangFt: oh }
+    : { kind: 'none' };
+}
+
+function setFoundationKind(spec: BuildingSpec, kind: FoundationSpec['kind']): void {
+  const prev = spec.foundation;
+  const crawl = prev.kind === 'piers' || prev.kind === 'wall' ? prev.crawlFt : 1.5;
+  spec.foundation =
+    kind === 'piers' ? { kind, crawlFt: crawl }
+    : kind === 'wall' ? { kind, crawlFt: crawl }
+    : kind === 'basement' ? { kind, depthFt: 7.5, stairs: true }
+    : kind === 'slab' ? { kind }
+    : kind === 'skids' ? { kind }
+    : { kind: 'embedded', embedFt: 3 };
+}
+
+function rowHtml(row: PanelRow, value: unknown): string {
+  const locked = row.lockedBy
+    ? `<span class="lock" title="${esc(row.cite ?? '')}">standard design · ${esc(row.lockedBy)}</span>`
     : '';
-  const rows = (cur?.lines ?? [])
-    .map((l) => `<tr><td>${l.nominal}</td><td class="num">${fmtFtIn(l.cutLengthIn)}</td><td class="num">${l.count}</td><td>${l.roles.join(', ')}</td></tr>`)
-    .join('');
-  document.getElementById('stageBom')!.innerHTML =
-    `<h2>Cut list — this stage</h2>
-     <table><tr><th>Stock</th><th class="num">Cut</th><th class="num">Pcs</th><th>Use</th></tr>${rows}</table>`;
-}
-
-function setStage(s: StageId): void {
-  currentStage = s;
-  for (const b of document.querySelectorAll('#stages button')) {
-    b.classList.toggle('on', Number((b as HTMLButtonElement).dataset.stage) === s);
+  const std = row.lock === 'preset' ? '<span class="std">STD</span>' : '';
+  const help = row.help ? `<span class="help">${esc(row.help)}</span>` : '';
+  const cite = row.cite && !row.lockedBy ? `<span class="cite">${esc(row.cite)}</span>` : '';
+  if (row.control === 'openings-editor') {
+    return `<div class="row row--openings" data-path="${esc(row.path)}">
+      <span class="row-label">${esc(row.label)} ${std}</span>${help}
+      <div class="openings" id="openingsEditor"></div>
+    </div>`;
   }
-  rebuild();
-  renderStagePanel();
+  if (row.control === 'toggle') {
+    return `<label class="row"><span class="row-label">${esc(row.label)}</span>
+      <input type="checkbox" data-path="${esc(row.path)}" ${value ? 'checked' : ''} ${row.lockedBy ? 'disabled' : ''}/>
+      ${locked}${help}</label>`;
+  }
+  if (row.control === 'select' || row.control === 'family') {
+    // The option VALUE stays the spec's own token; the reader sees the plain-language label.
+    // A select full of raw enum tokens was the panel quietly assuming everyone already knew
+    // the vocabulary — in the tool whose other half exists to teach it.
+    const opts = (row.options ?? [])
+      .map((o, i) => `<option value="${esc(o)}"${String(value) === o ? ' selected' : ''}>${esc(row.optionLabels?.[i] ?? o)}</option>`)
+      .join('');
+    return `<label class="row"><span class="row-label">${esc(row.label)}</span>
+      <select data-path="${esc(row.path)}" ${row.lockedBy ? 'disabled' : ''}>${opts}</select>
+      ${locked}${help}</label>`;
+  }
+  return `<label class="row"><span class="row-label">${esc(row.label)}</span>
+    <input type="number" data-path="${esc(row.path)}" value="${Number(value ?? 0)}"
+      min="${row.min ?? ''}" max="${row.max ?? ''}" step="${row.step ?? 'any'}" inputmode="decimal"
+      ${row.lockedBy ? 'disabled' : ''}/>
+    ${locked}${cite}${help}</label>`;
 }
 
-// ── Layout strips (design doc §11.4) — SVG per wall, marks are tappable ──────
+function renderConfigPanel(): void {
+  if (!current) return;
+  const schema = configSchemaFor(current.familyId);
+  const panel = document.getElementById('configPanel')!;
+  // THE PANEL REMEMBERS WHAT YOU HAD OPEN. Every edit re-renders it, and the rebuild used to
+  // reset the disclosure state to its default — open FOUNDATION, change the crawl height, and
+  // the section slammed shut on the control you were still using. Open-state is keyed by
+  // section title so it survives the rebuild; a fresh panel (or a family switch, whose titles
+  // differ) falls back to the default of the first two sections open. Scroll position gets the
+  // same treatment for the same reason.
+  const openState = new Map(
+    [...panel.querySelectorAll<HTMLDetailsElement>('details.cfg-group')]
+      .map((d) => [d.querySelector('summary')?.textContent ?? '', d.open] as const),
+  );
+  const pane = panel.parentElement;
+  const scrollTop = pane?.scrollTop ?? 0;
+  // Rows that do not apply to the current choices do not render, and a section left with
+  // nothing to say disappears whole — the panel is exactly as long as the structure is
+  // complicated, which is the point of the cascade.
+  const visibleGroups = schema.groups
+    .map((g) => ({ ...g, rows: g.rows.filter((r) => !r.applies || r.applies(current!.spec)) }))
+    .filter((g) => g.rows.length > 0);
+  panel.innerHTML = visibleGroups
+    .map((g, i) => `<details class="cfg-group"${(openState.get(g.title) ?? i < 2) ? ' open' : ''}>
+      <summary>${esc(g.title)}</summary>
+      ${g.rows.map((r) => rowHtml(r,
+        r.path === '__family' ? current!.familyId
+        : r.path === 'openFront' ? (getPath(current!.spec, r.path) ?? 'none')
+        : r.path === 'site.soil' ? (getPath(current!.spec, r.path) ?? 'unknown')
+        : getPath(current!.spec, r.path))).join('')}
+    </details>`)
+    .join('');
+
+  // `input[data-path], select[data-path]` — NOT `[data-path]`. The openings row is a <div> that
+  // carries data-path to say which spec branch it edits, and the bare selector matched it too.
+  // `change` bubbles, so every keystroke committed inside the openings editor re-entered this
+  // handler with `el` = that div, fell through to the final `setPath(spec, path, el.value)`, and
+  // wrote `undefined` over `stories.0.openings` — silently deleting every door and window in the
+  // building the moment you adjusted one of them. It was there before this editor was rewritten;
+  // the old one just never re-rendered afterwards, so nothing on screen contradicted itself.
+  panel.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input[data-path], select[data-path]').forEach((el) => {
+    el.addEventListener('change', () => {
+      const path = el.dataset.path!;
+      const spec = current!.spec as BuildingSpec;
+      if (path === '__family') {
+        // Changing the TYPE is not an edit of this spec — it opens that structure's standard
+        // build, exactly as the picker card would, so the first input on the panel and the
+        // picker are the same decision made in two places.
+        const next = buildFromFamily((el as HTMLSelectElement).value as FamilyId);
+        if (next) {
+          session = commitBuild(session, next).state;
+          scheduleSave();
+          go(routeToHash({ name: 'build', id: next.id }));
+        }
+        return;
+      }
+      if (path === 'openFront') {
+        // 'none' clears it: an absent field means the building is closed in, and storing the
+        // string 'none' would read as a wall named none everywhere downstream.
+        const w = (el as HTMLSelectElement).value;
+        (spec as unknown as { openFront?: string }).openFront = w === 'none' ? undefined : w;
+      } else if (path === 'site.soil') {
+        const soil = (el as HTMLSelectElement).value;
+        // 'unknown' clears the record rather than storing a value that claims an observation.
+        (spec as unknown as { site?: { soil?: string } }).site = soil === 'unknown' ? undefined : { soil };
+      } else if (path === 'screenBand') {
+        // The toggle is "does this hut breathe"; the spec value is the band itself, or null.
+        // Mapping it here keeps the doctrine numbers out of the control and out of the panel.
+        (spec as unknown as Record<string, unknown>).screenBand = (el as HTMLInputElement).checked
+          ? { sillFt: HUT_BAND.sillFt, heightFt: HUT_BAND.heightFt }
+          : null;
+      } else if (path === 'roof.kind') {
+        setRoofKind(spec, (el as HTMLSelectElement).value as RoofSpec['kind']);
+        // A consequence of THIS choice, carried with it: the frozen gable lays its own solid
+        // deck, so a purlin deck picked under another roof shape resolves to the deck a gable
+        // actually gets. Left as 'purlins', the panel's gable row could not display the value
+        // it holds — a control showing one thing over a spec meaning another.
+        if (spec.roof.kind === 'gable' && spec.coverings?.roofDeck === 'purlins') {
+          spec.coverings.roofDeck = 'plywood';
+        }
+      }
+      else if (path === 'foundation.kind') setFoundationKind(spec, (el as HTMLSelectElement).value as FoundationSpec['kind']);
+      else if (el instanceof HTMLInputElement && el.type === 'checkbox') setPath(spec, path, el.checked);
+      else if (el instanceof HTMLInputElement && el.type === 'number') {
+        const n = Number(el.value);
+        // Commit-on-valid: a value that cannot be a number stays in the control.
+        if (!Number.isFinite(n)) {
+          el.classList.add('blocked');
+          return;
+        }
+        el.classList.remove('blocked');
+        setPath(spec, path, n);
+      } else {
+        const raw = (el as HTMLSelectElement).value;
+        const row = schema.groups.flatMap((g) => g.rows).find((r) => r.path === path);
+        setPath(spec, path, row?.numeric ? Number(raw) : raw);
+      }
+      regenerate();
+      renderConfigPanel();
+    });
+  });
+  renderOpeningsEditor();
+  if (pane) pane.scrollTop = scrollTop;
+}
+
+// ── Openings ────────────────────────────────────────────────────────────────
+//
+// The first version of this editor put six controls on one line per opening: a type popup and
+// five bare number boxes under a header strip. With four windows on a wall it was a grid of
+// twenty unlabelled numbers, the header only lined up with the first row, and the owner asked
+// why adding a door was so hard when it should be trivial. It should be, so:
+//
+//   · ADDING IS ONE CLICK. "+ Door" makes a real 3'0" x 6'8" door in the first gap wide enough
+//     to hold it. Nothing has to be typed for the result to be correct and buildable.
+//   · A PLACED OPENING READS AS A SENTENCE. Collapsed, a row says what it is, how big, and
+//     where — in feet and inches, not decimal feet. No column headers to look up.
+//   · EDITING IS NAMED FIELDS, not a row of boxes, and only the ones that apply: a door has no
+//     sill, so a door never shows one.
+//   · WHAT IS WRONG SAYS SO, on the row: off the end of the wall, or overlapping its neighbour.
+
+const OPENING_KINDS: { kind: OpeningKind; label: string; widthFt: number; heightFt: number; sillHeightFt: number; fill: OpeningFill }[] = [
+  // Sizes are the standard-design rough openings this tool already ships in its presets, so
+  // "+ Door" produces the same door the GP building's own drawing calls for.
+  { kind: 'door', label: 'Door', widthFt: 3, heightFt: 6.7, sillHeightFt: 0, fill: 'door-ledged' },
+  { kind: 'window', label: 'Window', widthFt: 3, heightFt: 3.5, sillHeightFt: 3.5, fill: 'window-shutter' },
+  { kind: 'vent', label: 'Vent', widthFt: 1.5, heightFt: 1, sillHeightFt: 6.5, fill: 'vent-screen' },
+];
+
+/** Decimal feet as a carpenter reads them: 6.7 ft is 6'-8", not "6.7". */
+function ftIn(ft: number): string {
+  const total = Math.round(ft * 12);
+  const f = Math.trunc(total / 12);
+  const i = Math.abs(total % 12);
+  return i === 0 ? `${f}'` : `${f}'-${i}"`;
+}
+
+/** How long this wall runs, which is what an offset is measured along. */
+function wallRunFt(spec: BuildingSpec, wall: string): number {
+  return wall === 'S' || wall === 'N' ? spec.dims.lengthFt : spec.dims.widthFt;
+}
+
+/**
+ * Where to put a new opening: the middle of the widest clear stretch, keeping a corner post's
+ * worth of wall at each end. Dropping every new opening at a fixed offset would stack them on
+ * top of each other, and then the FIRST thing the user has to do is fix the tool's mess.
+ */
+function placeInGap(list: OpeningSpec[], runFt: number, widthFt: number): number {
+  const margin = 0.5;
+  const taken = [...list].map((o) => [o.offsetFt, o.offsetFt + o.widthFt] as const).sort((a, b) => a[0] - b[0]);
+  let best = margin;
+  let bestSpan = -1;
+  let cursor = margin;
+  for (const [a, b] of [...taken, [runFt - margin, runFt - margin] as const]) {
+    const span = a - cursor;
+    if (span > bestSpan) {
+      bestSpan = span;
+      best = cursor + Math.max(0, (span - widthFt) / 2);
+    }
+    cursor = Math.max(cursor, b + margin);
+  }
+  // Every gap is too small: park it at the left margin and let the row's own warning say so.
+  return Math.round(Math.max(margin, Math.min(best, runFt - widthFt - margin)) * 4) / 4;
+}
+
+/**
+ * Plain-language complaint about one opening, or null when it is fine.
+ *
+ * Deliberately short. `normalizeSpec` already slides an opening back inside its wall, clamps
+ * width/height/sill to their spec ranges, and drops one too wide to fit — with a message each
+ * time — so those states never reach a row here and a warning about them would be dead code
+ * pretending to be a safety net. OVERLAP is the one thing normalization does not touch (order
+ * is preserved verbatim under TD5, and silently reordering someone's wall would be worse), so
+ * it is the one thing the row has to say out loud.
+ */
+function openingProblem(o: OpeningSpec, i: number, list: OpeningSpec[]): string | null {
+  for (let k = 0; k < list.length; k++) {
+    const b = list[k]!;
+    if (k === i) continue;
+    if (o.offsetFt < b.offsetFt + b.widthFt - 1e-6 && b.offsetFt < o.offsetFt + o.widthFt - 1e-6) {
+      return `overlaps the ${esc(b.kind)} at ${ftIn(b.offsetFt)} — the framing will collide`;
+    }
+  }
+  return null;
+}
+
+/** Which opening is expanded for editing. One at a time — the panel is 328 px wide. */
+let openOpening: string | null = null;
+
+function renderOpeningsEditor(): void {
+  const host = document.getElementById('openingsEditor');
+  if (!host || !current) return;
+  const spec = current.spec as BuildingSpec;
+  const story = spec.stories?.[0];
+  if (!story) return;
+  const walls: [string, string][] = [['S', 'Front (S)'], ['N', 'Rear (N)'], ['E', 'Right (E)'], ['W', 'Left (W)']];
+
+  const fieldsFor = (o: OpeningSpec): { key: keyof OpeningSpec; label: string; step: number; min: number }[] => [
+    { key: 'widthFt', label: 'Width', step: 0.25, min: 0.5 },
+    { key: 'heightFt', label: 'Height', step: 0.25, min: 0.5 },
+    { key: 'offsetFt', label: 'From left corner', step: 0.25, min: 0 },
+    // A door's sill is zero by definition — the opening starts at the sole plate — so showing
+    // the field would only offer a way to make the model wrong.
+    ...(o.kind === 'door' ? [] : [{ key: 'sillHeightFt' as const, label: 'Sill height', step: 0.25, min: 0 }]),
+  ];
+
+  host.innerHTML = walls
+    .map(([w, label]) => {
+      const list = story.openings[w as 'S'] ?? [];
+      const runFt = wallRunFt(spec, w);
+      const rows = list
+        .map((o, i) => {
+          const id = `${w}-${i}`;
+          const open = openOpening === id;
+          const kindLabel = OPENING_KINDS.find((k) => k.kind === o.kind)?.label ?? o.kind;
+          const problem = openingProblem(o, i, list);
+          const editor = open
+            ? `<div class="op-edit">${fieldsFor(o)
+                .map(
+                  (f) => `<label class="op-field"><span>${f.label}</span>
+                    <input type="number" data-op="${f.key}" value="${Number(o[f.key] ?? 0)}"
+                      step="${f.step}" min="${f.min}" inputmode="decimal" />
+                    <em>ft</em></label>`,
+                )
+                .join('')}
+                <button class="op-del" data-op="remove" type="button">Remove this ${esc(kindLabel.toLowerCase())}</button>
+              </div>`
+            : '';
+          return `<div class="op${open ? ' op--open' : ''}${problem ? ' op--bad' : ''}" data-wall="${w}" data-i="${i}" data-id="${id}">
+            <button class="op-sum" data-toggle="${id}" type="button" aria-expanded="${open}">
+              <span class="op-kind">${esc(kindLabel)}</span>
+              <span class="op-size">${ftIn(o.widthFt)} × ${ftIn(o.heightFt)}</span>
+              <span class="op-at">${ftIn(o.offsetFt)} from left</span>
+              <span class="op-chev" aria-hidden="true">${open ? '▾' : '›'}</span>
+            </button>
+            ${problem ? `<p class="op-warn">${esc(problem)}</p>` : ''}
+            ${editor}
+          </div>`;
+        })
+        .join('');
+      return `<section class="op-wall">
+        <h4>${esc(label)}<span class="op-run">${ftIn(runFt)} wall</span></h4>
+        ${rows || '<p class="op-none">No openings — a solid wall.</p>'}
+        <div class="op-add">${OPENING_KINDS.map((k) => `<button class="chip" data-add="${w}" data-kind="${k.kind}" type="button">+ ${esc(k.label)}</button>`).join('')}</div>
+      </section>`;
+    })
+    .join('');
+
+  host.querySelectorAll<HTMLButtonElement>('[data-add]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const w = el.dataset.add as 'S';
+      const preset = OPENING_KINDS.find((k) => k.kind === el.dataset.kind)!;
+      // Re-read through `current` rather than the captured story: `regenerate()` swaps
+      // `current.spec` for the normalized copy, so anything closed over here is one edit stale.
+      const live = (current!.spec as BuildingSpec).stories[0]!;
+      const list = live.openings[w] ?? [];
+      live.openings[w] = [
+        ...list,
+        {
+          kind: preset.kind,
+          offsetFt: placeInGap(list, wallRunFt(spec, w), preset.widthFt),
+          widthFt: preset.widthFt,
+          heightFt: preset.heightFt,
+          sillHeightFt: preset.sillHeightFt,
+          fill: preset.fill,
+        },
+      ];
+      // Open the one just added: the common next move is to slide it, and a row that appears
+      // already unfolded is the difference between "added" and "added, now find it".
+      openOpening = `${w}-${(live.openings[w] ?? []).length - 1}`;
+      regenerate();
+      renderConfigPanel();
+    });
+  });
+
+  host.querySelectorAll<HTMLButtonElement>('[data-toggle]').forEach((el) => {
+    el.addEventListener('click', () => {
+      openOpening = openOpening === el.dataset.toggle ? null : el.dataset.toggle!;
+      renderOpeningsEditor();
+    });
+  });
+
+  host.querySelectorAll<HTMLElement>('.op--open').forEach((opEl) => {
+    const w = opEl.dataset.wall as 'S';
+    const i = Number(opEl.dataset.i);
+    opEl.querySelectorAll<HTMLInputElement>('input[data-op]').forEach((field) => {
+      field.addEventListener('change', () => {
+        const n = Number(field.value);
+        if (!Number.isFinite(n)) {
+          field.classList.add('blocked');
+          return;
+        }
+        field.classList.remove('blocked');
+        const live = (current!.spec as BuildingSpec).stories[0]!;
+        if (!live.openings[w]?.[i]) return;
+        (live.openings[w]![i] as unknown as Record<string, unknown>)[field.dataset.op!] = n;
+        regenerate();
+        renderOpeningsEditor(); // refresh the summary line and any warning
+      });
+    });
+    opEl.querySelector<HTMLButtonElement>('[data-op="remove"]')?.addEventListener('click', () => {
+      const live = (current!.spec as BuildingSpec).stories[0]!;
+      live.openings[w] = (live.openings[w] ?? []).filter((_, k) => k !== i);
+      openOpening = null;
+      regenerate();
+      renderConfigPanel();
+    });
+  });
+}
+
+// ── Layout strips ───────────────────────────────────────────────────────────
+
 function renderStrips(): void {
-  const body = document.getElementById('stripsBody')!;
+  const body = document.getElementById('stripsBody');
+  if (!body || !current || !model) return;
+  const spec = current.spec as BuildingSpec;
+  if (spec.family !== 'building') {
+    body.innerHTML = '';
+    return;
+  }
   const walls: ['S' | 'N' | 'E' | 'W', string][] = [
-    ['S', 'South (front)'], ['N', 'North (rear)'], ['E', 'East (right)'], ['W', 'West (left)'],
+    ['S', 'Front (S)'], ['N', 'Rear (N)'], ['E', 'Right (E)'], ['W', 'Left (W)'],
   ];
   body.innerHTML = walls
     .map(([wall, label]) => {
-      const marks = layoutStrip(MODEL.members, wall, BUILDING.lengthFt, BUILDING.widthFt);
-      const runIn = (wall === 'S' || wall === 'N' ? BUILDING.lengthFt : BUILDING.widthFt) * 12;
+      const marks = layoutStrip(model!.members, wall, spec.dims.lengthFt, spec.dims.widthFt);
+      const runIn = (wall === 'S' || wall === 'N' ? spec.dims.lengthFt : spec.dims.widthFt) * 12;
       const px = 3.2;
       const wPx = runIn * px + 40;
       const ticks: string[] = [];
       for (let i = 0; i <= runIn; i += 12) {
-        ticks.push(`<line x1="${20 + i * px}" y1="34" x2="${20 + i * px}" y2="46" stroke="#b7ad97"/>` +
-          `<text x="${20 + i * px}" y="58" font-size="9" text-anchor="middle" fill="#6b6250">${i / 12}'</text>`);
+        ticks.push(
+          `<line x1="${20 + i * px}" y1="34" x2="${20 + i * px}" y2="46" stroke="#b7ad97"/>` +
+            `<text x="${20 + i * px}" y="58" font-size="9" text-anchor="middle" fill="#6b6250">${i / 12}'</text>`,
+        );
       }
       const markSvg = marks
         .map((mk) => {
           const x = 20 + mk.atIn * px;
-          return `<g data-member="${mk.memberId}" style="cursor:pointer">
+          return `<g data-member="${esc(mk.memberId)}" style="cursor:pointer">
             <line x1="${x}" y1="10" x2="${x}" y2="34" stroke="#2b2419" stroke-width="1.4"/>
             <text x="${x}" y="8" font-size="10" font-weight="700" text-anchor="middle" fill="#2b2419">${mk.kind}</text>
           </g>`;
         })
         .join('');
-      return `<details open><summary><strong>${label}</strong> — ${marks.length} marks</summary>
-        <div class="stripScroll"><svg width="${wPx}" height="64" role="img" aria-label="Layout strip, ${label} wall">
+      // Strips print unscrolled: the viewBox lets the SVG scale to the page width.
+      return `<details open><summary><strong>${esc(label)}</strong> — ${marks.length} marks</summary>
+        <div class="strip-scroll"><svg viewBox="0 0 ${wPx} 64" width="${wPx}" height="64" role="img" aria-label="Layout strip, ${esc(label)} wall">
           <rect x="20" y="34" width="${runIn * px}" height="12" fill="#e8dcc0" stroke="#b7ad97"/>
           ${ticks.join('')}${markSvg}
         </svg></div></details>`;
     })
     .join('');
-  body.querySelectorAll('[data-member]').forEach((el) => {
-    el.addEventListener('click', () => {
-      selectedId = (el as SVGGElement).dataset.member ?? null;
-      renderMemberCard();
-      rebuild();
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-  });
 }
 
-// ── Toolbar wiring ────────────────────────────────────────────────────────────
-const viewsEl = document.getElementById('views')!;
-for (const [name, go] of VIEWS) {
-  const b = document.createElement('button');
-  b.className = 'chip';
-  b.textContent = name;
-  b.addEventListener('click', go);
-  viewsEl.appendChild(b);
-}
-const stagesEl = document.getElementById('stages')!;
-for (const s of STAGES) {
-  if (!BOM.stages.some((b) => b.stage === s.id)) continue; // only stages with members
-  const b = document.createElement('button');
-  b.className = 'chip';
-  b.dataset.stage = String(s.id);
-  b.title = s.name;
-  b.textContent = String(s.id);
-  b.addEventListener('click', () => setStage(s.id));
-  stagesEl.appendChild(b);
-}
+// ── Keyboard (guarded: accelerators never fire while typing) ────────────────
 
-// ── Boot ──────────────────────────────────────────────────────────────────────
-fitViewport();
-VIEWS[2]![1](); // Iso SE default
-setStage(11);
-renderStrips();
-onPropAssetsReady(rebuild); // swap in the real lumber props when the GLBs land
+window.addEventListener('keydown', (ev) => {
+  const t = ev.target as HTMLElement | null;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
+  if (ev.key === 'Escape') {
+    if (document.body.dataset.screen === 'build') go('#/');
+    return;
+  }
+  const stageBtn = document.querySelector<HTMLButtonElement>(`#stages [data-stage="${ev.key === '0' ? 'all' : ev.key}"]`);
+  if (/^[0-9]$/.test(ev.key) && stageBtn) {
+    stageBtn.click();
+    ev.preventDefault();
+  }
+});
 
-(window as unknown as Record<string, unknown>).__frame = { camera: () => camera, controls: () => controls, scene, group, setStage };
+render();
 
-function loop(): void {
-  requestAnimationFrame(loop);
-  controls.update();
-  renderer.render(scene, camera);
-}
-loop();
+(window as unknown as Record<string, unknown>).__timber = {
+  session: () => session,
+  model: () => model,
+  studio: () => studio?.debug(),
+  spec: () => current?.spec,
+};

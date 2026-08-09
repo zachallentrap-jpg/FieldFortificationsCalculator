@@ -5,15 +5,16 @@
 import type { Member, WallId } from './types';
 
 const FT = 12;
-const T = 1.5 / FT; // dressed 2x4 thickness, feet
+const D = 3.5 / FT; // dressed 2x4 face width (wall thickness), feet
 
-// Wall frames must match walls.ts placement exactly (start = left end viewed from OUTSIDE).
+// Wall frames must match walls.ts placement exactly (start = left end viewed from OUTSIDE;
+// walls sit inside the floor edge, N/S run through, E/W butt between them).
 function wallFrame(wall: WallId, lengthFt: number, widthFt: number): { start: [number, number]; dir: [number, number]; runFt: number } {
   switch (wall) {
-    case 'S': return { start: [0, 0], dir: [1, 0], runFt: lengthFt };
-    case 'N': return { start: [lengthFt, widthFt], dir: [-1, 0], runFt: lengthFt };
-    case 'E': return { start: [lengthFt, T / 2], dir: [0, 1], runFt: widthFt - T };
-    case 'W': return { start: [0, widthFt - T / 2], dir: [0, -1], runFt: widthFt - T };
+    case 'S': return { start: [0, D / 2], dir: [1, 0], runFt: lengthFt };
+    case 'N': return { start: [lengthFt, widthFt - D / 2], dir: [-1, 0], runFt: lengthFt };
+    case 'E': return { start: [lengthFt - D / 2, D], dir: [0, 1], runFt: widthFt - 2 * D };
+    case 'W': return { start: [D / 2, widthFt - D], dir: [0, -1], runFt: widthFt - 2 * D };
   }
 }
 
@@ -52,6 +53,12 @@ export function wallElevation(members: Member[], wall: WallId, lengthFt: number,
       rects.push({ memberId: m.id, role: m.role, u0: u - wFt / 2, u1: u + wFt / 2, v0: y - lenFt / 2, v1: y + lenFt / 2 });
     } else if (flat) {
       rects.push({ memberId: m.id, role: m.role, u0: u - lenFt / 2, u1: u + lenFt / 2, v0: y - wFt / 2, v1: y + wFt / 2 });
+    } else if (m.role === 'brace') {
+      // Let-in braces are diagonal in the wall plane; project the tilted extents from the
+      // member's in-plane rotation (rotation[2] = rise angle).
+      const du = (Math.abs(Math.cos(m.rotation[2])) * lenFt) / 2;
+      const dv = (Math.abs(Math.sin(m.rotation[2])) * lenFt) / 2;
+      rects.push({ memberId: m.id, role: m.role, u0: u - du, u1: u + du, v0: y - dv, v1: y + dv });
     } else {
       // headers (on edge): face width is vertical
       rects.push({ memberId: m.id, role: m.role, u0: u - lenFt / 2, u1: u + lenFt / 2, v0: y - dFt / 2, v1: y + dFt / 2 });

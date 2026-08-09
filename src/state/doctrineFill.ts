@@ -9,11 +9,16 @@ import type { StorageAdapter } from './persistence';
 const KEY = 'doctrine-fill';
 
 // Save the current live doctrine state as a fill snapshot. Called after any successful apply.
-export async function saveFill(adapter: StorageAdapter, manifest?: { author?: string; date?: string }): Promise<void> {
+// Returns whether the save actually succeeded — a storage failure is non-fatal to the LIVE
+// session (the fill still applies for this session either way), but the caller must know so it
+// can tell the user the fill won't survive a reload, rather than unconditionally claiming
+// "...and saved on this device" regardless of whether that's true.
+export async function saveFill(adapter: StorageAdapter, manifest?: { author?: string; date?: string }): Promise<boolean> {
   try {
     await adapter.set(KEY, JSON.stringify(exportDoctrine(manifest)));
+    return true;
   } catch {
-    /* storage failure is non-fatal — the fill still applies for this session */
+    return false;
   }
 }
 

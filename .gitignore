@@ -9,3 +9,4 @@ dist-standalone/
 __pycache__/
 *.pyc
 .samples/
+.scratch/

@@ -48,6 +48,56 @@ test('engineered munitions NEVER get a fabricated cover box in 3D (§2.7)', () =
   }
 });
 
+test('the 3D engineered-roof hazard marker\'s footprint matches the 2D section\'s exactly (holeW/holeL + parapetW)', () => {
+  // Neither view fabricates a real structure here (§2.7) so there's no doctrine leaf sizing this
+  // marker, but the two views of the same "needs an engineer" flag must still agree on how big a
+  // banner they draw — the 3D box previously used a flat +1.5 ft/side constant that didn't match
+  // the 2D section's +parapetW (3.0 ft for one_man), leaving the views 1.5 ft apart per side.
+  for (const threat of ['at-rpg', 'at-tank', 'at-he-contact', 'blast-vbied']) {
+    const r = compute(defaultInputs({ positionType: 'one_man', overheadCover: true, threat, sump: false }));
+    const geo = r.geometry as { section: { roofPath: string }; plan: { holeL: number; holeW: number; parapetW: number } };
+    assert.equal(geo.section.roofPath, 'engineered_required', threat + ': fixture must exercise the engineered path');
+    const scene = buildScene3D(r);
+    const hazard = scene.parts.find((p) => p.kind === 'box' && p.role === 'engineeredCover') as { w: number; d: number } | undefined;
+    assert.ok(hazard, threat + ': hazard marker present');
+    const expectedW = geo.plan.holeL + geo.plan.parapetW;
+    const expectedD = geo.plan.holeW + geo.plan.parapetW;
+    assert.ok(Math.abs(hazard!.w - expectedW) < 1e-9, threat + ': 3D hazard width ' + hazard!.w + ' != holeL+parapetW ' + expectedW);
+    assert.ok(Math.abs(hazard!.d - expectedD) < 1e-9, threat + ': 3D hazard depth ' + hazard!.d + ' != holeW+parapetW ' + expectedD + ' (2D section\'s own hazard-block formula)');
+  }
+});
+
+test('3D roof cover\'s front/rear insets exactly match the 2D section\'s own setback and rearOverhang', () => {
+  // geo.section.setback (threat-aware, front-only) and geo.section.rearOverhang (structural
+  // bearing-shelf only, no threat concern) are the SAME engine-computed values the 2D section
+  // draws and the specs panel reports — the 3D cover box is asymmetric (front != rear) and must
+  // recover EXACTLY these two values from its own footprint, or the views disagree on a
+  // safety-critical (front) or structural (rear) dimension.
+  for (const threat of ['sa-556', 'ind-mtr-81', 'ind-art-105', 'ind-art-155', 'blast-demo']) {
+    const r = compute(defaultInputs({ positionType: 'one_man', overheadCover: true, threat, sump: false }));
+    const geo = r.geometry as { section: { setback: number; rearOverhang: number; roofPath: string }; plan: { holeW: number } };
+    assert.equal(geo.section.roofPath, 'earth_on_stringers', threat + ': fixture must exercise the earth roof path');
+    const scene = buildScene3D(r);
+    const cover = scene.parts.find((p) => p.kind === 'box' && p.role === 'cover') as { z: number; d: number } | undefined;
+    assert.ok(cover, threat + ': cover box present');
+    // z axis: negative = front (enemy side), positive = rear (file header convention). The box
+    // is centered at z with total depth d, so its two edges recover each inset independently —
+    // no assumption of symmetry, unlike halving the total overhang would require.
+    const frontEdgeZ = cover!.z - cover!.d / 2;
+    const rearEdgeZ = cover!.z + cover!.d / 2;
+    const frontInset3d = -frontEdgeZ - geo.plan.holeW / 2;
+    const rearInset3d = rearEdgeZ - geo.plan.holeW / 2;
+    assert.ok(
+      Math.abs(frontInset3d - geo.section.setback) < 1e-9,
+      threat + ': 3D front inset ' + frontInset3d.toFixed(3) + ' ft != 2D/specs-panel setback ' + geo.section.setback.toFixed(3) + ' ft',
+    );
+    assert.ok(
+      Math.abs(rearInset3d - geo.section.rearOverhang) < 1e-9,
+      threat + ': 3D rear inset ' + rearInset3d.toFixed(3) + ' ft != 2D rearOverhang ' + geo.section.rearOverhang.toFixed(3) + ' ft',
+    );
+  }
+});
+
 test('parapet and cover exist and are never tagged with the revetment\'s finish, regardless of choice', () => {
   for (const revetment of ['none', 'sandbag_facing', 'pickets_wire', 'corrugated_metal', 'timber_plywood']) {
     const r = compute(defaultInputs({ revetment, overheadCover: true }));
@@ -116,6 +166,40 @@ test('bay-wall taper never exceeds the bay\'s own size — walls cannot flare in
     const cap = Math.min(geo.plan.holeL, geo.plan.holeW) * 0.35 + 1e-9;
     for (const w of walls) {
       assert.ok((w.taperAmount ?? 0) <= cap, positionType + ' taper ' + w.taperAmount + ' ≤ bay cap ' + cap);
+    }
+  }
+});
+
+test('flared bay walls get a double-tapered corner post — no void where two walls meet', () => {
+  // The regression this pins (docs/REALISM_PASS_3D_PLAN.md R4): each bay wall only tapers its
+  // OWN outer face (front/rear flare on z, left/right flare on x), so a flared excavation left a
+  // triangular gap at all 4 corners — nothing occupied the diagonal between two adjacent walls'
+  // flared edges. A corner post, double-tapered (same amount, both axes), fills it.
+  // Scoped to single-bay shapes (one pushBayBox call ⇒ unambiguously 4 corners) — an L-shape/
+  // inverted-T's extra arm calls pushBayBox again for its own 4, which this test isn't about.
+  for (const positionType of ['one_man', 'two_man', 'connecting_trench', 'bunker_op_cp']) {
+    const r = compute(defaultInputs({ positionType, soil: 'loam', standard: 'reinforced', revetment: 'none' }));
+    const scene = buildScene3D(r);
+    const walls = scene.parts.filter((p) => p.kind === 'box' && p.role === 'bayWall') as Array<{
+      x: number; z: number; w: number; d: number;
+      taperAxis?: 0 | 2; taperSign?: 1 | -1; taperAmount?: number;
+      taperAxis2?: 0 | 2; taperSign2?: 1 | -1;
+    }>;
+    const edges = walls.filter((w) => w.taperAxis2 === undefined);
+    const corners = walls.filter((w) => w.taperAxis2 !== undefined);
+    assert.equal(corners.length, 4, positionType + ' needs exactly 4 corner posts');
+    for (const c of corners) {
+      assert.ok((c.taperAmount ?? 0) > 0, positionType + ' corner post must actually flare');
+      const alongZ = edges.find((w) => w.taperAxis === c.taperAxis && w.taperSign === c.taperSign);
+      const alongX = edges.find((w) => w.taperAxis === c.taperAxis2 && w.taperSign === c.taperSign2);
+      assert.ok(alongZ, positionType + ' corner post has a matching front/rear wall');
+      assert.ok(alongX, positionType + ' corner post has a matching left/right wall');
+      // Same row/column as each neighbor (post sits exactly at their shared corner) and the same
+      // taper magnitude (so the flared tips actually meet, not just the unflared base).
+      assert.ok(Math.abs(c.z - alongZ!.z) < 1e-6, positionType + ' post z aligns with its front/rear wall');
+      assert.ok(Math.abs(c.x - alongX!.x) < 1e-6, positionType + ' post x aligns with its left/right wall');
+      assert.equal(c.taperAmount, alongZ!.taperAmount, positionType + ' post tapers exactly as much as the front/rear wall');
+      assert.equal(c.taperAmount, alongX!.taperAmount, positionType + ' post tapers exactly as much as the left/right wall');
     }
   }
 });

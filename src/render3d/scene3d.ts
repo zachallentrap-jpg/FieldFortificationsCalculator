@@ -41,6 +41,11 @@ export interface Box3 {
   taperAxis?: 0 | 2;
   taperSign?: 1 | -1;
   taperAmount?: number;
+  // A second, independent taper (same amount, the other axis) for the small corner posts that
+  // fill the void where two adjacent tapered bay walls meet — each wall only flares along its
+  // own axis, so the diagonal corner between them is otherwise never covered by either face.
+  taperAxis2?: 0 | 2;
+  taperSign2?: 1 | -1;
   // Sheared top for the vehicle access ramp: the box's top face tilts so its −z edge sits
   // `shearDrop` feet below its +z edge — a continuous grade the vehicle drives, not a staircase.
   shearDrop?: number;
@@ -430,22 +435,39 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
   const earthRoof = s.coverOn && s.roofPath === 'earth_on_stringers';
   const engineeredRoof = s.roofPath === 'engineered_required';
   if (earthRoof && geo.shape !== 'vehicle_ramp') {
-    // Setback (the "dead-man" bearing shelf): the roof's stringers must land on UNDISTURBED
-    // earth back from the hole edge, ≥1 ft (one helmet) OR ¼ of the cut depth, whichever is
-    // greater (ATP 5-238 / FM 5-103, both source-verified). The old flat +1 ft per side was
-    // right for a shallow 4-ft cut but far too little for a deep one — the cover would bear on
-    // the spoil lip and collapse the model's own load path.
-    const setback = Math.max(1.0, 0.25 * s.depthOfCut);
+    // The roof's edges are NOT symmetric — front and rear answer different doctrinal questions:
+    //   FRONT (s.setback, -z): the threat approaches from here, so this edge must clear the
+    //   SAME safety-critical, threat-aware standoff (max of the selected threat's standoffMin
+    //   and the depth fraction) that drives the 2D section's "Roof setback" dimension and the
+    //   specs panel — both now read from the engine's own s.setback rather than a locally
+    //   re-derived, threat-blind copy (the old flat 1.0 ft floor silently ignored the threat).
+    //   REAR (s.rearOverhang, +z): purely a structural "dead-man bearing shelf" (stringers must
+    //   land on undisturbed earth, ≥1 ft OR ¼ of the cut depth, whichever is greater — ATP
+    //   5-238/FM 5-103) — no threat clearance needed since the aperture faces front only. Also
+    //   reused for the LEFT/RIGHT (x/L-axis) overhang, which has the same no-threat bearing-only
+    //   requirement. Both values come from geometry.ts (geo.section) so the 2D section, the 3D
+    //   model, and the specs panel can never drift apart on the same doctrine leaves again.
+    const frontInset = s.setback;
+    const rearInset = s.rearOverhang;
     const coverY = s.coverT / 2 + 0.15;
-    parts.push({ kind: 'box', x: 0, y: coverY, z: 0, w: p.holeL + 2 * setback, h: s.coverT, d: p.holeW + 2 * setback, role: 'cover', label: 'Roof cover', finish: 'sandbag' });
+    const coverZ = (rearInset - frontInset) / 2;
+    const coverD = p.holeW + frontInset + rearInset;
+    const coverW = p.holeL + 2 * rearInset;
+    parts.push({ kind: 'box', x: 0, y: coverY, z: coverZ, w: coverW, h: s.coverT, d: coverD, role: 'cover', label: 'Roof cover', finish: 'sandbag' });
     const n = Math.max(1, Math.min(s.stringers, 8));
     for (let i = 0; i < n; i++) {
       const frac = n === 1 ? 0.5 : i / (n - 1);
-      const sx = -halfL - setback + frac * (p.holeL + 2 * setback);
-      parts.push({ kind: 'box', x: sx, y: coverY - s.coverT / 2 - 0.15, z: 0, w: 0.35, h: 0.3, d: p.holeW + 2 * setback, role: 'stringer' });
+      const sx = -halfL - rearInset + frac * coverW;
+      parts.push({ kind: 'box', x: sx, y: coverY - s.coverT / 2 - 0.15, z: coverZ, w: 0.35, h: 0.3, d: coverD, role: 'stringer' });
     }
   } else if (engineeredRoof && geo.shape !== 'vehicle_ramp') {
-    parts.push({ kind: 'box', x: 0, y: 1.4, z: 0, w: p.holeL + 1.5, h: 0.2, d: p.holeW + 1.5, role: 'engineeredCover', label: 'Engineered roof — see engineer' });
+    // Footprint matches the 2D section's hazard block exactly (holeW + parapetW there) — this
+    // marker fabricates no real structure (§2.7), so there's no doctrine leaf to size it from,
+    // but the two views of the same "needs an engineer" flag should still agree on how big a
+    // banner they draw over the position instead of each inventing its own constant (this used
+    // a flat +1.5 ft/side that didn't match the 2D section's +parapetW — 3.0 ft for one_man —
+    // leaving the two views 1.5 ft apart on the same hazard marker for the identical position).
+    parts.push({ kind: 'box', x: 0, y: 1.4, z: 0, w: p.holeL + p.parapetW, h: 0.2, d: p.holeW + p.parapetW, role: 'engineeredCover', label: 'Engineered roof — see engineer' });
   }
 
   // ── Firing platform / firing step ─────────────────────────────────────────
@@ -711,4 +733,31 @@ function pushBayBox(
   }
   parts.push(wall(cx - hl + wallT / 2, cz, wallT, w, 0, -1)); // left — outer face is -x
   parts.push(wall(cx + hl - wallT / 2, cz, wallT, w, 0, 1)); // right — outer face is +x
+
+  // Corner posts: each wall above tapers along ONE axis only, so a flared bay otherwise leaves a
+  // triangular void at all 4 corners where two faces should meet. A small wallT×wallT post,
+  // double-tapered (same amount, both axes) so its own flare meets each adjacent wall's flare
+  // flush, fills exactly that gap. Only needed when there's a flare to fill.
+  if (taperAmount > 0) {
+    const corner = (x: number, z: number, signX: 1 | -1, signZ: 1 | -1): Box3 => ({
+      kind: 'box',
+      x,
+      y: -depth / 2 + gradeMargin / 2,
+      z,
+      w: wallT,
+      h,
+      d: wallT,
+      role: 'bayWall',
+      finish,
+      taperAxis: 2,
+      taperSign: signZ,
+      taperAmount,
+      taperAxis2: 0,
+      taperSign2: signX,
+    });
+    parts.push(corner(cx - hl + wallT / 2, cz - hw + wallT / 2, -1, -1)); // front-left
+    parts.push(corner(cx + hl - wallT / 2, cz - hw + wallT / 2, 1, -1)); // front-right
+    parts.push(corner(cx - hl + wallT / 2, cz + hw - wallT / 2, -1, 1)); // rear-left
+    parts.push(corner(cx + hl - wallT / 2, cz + hw - wallT / 2, 1, 1)); // rear-right
+  }
 }

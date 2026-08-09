@@ -15,6 +15,7 @@ test('each validation code is reachable', () => {
     { soil: '___' }, // INVALID_SOIL
     { standard: '___' as unknown as Inputs['standard'] }, // INVALID_STANDARD
     { threat: '___' }, // INVALID_THREAT
+    { revetment: '___' }, // INVALID_REVETMENT
     { soil: 'sand', revetment: 'none' }, // REVET_REQUIRED_SOIL
     { threat: 'at-he-contact', overheadCover: true }, // ROOF_ENGINEERED
     { threat: 'at-rpg', overheadCover: true, standard: 'hasty' }, // + ROOF_ENGINEERED_HASTY
@@ -54,6 +55,15 @@ test('COVER_UNDER_THREAT fires for a hasty roof and clears at deliberate/reinfor
 test('REVET_REQUIRED_SOIL is an error and clears when a revetment is chosen', () => {
   assert.ok(codesFor({ soil: 'sand', revetment: 'none' }).has('REVET_REQUIRED_SOIL'));
   assert.ok(!codesFor({ soil: 'sand', revetment: 'sandbag_facing' }).has('REVET_REQUIRED_SOIL'));
+});
+
+test('SANDBAG_BASIC_LOAD_EXCEEDED is a per-position check — building more positions must not hide it', () => {
+  // A bunker with overhead cover against a small crew: each individual position needs far more
+  // bags than that crew carries. Scaling `count` up must not make the SAME per-position shortfall
+  // disappear — the crew's carried load is per-soldier, not per-job.
+  const base = { positionType: 'bunker_op_cp' as const, standard: 'reinforced' as const, threat: 'sa-127', overheadCover: true, teamSize: 4 };
+  assert.ok(codesFor({ ...base, count: 1 }).has('SANDBAG_BASIC_LOAD_EXCEEDED'), 'fires at count=1');
+  assert.ok(codesFor({ ...base, count: 50 }).has('SANDBAG_BASIC_LOAD_EXCEEDED'), 'still fires at count=50 — same per-position shortfall');
 });
 
 test('validation ordering: errors before warnings before advisories', () => {

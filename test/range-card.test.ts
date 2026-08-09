@@ -1,6 +1,6 @@
 // Phase 3 (docs/EXECUTION_PLAN.md) — the plan doubles as a usable range card: azimuths in
 // degrees AND mils, a north arrow, a scale bar, an FPL for machine-gun positions. Plus the
-// job sheet carries the hand-filled field header and doctrine-fill provenance.
+// job sheet carries the hand-filled field header.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compute } from '../src/engine/compute';
@@ -37,10 +37,9 @@ test('non-sector positions (vehicle defilade) render without azimuth labels but 
   assert.ok(positions['vehicle_hull_defilade']!.sectorsOfFire === false, 'fixture has no sectors');
 });
 
-test('job sheet carries the hand-filled field header and fill provenance footer', () => {
+test('job sheet carries the hand-filled field header', () => {
   const sheet = jobSheet(compute(defaultInputs()), { scenario: 'Hill 402', date: '2026-07-02' });
   for (const label of ['GRID', 'UNIT', 'DTG', 'AZIMUTH OF FIRE']) {
     assert.ok(sheet.includes(label), 'field header line: ' + label);
   }
-  assert.match(sheet, /placeholder doctrine|doctrine fill/i, 'fill provenance footer present');
 });

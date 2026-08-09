@@ -4,6 +4,7 @@
 // (protection desc, then man-hours asc, then a fixed tie-break key).
 
 import { compute } from './compute';
+import { clamp, finite } from './round';
 import type { Inputs, RoofPath } from './types';
 
 export interface PlanRequest {
@@ -21,7 +22,9 @@ export interface PlanOption {
   elapsedHours: number;
   roofPath: RoofPath;
   protectionScore: number;
-  feasible: boolean;
+  feasible: boolean; // time budget only — see hasErrors for doctrine validity
+  hasErrors: boolean; // this exact combination fails one of compute()'s own validation errors
+                       // (e.g. a soil that requires revetment, with revetment='none' in the sweep)
 }
 
 export interface PlanResult {
@@ -48,7 +51,10 @@ function tieKey(o: PlanOption): string {
 }
 
 export function planForTime(req: PlanRequest): PlanResult {
-  const teamSize = Math.max(1, Math.round(req.teamSize));
+  // Match compute()'s own [1,50] clamp exactly (engine/compute.ts) — a local reimplementation
+  // that only floors, not ceilings, let an option's "Use" button push an out-of-range team size
+  // (e.g. 500) into the live store even though every number shown was computed for a team of 50.
+  const teamSize = clamp(Math.round(finite(req.teamSize, 1)), 1, 50);
   const options: PlanOption[] = [];
 
   for (const standard of STANDARDS) {
@@ -57,7 +63,9 @@ export function planForTime(req: PlanRequest): PlanResult {
         const inputs: Inputs = { ...req.base, standard, overheadCover, revetment, teamSize };
         const r = compute(inputs);
         options.push({
-          inputs,
+          // compute()'s own clamped echo, not the locally-built `inputs` — keeps this in sync
+          // if compute() ever normalizes anything else about the inputs beyond count/team.
+          inputs: r.inputs,
           standard,
           overheadCover,
           revetment,
@@ -66,12 +74,19 @@ export function planForTime(req: PlanRequest): PlanResult {
           roofPath: r.cover.roofPath,
           protectionScore: protectionScore(standard, r.cover.roofPath === 'none' ? false : overheadCover, r.cover.roofPath, revetment),
           feasible: r.labor.elapsedHours <= req.availableHours,
+          hasErrors: r.validation.some((v) => v.severity === 'error'),
         });
       }
     }
   }
 
+  // A combination compute() itself flags as a doctrine ERROR (e.g. a soil that requires
+  // revetment, swept with revetment='none') must never outrank a combination with none — this
+  // used to sort purely on protectionScore/manHoursTotal, which doesn't know about validation
+  // at all, so an error-carrying option could land ahead of (or between) valid ones at the same
+  // protection tier with nothing in the ranking to say so.
   const rank = (a: PlanOption, b: PlanOption): number =>
+    Number(a.hasErrors) - Number(b.hasErrors) ||
     b.protectionScore - a.protectionScore ||
     a.manHoursTotal - b.manHoursTotal ||
     (tieKey(a) < tieKey(b) ? -1 : tieKey(a) > tieKey(b) ? 1 : 0);

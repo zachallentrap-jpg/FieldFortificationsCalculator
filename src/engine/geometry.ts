@@ -4,6 +4,7 @@
 // a single projector (render/project.ts) so nothing drifts.
 
 import { parapet, berm, overhead } from '../doctrine/protection';
+import { soils } from '../doctrine/soils';
 import type { ShapeId } from '../doctrine/positions';
 import type { RoofPath } from './types';
 import type { Calc } from './compute';
@@ -31,6 +32,7 @@ export interface GeometryModel {
     parapetW: number;
     sectors: { present: boolean; leftDeg: number; rightDeg: number };
     sumps: SumpMark[];
+    elbows: SumpMark[];
     platform: { L: number; W: number } | null;
     enemy: 'front';
   };
@@ -40,6 +42,12 @@ export interface GeometryModel {
     parapetW: number;
     parapetH: number;
     setback: number;
+    rearOverhang: number;
+    // How far the excavation wall flares outward at grade vs. the floor (feet), for an
+    // unrevetted earth wall in loose soil — 0 when revetted (revetment holds the wall vertical
+    // regardless of soil) or the soil needs no batter. Same formula the 3D model already used
+    // (scene3d.ts's pushBayBox taperAmount) — feet, same axis as holeW.
+    wallTaper: number;
     coverOn: boolean;
     roofPath: RoofPath;
     coverT: number;
@@ -72,6 +80,38 @@ function sumpMarks(count: number, holeL: number, holeW: number): SumpMark[] {
   return marks;
 }
 
+// Elbow rests (one_man: 2, two_man: 4 — one per firer per sector of fire) are a firing-edge
+// feature, not a floor feature: they sit at the FRONT lip of the bay where a prone/kneeling
+// firer's elbows brace against the parapet, opposite the sump's rear-wall placement. Same
+// even-spread-across-frontage math as sumpMarks, mirrored to the front wall.
+function elbowMarks(count: number, holeL: number, holeW: number): SumpMark[] {
+  if (count <= 0) return [];
+  const yFt = -(holeW / 2 - 0.5); // near the front wall
+  const marks: SumpMark[] = [];
+  for (let i = 0; i < count; i++) {
+    const frac = count === 1 ? 0.5 : i / (count - 1);
+    const xFt = (frac - 0.5) * (holeL - 1);
+    marks.push({ xFt, yFt });
+  }
+  return marks;
+}
+
+// How far an UNREVETTED earth excavation wall flares outward at grade vs. the floor — steeper
+// soils (sand, silt) batter more, revetted walls stay vertical regardless of soil (the facing
+// holds it), and round/vehicle excavations use their own shape (never this rect-family taper).
+// Identical formula to the 3D model's pushBayBox taperAmount so the two views agree on the same
+// doctrine-driven slope instead of the 2D section silently drawing every soil as a plumb wall.
+function wallTaperFt(calc: Calc): number {
+  if (calc.isVehicle || calc.isCircular || calc.inputs.revetment !== 'none') return 0;
+  const soilRow = soils[calc.inputs.soil];
+  if (!soilRow) return 0;
+  return Math.min(
+    soilRow.wallSlopeRatio.value * calc.depthOfCut,
+    calc.parapetW * 0.9,
+    Math.min(calc.holeL, calc.holeW) * 0.35,
+  );
+}
+
 export function buildGeometry(calc: Calc): GeometryModel {
   const posD = calc.position.hole.D.status;
   const posL = calc.position.hole.L.status;
@@ -96,7 +136,12 @@ export function buildGeometry(calc: Calc): GeometryModel {
       key: 'setback',
       label: 'Roof setback',
       valueFt: calc.setback,
-      placeholder: ph(overhead.setbackMin.status) || ph(overhead.setbackDepthFrac.status),
+      // calc.setback = max(standoffMin, setbackDepthFrac × depthOfCut). standoffMin comes from
+      // calc.standoffLeaf (the THREAT's own standoff, explain.ts:46) whenever a real threat is
+      // selected — overhead.setbackMin is only the fallback for threat==='none'/unknown, so
+      // checking it unconditionally missed the leaf that's actually live in the common case.
+      // depthOfCut also feeds this (depthPh, computed above) and was never OR'd in at all.
+      placeholder: ph((calc.standoffLeaf ?? overhead.setbackMin).status) || ph(overhead.setbackDepthFrac.status) || depthPh,
     },
     { key: 'outer_l', label: 'Overall length', valueFt: calc.outerL, placeholder: ph(posL) || ph(frontalW.status) },
     { key: 'outer_w', label: 'Overall width', valueFt: calc.outerW, placeholder: ph(posW) || ph(frontalW.status) },
@@ -132,9 +177,19 @@ export function buildGeometry(calc: Calc): GeometryModel {
         rightDeg: az ? az.rightDeg : 45,
       },
       sumps: sumpMarks(calc.sumpCount, calc.holeL, calc.holeW),
+      elbows: elbowMarks(calc.position.elbowHoles, calc.holeL, calc.holeW),
+      // Drawn footprint only — clamped to the hole's own size (fifty_cal's doctrine platform.W
+      // is 3.0 ft in a 2.0 ft-wide hole; drawn at full size it overhung the excavation by 1 ft
+      // in both the plan and the 3D model, a platform floating a foot past the wall of the hole
+      // it's built in). The BOM/labor volume still uses the true, unclamped doctrine value
+      // (calc.position.firingPlatform via platformVol in compute.ts) — this clamp is rendering-
+      // only and never touches the doctrine leaf itself.
       platform:
         calc.hasPlatform && calc.position.firingPlatform
-          ? { L: calc.position.firingPlatform.L.value, W: calc.position.firingPlatform.W.value }
+          ? {
+              L: Math.min(calc.position.firingPlatform.L.value, calc.holeL),
+              W: Math.min(calc.position.firingPlatform.W.value, calc.holeW),
+            }
           : null,
       enemy: 'front',
     },
@@ -144,6 +199,13 @@ export function buildGeometry(calc: Calc): GeometryModel {
       parapetW: calc.parapetW,
       parapetH: calc.parapetH,
       setback: calc.setback,
+      // The roof's REAR overhang past the hole edge — a purely structural "dead-man bearing
+      // shelf" requirement (stringers must land on undisturbed earth, ≥ bearingEachEnd OR ¼ of
+      // the cut depth, whichever is greater — ATP 5-238/FM 5-103), NOT the threat-safety
+      // standoff that governs the FRONT (`setback` above): the threat approaches from the
+      // front only, so the rear has no aperture-clearance concern, just a bearing one.
+      rearOverhang: Math.max(overhead.bearingEachEnd.value, overhead.setbackDepthFrac.value * calc.depthOfCut),
+      wallTaper: wallTaperFt(calc),
       coverOn: calc.coverOn,
       roofPath: calc.roofPath,
       coverT: calc.coverT,

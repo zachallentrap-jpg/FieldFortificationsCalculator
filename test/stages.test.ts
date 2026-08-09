@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compute } from '../src/engine/compute';
 import { computeStages, scheduleStages } from '../src/engine/stages';
+import { round1 } from '../src/engine/round';
 import { defaultInputs } from './helpers';
 import type { Inputs } from '../src/engine/types';
 
@@ -55,11 +56,11 @@ test('engineered-roof position emits no overhead stage and no fabricated cover l
 
 test('schedule: halving effective diggers doubles elapsed; DTGs are inputs, output deterministic', () => {
   const plan = computeStages(compute(defaultInputs()));
-  const four = scheduleStages(plan, { teamSize: 4, availableHours: 24, securityPostureFrac: 1, machineAssist: false });
-  const two = scheduleStages(plan, { teamSize: 2, availableHours: 24, securityPostureFrac: 1, machineAssist: false });
+  const four = scheduleStages(plan, { teamSize: 4, availableHours: 24, securityPostureFrac: 1 });
+  const two = scheduleStages(plan, { teamSize: 2, availableHours: 24, securityPostureFrac: 1 });
   assert.ok(Math.abs(two.totalElapsedHours - 2 * four.totalElapsedHours) < 0.2, 'half the team ≈ double the time');
   // Deterministic: identical inputs → identical schedule.
-  assert.deepEqual(scheduleStages(plan, { teamSize: 4, availableHours: 24, securityPostureFrac: 1, machineAssist: false }), four);
+  assert.deepEqual(scheduleStages(plan, { teamSize: 4, availableHours: 24, securityPostureFrac: 1 }), four);
   // Cumulative times are monotonic non-decreasing and finite.
   let prev = 0;
   for (const s of four.steps) { assert.ok(Number.isFinite(s.cumulativeHours) && s.cumulativeHours >= prev - 1e-9); prev = s.cumulativeHours; }
@@ -67,10 +68,10 @@ test('schedule: halving effective diggers doubles elapsed; DTGs are inputs, outp
 
 test('shortfall math: unreachable stand-to reports hours past, feasible reports zero', () => {
   const plan = computeStages(compute(defaultInputs({ positionType: 'bunker_op_cp', standard: 'reinforced' })));
-  const tight = scheduleStages(plan, { teamSize: 1, availableHours: 1, securityPostureFrac: 0.5, machineAssist: false });
+  const tight = scheduleStages(plan, { teamSize: 1, availableHours: 1, securityPostureFrac: 0.5 });
   assert.equal(tight.feasible, false);
   assert.ok(tight.shortfallHours > 0);
-  const loose = scheduleStages(plan, { teamSize: 20, availableHours: 200, securityPostureFrac: 1, machineAssist: false });
+  const loose = scheduleStages(plan, { teamSize: 20, availableHours: 200, securityPostureFrac: 1 });
   assert.equal(loose.feasible, true);
   assert.equal(loose.shortfallHours, 0);
 });
@@ -89,9 +90,22 @@ test('an unknown revetment string never invents phantom revet-stage labor (per-s
   assert.ok(mh(real, 'revet_sump') > mh(none, 'revet_sump'), 'a real revetment adds revet-stage labor');
 });
 
+test('machine assist is not re-applied by the schedule clock (compute.ts already reduced the total)', () => {
+  // compute.ts scales excavation man-hours by machine.excavationFactor when machineAssist is on
+  // (a real 0.4x reduction baked into manHoursPerPosition). scheduleStages must divide that
+  // already-reduced total by team×posture only — team of 1, posture 1 — so elapsed hours comes
+  // out to EXACTLY the position total, never further scaled by a second machine factor.
+  const r = compute(defaultInputs({ positionType: 'vehicle_hull_defilade', machineAssist: true }));
+  const schedule = scheduleStages(computeStages(r), { teamSize: 1, availableHours: 999, securityPostureFrac: 1 });
+  assert.ok(
+    Math.abs(schedule.totalElapsedHours - round1(r.labor.manHoursPerPosition)) < 0.05,
+    'elapsed hours (' + schedule.totalElapsedHours + ') must match manHoursPerPosition (' + r.labor.manHoursPerPosition + '), not a further-sped-up figure',
+  );
+});
+
 test('security posture: fewer diggers on the tools (more on watch) lengthens the build', () => {
   const plan = computeStages(compute(defaultInputs()));
-  const allDigging = scheduleStages(plan, { teamSize: 4, availableHours: 24, securityPostureFrac: 1, machineAssist: false });
-  const halfWatch = scheduleStages(plan, { teamSize: 4, availableHours: 24, securityPostureFrac: 0.5, machineAssist: false });
+  const allDigging = scheduleStages(plan, { teamSize: 4, availableHours: 24, securityPostureFrac: 1 });
+  const halfWatch = scheduleStages(plan, { teamSize: 4, availableHours: 24, securityPostureFrac: 0.5 });
   assert.ok(halfWatch.totalElapsedHours > allDigging.totalElapsedHours, 'watch posture costs time');
 });

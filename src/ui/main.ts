@@ -25,7 +25,7 @@ import { computeStages, scheduleStages, type Schedule } from '../engine/stages';
 import { ScenarioStore, makeScenario, duplicateScenario } from '../state/scenarios';
 import { createStorageAdapter } from '../state/persistence';
 import { saveSession, restoreSession } from '../state/session';
-import { all as allDoctrine, counts as doctrineCounts } from '../doctrine/registry';
+import { all as allDoctrine } from '../doctrine/registry';
 import { exportDoctrine, importDoctrine, getFillState } from '../doctrine/io';
 import { DOCTRINE_VERSION } from '../version';
 import { saveFill, restoreFill } from '../state/doctrineFill';
@@ -62,7 +62,7 @@ let doctrineReport: import('../doctrine/io').DoctrineImportReport | null = null;
 let pendingImport: unknown = null; // a dry-run-validated file awaiting the user's Apply
 
 function openDoctrine(): void {
-  showOverlay(doctrineOverlay(allDoctrine(), doctrineCounts(), getFillState(), doctrineScOnly, doctrineReport));
+  showOverlay(doctrineOverlay(allDoctrine(), getFillState(), doctrineScOnly, doctrineReport));
 }
 
 function persistSession(): void {
@@ -109,7 +109,6 @@ function runSchedule(): void {
     teamSize: schedTeam,
     availableHours: schedHours,
     securityPostureFrac: schedPosture,
-    machineAssist: lastResult.inputs.machineAssist,
   });
 }
 function openSchedule(): void {
@@ -146,7 +145,9 @@ function pickFile(cb: (text: string) => void): void {
   input.click();
 }
 function openScenarios(): void {
-  scenarioStore.list().then((list) => showOverlay(scenariosOverlay(list, store.getState().activeScenarioId)));
+  scenarioStore.list()
+    .then((list) => showOverlay(scenariosOverlay(list, store.getState().activeScenarioId)))
+    .catch(() => showToast('Could not read saved setups — device storage unavailable.'));
 }
 function openMission(): void {
   const set = store.getState().missionSet;
@@ -413,7 +414,13 @@ document.addEventListener('click', (e) => {
     }
     case 'scenario-load': {
       const id = actionEl.dataset['id'];
-      if (id) scenarioStore.load(id).then((s) => { if (s) { store.replaceInputs(s.inputs); history.reset(s.inputs); syncHistory(); store.setState({ activeScenarioId: id, activeScenarioName: s.name }); hideOverlay(); } });
+      // history.push (not .reset) — loading a scenario is "switch to a different setup," the
+      // same kind of whole-input replacement plan-apply already treats as undoable, not "start
+      // over" (which is what the Reset button explicitly means and is the one action that
+      // should wipe the undo stack).
+      if (id) scenarioStore.load(id)
+        .then((s) => { if (s) { store.replaceInputs(s.inputs); history.push(s.inputs); syncHistory(); store.setState({ activeScenarioId: id, activeScenarioName: s.name }); hideOverlay(); } })
+        .catch(() => showToast('Load FAILED — device storage unavailable.'));
       break;
     }
     case 'scenario-duplicate': {
@@ -422,7 +429,7 @@ document.addEventListener('click', (e) => {
         if (s) scenarioStore.save(duplicateScenario(s, newId(), s.name + ' (copy)', new Date().toISOString()))
           .then(openScenarios)
           .catch(() => showToast('Duplicate FAILED — device storage unavailable.'));
-      });
+      }).catch(() => showToast('Duplicate FAILED — device storage unavailable.'));
       break;
     }
     case 'scenario-delete-ask': {
@@ -437,11 +444,14 @@ document.addEventListener('click', (e) => {
         scenarioStore.remove(id).then(() => {
           if (store.getState().activeScenarioId === id) store.setState({ activeScenarioId: null, activeScenarioName: null });
           openScenarios();
-        });
+        }).catch(() => showToast('Delete FAILED — device storage unavailable.'));
       }
       break;
     }
-    case 'scenario-export': scenarioStore.list().then((list) => { download('sap1-scenarios.json', JSON.stringify(list, null, 2), 'application/json'); showToast(list.length + ' scenario(s) exported as a file.'); }); break;
+    case 'scenario-export': scenarioStore.list()
+      .then((list) => { download('sap1-scenarios.json', JSON.stringify(list, null, 2), 'application/json'); showToast(list.length + ' scenario(s) exported as a file.'); })
+      .catch(() => showToast('Export FAILED — device storage unavailable.'));
+      break;
     case 'scenario-import': pickFile((text) => {
       const r = scenarioStore.parseImportMany(text);
       if (!r.ok) { showToast('Import failed: ' + r.error); return; }
@@ -470,13 +480,36 @@ document.addEventListener('click', (e) => {
       if (pendingImport !== null) {
         doctrineReport = importDoctrine(pendingImport);
         pendingImport = null;
-        if (doctrineReport.ok) { saveFill(persistAdapter); showToast(doctrineReport.applied + ' doctrine value(s) applied and saved on this device.'); scheduleRender(); }
+        if (doctrineReport.ok) {
+          const applied = doctrineReport.applied;
+          // The values are already applied in memory (this session is fine either way) — the
+          // toast must reflect whether the PERSISTED save actually succeeded, not claim "saved
+          // on this device" unconditionally the instant the fire-and-forget write is issued.
+          saveFill(persistAdapter).then((saved) => {
+            showToast(
+              saved
+                ? applied + ' doctrine value(s) applied and saved on this device.'
+                : applied + ' doctrine value(s) applied for this session — device storage unavailable, will NOT survive a reload.',
+            );
+          });
+          scheduleRender();
+        }
         openDoctrine();
       }
       break;
     case 'doctrine-apply-edits': {
       doctrineReport = applyInlineDoctrineEdits();
-      if (doctrineReport.ok) { saveFill(persistAdapter); showToast(doctrineReport.applied + ' doctrine value(s) applied.'); scheduleRender(); }
+      if (doctrineReport.ok) {
+        const applied = doctrineReport.applied;
+        saveFill(persistAdapter).then((saved) => {
+          showToast(
+            saved
+              ? applied + ' doctrine value(s) applied and saved on this device.'
+              : applied + ' doctrine value(s) applied for this session — device storage unavailable, will NOT survive a reload.',
+          );
+        });
+        scheduleRender();
+      }
       openDoctrine();
       break;
     }
@@ -511,6 +544,10 @@ document.addEventListener('click', (e) => {
       planHours = h ? Math.max(1, parseInt(h.value, 10) || planHours) : planHours;
       planTeam = t ? Math.max(1, parseInt(t.value, 10) || planTeam) : planTeam;
       lastPlan = planForTime({ availableHours: planHours, teamSize: planTeam, base: store.getState().inputs });
+      // planForTime clamps team size to compute()'s own [1,50] range — reflect that back into
+      // the field so a wildly out-of-range typed value (e.g. 500) doesn't sit on screen next to
+      // results that were actually computed for a team of 50.
+      planTeam = lastPlan.teamSize;
       openPlan();
       break;
     }

@@ -9,14 +9,21 @@
 # tool → Static, not the app-publish flow).
 run = "npm run dev -- --host 0.0.0.0 --port 5000"
 entrypoint = "src/ui/index.html"
-modules = ["nodejs-20"]
+# nodejs-22: sap2's toolchain pins Node 22 (sap2/.nvmrc) and Vite 8 requires
+# ^20.19.0 || >=22.12.0 — the old nodejs-20 pin fails the suite build.
+modules = ["nodejs-22"]
 
 [nix]
 channel = "stable-24_05"
 
 [deployment]
 deploymentTarget = "autoscale"
-build = ["sh", "-c", "npm ci && npm run build"]
+# Deploys the 1371 Combat Engineer Toolkit: hub at /, TIMBER-1 at /woodframe.html,
+# SAP-2 at /survivability/. SAP-1 is retired and is NOT built — its bundle carries
+# the 295 illustrative placeholder values (docs/SAP2_BLUEPRINT.md §2.11), so it must
+# not ship even as an unreferenced chunk. scripts/serve-suite.mjs (zero-dep) serves
+# dist/ with the cache headers the in-app update button depends on.
+build = ["sh", "-c", "npm ci && npm run build:suite"]
 run = ["sh", "-c", "npm run start"]
 
 [[ports]]

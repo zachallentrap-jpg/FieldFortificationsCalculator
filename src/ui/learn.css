@@ -1,0 +1,419 @@
+/* 1371 LEARNING — the toolkit-level trainer.
+   Same token vocabulary as the wood-frame studio (woodframe.css) so the suite reads as one
+   family, but its own layout: this app is a card in the middle of the screen and very little
+   else, and it has to work one-handed on a phone in a field environment. */
+
+:root {
+  --bg: #f2f2f5;
+  --content: #ffffff;
+  --chrome: rgba(246, 246, 248, 0.82);
+  --raised: #ffffff;
+  --label: #1d1d1f;
+  --label-2: rgba(60, 60, 67, 0.62);
+  --label-3: rgba(60, 60, 67, 0.32);
+  --sep: rgba(60, 60, 67, 0.13);
+  --sep-strong: rgba(60, 60, 67, 0.22);
+  --fill: rgba(118, 118, 128, 0.12);
+  --fill-2: rgba(118, 118, 128, 0.18);
+  --accent: #0071e3;
+  --accent-soft: rgba(0, 113, 227, 0.12);
+  --good: #1c7c34;
+  --good-soft: rgba(28, 124, 52, 0.12);
+  --miss: #c9271e;
+  --miss-soft: rgba(255, 59, 48, 0.11);
+  --pick: #c2410c;
+  --warn: #b25000;
+  --warn-soft: rgba(255, 149, 0, 0.13);
+  --shadow-1: 0 0.5px 1px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.09), 0 1px 3px rgba(0, 0, 0, 0.05);
+  --r: 8px;
+  --r-lg: 14px;
+  --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1c1e; --content: #1c1c1e; --chrome: rgba(38, 38, 41, 0.84); --raised: #2c2c2e;
+    --label: #f5f5f7; --label-2: rgba(235, 235, 245, 0.6); --label-3: rgba(235, 235, 245, 0.3);
+    --sep: rgba(235, 235, 245, 0.13); --sep-strong: rgba(235, 235, 245, 0.22);
+    --fill: rgba(120, 120, 128, 0.2); --fill-2: rgba(120, 120, 128, 0.32);
+    --accent: #0a84ff; --accent-soft: rgba(10, 132, 255, 0.2);
+    --good: #30d158; --good-soft: rgba(48, 209, 88, 0.16);
+    --miss: #ff6961; --miss-soft: rgba(255, 69, 58, 0.16);
+    --pick: #ff9f45;
+    --warn: #ff9f0a; --warn-soft: rgba(255, 159, 10, 0.15);
+    --shadow-1: 0 0.5px 1px rgba(0, 0, 0, 0.5);
+    --shadow-2: 0 6px 20px rgba(0, 0, 0, 0.5);
+  }
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--label);
+  font: 14px/1.5 var(--sans); -webkit-font-smoothing: antialiased;
+  min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column;
+}
+h1, h2, h3 { margin: 0; font-weight: 600; letter-spacing: -0.012em; }
+button { font: inherit; color: inherit; }
+:where(button, a, input, summary, [tabindex]):focus-visible {
+  outline: none; box-shadow: 0 0 0 3.5px var(--accent-soft), 0 0 0 1px var(--accent); border-radius: var(--r);
+}
+::selection { background: var(--accent-soft); }
+
+/* ── Chrome ───────────────────────────────────────────────────────────── */
+.topbar {
+  display: flex; gap: 10px; align-items: center; padding: 11px 16px;
+  border-bottom: 0.5px solid var(--sep); background: var(--chrome);
+  -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+  position: sticky; top: 0; z-index: 50;
+}
+/* The way out of the tool: identical component, identical position, every app in the
+   suite. It leads the bar rather than trailing it, because the thing that takes you OUT
+   of a screen belongs where a back button belongs. */
+.topbar .home { order: -1; margin: 0; font-size: 12.5px; font-weight: 540; color: var(--label-2);
+                 text-decoration: none; white-space: nowrap; padding: 5px 11px; border-radius: 999px;
+                 box-shadow: inset 0 0 0 0.5px var(--sep-strong); }
+.topbar .home:hover { background: var(--fill); color: var(--label); text-decoration: none; }
+.topbar .name { font-size: 13px; font-weight: 660; letter-spacing: 0.02em; }
+.topbar .sub { font-size: 12.5px; color: var(--label-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 640px) { .topbar .sub { display: none; } }
+
+.notices { margin: 0; padding: 9px 16px; background: var(--warn-soft); border-bottom: 0.5px solid var(--sep); font-size: 12.5px; color: var(--warn); }
+.notices p { margin: 2px 0; }
+
+main { flex: 1; width: 100%; }
+footer { padding: 22px 16px 34px; font-size: 11.5px; color: var(--label-2); text-align: center; max-width: 68ch; margin: 0 auto; line-height: 1.55; }
+
+/* ── Buttons ──────────────────────────────────────────────────────────── */
+.btn {
+  min-height: 34px; padding: 7px 15px; border: 0; border-radius: var(--r);
+  background: var(--raised); color: var(--label); font-size: 14px; font-weight: 530;
+  cursor: pointer; box-shadow: var(--shadow-1), inset 0 0 0 0.5px var(--sep-strong);
+  transition: background 0.12s ease; white-space: nowrap;
+}
+.btn:hover { background: var(--fill); }
+.btn:active { transform: translateY(0.5px); }
+.btn.primary { background: var(--accent); color: #fff; font-weight: 590; box-shadow: var(--shadow-1); }
+.btn.primary:hover { filter: brightness(1.06); background: var(--accent); }
+.btn.quiet { box-shadow: none; background: none; color: var(--label-2); }
+.btn.quiet:hover { background: var(--fill); color: var(--label); }
+.btn.wide { width: 100%; }
+.btn.good { background: var(--good-soft); color: var(--good); box-shadow: inset 0 0 0 0.5px var(--good); }
+.btn.miss { background: var(--miss-soft); color: var(--miss); box-shadow: inset 0 0 0 0.5px var(--miss); }
+
+/* Segmented control */
+.seg { display: inline-flex; padding: 2px; background: var(--fill); border-radius: 9px; gap: 0; }
+.seg button {
+  border: 0; background: none; border-radius: 7px; padding: 5px 14px; font-size: 13px;
+  font-weight: 510; color: var(--label-2); cursor: pointer; min-height: 28px;
+}
+.seg button:hover { color: var(--label); }
+.seg button[aria-selected='true'] {
+  background: var(--raised); color: var(--label); font-weight: 590;
+  box-shadow: 0 0.5px 2px rgba(0, 0, 0, 0.14), inset 0 0 0 0.5px var(--sep);
+}
+
+/* ── Deck list ────────────────────────────────────────────────────────── */
+.wrap { max-width: 1060px; margin: 0 auto; padding: 22px 16px 10px; }
+.lead h1 { font-size: 26px; font-weight: 680; letter-spacing: -0.022em; }
+.lead p { color: var(--label-2); margin: 7px 0 0; max-width: 64ch; font-size: 14.5px; }
+.tabs { margin: 18px 0 4px; }
+
+/* ── The general decks, up top and unmissable ──────────────────────────────
+   These two ARE the flashcards. The old page put them in a fourteen-tile grid beside every
+   building the toolkit can draw, where the deck that teaches the vocabulary was one tile among
+   thirteen structures — so they get their own row, at a size that says "open this one". */
+.heroes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0 8px; }
+@media (max-width: 760px) { .heroes { grid-template-columns: 1fr; } }
+.hero {
+  display: flex; flex-direction: column; text-align: left; padding: 0; overflow: hidden;
+  background: var(--raised); border: 0; border-radius: 18px; cursor: pointer;
+  box-shadow: var(--shadow-2), inset 0 0 0 0.5px var(--sep-strong);
+  transition: box-shadow 0.18s ease, transform 0.18s ease;
+}
+.hero:hover { transform: translateY(-2px); }
+.hero .body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 7px; flex: 1; }
+.hero .kicker { font-size: 10.5px; font-weight: 720; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent); }
+.hero h3 { font-size: 20px; letter-spacing: -0.02em; }
+.hero .blurb { margin: 0; font-size: 13.5px; color: var(--label-2); line-height: 1.5; flex: 1; }
+.hero .cta { font-size: 13.5px; font-weight: 600; color: var(--accent); margin-top: 2px; }
+
+/* THE FAN. Three real card fronts, offset and rotated so the tile reads as a stack you can go
+   through. The transforms are on the FACES, not the container, so the container still lays out
+   as a normal block and the hover lift below does not fight three separate rotations. */
+.fan {
+  position: relative; display: block; height: 208px; overflow: hidden;
+  background: linear-gradient(160deg, #23252b, #15161a);
+}
+.fan.none { display: flex; align-items: center; justify-content: center; color: var(--label-3); font-size: 34px; }
+.fan .face {
+  position: absolute; left: 50%; top: 50%; width: 44%; border-radius: 10px; overflow: hidden;
+  background: #17181b; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+  transition: transform 0.24s ease;
+}
+.fan .face svg { display: block; width: 100%; height: auto; }
+.fan .f0 { transform: translate(-50%, -50%) rotate(-13deg) translateX(-64%); }
+.fan .f1 { transform: translate(-50%, -50%) rotate(-1deg) translateY(-3%); }
+.fan .f2 { transform: translate(-50%, -50%) rotate(12deg) translateX(64%); }
+.hero:hover .fan .f0 { transform: translate(-50%, -50%) rotate(-17deg) translateX(-76%); }
+.hero:hover .fan .f2 { transform: translate(-50%, -50%) rotate(16deg) translateX(76%); }
+
+.split { margin: 34px 0 0; padding-top: 20px; border-top: 0.5px solid var(--sep); }
+.split .grouphead { margin: 0; }
+.groupsub { margin: 5px 0 0; font-size: 13.5px; color: var(--label-2); max-width: 62ch; line-height: 1.5; }
+.subhead { margin: 20px 0 10px; font-size: 11.5px; font-weight: 680; letter-spacing: 0.07em; text-transform: uppercase; color: var(--label-3); }
+
+.grouphead { margin: 26px 0 10px; font-size: 13px; font-weight: 680; letter-spacing: -0.01em; color: var(--label); }
+.decks { display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 14px; }
+.deck {
+  display: flex; flex-direction: column; text-align: left; padding: 0; overflow: hidden;
+  background: var(--raised); border: 0; border-radius: var(--r-lg); cursor: pointer;
+  box-shadow: var(--shadow-1), inset 0 0 0 0.5px var(--sep-strong); transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.deck:hover { box-shadow: var(--shadow-2), inset 0 0 0 0.5px var(--sep-strong); transform: translateY(-1px); }
+.deck .tile { background: var(--fill); display: flex; align-items: center; justify-content: center; padding: 6px; min-height: 128px; }
+.deck .tile svg { width: 100%; height: auto; max-height: 150px; }
+.deck .tile.none { color: var(--label-3); font-size: 34px; font-weight: 300; }
+.deck .body { padding: 12px 14px 14px; display: flex; flex-direction: column; flex: 1; gap: 6px; }
+.deck h3 { font-size: 15.5px; }
+.deck .blurb {
+  margin: 0; font-size: 12.5px; color: var(--label-2); line-height: 1.45; flex: 1;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.deck .stats { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--label-2); }
+.bar { flex: 1; height: 5px; border-radius: 3px; background: var(--fill-2); overflow: hidden; display: flex; }
+.bar i { display: block; height: 100%; }
+.bar i.k { background: var(--good); }
+.bar i.l { background: var(--accent); }
+
+/* ── Drill ────────────────────────────────────────────────────────────── */
+.drill { max-width: 620px; margin: 0 auto; padding: 14px 16px 40px; }
+.drillbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.drillbar .count { font-size: 12.5px; color: var(--label-2); font-variant-numeric: tabular-nums; margin-left: auto; }
+.pips { display: flex; gap: 3px; flex-wrap: wrap; margin-bottom: 14px; }
+.pips i { width: 100%; height: 3px; border-radius: 2px; background: var(--fill-2); flex: 1; min-width: 4px; }
+/* `hit`/`slip`, not `done`/`miss`: `.done` is also the summary screen's container, and a
+   selector that matches both a progress pip and the end-of-session panel is a selector that
+   lies to every test written against it. */
+.pips i.hit { background: var(--good); }
+.pips i.slip { background: var(--miss); }
+.pips i.now { background: var(--accent); }
+
+.card {
+  background: var(--raised); border-radius: var(--r-lg); box-shadow: var(--shadow-2), inset 0 0 0 0.5px var(--sep-strong);
+  overflow: hidden;
+}
+.card .prompt { padding: 14px 18px 0; font-size: 15px; font-weight: 560; }
+.card .modetag { display: inline-block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--label-2); padding: 14px 18px 0; }
+/* THE PICTURE IS THE CARD. It gets a dark ground of its own rather than the page's fill, for
+   two reasons: the drawing is a lit object and a lit object needs somewhere to sit, and the
+   card front then reads as a photograph on a table instead of as a diagram in a form. It is
+   the same dark either side of the light/dark switch, deliberately — the subject is the same
+   piece of wood whichever theme the reader has, and re-lighting it per theme would mean two
+   drawings to keep looking right. */
+.art {
+  background: #17181b; display: flex; align-items: center; justify-content: center;
+  padding: 0; margin: 12px 0 0; overflow: hidden;
+}
+.art svg { display: block; width: 100%; height: auto; }
+.art.blank { min-height: 180px; color: var(--label-3); font-size: 13px; text-align: center; padding: 30px; background: var(--fill); }
+
+/* The 'name' deck's answer: the name, and one line. Nothing else — see cardBack(). */
+.plain-back { text-align: center; padding: 18px 22px 6px; }
+.plain-back .name.big { font-size: 27px; font-weight: 680; letter-spacing: -0.024em; margin: 0; }
+.plain-back .plain { margin: 8px auto 0; max-width: 46ch; color: var(--label-2); font-size: 14.5px; }
+
+.answers { display: grid; gap: 8px; padding: 14px 18px 18px; }
+.answers.arts { grid-template-columns: 1fr 1fr; }
+.ans {
+  text-align: left; padding: 12px 14px; min-height: 46px; border: 0; border-radius: var(--r);
+  background: var(--fill); color: var(--label); font-size: 14px; font-weight: 510; cursor: pointer;
+  box-shadow: inset 0 0 0 0.5px var(--sep-strong); transition: background 0.12s ease;
+}
+.ans:hover:not(:disabled) { background: var(--fill-2); }
+.ans:disabled { cursor: default; }
+.ans.right { background: var(--good-soft); color: var(--good); box-shadow: inset 0 0 0 1px var(--good); font-weight: 600; }
+.ans.wrong { background: var(--miss-soft); color: var(--miss); box-shadow: inset 0 0 0 1px var(--miss); }
+.answers.arts .ans { padding: 6px; display: flex; align-items: center; justify-content: center; }
+.answers.arts .ans svg { width: 100%; height: auto; }
+
+.back { padding: 4px 18px 18px; }
+.back .name { font-size: 19px; font-weight: 660; letter-spacing: -0.018em; margin: 10px 0 0; }
+.back .plain { margin: 6px 0 0; font-size: 14.5px; line-height: 1.5; }
+.back .where { margin: 8px 0 0; font-size: 13px; color: var(--label-2); }
+.facts { margin: 14px 0 0; border-top: 0.5px solid var(--sep); }
+.fact { display: grid; grid-template-columns: 92px 1fr; gap: 10px; padding: 8px 0; border-bottom: 0.5px solid var(--sep); font-size: 13.5px; align-items: baseline; }
+.fact .k { color: var(--label-2); font-size: 12px; font-weight: 560; text-transform: uppercase; letter-spacing: 0.04em; }
+.fact .v { font-variant-numeric: tabular-nums; }
+.fact .cite { display: block; margin-top: 3px; font-size: 11.5px; color: var(--label-2); line-height: 1.4; }
+/* `block`, not `inline-block` — inline it ran straight into the value it qualifies ("4x4from
+   this structure"), which read as one garbled word rather than a number and its provenance. */
+.fact .mine { display: block; margin-top: 3px; font-size: 11px; color: var(--label-2); font-style: italic; }
+.regime { margin: 12px 0 0; font-size: 11.5px; color: var(--label-2); line-height: 1.45; }
+.grade { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 18px 18px; }
+
+/* ── Session summary ──────────────────────────────────────────────────── */
+.done { max-width: 460px; margin: 40px auto; text-align: center; padding: 0 16px; }
+.done h2 { font-size: 22px; letter-spacing: -0.02em; }
+.done .score { font-size: 46px; font-weight: 300; letter-spacing: -0.03em; margin: 14px 0 2px; font-variant-numeric: tabular-nums; }
+.done .sub { color: var(--label-2); font-size: 14px; }
+.tally { display: flex; justify-content: center; gap: 22px; margin: 22px 0 26px; }
+.tally div { font-size: 12px; color: var(--label-2); }
+.tally b { display: block; font-size: 22px; font-weight: 600; color: var(--label); font-variant-numeric: tabular-nums; }
+.done .row { display: flex; gap: 8px; justify-content: center; }
+
+/* ── Glossary ─────────────────────────────────────────────────────────── */
+.search {
+  width: 100%; max-width: 420px; padding: 9px 13px; font: inherit; border-radius: var(--r);
+  border: 0; background: var(--raised); color: var(--label); box-shadow: inset 0 0 0 0.5px var(--sep-strong);
+}
+.terms { margin: 16px 0 0; display: grid; gap: 0; }
+.term { padding: 13px 2px; border-bottom: 0.5px solid var(--sep); display: grid; grid-template-columns: 1fr auto; gap: 10px 16px; align-items: baseline; }
+.term h3 { font-size: 15px; }
+.term p { margin: 4px 0 0; font-size: 13.5px; color: var(--label-2); line-height: 1.5; grid-column: 1 / -1; }
+.term .where { font-size: 11.5px; color: var(--label-3); white-space: nowrap; }
+.empty { padding: 40px 0; text-align: center; color: var(--label-2); }
+
+/* ── Sequence ─────────────────────────────────────────────────────────── */
+.seqpick { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 20px; }
+.seqpick .btn { min-height: 30px; padding: 5px 12px; font-size: 13px; border-radius: 999px; }
+.seqpick .btn[aria-pressed='true'] { background: var(--accent); color: #fff; box-shadow: var(--shadow-1); }
+.stages { counter-reset: st; border-top: 0.5px solid var(--sep); }
+.stage { display: grid; grid-template-columns: 30px 1fr 240px; gap: 14px; padding: 14px 2px; border-bottom: 0.5px solid var(--sep); align-items: start; }
+.stage .shot { background: var(--fill); border-radius: var(--r); padding: 4px; display: flex; }
+.stage .shot svg { width: 100%; height: auto; }
+@media (max-width: 700px) {
+  /* The drawing goes UNDER the text rather than beside it — at phone width a 240px column
+     leaves the "why" line four words wide, and the why is the part worth reading. */
+  .stage { grid-template-columns: 30px 1fr; }
+  .stage .shot { grid-column: 2; max-width: 320px; }
+}
+.stage .n {
+  width: 26px; height: 26px; border-radius: 50%; background: var(--fill); color: var(--label-2);
+  display: flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 620; font-variant-numeric: tabular-nums;
+}
+.stage h3 { font-size: 15px; }
+.stage p { margin: 4px 0 0; font-size: 13.5px; color: var(--label-2); line-height: 1.5; }
+
+@media (max-width: 520px) {
+  .fact { grid-template-columns: 1fr; gap: 2px; }
+  .grade { grid-template-columns: 1fr; }
+  .tally { gap: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+  .deck:hover { transform: none; }
+}
+
+/* ── Print-the-deck dialog ─────────────────────────────────────────────────
+   Shares the studio's dialog shape so the two apps feel like one toolkit;
+   duplicated rather than imported because learn.css is deliberately
+   standalone (this page loads no three.js and no studio stylesheet). */
+.pktdlg {
+  border: 0; border-radius: var(--r-lg); padding: 0; max-width: 420px; width: calc(100% - 32px);
+  background: var(--raised); color: var(--label); box-shadow: var(--shadow-2);
+}
+.pktdlg::backdrop { background: rgba(0, 0, 0, 0.34); }
+.pktdlg form { padding: 18px 20px 16px; display: flex; flex-direction: column; gap: 13px; }
+.pktdlg h2 { font-size: 17px; font-weight: 640; letter-spacing: -0.015em; }
+.pktdlg > form > p { margin: -6px 0 0; font-size: 13px; color: var(--label-2); line-height: 1.45; }
+.pktdlg label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 560; }
+.pktdlg select {
+  font: inherit; font-weight: 400; padding: 8px 10px; border: 0; border-radius: var(--r);
+  background: var(--raised); color: var(--label); box-shadow: inset 0 0 0 0.5px var(--sep-strong);
+}
+.pktdlg small { font-size: 11.5px; font-weight: 400; color: var(--label-2); line-height: 1.4; }
+.pktdlg-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 3px; }
+.pktdlg .chip {
+  min-height: 34px; padding: 7px 15px; border: 0; border-radius: var(--r);
+  background: var(--fill); color: var(--label); font-size: 14px; font-weight: 530; cursor: pointer;
+}
+.pktdlg .chip--go { background: var(--accent); color: #fff; font-weight: 590; }
+
+/* ── The two handouts ──────────────────────────────────────────────────────
+   They sit on the SEQUENCE screen rather than the deck list, because both are about one
+   structure and that is the screen where a person has already chosen one. */
+.handouts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 18px; }
+.handouts .hint { flex-basis: 100%; margin: 2px 0 0; font-size: 12px; color: var(--label-2); line-height: 1.45; max-width: 62ch; }
+
+/* ── The card ─────────────────────────────────────────────────────────────
+   A FLASHCARD, not a form with a picture on it. It had a mode tag, a printed instruction and a
+   full-width blue button around a thing whose entire interface is the card itself — so the
+   chrome came off and the card turns on a click, anywhere on it.
+
+   Both faces live in the DOM at once and the CONTAINER rotates. Rendering the back only after
+   the flip would mean animating in something that was not there a frame ago, which the browser
+   cannot tween; `backface-visibility` hides whichever side is facing away instead. */
+.card--flip { background: none; box-shadow: none; overflow: visible; }
+.flipcard {
+  perspective: 1400px; cursor: pointer; display: block; width: 100%;
+  /* The drawing is 420x300; holding that ratio stops the card resizing as it turns, which
+     would otherwise shove the grade buttons out from under the thumb about to press them. */
+  aspect-ratio: 42 / 30;
+}
+.flipcard .inner {
+  position: relative; width: 100%; height: 100%; transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.flipcard.turned .inner { transform: rotateY(180deg); }
+.flipcard .side {
+  position: absolute; inset: 0; border-radius: var(--r-lg); overflow: hidden;
+  -webkit-backface-visibility: hidden; backface-visibility: hidden;
+  box-shadow: var(--shadow-2), inset 0 0 0 0.5px var(--sep-strong);
+}
+.flipcard .front { background: #17181b; display: flex; align-items: center; justify-content: center; }
+.flipcard .front .art { margin: 0; width: 100%; height: 100%; }
+.flipcard .front .art svg { width: 100%; height: 100%; object-fit: contain; }
+/* The back is dark like the front, because a card that changes colour as it turns reads as two
+   different objects rather than two sides of one. */
+.flipcard .back-face {
+  transform: rotateY(180deg); background: #1f2126; color: #f5f5f7;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 22px 26px; text-align: center; overflow: auto;
+}
+.flipcard .back-face .back { padding: 0; }
+.flipcard .back-face .name { font-size: 30px; font-weight: 700; letter-spacing: -0.026em; margin: 0; text-transform: capitalize; }
+.flipcard .back-face .plain { margin: 10px auto 0; max-width: 44ch; font-size: 15px; line-height: 1.45; color: rgba(235, 235, 245, 0.84); }
+.flipcard .back-face .where { color: rgba(235, 235, 245, 0.6); }
+.flipcard .back-face .facts { border-top-color: rgba(235, 235, 245, 0.2); text-align: left; max-width: 46ch; margin-inline: auto; }
+.flipcard .back-face .fact { border-bottom-color: rgba(235, 235, 245, 0.16); }
+.flipcard .back-face .fact .k, .flipcard .back-face .fact .cite,
+.flipcard .back-face .fact .mine, .flipcard .back-face .regime { color: rgba(235, 235, 245, 0.62); }
+.flipcard:focus-visible { outline: none; }
+.flipcard:focus-visible .side { box-shadow: 0 0 0 3px var(--accent-soft), 0 0 0 1px var(--accent); }
+@media (prefers-reduced-motion: reduce) { .flipcard .inner { transition: none; } }
+
+.turnhint { margin: 14px 0 0; text-align: center; font-size: 12.5px; color: var(--label-3); }
+.card--flip .grade { padding: 16px 0 0; }
+
+/* ── Keyboard affordances in the drill ─────────────────────────────────────
+   Shown only where a keyboard is likely (any hover-capable pointer); on touch they are noise
+   about keys that do not exist. */
+.grade kbd {
+  margin-left: 9px; font: 600 10.5px/1 var(--sans); letter-spacing: 0;
+  background: rgba(120, 120, 128, 0.16); border-radius: 4px; padding: 2.5px 5.5px;
+  vertical-align: 1.5px; opacity: 0.85;
+}
+@media (hover: none) { .grade kbd, .kbdhint { display: none; } }
+
+/* ── The end-of-session recap ──────────────────────────────────────────────
+   The misses, by picture and name — the only part of a finished session worth carrying out of
+   the room, so it gets the room. */
+.recap { margin: 4px 0 24px; text-align: left; }
+.recap h3 { font-size: 13px; font-weight: 640; color: var(--label-2); margin: 0 0 10px; text-align: center; }
+.recaps { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.recapcard { border-radius: 10px; overflow: hidden; background: var(--raised); box-shadow: var(--shadow-1), inset 0 0 0 0.5px var(--sep-strong); }
+.recapcard .mini { display: block; background: #17181b; }
+.recapcard .mini svg { display: block; width: 100%; height: auto; }
+.recapcard .rname { display: block; padding: 7px 10px 8px; font-size: 12.5px; font-weight: 600; text-transform: capitalize; }
+
+/* Key badges on the choice buttons — same rule as the grade keys: only where keys exist. */
+.ans { position: relative; padding-right: 34px; }
+.anskey {
+  position: absolute; top: 50%; right: 9px; transform: translateY(-50%);
+  font: 600 10.5px/1 var(--sans); background: rgba(120, 120, 128, 0.16);
+  border-radius: 4px; padding: 2.5px 5.5px; opacity: 0.85;
+}
+.answers.arts .anskey { top: 9px; right: 9px; transform: none; background: rgba(23, 24, 27, 0.72); color: #f5f5f7; }
+@media (hover: none) { .anskey { display: none; } .ans { padding-right: 14px; } }

@@ -1,22 +1,37 @@
 # SAP-1 — Survivability Position Planner
 
+> ## 🪦 DEPRECATED — v1 is end-of-life; SAP-2 replaces it
+>
+> **This tree (SAP-1) is frozen.** It receives critical fixes only; all development
+> has moved to the ground-up rebuild in [`sap2/`](sap2/), governed by
+> [`docs/SAP2_BLUEPRINT.md`](docs/SAP2_BLUEPRINT.md).
+>
+> **Why it was retired — the seed hazard, named plainly:** SAP-1 ships **295
+> plausible-looking illustrative placeholder values** (dimensions, shielding
+> thicknesses, standoffs, labor rates) adjacent to real publication citations. Every
+> one is flagged `PLACEHOLDER` and a NOT-FOR-FIELD-USE banner covers the app, but the
+> values *look* real, and a screenshot, a crop, or a stripped export can outlive the
+> banner. SAP-2 removes the hazard class entirely: it **ships empty** — no doctrinal
+> magnitude exists anywhere in its source or artifacts; values exist only in
+> owner-entered, cited, verified, commissioned fill files, and every output is
+> stamped with its data's provenance state.
+>
+> **Do not use SAP-1 to plan a real position. Do not treat any number in this tree
+> as doctrine.**
+>
+> Archival identity: this tree's final v1-only state is commit
+> `6edb208f4beb0ae2efd438bc8ac36ed4739bd016` (2026-08-01). Remaining EOL steps that
+> are owner actions, per blueprint §2.11: (1) take down or replace the live Replit
+> static deployment; (2) push an archival tag at the commit above (suggested:
+> `git tag v1-archival 6edb208 && git push origin v1-archival`).
+
 SAP-1 is a deterministic, offline, private, parametric planner for doctrinal USMC/Army combat-engineer survivability positions — fighting positions, crew-served positions, vehicle defilade, bunkers, connecting trenches, and ATGM positions. You pick from dropdowns and toggles (position, threat, soil, standard, roof), and SAP-1 turns those inputs into dimensioned plan/section drawings that double as a **range card** (sectors of fire in degrees and mils, north arrow, scale bar, FPL), a real **drag-to-rotate 3D model** with a **construction-stage scrubber** and cutaway, a bill of materials, a labor estimate, a **priorities-of-work timeline** that answers "are we ready by stand-to," and a printable job sheet — all recomputed live as you change an input.
 
 The whole roadmap that produced the current tool — the multi-angle plan and the phase-by-phase execution — is in [`docs/EXECUTION_PLAN.md`](docs/EXECUTION_PLAN.md); the decisions are logged in [`DECISIONS.md`](DECISIONS.md).
 
 The interface leads with plain language everywhere (the technical term stays alongside in parentheses — e.g. "Dirt wall up front (parapet)") so it's usable without already knowing the jargon; the fixed doctrinal vocabulary the spec requires is never hidden, just never load-bearing for basic use.
 
----
-
-> ## ⚠ NOT FOR FIELD USE — CUI handling
->
-> **SAP-1 ships on illustrative placeholder data. Do not use it to build a real position.**
->
-> It is **not** a substitute for current engineer publications or the engineer's judgment. SAP-1 performs **no** authoritative-value lookup and fabricates **no** shielding thickness, roof/stringer load or span, standoff, or parapet/retaining thickness. Every such value is a flagged placeholder (`status: "PLACEHOLDER"`, `source: "TODO: confirm against current pub"`), and the safety-critical ones — shielding thickness, roof/stringer load and span, standoff, parapet and retaining thickness — are tagged `safetyCritical: true`.
->
-> A data-driven **NOT FOR FIELD USE** banner is on until the count of remaining placeholders reaches zero. It clears only when a qualified user has replaced every placeholder with a real, verified value **offline** via doctrine import (`src/doctrine/io.ts`). Until then, treat every number on screen as a stand-in.
->
-> **Handling:** this tool and its output are **CUI**. Clear handling and distribution with your **S-6 / information-management shop** before fielding.
+Real values are filled in **offline** via doctrine import (`src/doctrine/io.ts`) — export the current values, edit them against the current pub, and import them back in.
 
 ---
 
@@ -67,7 +82,7 @@ Both are produced by the same `npm run build`, and both pass the `check:offline`
 
 ## More docs
 
-- [`PLACEHOLDER_POLICY.md`](PLACEHOLDER_POLICY.md) — the placeholder / provenance regime and how the NOT FOR FIELD USE banner clears.
+- [`PLACEHOLDER_POLICY.md`](PLACEHOLDER_POLICY.md) — the placeholder / provenance regime and how a doctrine fill clears it.
 - [`DOCTRINE_SOURCES.md`](DOCTRINE_SOURCES.md) — what a qualified user must confirm, and against which publications, before fielding.
 - [`USER_GUIDE.md`](USER_GUIDE.md) — how to use the planner: inputs, drawings, exports, scenarios, mission rollup, comparison, and time-available planning.
 - [`DECISIONS.md`](DECISIONS.md) — the design decisions behind the engine, the safety invariants, and the offline / private posture.

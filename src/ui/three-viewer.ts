@@ -158,6 +158,20 @@ function corrugatedTexture(): THREE.Texture {
 // Sawn dimensional lumber — warm SPF tone with fine, faintly wavy grain lines. Distinct from
 // the pale plywood face below (lumber is warmer and more densely grained), and dresses every
 // dimensional-lumber prop: stringers, the plywood-revetment frame, and platform/step decking.
+//
+// GRAIN RUNS ALONG THE STICK, and for a long time it did not. The lumber props are unit cubes
+// carrying a box-atlas UV, and on a board's broad face that atlas puts **V across the full
+// length** while U is a sliver a few percent wide — measured off the GLBs, corner (-0.5,-0.46)
+// maps to (0.076, 0.998) and (+0.5,+0.43) to (0.041, 0.002). Grain drawn as lines of constant
+// canvas-Y is therefore a line of constant V: it crosses the board and repeats ALONG it. Nine
+// lines over an eight-foot board is a band every eleven inches, which is why board-and-batten
+// siding — vertical boards, correct geometry, asserted by its own test — rendered as horizontal
+// clapboard. The material was lying about which way the wood ran.
+//
+// So the grain is drawn as VERTICAL lines (constant canvas-X, spanning canvas-Y), which the
+// atlas maps to lines running the length of the piece. `repeat.x` then compensates for that
+// sliver: the broad face samples about 3.5% of the canvas across its width, so the pattern has
+// to tile hard to put more than one line on a board.
 let lumberTexCache: THREE.Texture | null = null;
 function lumberTexture(): THREE.Texture {
   if (lumberTexCache) return lumberTexCache;
@@ -171,78 +185,116 @@ function lumberTexture(): THREE.Texture {
   for (let i = 0; i < 9; i++) {
     ctx.strokeStyle = i % 3 === 0 ? '#a97f4e' : i % 3 === 1 ? '#b98d59' : '#c29a66';
     ctx.beginPath();
-    const gy = 3 + i * 7;
-    ctx.moveTo(0, gy);
-    for (let x = 0; x <= 64; x += 4) {
-      ctx.lineTo(x, gy + Math.sin((x / 64) * Math.PI * 2 + i * 1.7) * 1.6);
+    const gx = 3 + i * 7;
+    ctx.moveTo(gx, 0);
+    for (let y = 0; y <= 64; y += 4) {
+      ctx.lineTo(gx + Math.sin((y / 64) * Math.PI * 2 + i * 1.7) * 1.6, y);
     }
     ctx.stroke();
   }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace; // see dirtTexture — all canvas color maps are sRGB
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  // ~4 grain lines across a board's width, given the atlas hands the face only 0.035 of U.
+  tex.repeat.set(LUMBER_GRAIN_REPEAT, 1);
   lumberTexCache = tex;
   sharedTextures.add(tex);
   return tex;
 }
 
-// Pale plywood FACE — light birch tone with wavy grain, a few darker streaks, and a couple of
-// knots (concentric dark rings), clearly NOT the warmer sawn-lumber texture above (that one
-// dresses the frame posts behind the sheets). Drawn at 4:8 aspect so it maps a 4-ft × 8-ft sheet
-// without distorting the knots. Deterministic — no Math.random.
+/** How hard the grain tiles across a piece — see `lumberTexture` for why it is not 1. */
+const LUMBER_GRAIN_REPEAT = 14;
+
+// Plywood FACE — the sanded veneer of one whole sheet, mapped 1:1 onto it (the caller scales a
+// unit box, so this canvas IS the sheet, corner to corner). Warm CDX tan, clearly not the
+// redder sawn-lumber texture above, which dresses the frame behind the sheets.
+//
+// SCALE IS THE WHOLE PROBLEM HERE. The first version drew 12 wavy lines across the canvas, which
+// after mapping put a dark stripe every 8 INCHES with 5 in of wobble — so a sheathed roof read as
+// corrugated boards, and the owner asked, reasonably, "what the heck are these boards on the
+// roof?" Face grain is a fraction of an inch wide and near-invisible at building distance. Every
+// number below is therefore stated in inches of real sheet and converted, so the next edit can
+// see when it is drawing something a person would trip over.
+//
+// The sheet also has to READ as a sheet: a rank of 4x8s wants visible joints, and that is the
+// only high-contrast thing in here — a hairline of shadow inset from the perimeter, the way the
+// sawn edge of the next panel shades its neighbour. Deterministic; no Math.random.
+//
+// One texture instance is shared by every sheet in the scene, so anything with a recognisable
+// SHAPE (a knot, a repair football, a mineral streak) reproduces at the identical spot on all 36
+// roof panels and reads as a manufactured pattern rather than wood. Hence grain and joint only.
 let plywoodFaceTexCache: THREE.Texture | null = null;
 function plywoodFaceTexture(): THREE.Texture {
   if (plywoodFaceTexCache) return plywoodFaceTexCache;
-  const W = 128;
-  const H = 256;
+  const PX_PER_IN = 6; // 8 ft × 4 ft sheet at 6 px/in
+  const W = 96 * PX_PER_IN; // 576
+  const H = 48 * PX_PER_IN; // 288
   const c = document.createElement('canvas');
   c.width = W;
   c.height = H;
   const ctx = c.getContext('2d')!;
-  ctx.fillStyle = '#dcc08f';
+  ctx.fillStyle = '#d8bf96';
   ctx.fillRect(0, 0, W, H);
-  // Long vertical grain lines running the full height, most faint, a few clearly darker.
-  ctx.lineWidth = 1.5;
-  for (let i = 0; i < 12; i++) {
-    const dark = i % 4 === 0;
-    ctx.strokeStyle = dark ? '#8f6f3f' : i % 2 === 0 ? '#c5a670' : '#cfae78';
-    ctx.lineWidth = dark ? 2 : 1.3;
+
+  // Lathe banding: peeled veneer carries broad, very soft tonal bands ALONG the grain, which is
+  // the sheet's long axis (u). A few percent of value — enough to keep the face from reading as
+  // flat plastic, far too little to look like a stripe.
+  for (let i = 0; i < 7; i++) {
+    const y = (H * (i + 0.5)) / 7;
+    const band = ctx.createLinearGradient(0, y - H / 14, 0, y + H / 14);
+    band.addColorStop(0, 'rgba(255,255,255,0)');
+    band.addColorStop(0.5, i % 2 === 0 ? 'rgba(255,246,226,0.16)' : 'rgba(150,116,66,0.10)');
+    band.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = band;
+    ctx.fillRect(0, y - H / 14, W, H / 7);
+  }
+
+  // Grain: lines every 1/2 in, running the LENGTH of the sheet (face grain always does), each
+  // wandering about 1/8 in over the full 8 ft. At a metre away this is a direction, not a mark.
+  const spacing = 0.5 * PX_PER_IN;
+  const wander = 0.125 * PX_PER_IN;
+  ctx.lineWidth = 1;
+  for (let i = 0; i * spacing < H; i++) {
+    const gy = i * spacing + spacing / 2;
+    // Three tones, cycling — a repeat of 3 across 96 lines is below the eye's pattern threshold
+    // at this contrast, and picking per-line colours from a hash buys nothing visible.
+    ctx.strokeStyle = i % 3 === 0 ? 'rgba(150,116,66,0.20)' : i % 3 === 1 ? 'rgba(150,116,66,0.11)' : 'rgba(255,246,226,0.16)';
     ctx.beginPath();
-    const gx = 6 + i * 10;
-    ctx.moveTo(gx, 0);
-    for (let y = 0; y <= H; y += 6) {
-      ctx.lineTo(gx + Math.sin((y / H) * Math.PI * 4 + i * 1.3) * 3.2, y);
+    ctx.moveTo(0, gy);
+    for (let x = 0; x <= W; x += 24) {
+      ctx.lineTo(x, gy + Math.sin((x / W) * Math.PI * 2 + i * 0.7) * wander);
     }
     ctx.stroke();
   }
-  // A few short dark mineral streaks.
-  ctx.strokeStyle = '#7a5c31';
-  ctx.lineWidth = 1.6;
-  for (const [sx, sy, len] of [[30, 60, 26], [92, 150, 34], [58, 205, 20]] as const) {
-    ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    ctx.lineTo(sx + 5, sy + len);
-    ctx.stroke();
+
+  // The joint. Inset a hair from the perimeter so neighbouring sheets show a single shadow line
+  // between them rather than two touching ones, and keep it soft — a sheathed wall is a grid of
+  // panels, not a grid of drawn boxes.
+  const rim = ctx.createLinearGradient(0, 0, 0, 1.25 * PX_PER_IN);
+  rim.addColorStop(0, 'rgba(96,72,38,0.34)');
+  rim.addColorStop(1, 'rgba(96,72,38,0)');
+  for (const [dx, dy, w, h, rot] of [
+    [0, 0, W, 1.25 * PX_PER_IN, 0],
+    [W, H, W, 1.25 * PX_PER_IN, Math.PI],
+    [0, H, H, 1.25 * PX_PER_IN, -Math.PI / 2],
+    [W, 0, H, 1.25 * PX_PER_IN, Math.PI / 2],
+  ] as const) {
+    ctx.save();
+    ctx.translate(dx, dy);
+    ctx.rotate(rot);
+    ctx.fillStyle = rim;
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
   }
-  // Knots: filled dark-brown core + a couple of concentric rings, grain sweeping around each.
-  const knot = (kx: number, ky: number, r: number): void => {
-    for (let ring = 3; ring >= 1; ring--) {
-      ctx.beginPath();
-      ctx.ellipse(kx, ky, r * (ring / 3), r * 1.35 * (ring / 3), 0, 0, Math.PI * 2);
-      ctx.fillStyle = ring === 1 ? '#4b3618' : ring === 2 ? '#6d4e26' : '#8a6a3a';
-      ctx.fill();
-    }
-    ctx.strokeStyle = '#9c7b45';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.ellipse(kx, ky, r * 1.5, r * 2, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  };
-  knot(44, 96, 7);
-  knot(96, 188, 5.5);
+
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace; // see dirtTexture — all canvas color maps are sRGB
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  // A roof plane is seen at a grazing angle, where an unfiltered half-inch grain turns into the
+  // smeared moiré the audit shot caught along the ridge. Mips + anisotropy resolve it to a tone.
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.anisotropy = 8;
   plywoodFaceTexCache = tex;
   sharedTextures.add(tex);
   return tex;
@@ -304,6 +356,135 @@ function plywoodSheet(parent: THREE.Group): THREE.Group {
   const geo = new THREE.BoxGeometry(1, 1, 1);
   const wrapper = new THREE.Group();
   wrapper.add(new THREE.Mesh(geo, [edgeV, edgeV, edgeH, edgeH, face, face]));
+  parent.add(wrapper);
+  return wrapper;
+}
+
+// ROOFING, which is not plywood and must never be drawn as it. Roll goods are a mineral-surfaced
+// asphalt sheet — near-black with a fine granule speckle — and corrugated is galvanised steel:
+// cool grey with ribs on a 2 1/6-in pitch. Both went through `plywoodSheet` before, so a roll
+// roof came out as five overlapping tan boards lying across the deck, which is precisely what the
+// owner was pointing at. Deterministic; two small canvases, shared like every other texture here.
+const roofingTexCache: Partial<Record<'roll' | 'corrugated', THREE.Texture>> = {};
+function roofingTexture(kind: 'roll' | 'corrugated'): THREE.Texture {
+  const cached = roofingTexCache[kind];
+  if (cached) return cached;
+  const PX_PER_IN = 8;
+  const c = document.createElement('canvas');
+  const ctx = (): CanvasRenderingContext2D => c.getContext('2d')!;
+  if (kind === 'roll') {
+    // One 36-in course, drawn at its true width so the granules stay granule-sized.
+    c.width = 36 * PX_PER_IN;
+    c.height = 36 * PX_PER_IN;
+    const g = ctx();
+    g.fillStyle = '#3b3f3c'; // slate-green mineral surface
+    g.fillRect(0, 0, c.width, c.height);
+    // Granules: a fixed lattice jittered by a hash, so it is dense and even without Math.random.
+    for (let y = 0; y < c.height; y += 3) {
+      for (let x = 0; x < c.width; x += 3) {
+        const h = (x * 73856093) ^ (y * 19349663);
+        const v = (h >>> 8) & 0xff;
+        if (v < 96) continue;
+        g.fillStyle = v > 208 ? 'rgba(196,198,190,0.30)' : v > 152 ? 'rgba(126,130,122,0.34)' : 'rgba(24,26,24,0.36)';
+        g.fillRect(x + (h & 1), y + ((h >> 1) & 1), 2, 2);
+      }
+    }
+  } else {
+    // Corrugations run UP the slope (v), so the ribs must run along the canvas height.
+    c.width = 26 * PX_PER_IN;
+    c.height = 32;
+    const g = ctx();
+    const pitch = (26 / 12) * PX_PER_IN; // 2 1/6 in between crests
+    for (let x = 0; x < c.width; x += 1) {
+      // A cosine section reads as a rolled rib; a hard step reads as printed stripes.
+      const t = (Math.cos((x / pitch) * Math.PI * 2) + 1) / 2;
+      const l = Math.round(120 + t * 96);
+      g.fillStyle = `rgb(${l},${l + 4},${l + 8})`;
+      g.fillRect(x, 0, 1, c.height);
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping; // a course is longer than one tile; tile along it
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.anisotropy = 8;
+  roofingTexCache[kind] = tex;
+  sharedTextures.add(tex);
+  return tex;
+}
+
+/**
+ * One roofing course as a unit box the caller scales to the real course. `repeatAlong` is how
+ * many texture tiles fit across the course's LENGTH — pass the course length in feet over the
+ * material's own width, so granule size and rib pitch stay constant no matter how long the run.
+ * No outline: a black rim around a 1/4-in sheet is thicker than the sheet.
+ */
+function roofingSheet(parent: THREE.Group, kind: 'roll' | 'corrugated', repeatAlong: number, repeatAcross = 1): THREE.Group {
+  const map = roofingTexture(kind).clone();
+  map.needsUpdate = true;
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  // FRACTIONS ARE THE POINT. These used to be clamped to at least one whole tile, which meant
+  // every piece narrower than one tile got the whole pattern squeezed into it — twelve
+  // corrugations across a three-inch sliver. The texture wraps, so a partial tile renders as a
+  // cut sheet, which is what the piece is. The floor is only a guard against zero or NaN.
+  map.repeat.set(Math.max(1e-4, repeatAlong), Math.max(1e-4, repeatAcross));
+  sharedTextures.add(map);
+  const mat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: toonGradient(), map });
+  const edge = new THREE.MeshToonMaterial({ color: kind === 'roll' ? 0x23251f : 0x8e9298, gradientMap: toonGradient() });
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), [edge, edge, edge, edge, mat, mat]);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  const wrapper = new THREE.Group();
+  wrapper.add(mesh);
+  parent.add(wrapper);
+  return wrapper;
+}
+
+// INSECT SCREEN. Same trap the roofing fell into: `screenPanel` went through `plywoodSheet`, so
+// a SEA hut's screened band and a tower cab's screen came out as tan boards — a wall where the
+// drawing says an opening. Screen is a dark mesh you can see through, and the seeing-through is
+// the entire point of the member, so it is drawn transparent with a woven grid.
+let screenTexCache: THREE.Texture | null = null;
+function screenTexture(): THREE.Texture {
+  if (screenTexCache) return screenTexCache;
+  const N = 32; // one tile = one inch of cloth; the caller repeats it per real foot
+  const c = document.createElement('canvas');
+  c.width = c.height = N;
+  const g = c.getContext('2d')!;
+  g.clearRect(0, 0, N, N);
+  g.fillStyle = 'rgba(38,42,40,0.85)';
+  for (let i = 0; i < N; i += 4) {
+    g.fillRect(i, 0, 1.4, N);
+    g.fillRect(0, i, N, 1.4);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.anisotropy = 8;
+  screenTexCache = tex;
+  sharedTextures.add(tex);
+  return tex;
+}
+
+/**
+ * A panel of insect screen in its frame. `repeatX`/`repeatY` are the cloth's real size in
+ * inches, so the weave stays weave-sized on a band of any length.
+ */
+function screenSheet(parent: THREE.Group, repeatX: number, repeatY: number): THREE.Group {
+  const map = screenTexture().clone();
+  map.needsUpdate = true;
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.repeat.set(Math.max(1, repeatX / 6), Math.max(1, repeatY / 6));
+  sharedTextures.add(map);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xffffff, map, transparent: true, alphaTest: 0.18, side: THREE.DoubleSide, depthWrite: false,
+  });
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), mat);
+  const wrapper = new THREE.Group();
+  wrapper.add(mesh);
   parent.add(wrapper);
   return wrapper;
 }
@@ -848,6 +1029,89 @@ function lumberPiece(group: THREE.Group, size: LumberSize, length: number, width
   return wrapper;
 }
 
+/**
+ * One piece of lumber that has been CUT — a profile in the board's own side elevation, extruded
+ * across its thickness. This is what draws a bird's-mouth.
+ *
+ * The plain `lumberPiece` above is a prop scaled to a box, and a box cannot have a notch in it, so
+ * a rafter drawn that way passes straight through the plate it is supposed to sit on. Hand this
+ * the profile the framing square gives you (local x along the length, local y across the face, in
+ * feet, anticlockwise) and it returns the same toon-shaded, grained, outlined wrapper the box path
+ * returns — already in real feet, so the caller sets rotation and position and nothing else.
+ *
+ * UVs are projected from the profile plane rather than left to ExtrudeGeometry's generator, whose
+ * front/back mapping is in raw feet: on a 12-ft rafter that is 12 texture repeats of grain running
+ * the wrong way. `LUMBER_FACE_U` reproduces the atlas share the GLB props give a board's face, so
+ * a cut rafter and an uncut one carry the same grain at the same scale.
+ */
+function cutLumberPiece(
+  group: THREE.Group,
+  profile: readonly (readonly [number, number])[],
+  thickFt: number,
+  holes: readonly (readonly (readonly [number, number])[])[] = [],
+): THREE.Group {
+  const shape = new THREE.Shape();
+  shape.moveTo(profile[0]![0], profile[0]![1]);
+  for (const [x, y] of profile.slice(1)) shape.lineTo(x, y);
+  shape.closePath();
+  // Holes go straight through — a latrine's seat openings, punched in the lid it is cut from.
+  // THREE.Shape wants each hole wound OPPOSITE the outer contour, and `Path` does not care which
+  // way the caller listed the corners, so the winding is fixed here rather than trusted.
+  for (const h of holes) {
+    if (h.length < 3) continue;
+    const area = h.reduce((s2, [x, y], i) => {
+      const [nx, ny] = h[(i + 1) % h.length]!;
+      return s2 + x * ny - nx * y;
+    }, 0);
+    const pts = area > 0 ? [...h].reverse() : [...h];
+    const path = new THREE.Path();
+    path.moveTo(pts[0]![0], pts[0]![1]);
+    for (const [x, y] of pts.slice(1)) path.lineTo(x, y);
+    path.closePath();
+    shape.holes.push(path);
+  }
+  const t = Math.max(0.02, thickFt);
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: t, bevelEnabled: false, curveSegments: 1 });
+  geo.translate(0, 0, -t / 2); // extrusion runs 0..depth; the member frame is centred
+  geo.computeVertexNormals();
+
+  const pos = geo.getAttribute('position');
+  const uv = geo.getAttribute('uv');
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (let i = 0; i < pos.count; i++) {
+    minY = Math.min(minY, pos.getY(i));
+    maxY = Math.max(maxY, pos.getY(i));
+  }
+  const span = Math.max(1e-6, maxY - minY);
+  for (let i = 0; i < uv.count; i++) {
+    // U across the face width (grain lines run the length of the board), V along the length at a
+    // fixed real-world rate so the wander repeats every GRAIN_PERIOD_FT no matter how long the cut.
+    uv.setXY(i, (LUMBER_FACE_U * (pos.getY(i) - minY)) / span, pos.getX(i) / GRAIN_PERIOD_FT);
+  }
+  uv.needsUpdate = true;
+
+  const wrapper = addToonMesh(group, geo, 0xffffff, { map: lumberTexture() });
+  // Same hairline rule as `lumberPiece`: the shared 3.5% shell is calibrated for compact props and
+  // would ink a 12-ft board. Here the geometry is already in feet, so the shell is scaled about
+  // the origin by the ratio that turns a fixed offset into the piece's own extents.
+  const outlineFt = 0.012;
+  const outline = wrapper.children.length > 1 ? (wrapper.children[0] as THREE.Mesh) : null;
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox!;
+  outline?.scale.set(
+    1 + (2 * outlineFt) / Math.max(0.05, bb.max.x - bb.min.x),
+    1 + (2 * outlineFt) / Math.max(0.05, span),
+    1 + (2 * outlineFt) / t,
+  );
+  return wrapper;
+}
+
+/** The share of U a board's face gets in the prop atlas — matched so cut and uncut stock agree. */
+const LUMBER_FACE_U = 0.035;
+/** Feet of board per repeat of the grain wander, along the length. */
+const GRAIN_PERIOD_FT = 2;
+
 // A deck of 2x6 planks over a solid fill body — the standing platform and the firing step are
 // built lumber, not bare earth mounds. Planks run along the longer horizontal dimension, laid
 // side by side across the shorter one, each one a real 2x6 prop (1.5" deck over the fill below).
@@ -952,6 +1216,11 @@ function buildPartInner(group: THREE.Group, part: Part3, bags: SandbagBatcher): 
         // Both the sloped bay wall AND the mounded earth parapet flare their outer face.
         if ((part.role === 'bayWall' || part.role === 'earthParapet') && part.taperAmount) {
           taperOuterFace(geometry, part.taperAxis ?? 2, part.taperSign ?? 1, part.taperAmount);
+          // Corner posts additionally flare a second, independent axis so their outer tip meets
+          // both adjacent walls' flares flush instead of leaving a triangular void between them.
+          if (part.taperAxis2 !== undefined && part.taperSign2 !== undefined) {
+            taperOuterFace(geometry, part.taperAxis2, part.taperSign2, part.taperAmount);
+          }
         }
         // The vehicle access ramp's floor is a sheared wedge (continuous grade, not steps).
         if (part.shearDrop) shearTopZ(geometry, part.shearDrop);
@@ -1522,4 +1791,4 @@ export function onPropAssetsReady(cb: () => void): () => void {
   return () => rerenderCallbacks.delete(cb);
 }
 
-export { disposeObject, toonGradient, lumberPiece, plywoodSheet };
+export { disposeObject, toonGradient, lumberPiece, cutLumberPiece, plywoodSheet, roofingSheet, screenSheet };

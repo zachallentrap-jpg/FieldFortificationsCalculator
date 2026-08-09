@@ -1,7 +1,6 @@
 // App shell (§11). Builds every region once, then hands them to the active layout's arrange()
-// (mobile / tablet / desktop). A slim topbar carries the title, the data-driven NOT-FOR-FIELD-USE
-// badge (§2.5), and one hamburger menu (setups, exports, help, status, screen size); a persistent
-// bottom toolbar carries the four things
+// (mobile / tablet / desktop). A slim topbar carries the title and one hamburger menu (setups,
+// exports, help, status, screen size); a persistent bottom toolbar carries the four things
 // people reach for constantly — undo, redo, reset, theme — plus the input-editing trigger on
 // mobile. Drawings render through the error boundary so a bad view degrades to a card, never
 // a crash.
@@ -88,22 +87,12 @@ function menuGroupTitle(label: string): string {
   return '<div class="menu-group-title" role="presentation">' + label + '</div>';
 }
 
-// Whether there are still placeholder (illustrative, unverified) values feeding the result —
-// drives the topbar's NOT-FOR-FIELD-USE badge and the Doctrine values tool's progress readout.
-// Exported for the doctrine-unlock test.
-export function topbarHasFieldUseBadge(result: Result): boolean {
-  return result.placeholderReport.remaining > 0;
-}
-
 // Slim topbar: the plain-language app name on the left, ONE hamburger menu on the right holding
 // everything that isn't reached for constantly (setups, exports, help, status, screen size).
 // The four things people tap over and over while iterating — undo, redo, reset, theme — live in
 // bottomToolbar() instead, always in reach without opening anything (§ redesign: quick actions
 // stay one tap away; everything else is a deliberate trip to the menu, not a wall of buttons).
-function topbar(state: AppState, result: Result): string {
-  const badge = topbarHasFieldUseBadge(result)
-    ? '<span class="fielduse-badge" role="status">NOT FOR FIELD USE — placeholder data</span>'
-    : '';
+function topbar(state: AppState): string {
   const overrideOpts = ([
     ['auto', 'Auto (fits your screen)'],
     ['mobile', 'Phone'],
@@ -145,7 +134,7 @@ function topbar(state: AppState, result: Result): string {
 
   return (
     '<header class="topbar">' +
-    '<div class="brand"><strong>Fighting Position Planner</strong>' + badge + '</div>' +
+    '<div class="brand"><strong>Fighting Position Planner</strong></div>' +
     hamburgerMenu +
     '</header>'
   );
@@ -207,5 +196,5 @@ export function renderApp(state: AppState, result: Result, webglOk: boolean, she
     state.layoutMode === 'mobile' ? arrangeMobile(parts, sheetOpen)
     : state.layoutMode === 'tablet' ? arrangeTablet(parts)
     : arrangeDesktop(parts);
-  return topbar(state, result) + body + bottomToolbar(state);
+  return topbar(state) + body + bottomToolbar(state);
 }

@@ -66,7 +66,17 @@ export function validateInputs(raw: unknown): Parsed<Inputs> {
 
   const boolFields = ['overheadCover', 'sump', 'firingStep', 'camouflage', 'machineAssist'] as const;
   for (const f of boolFields) if (!isBool(o[f])) return { ok: false, error: 'Field "' + f + '" must be a boolean.' };
-  if (!isNum(o['count']) || !isNum(o['teamSize'])) return { ok: false, error: 'count and teamSize must be numbers.' };
+  // Integer + range, matching engine/compute.ts's own clamp bounds exactly — this file's
+  // contract is that ok:true means every field is already valid, not "valid except count/
+  // teamSize, which get silently renormalized somewhere downstream." A file with count:50000
+  // or teamSize:-5 is rejected here the same way an invalid "standard" is, rather than being
+  // accepted and left to drift as a stored value nothing else ever corrects.
+  if (!isNum(o['count']) || !Number.isInteger(o['count']) || o['count'] < 1 || o['count'] > 999) {
+    return { ok: false, error: 'Field "count" must be an integer from 1 to 999.' };
+  }
+  if (!isNum(o['teamSize']) || !Number.isInteger(o['teamSize']) || o['teamSize'] < 1 || o['teamSize'] > 50) {
+    return { ok: false, error: 'Field "teamSize" must be an integer from 1 to 50.' };
+  }
 
   let sectorAzimuths: Inputs['sectorAzimuths'];
   if (o['sectorAzimuths'] !== undefined) {

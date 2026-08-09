@@ -29,8 +29,15 @@ export function drawSection(result: Result): string {
 
   const s = geo.section;
   const isVehicle = geo.shape === 'vehicle_ramp';
-  const earthRoof = s.coverOn && s.roofPath === 'earth_on_stringers';
-  const engineered = s.roofPath === 'engineered_required';
+  // A vehicle defilade is never roofed — there's no parapet for a built structure to span
+  // between, and the vehicle's own armor plus the terrain defilade already are the protection.
+  // scene3d.ts already excludes vehicle_ramp from both the earth-roof and engineered-hazard
+  // branches entirely (nobody ever designed a "roof over a vehicle pit" geometry); this section
+  // used to draw the engineered hazard block for it anyway (calc.roofPath/coverOn themselves are
+  // left untouched — they still feed the specs panel and ROOF_SPAN_EXCEEDED correctly — only the
+  // schematic's attempt to depict an undesigned shape is suppressed here, matching the 3D view).
+  const earthRoof = !isVehicle && s.coverOn && s.roofPath === 'earth_on_stringers';
+  const engineered = !isVehicle && s.roofPath === 'engineered_required';
   const halfBay = s.holeW / 2;
   const aboveTop = s.parapetH + (earthRoof ? s.coverT + 0.4 : 0) + (engineered ? 1.6 : 0);
   const margin = Math.max(1, s.parapetW);
@@ -57,8 +64,19 @@ export function drawSection(result: Result): string {
   const earthBottom = px(0, s.depthOfCut + 1.0)[1];
   parts.push(el('rect', { x: gL[0], y: gradeY, width: gR[0] - gL[0], height: earthBottom - gradeY, fill: 'url(#pat-earth)' }));
 
-  const bayTL = px(-halfBay, 0);
-  parts.push(el('rect', { x: bayTL[0], y: bayTL[1], width: proj.lenPx(s.holeW), height: proj.lenPx(s.depthOfCut), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-cut)' }));
+  // An unrevetted wall in loose soil battens outward toward grade (s.wallTaper, doctrine's
+  // wallSlopeRatio × depth, capped the same way the 3D model caps it) — a plumb rectangle only
+  // when revetted or wallTaper is 0. Degenerates to the exact same rectangle when wallTaper is 0
+  // (the two top corners collapse onto the bottom corners' x), so this single polygon replaces
+  // the old unconditional rect rather than branching on taper presence.
+  const bayFloorL = px(-halfBay, s.depthOfCut);
+  const bayFloorR = px(halfBay, s.depthOfCut);
+  const bayGradeR = px(halfBay + s.wallTaper, 0);
+  const bayGradeL = px(-halfBay - s.wallTaper, 0);
+  parts.push(el('polygon', {
+    points: bayFloorL.join(',') + ' ' + bayFloorR.join(',') + ' ' + bayGradeR.join(',') + ' ' + bayGradeL.join(','),
+    fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-cut)',
+  }));
   used.add('bay');
   parts.push(callout('bay', ...px(halfBay * 0.15, s.depthOfCut * 0.62), used));
 
@@ -115,10 +133,18 @@ export function drawSection(result: Result): string {
   }
 
   // ── Grenade sump notch at the bay floor ────────────────────────────────────────
+  // REAR of the bay (positive x here), matching the plan's own sump marks (sumpMarks in
+  // geometry.ts places them at "near the rear wall", yFt > 0) and the 3D model (scene3d.ts
+  // reads sump.yFt straight through). This used to sit at the FRONT (-halfBay * 0.85) —
+  // directly under the firing step/platform, which are correctly front-sited — so on a narrow
+  // position (two_man's 2 ft front-to-back) the sump notch visually collided with the firing
+  // step in the very same picture, and every position's section silently drew the sump on the
+  // opposite wall from where its own plan view and 3D model put it.
+  const sumpWFt = Math.min(0.9, s.holeW * 0.22);
   if (s.sump) {
-    const sW = proj.lenPx(Math.min(0.9, s.holeW * 0.22));
+    const sW = proj.lenPx(sumpWFt);
     const sH = proj.lenPx(0.7);
-    const sTL = px(-halfBay * 0.85, s.depthOfCut);
+    const sTL = px(halfBay * 0.85 - sumpWFt, s.depthOfCut);
     parts.push(el('rect', { x: sTL[0], y: sTL[1], width: sW, height: sH, fill: 'var(--draw-timber)', stroke: 'var(--draw-outline)', 'stroke-width': 1 }));
     used.add('sump');
     parts.push(callout('sump', sTL[0] + sW + 9, sTL[1] + 7, used));
@@ -128,8 +154,12 @@ export function drawSection(result: Result): string {
   if (earthRoof) {
     // Cover bears on the parapets and spans the hole, set back from the FRONT edge by the
     // roof setback to leave a firing gap. slabW is always > 0 (no self-cancelling inset).
+    // The REAR edge overhangs by rearOverhang (structural bearing only, no threat clearance
+    // needed) — NOT the full parapet thickness (s.parapetW is the earthen wall's own thickness,
+    // an unrelated doctrine value; reusing it here overstated the roof's rear extent by ~2x-3x
+    // versus the same bearing-shelf math the front edge and the 3D model both already use).
     const slabX1 = px(Math.min(halfBay - 0.25, -halfBay + s.setback), 0)[0];
-    const slabX2 = px(halfBay + s.parapetW, 0)[0];
+    const slabX2 = px(halfBay + s.rearOverhang, 0)[0];
     const slabW = Math.max(6, slabX2 - slabX1);
     const slabBottomY = px(0, -s.parapetH)[1]; // rests on parapet tops
     const slabTopY = px(0, -(s.parapetH + s.coverT))[1];

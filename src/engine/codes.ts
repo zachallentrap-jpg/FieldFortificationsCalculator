@@ -17,6 +17,7 @@ export const CODES = {
   INVALID_SOIL: def('INVALID_SOIL', 'error', 'Unknown soil — using a default soil.'),
   INVALID_THREAT: def('INVALID_THREAT', 'error', 'Unknown threat — treated as no threat.'),
   INVALID_STANDARD: def('INVALID_STANDARD', 'error', 'Unknown standard — using deliberate.'),
+  INVALID_REVETMENT: def('INVALID_REVETMENT', 'error', 'Unknown revetment — treated as none (walls unrevetted).'),
   REVET_REQUIRED_SOIL: def(
     'REVET_REQUIRED_SOIL',
     'error',

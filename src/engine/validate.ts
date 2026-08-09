@@ -23,6 +23,7 @@ export function runValidation(calc: Calc): ValidationIssue[] {
   if (calc.invalid.soil) errors.push(issue(CODES.INVALID_SOIL));
   if (calc.invalid.standard) errors.push(issue(CODES.INVALID_STANDARD));
   if (calc.invalid.threat) errors.push(issue(CODES.INVALID_THREAT));
+  if (calc.invalid.revetment) errors.push(issue(CODES.INVALID_REVETMENT));
 
   // Soil doctrinally forces revetment but none selected.
   if (calc.soil.revetForced.value === true && calc.revet.kind === 'none') {
@@ -109,8 +110,13 @@ export function runValidation(calc: Calc): ValidationIssue[] {
   // now essentially never fires for a corrected earth-parapet rifle position (~12 aperture
   // bags < what a crew carries) and correctly fires for a bunker or a sandbagged deliberate
   // position with overhead cover. Advisory, not error: exceeding it is legitimate, you resupply.
+  // bagsTotal is PER POSITION (matches "a design needing more sandbags..." above) — the crew's
+  // carried load is a fixed per-soldier quantity and must NOT scale with `count`. Multiplying by
+  // count here made the advisory get EASIER to suppress the more positions you build (count=20
+  // hid the exact same per-position shortfall that count=1 correctly flagged) — backwards for a
+  // "you don't have enough material" warning.
   const bagsTotal = calc.bagsParapet + calc.bagsCover + calc.bagsRevet;
-  const carriedBags = calc.inputs.count * calc.inputs.teamSize * sandbag.basicLoad.value;
+  const carriedBags = calc.inputs.teamSize * sandbag.basicLoad.value;
   if (bagsTotal > carriedBags) {
     advisories.push(
       issue(CODES.SANDBAG_BASIC_LOAD_EXCEEDED, '(needs ~' + bagsTotal + ' bags; a crew carries ~' + carriedBags + ')'),

@@ -4,20 +4,7 @@ SAP-1 turns a few dropdowns and toggles into dimensioned drawings, a real drag-t
 
 Every input carries a plain-language explanation, not just its name — the doctrinal term is always there too (in parentheses), but you never have to already know it to use the tool.
 
----
-
-## READ THIS FIRST — NOT FOR FIELD USE
-
-**SAP-1 ships on illustrative placeholder data. It is not for field use.**
-
-- It is **not** a substitute for current engineer publications or the engineer's judgment.
-- It performs **no** authoritative-value lookup and **fabricates no** shielding thickness, roof or stringer load, standoff, or parapet thickness. Every one of those numbers is a flagged placeholder.
-- While any placeholder figure remains, a red **NOT FOR FIELD USE — placeholder data** badge sits in the topbar next to the app name, on every screen. It clears only when zero placeholders remain — that is, only after a qualified user has replaced the values with real, verified ones. The exact count (and how many are safety-critical) is always visible in **Status**, and the **Doctrine values** tool shows which specific figures are still placeholders.
-- **Handling is CUI.** Clear this tool with your S-6 / information-management shop before you field it or share exported files.
-
-The safety-critical values — shielding thickness, roof and stringer load and span, standoff, and parapet/retaining thickness — never get invented. For the heaviest threats they are not even estimated: the app hands the roof to an engineer instead (see "The engineered-roof case" below).
-
-**How the placeholders get replaced.** A qualified user fills in real values **offline** through a doctrine import file (export the current values, edit them against the current pub, import them back). Importing flips each value's status from PLACEHOLDER to DOCTRINE in place, and the banner recomputes. This is an offline data-editing step, not a button on the toolbar. Until it is done, treat every figure as illustrative.
+The safety-critical values — shielding thickness, roof and stringer load and span, standoff, and parapet/retaining thickness — never get invented. For the heaviest threats they are not even estimated: the app hands the roof to an engineer instead (see "The engineered-roof case" below). Real values are filled in **offline** through a doctrine import file (export the current values, edit them against the current pub, import them back) — see **Doctrine values** in the menu.
 
 ---
 
@@ -107,7 +94,7 @@ Picking a class jumps the caliber dropdown to the first round in that class; pic
 
 ## Reading the drawings
 
-You get three views — **Plan**, **Section A–A**, and **Isometric** — that share one visual language: a dark header bar per view, numbered callout discs tied to a single legend, and dimensions in one accent color (the NOT FOR FIELD USE badge lives once, in the topbar, not repeated per view). Every header also reminds you: **not to scale — dimensions govern.** Read the numbers, not the pixels.
+You get three views — **Plan**, **Section A–A**, and **Isometric** — that share one visual language: a dark header bar per view, numbered callout discs tied to a single legend, and dimensions in one accent color. Every header also reminds you: **not to scale — dimensions govern.** Read the numbers, not the pixels.
 
 ### The shared legend and numbered callouts
 
@@ -127,7 +114,7 @@ The plan looks down on the position: the parapet ring, the fighting bay cut into
 
 ### Section A–A — the cut, the roof, the scale figure
 
-The section is the front-to-back vertical slice taken along the A–A line, with **FRONT on the left** to match the plan. You see the earth mass with the bay cut out of it, the spoil-filled parapets, the firing step or platform, a grenade sump notch, and — if you have overhead cover — the roof on its stringers, set back from the front edge to leave a firing gap. A standing figure (~5'-10" reference) and a scale bar give real-world scale. Dimensions cover depth of cut, front-to-back, parapet height, roof setback, and cover thickness. The drawings show dimensions only — check **Status** or **Doctrine values** for which figures are still placeholders.
+The section is the front-to-back vertical slice taken along the A–A line, with **FRONT on the left** to match the plan. You see the earth mass with the bay cut out of it, the spoil-filled parapets, the firing step or platform, a grenade sump notch, and — if you have overhead cover — the roof on its stringers, set back from the front edge to leave a firing gap. A standing figure (~5'-10" reference) and a scale bar give real-world scale. Dimensions cover depth of cut, front-to-back, parapet height, roof setback, and cover thickness.
 
 ### The engineered-roof case — never a made-up number
 
@@ -156,7 +143,7 @@ Any number with an underline (it renders as a button) is backed by a derivation 
 
 **What you do:** tap/click the underlined number — in the specs, in the BOM, or in the labor panel. (You can also tap the underlined dimension figures.)
 
-**What you see:** a panel with the figure's **label**, the exact **formula**, the running **result**, and every **operand** with its value and unit. Operands that are placeholders are marked **placeholder** (hover for the source note). A footer reminds you every placeholder figure is illustrative — confirm against current pubs. This is how you see *why* a number is what it is, and *which* inputs to it are not yet real.
+**What you see:** a panel with the figure's **label**, the exact **formula**, the running **result**, and every **operand** with its value and unit. This is how you see *why* a number is what it is.
 
 Close the panel by clicking outside it or pressing Esc.
 
@@ -222,7 +209,7 @@ All three exports are produced locally; you click to download or print. Nothing 
 - **CSV** — downloads the bill of materials as **`sap1-bom.csv`** (RFC-4180 CSV, safe to open in a spreadsheet).
 - **JSON** — downloads the current inputs as **`sap1-scenario.json`** — the portable configuration you can re-import later or on another device.
 
-Exports carry the app / schema / doctrine version stamps. Remember the CUI handling caveat before you move any exported file off the device.
+Exports carry the app / schema / doctrine version stamps.
 
 ---
 
@@ -238,10 +225,10 @@ Exports carry the app / schema / doctrine version stamps. Remember the CUI handl
 
 **Diagnostics** (the **Diag** button) opens an offline snapshot for troubleshooting or a bug report: the app / schema / doctrine versions, the placeholder counts (how many remain, and how many of those are safety-critical), the last error if any, and a flat statement that the app is **offline by design** — it makes no network calls, ever. If a view ever fails to draw, it degrades to an error card instead of crashing, and that error shows up here.
 
-**Help** (the **Help** button) opens a plain-language explainer of every input — Type, Standard, Soil, Threat, Revetment, the feature toggles, Positions / Team size, Units, and the tap-a-number trace — all offline. It repeats the core caveat: everything runs on illustrative placeholder data, and operands marked **placeholder** in the trace are not authoritative until confirmed against current pubs.
+**Help** (the **Help** button) opens a plain-language explainer of every input — Type, Standard, Soil, Threat, Revetment, the feature toggles, Positions / Team size, Units, and the tap-a-number trace — all offline.
 
 ---
 
 ## The short version
 
-Pick a position, a standard, a soil, and a specific threat round. Read the drawings by their dimensions and legend, not their pixels. Tap any number to see how it was derived and whether it rests on a placeholder. Use Scenarios, Mission BOM, Compare, and Plan to work across many positions and constraints; export a job sheet, CSV, or JSON when you're done. And until a qualified user has replaced the placeholder values offline and the red banner has cleared, treat every figure as illustrative — **SAP-1 is not for field use, and its handling is CUI.**
+Pick a position, a standard, a soil, and a specific threat round. Read the drawings by their dimensions and legend, not their pixels. Tap any number to see how it was derived. Use Scenarios, Mission BOM, Compare, and Plan to work across many positions and constraints; export a job sheet, CSV, or JSON when you're done.

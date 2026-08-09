@@ -44,7 +44,7 @@ export interface Calc {
   count: number;
   teamSize: number;
 
-  invalid: { position: boolean; soil: boolean; threat: boolean; standard: boolean };
+  invalid: { position: boolean; soil: boolean; threat: boolean; standard: boolean; revetment: boolean };
   clamped: { count: boolean; team: boolean };
 
   // shape family (from the position's volumeModel)
@@ -139,7 +139,9 @@ function computeCalc(raw: Inputs): Calc {
   const invalidThreat = !threatKnown;
   const threat = threatKnown ? raw.threat : 'none';
 
-  const revet = revetments[raw.revetment] ?? revetments['none']!;
+  const revetKnown = raw.revetment in revetments;
+  const invalidRevetment = !revetKnown;
+  const revet = revetKnown ? revetments[raw.revetment]! : revetments['none']!;
 
   const roundedCount = Math.round(finite(raw.count, 1));
   const roundedTeam = Math.round(finite(raw.teamSize, 1));
@@ -207,7 +209,16 @@ function computeCalc(raw: Inputs): Calc {
   // §9 folds into holeVol. It adds no fabricated volume or labor of its own. A one-man position
   // is dug armpit-deep for standing fire and takes NO firing step (modeling spec §2.f), so the
   // toggle is a no-op there — the drawing must never teach a step the doctrine forbids.
-  const firingStepOn = inputs.firingStep && raw.positionType !== 'one_man';
+  //
+  // Also a no-op for any position with sectorsOfFire=false (mortar_pit, both vehicle defilades,
+  // bunker_op_cp, connecting_trench): "step up TO SHOOT" only makes sense for a position that
+  // has a modeled aiming direction over its own front wall to begin with. A mortar fires
+  // high-angle indirect, laid by aiming stakes/FDC data, not sighted over a parapet; a vehicle
+  // crew fires from the vehicle's own sights, not a dismounted soldier on a dug ledge; the
+  // other three have no facing direction at all (the plan view already draws them as open
+  // corridors with no FRONT/REAR for the same reason). The drawing must not teach a "step up
+  // and shoot over the wall" pose to a crew with no wall to shoot over in that sense.
+  const firingStepOn = inputs.firingStep && raw.positionType !== 'one_man' && position.sectorsOfFire;
 
   const sumpOn = inputs.sump;
   const sumpCount = sumpOn ? position.grenadeSumps : 0;
@@ -301,7 +312,7 @@ function computeCalc(raw: Inputs): Calc {
     threat,
     count,
     teamSize,
-    invalid: { position: invalidPosition, soil: invalidSoil, threat: invalidThreat, standard: invalidStandard },
+    invalid: { position: invalidPosition, soil: invalidSoil, threat: invalidThreat, standard: invalidStandard, revetment: invalidRevetment },
     clamped: { count: clampedCount, team: clampedTeam },
     isVehicle,
     isCircular,

@@ -7,6 +7,7 @@ import { generateFrame, type BuildingInput } from '../src/timber/frame';
 import { bomSummary, cutList, boardFeet } from '../src/timber/bom';
 import { wallElevation, layoutStrip } from '../src/timber/elevation';
 import { STAGES } from '../src/timber/types';
+import { rafterSeatLiftFt } from '../src/timber/birdsMouth';
 
 const golden: BuildingInput = {
   lengthFt: 20,
@@ -70,9 +71,11 @@ test('floor structure stacks: posts reach grade, joists bear on sill/girder tops
   }
 });
 
-test('roof geometry: rafter length follows the framing-square method, ridge is centered', () => {
+test('roof geometry: rafter length is framing-square length LESS half the ridge, ridge is centered', () => {
   const { members, input } = generateFrame(golden);
-  const run = input.widthFt / 2 + input.overhangFt;
+  // FM 5-426 layout sequence: line length by the framing-square method, then shorten half
+  // the ridge thickness (0.75" of run).
+  const run = input.widthFt / 2 + input.overhangFt - 0.75 / 12;
   const expected = run * (Math.sqrt(144 + input.risePer12 ** 2) / 12) * 12; // inches
   for (const r of members.filter((m) => m.role === 'rafter')) {
     assert.ok(Math.abs(r.cutLength - expected) < 0.01, `${r.id}: ${r.cutLength} vs ${expected}`);
@@ -81,9 +84,129 @@ test('roof geometry: rafter length follows the framing-square method, ridge is c
   const ridge = members.find((m) => m.role === 'ridge')!;
   assert.equal(ridge.position[2], input.widthFt / 2);
   assert.ok(ridge.position[1] > input.wallHeightFt, 'ridge above the walls');
+  // Ridge top edge stays flush with the rafter top planes (no board poking through the roof).
+  const pitch = Math.atan2(input.risePer12, 12);
+  // The roof plane's datum is NOT the plate top — a seated rafter sits one bird's-mouth above
+  // it (see `rafterSeatLiftFt`). Read it from the same rule the engine uses, so this keeps
+  // testing "the ridge top is flush with the rafter tops" rather than pinning an elevation.
+  const eaveDatum = input.wallHeightFt + rafterSeatLiftFt(5.5, 3.5, input.risePer12 / 12);
+  const ridgeY = eaveDatum + (input.widthFt / 2) * (input.risePer12 / 12);
+  const rafterHalf = 5.5 / 12 / 2;
+  const ridgeTopExpected = ridgeY + rafterHalf / Math.cos(pitch);
+  const ridgeTop = ridge.position[1] + ridge.actual.d / 12 / 2;
+  assert.ok(Math.abs(ridgeTop - ridgeTopExpected) < 1e-9, `ridge top ${ridgeTop} vs ${ridgeTopExpected}`);
   // Rafters come in pairs per grid line.
   const rafters = members.filter((m) => m.role === 'rafter');
   assert.equal(rafters.length % 2, 0);
+});
+
+test('roof sheathing courses tile the slope with no overlap or gap, for any pitch', () => {
+  // Each course's along-slope width (actual.d) must sum to exactly the slope length, per side —
+  // an overlap (the old bug: a fixed-width last course whose CENTER was clamped inward instead
+  // of shrinking) would sum to MORE than the slope length; a gap would sum to less.
+  for (const risePer12 of [2, 3, 4, 5, 6, 7, 12]) {
+    const { members, input } = generateFrame({ ...golden, risePer12, openings: [] });
+    const run = input.widthFt / 2 + (input.overhangFt ?? 1);
+    const slopeLenIn = run * (Math.sqrt(144 + risePer12 ** 2) / 12) * 12;
+    const panels = members.filter((m) => m.role === 'roofPanel');
+    // Courses on the two slope sides (±Z) share the same |z - W/2| distance from the ridge but
+    // differ in sign — group by (y, |z - ridgeZ|) so front and rear courses are counted
+    // separately, then each side's course widths must sum to slopeLenIn on their own.
+    const ridgeZ = input.widthFt / 2;
+    const perSide = new Map<0 | 1, Map<string, number>>([[0, new Map()], [1, new Map()]]);
+    for (const p of panels) {
+      const side = p.position[2] < ridgeZ ? 0 : 1;
+      const key = p.position[1].toFixed(6) + ',' + p.position[2].toFixed(6);
+      perSide.get(side)!.set(key, p.actual.d);
+    }
+    for (const side of [0, 1] as const) {
+      const total = [...perSide.get(side)!.values()].reduce((a, d) => a + d, 0);
+      assert.ok(Math.abs(total - slopeLenIn) < 0.02, `rise ${risePer12} side ${side}: course widths sum to ${total}, expected ${slopeLenIn}`);
+    }
+  }
+});
+
+test('roof sheathing lies ON the rafter planes and courses never overlap', () => {
+  const { members, input } = generateFrame(golden);
+  const slope = input.risePer12 / 12;
+  const pitch = Math.atan2(input.risePer12, 12);
+  const eaveDatum = input.wallHeightFt + rafterSeatLiftFt(5.5, 3.5, slope);
+  const ridgeY = eaveDatum + (input.widthFt / 2) * slope;
+  const yEave = eaveDatum - input.overhangFt * slope;
+  for (const p of members.filter((m) => m.role === 'roofPanel')) {
+    const side = p.position[2] < input.widthFt / 2 ? -1 : 1;
+    const zEave = side === -1 ? -input.overhangFt : input.widthFt + input.overhangFt;
+    // Undo the normal offset to recover the point on the rafter center plane, then check
+    // the offset itself: panels must sit above the rafter centers by half a rafter depth
+    // plus half their own thickness (i.e. ON the rafters, not buried in them).
+    const lift = 5.5 / 12 / 2 + 0.25 / 12;
+    const zOnPlane = p.position[2] - side * Math.sin(pitch) * lift;
+    const frac = (zOnPlane - zEave) / (input.widthFt / 2 - zEave);
+    const yLine = yEave + (ridgeY - yEave) * frac;
+    const dy = p.position[1] - yLine;
+    assert.ok(Math.abs(dy - Math.cos(pitch) * lift) < 0.01, `${p.id}: lift ${dy}`);
+  }
+  // Courses partition the slope: total course width per side ≈ slope length (no overlaps).
+  const slopeLen = (input.widthFt / 2 + input.overhangFt) * (Math.sqrt(144 + input.risePer12 ** 2) / 12);
+  for (const side of [-1, 1]) {
+    const panels = members.filter((m) => m.role === 'roofPanel' && (m.position[2] < input.widthFt / 2 ? -1 : 1) === side);
+    const perX = new Map<number, number>();
+    for (const p of panels) {
+      const key = Math.round(p.position[0] * 100);
+      perX.set(key, (perX.get(key) ?? 0) + p.actual.d / 12);
+    }
+    for (const [key, total] of perX) {
+      assert.ok(Math.abs(total - slopeLen) < 0.05, `side ${side} x=${key / 100}: courses sum ${total} vs slope ${slopeLen}`);
+    }
+  }
+});
+
+test('subfloor panels tile both axes with no overlap or gap, including staggered rows', () => {
+  // lengthFt=13.5 (not a multiple of 8) and widthFt=14 (not a multiple of 4) are exactly the
+  // dimensions the audit found overlapping under the old center-computed-from-both-edges
+  // algorithm — assert coverage sums to the true row/run length instead of re-deriving 3D
+  // overlap directly.
+  for (const [lengthFt, widthFt] of [[20, 16], [13.5, 14], [13.5, 8], [40, 24]] as const) {
+    const { members } = generateFrame({ ...golden, lengthFt, widthFt, openings: [] });
+    const panels = members.filter((m) => m.role === 'subfloor');
+    // Z-direction: one row = one distinct Z value; its width (actual.d) summed across rows
+    // must equal the building width exactly.
+    const rowWidths = new Map<number, number>();
+    for (const p of panels) rowWidths.set(p.position[2], p.actual.d);
+    const zTotal = [...rowWidths.values()].reduce((a, d) => a + d, 0);
+    assert.ok(Math.abs(zTotal - widthFt * 12) < 0.02, `${lengthFt}x${widthFt}: row widths sum to ${zTotal}, expected ${widthFt * 12}`);
+    // X-direction: within ANY single row, panel cutLengths (already trimmed to fit) must sum
+    // to exactly the building length.
+    for (const z of new Set(panels.map((p) => p.position[2]))) {
+      const rowPanels = panels.filter((p) => p.position[2] === z);
+      const xTotal = rowPanels.reduce((a, p) => a + p.cutLength, 0);
+      assert.ok(Math.abs(xTotal - lengthFt * 12) < 0.02, `${lengthFt}x${widthFt} row z=${z}: panel widths sum to ${xTotal}, expected ${lengthFt * 12}`);
+    }
+  }
+});
+
+test('collar tie stays finite at a flat (risePer12=0) roof', () => {
+  const { members } = generateFrame({ ...golden, risePer12: 0, openings: [] });
+  const ties = members.filter((m) => m.role === 'collarTie');
+  assert.ok(ties.length > 0, 'flat roof still emits collar ties');
+  for (const t of ties) assert.ok(Number.isFinite(t.cutLength) && t.cutLength > 0, `${t.id}: cutLength ${t.cutLength}`);
+});
+
+test('a very low window sill never emits a negative/zero-length cripple below it', () => {
+  for (const sillHeightFt of [0, 0.02, 0.1, 0.125, 0.5, 3]) {
+    const { members } = generateFrame({
+      ...golden,
+      openings: [{ wall: 'S', offsetFt: 4, widthFt: 3, heightFt: 3.5, sillHeightFt }],
+    });
+    for (const m of members) assert.ok(m.cutLength > 0, `sillHeightFt=${sillHeightFt}: ${m.id} cutLength ${m.cutLength}`);
+  }
+});
+
+test('a slab-on-grade building (crawlFt ≤ 0) never emits a negative/zero-length post', () => {
+  for (const crawlFt of [0, -0.5, -2]) {
+    const { members } = generateFrame({ ...golden, crawlFt, openings: [] });
+    for (const m of members) assert.ok(m.cutLength > 0, `crawlFt=${crawlFt}: ${m.id} cutLength ${m.cutLength}`);
+  }
 });
 
 test('stage BOMs partition the total exactly (design doc §9 stage integrity)', () => {

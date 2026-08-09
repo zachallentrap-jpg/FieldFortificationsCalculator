@@ -7,7 +7,30 @@ export type MemberRole =
   | 'sill' | 'girder' | 'post' | 'joist' | 'rimJoist' | 'bridging' | 'subfloor'
   | 'solePlate' | 'stud' | 'cripple' | 'jackStud' | 'kingStud' | 'header'
   | 'topPlate' | 'capPlate' | 'brace' | 'rafter' | 'ridge' | 'collarTie'
-  | 'sheathingPanel' | 'roofPanel' | 'siding';
+  | 'sheathingPanel' | 'roofPanel' | 'siding'
+  // Foundation options (FM 5-426 foundations, PH pages) and framed-opening/stair teaching roles.
+  | 'foundationWall' | 'footing' | 'slab'
+  | 'trimmerJoist' | 'headerJoist' | 'tailJoist'
+  | 'stringer' | 'tread'
+  // ── TIMBER-2 additions (plan §3.6). Additive only: `siding` above is REUSED as the
+  // plywood-siding role (TD8 — it had zero emitters), so no `sidingPanel` near-synonym
+  // is minted. Roles land in the phase that emits them; the dictionary test (I-14) checks
+  // emitted → PLAIN/WHAT, never the reverse, so declaring the vocabulary early is free.
+  | 'sidingBoard' | 'batten' | 'buildingPaper'          // T2 coverings
+  | 'purlin' | 'roofingCourse' | 'felt' | 'skid'        // T2 coverings / foundations
+  | 'ridgeCap'                                          // the bent piece over a ridge or a hip
+  | 'fascia'                                            // the board that closes an eave over the rafter tails
+  | 'bargeBoard'                                        // the same board up a RAKE, closing a gable end
+  | 'ponyStud' | 'rakeStud'                             // T2 shed roof (TD6)
+  | 'railPost' | 'railTop' | 'railMid' | 'toeBoard'     // T4 railings (EM 385-1-1)
+  | 'ladderRail' | 'ladderRung'                         // T4 access
+  | 'towerLeg' | 'towerBrace' | 'girt' | 'capBeam' | 'deckPlank' // T4 tower / T6 platform
+  | 'hipRafter' | 'jackRafter'                          // T4 pyramid cab, T8 hip
+  | 'bentPost' | 'bentRafter' | 'bentCollar'            // T6 tent frames
+  | 'screenFrame' | 'screenPanel'                       // T5 screen bands
+  | 'doorBoard' | 'doorLedge' | 'doorBrace' | 'shutter' | 'riserBox' // T5 built openings
+  | 'cribLog' | 'lagging' | 'ohcStringer' | 'ohcBlocking' | 'baffleWall' | 'soilGhost' // T7 bunker
+  | 'hardware';                                          // T8 counted items
 
 export type WallId = 'N' | 'S' | 'E' | 'W';
 
@@ -48,11 +71,25 @@ export interface Member {
 }
 
 // Dressed sizes, inches (FM 5-426 Table 2-1 values for common dimension lumber).
+// w = thickness, d = face width. TIMBER-2 §3.6 adds the sizes the new families cut from;
+// every nominal any generator emits must resolve HERE — the `{1.5, 3.5}` fallback in the
+// emitters is unreachable in generated output, and a test asserts it (I-14).
 export const DRESSED: Record<string, { w: number; d: number }> = {
+  '1x2': { w: 0.75, d: 1.5 },
+  '1x3': { w: 0.75, d: 2.5 },
+  '1x4': { w: 0.75, d: 3.5 },
+  '1x6': { w: 0.75, d: 5.5 },
+  '1x8': { w: 0.75, d: 7.25 },
+  '1x10': { w: 0.75, d: 9.25 },
+  '2x2': { w: 1.5, d: 1.5 },
   '2x4': { w: 1.5, d: 3.5 },
   '2x6': { w: 1.5, d: 5.5 },
   '2x8': { w: 1.5, d: 7.25 },
   '2x10': { w: 1.5, d: 9.25 },
   '2x12': { w: 1.5, d: 11.25 },
   '4x4': { w: 3.5, d: 3.5 },
+  '4x6': { w: 3.5, d: 5.5 },
+  '6x6': { w: 5.5, d: 5.5 },
+  '6x8': { w: 5.5, d: 7.25 },
+  '8x8': { w: 7.25, d: 7.25 },
 };
