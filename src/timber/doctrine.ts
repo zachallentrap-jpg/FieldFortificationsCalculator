@@ -452,6 +452,72 @@ export const LABOR = {
   mhPerConcreteLf: doc(0.15, 'TM 5-303 concrete form/pour factors', { unit: 'MH/LF' }),
 } as const;
 
+// ── Fastening schedules (mirrored from the FROZEN generators) ────────────────
+// The 28 distinct `nailing` strings `floor.ts` / `walls.ts` / `roof.ts` actually emit, given
+// one cited home. This is the mirror discipline described at the top of the file, not a move:
+// the generators keep their literals (editing them is C-10 stop-the-line), and
+// `test/timber2-doctrine.test.ts` asserts both directions — nothing emitted is unmirrored, and
+// nothing mirrored is dead. The set was enumerated from what the generators emit across the
+// full fixture matrix rather than read off the source, which is how the second sill-anchor
+// variant and the pier-cap case were found at all.
+//
+// `ph` tracks the "(PH)" the crew reads on the member card, and the test pins them together so
+// the register can never report a value as verified that still prints as pending. The four
+// IRC-cited schedules are the ones corrected on 2026-08-07 (see the compat-lock entry below).
+//
+// NOT life-safety tagged, deliberately. A fastening schedule's failure mode is an overload, so
+// the LS-GATE arguably reaches it — but `lifeSafetyRegister()` obligates a consumer for every
+// id it carries (`test/timber2-packet.test.ts` enforces that), and deciding how a nailing spec
+// surfaces in the command packet is a design call, not a mirroring one. Tagging them without
+// building that consumer would only break the gate. Recorded as open in DECISIONS.md.
+export const NAILING = {
+  // Foundation & floor — floor.ts
+  footing: doc('poured on undisturbed soil (PH)', 'FM 5-426 ch. 5 footings'),
+  slabOverVaporBarrier: doc('poured against walls over vapor barrier (PH)', 'FM 5-426 ch. 5 slab on grade'),
+  foundationWallAnchor: doc(
+    '1/2" anchor bolts @ 6 ft max o.c. into sill, min 2 per plate, within 12" of each end (IRC R403.1.6)',
+    'IRC R403.1.6',
+    { ph: false },
+  ),
+  sillAnchor: doc(
+    '1/2" anchor bolts @ 6 ft max o.c., min 2 per plate, within 12" of each end (IRC R403.1.6)',
+    'IRC R403.1.6',
+    { ph: false },
+  ),
+  sillAtPostCap: doc('anchor/drift per post cap (PH)', 'FM 5-426 ch. 5 pier caps'),
+  postGeneric: doc('16d common (PH)', 'FM 5-426 ch. 6 general framing'),
+  girderBuiltUp: doc('16d @ 16" staggered, both faces (PH)', 'FM 5-426 ch. 6 built-up girders'),
+  joistToBearing: doc('3-16d toenail ea bearing (PH)', 'FM 5-426 ch. 6 floor framing'),
+  trimmerJoistToMate: doc('16d @ 12" staggered to mate (PH)', 'FM 5-426 ch. 6 framed openings'),
+  headerJoist: doc('3-16d ea tail joist + 16d @ 12" to mate (PH)', 'FM 5-426 ch. 6 framed openings'),
+  rimJoist: doc('3-16d ea joist end (PH)', 'FM 5-426 ch. 6 floor framing'),
+  crossBridging: doc('2-8d ea end; bottom ends nailed after subfloor (PH)', 'FM 5-426 ch. 6 bridging'),
+  solidBlocking: doc('3-16d ea end, staggered line (PH)', 'FM 5-426 ch. 6 solid blocking'),
+  panelEdgeField: doc('8d @ 6" edges / 12" field (PH)', 'FM 5-426 ch. 6 panel sheathing'),
+  stairStringer: doc('top plumb cut to trimmer + kicker at slab (PH)', 'FM 5-426 ch. 6 stairs'),
+  stairTread: doc('3-16d per stringer (PH)', 'FM 5-426 ch. 6 stairs'),
+
+  // Walls — walls.ts
+  plateGeneric: doc('2-16d ea end (PH)', 'FM 5-426 ch. 6 wall framing'),
+  solePlateToJoists: doc('16d @ 16" to joists (PH)', 'FM 5-426 ch. 6 wall framing'),
+  capPlateLap: doc(
+    '16d @ 16" + 8-16d in the lap, joints offset 24" min (IRC Table R602.3(1))',
+    'IRC Table R602.3(1)',
+    { ph: false },
+  ),
+  studToPlate: doc('2-16d ea end or 4-8d toenail (PH)', 'FM 5-426 ch. 6 wall framing'),
+  studToEndStud: doc('16d @ 12" to end stud (PH)', 'FM 5-426 ch. 6 corners and partitions'),
+  jackToKingStud: doc('16d @ 12" to king stud (PH)', 'FM 5-426 ch. 6 framed openings'),
+  letInBracing: doc('2-8d at each stud crossing (PH)', 'FM 5-426 ch. 6 let-in bracing'),
+
+  // Roof — roof.ts
+  ceilingJoistAtPlate: doc('3-16d toenail ea plate + 16d to rafter (PH)', 'FM 5-426 ch. 7 ceiling framing'),
+  rafterAtRidge: doc('3-16d at ridge, bird’s-mouth toenail 3-8d (PH)', 'FM 5-426 ch. 7 rafters'),
+  ridgeToRafters: doc('rafters 3-16d ea (PH)', 'FM 5-426 ch. 7 ridge'),
+  collarTie: doc('3-10d face nail ea end (IRC R802.3.1)', 'IRC R802.3.1', { ph: false }),
+  roofBlocking: doc('toenail 2-8d ea end (PH)', 'FM 5-426 ch. 7 blocking'),
+} as const;
+
 // ── The register ─────────────────────────────────────────────────────────────
 
 export interface LsEntry {
@@ -465,7 +531,7 @@ export interface LsEntry {
 
 const GROUPS: Record<string, Record<string, Doc<unknown>>> = {
   LUMBER, PANEL, LAYOUT, FOUNDATION, STAIR, LADDER, RAIL, RAMP, ROOFING, SIDING, LABOR,
-  HUT, LATRINE, TOWER, TENT, OPENING, PLATFORM, SPAN, BUNKER,
+  HUT, LATRINE, TOWER, TENT, OPENING, PLATFORM, SPAN, BUNKER, NAILING,
 } as unknown as Record<string, Record<string, Doc<unknown>>>;
 
 /** Every doctrine constant, flattened — the source for the doc-integrity tests. */
