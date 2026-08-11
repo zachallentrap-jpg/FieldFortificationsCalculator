@@ -1,4 +1,4 @@
-// TIMBER-2 — the structure picker (plan §5.2, mandate #3).
+// WOODFRAME-2 — the structure picker (plan §5.2, mandate #3).
 //
 // The app OPENS here: cards with images, grouped, one of them "start from a clean sheet". The
 // images are runtime SVG drawn from each preset's own members (TD11), so a card can never
@@ -11,10 +11,10 @@
 //   - the Custom card states its SCOPE ("custom BUILDING — towers and bunkers customize from
 //     their own cards"), so nobody opens it hunting for a tower knob.
 
-import { pickerGroups, type FamilyDef } from '../../timber/catalog';
+import { pickerGroups, type FamilyDef } from '../../woodframe/catalog';
 import { isLearning } from './mode';
-import { portraitCached } from '../../timber/portrait';
-import { generateStructure } from '../../timber/families/index';
+import { portraitCached } from '../../woodframe/portrait';
+import { generateStructure } from '../../woodframe/families/index';
 import type { StoredBuild } from './store';
 
 /**

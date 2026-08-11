@@ -1,6 +1,6 @@
 {
   "format": 1,
-  "generatedFrom": "src/timber/frame.ts generateFrame",
+  "generatedFrom": "src/woodframe/frame.ts generateFrame",
   "full": [
     {
       "name": "demo",

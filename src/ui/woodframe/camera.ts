@@ -1,4 +1,4 @@
-// TIMBER-2 — camera rigs (plan §4.3).
+// WOODFRAME-2 — camera rigs (plan §4.3).
 //
 // The fit is computed against the TRUE member AABB — including everything below grade, which
 // is the part heuristics get wrong. A basement building's members run 8 feet under the floor;
@@ -9,7 +9,7 @@
 // the formula rather than applied afterward by eye. Pure — no three.js — so the framing is
 // node-testable over every catalog preset and the fuzz corpus.
 
-import type { Member } from '../../timber/types';
+import type { Member } from '../../woodframe/types';
 import type { Aabb } from './cutaway';
 
 export interface CameraRig {

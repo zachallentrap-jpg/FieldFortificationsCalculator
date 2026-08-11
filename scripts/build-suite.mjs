@@ -2,7 +2,7 @@
 //
 //   dist/index.html          the hub (root URL lands on the toolkit, never inside a tool)
 //   dist/hub.html            same page at its own name (sub-app back links target it)
-//   dist/woodframe.html      TIMBER-1
+//   dist/woodframe.html      WOODFRAME-1
 //   dist/survivability/      SAP-2 (its own assets + service worker, scoped to itself)
 //   dist/sw.js               cache-killer: unregisters v1's service worker and drops
 //                            every cache, so installed v1 copies stop serving the
@@ -42,7 +42,7 @@ const localBin = (pkgDir, name) => {
   return bin;
 };
 
-step('hub + TIMBER-1 (SAP-1 excluded by config)', () => {
+step('hub + WOODFRAME-1 (SAP-1 excluded by config)', () => {
   run(localBin(ROOT, 'vite'), ['build', '-c', 'vite.suite.config.ts'], ROOT);
 });
 
@@ -85,4 +85,4 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-console.log('\nsuite built: hub at /, TIMBER-1 at /woodframe.html, SAP-2 at /survivability/');
+console.log('\nsuite built: hub at /, WOODFRAME-1 at /woodframe.html, SAP-2 at /survivability/');

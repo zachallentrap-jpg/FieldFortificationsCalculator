@@ -1,7 +1,7 @@
-// TIMBER-2 T0 item (2) / TD12 — the compat lock's ANCHOR.
+// WOODFRAME-2 T0 item (2) / TD12 — the compat lock's ANCHOR.
 //
 // Serializes today's `generateFrame` output at the PRE-refactor commit into committed
-// JSON goldens. `test/timber2-compat.test.ts` (T1) diffs the refactored
+// JSON goldens. `test/woodframe2-compat.test.ts` (T1) diffs the refactored
 // `generateStructure(specFromBuildingInput(i))` against THESE FILES forever — never
 // against a live `generateFrame` call, which becomes self-referential the moment the
 // legacy path is delegated to the new engine (TD12, blocker fix).
@@ -14,12 +14,12 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { generateFrame, type BuildingInput } from '../src/timber/frame';
+import { generateFrame, type BuildingInput } from '../src/woodframe/frame';
 
 const OUT = fileURLToPath(new URL('../test/goldens/frame', import.meta.url));
 mkdirSync(OUT, { recursive: true });
 
-/** The suite's canonical building — matches `golden` in test/timber-frame.test.ts. */
+/** The suite's canonical building — matches `golden` in test/woodframe-frame.test.ts. */
 const golden: BuildingInput = {
   lengthFt: 20, widthFt: 16, wallHeightFt: 8,
   studSpacingIn: 16, joistSpacingIn: 16, rafterSpacingIn: 16,

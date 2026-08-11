@@ -1739,3 +1739,20 @@ move × 999. Everything else in the default fixture is byte-identical, labor inc
 - The `RENDERED_PROTECTION` register and the import-time invariants in `src/doctrine/io.ts`
   would be the right home for the platform and roof-footprint guards; that file is outside this
   phase's ownership and the guards live in tests instead.
+
+- **D45 — The toolkit formerly named TIMBER is the Woodframe construction toolkit, "woodframe"
+  as one word.** Operator decision (2026-08-11). The repo was split-brained about the name —
+  the UI directory, entry pages and Vite config said `woodframe` while the engine said
+  `src/timber/`, the hub cards said "Wood-Frame Construction" with a hyphen, and the packet
+  comments said TIMBER-2. One name now: `src/timber/` → `src/woodframe/`, `test/timber*` →
+  `test/woodframe*` (91 files, pure renames), product tokens TIMBER-1/TIMBER-2 →
+  WOODFRAME-1/WOODFRAME-2, hub and page titles "Woodframe Construction". Three things
+  deliberately did NOT change: **"timber" as a lumber class** (a 6x8 timber, the timber
+  dressing deduction, the "Timber & plywood" revetment in SAP-1) is carpentry vocabulary, not
+  the product's name, and stays; **`STORAGE_KEY = 'timber2-session'`** is an identifier in
+  users' browsers — renaming it would orphan every saved build, so it keeps its historical
+  value with a comment; and **historical documents** (TIMBER2_PLAN.md, dated DECISIONS
+  entries, the audit register) are records of what things were called when written, and are
+  not rewritten. `test/goldens/frame-compat/index.json` carries `generatedFrom:
+  src/woodframe/frame.ts` — a metadata path updated to where the generator now lives; the
+  generator's output bytes are unchanged, which the compat suite verifies.

@@ -16,8 +16,8 @@ import {
   shuffle,
   type CardSpec,
   type DeckSpec,
-} from '../../src/timber/train/core';
-import { TIMBER_REGIME_LINE } from '../../src/timber/train/compile';
+} from '../../src/woodframe/train/core';
+import { WOODFRAME_REGIME_LINE } from '../../src/woodframe/train/compile';
 
 /** A synthetic deck: the scheduler must be testable without generating a building. */
 export function fakeDeck(n: number, id = 'deck-x'): DeckSpec {
@@ -33,7 +33,7 @@ export function fakeDeck(n: number, id = 'deck-x'): DeckSpec {
         plain: `does thing ${i}`,
         whereItGoes: 'somewhere',
         facts: [],
-        regimeLine: TIMBER_REGIME_LINE,
+        regimeLine: WOODFRAME_REGIME_LINE,
       },
       modes: ['flip', 'identify'],
       fallbackArt: false,

@@ -1,6 +1,6 @@
-// TIMBER-2 T0 — snapshot `generateFrame` into committed goldens (plan TD12).
+// WOODFRAME-2 T0 — snapshot `generateFrame` into committed goldens (plan TD12).
 //
-// Run BEFORE any extraction touches src/timber. The snapshot is the permanent reference the
+// Run BEFORE any extraction touches src/woodframe. The snapshot is the permanent reference the
 // compat suite diffs against forever — never a live-vs-live comparison, which would go
 // self-referential the moment frame.ts starts delegating to the new engine.
 //
@@ -13,7 +13,7 @@ import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { generateFrame } from '../src/timber/frame';
+import { generateFrame } from '../src/woodframe/frame';
 import { FULL_FIXTURES, MATRIX_FIXTURES } from '../test/fixtures/frameFixtures';
 import { canonicalJson, frameSnapshot, GOLDEN_FORMAT } from '../test/fixtures/goldenFormat';
 
@@ -49,7 +49,7 @@ const matrix: { name: string; members: number; sha256: string }[] = MATRIX_FIXTU
 
 writeFileSync(
   join(OUT, 'index.json'),
-  JSON.stringify({ format: GOLDEN_FORMAT, generatedFrom: 'src/timber/frame.ts generateFrame', full: index, matrix }, null, 2) + '\n',
+  JSON.stringify({ format: GOLDEN_FORMAT, generatedFrom: 'src/woodframe/frame.ts generateFrame', full: index, matrix }, null, 2) + '\n',
 );
 
 const bytes = index.reduce((a, r) => a + r.members, 0);

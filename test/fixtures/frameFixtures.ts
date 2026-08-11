@@ -1,6 +1,6 @@
 // TIMBER-2 T0 — the compat corpus (plan §8.2, TD12). ONE definition of the golden inputs,
 // shared by `scripts/gen-compat-goldens.ts` (which snapshots them) and
-// `test/timber2-compat.test.ts` (which diffs against the committed snapshot forever).
+// `test/woodframe2-compat.test.ts` (which diffs against the committed snapshot forever).
 //
 // Two tiers, both frozen at the pre-refactor commit:
 //   FULL_FIXTURES   — curated, one per distinct code path; committed as complete JSON so a
@@ -12,7 +12,7 @@
 //
 // Not a *.test.ts file, so the runner never executes it (npm test globs test/*.test.ts).
 
-import type { BuildingInput } from '../../src/timber/frame';
+import type { BuildingInput } from '../../src/woodframe/frame';
 
 export interface Fixture {
   name: string;
@@ -124,7 +124,7 @@ export const FULL_FIXTURES: readonly Fixture[] = [
   },
 ];
 
-// The full timber-features matrix (test/timber-features.test.ts's option sweep), hashed.
+// The full timber-features matrix (test/woodframe-features.test.ts's option sweep), hashed.
 export const MATRIX_FIXTURES: readonly Fixture[] = (() => {
   const out: Fixture[] = [];
   for (const foundation of ['piers', 'wall', 'basement'] as const) {

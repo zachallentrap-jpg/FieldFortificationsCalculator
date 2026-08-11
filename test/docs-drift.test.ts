@@ -91,7 +91,7 @@ const declares = (text: string, symbol: string): boolean => new RegExp(`\\b${sym
  * The one document whose paths are NOT claims about the tree as it stands. A decision log's
  * genre is "we considered X and did Y instead": it names rejected alternatives (`src/sw.ts`),
  * files from branches that never merged (`src/ui/survivability.html`), and modules a later
- * decision removed on purpose (`src/timber/data.ts`). Requiring those to exist would be asking
+ * decision removed on purpose (`src/woodframe/data.ts`). Requiring those to exist would be asking
  * the log to lie about its own history. Every other check below still reads it — a symbol, a
  * doctrine path or a link in a decision entry is a claim about the code, and is held as one.
  */

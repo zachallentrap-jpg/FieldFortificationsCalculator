@@ -1,4 +1,4 @@
-// TIMBER-2 — the hash router and share codec (plan §5.1, §5.5, TD14, TD9).
+// WOODFRAME-2 — the hash router and share codec (plan §5.1, §5.5, TD14, TD9).
 //
 // Routes: `#/` picker · `#/build/<id>` workbench · `#/build/<id>?c=<payload>` a shared build.
 // Pure parsing, so the route table is node-testable and the DOM layer only has to listen.
@@ -9,8 +9,8 @@
 // user's stated design load, not ours to pass around. The on-device session keeps it so a
 // crash-resume does not interrogate the user again; only the shareable forms drop it.
 
-import type { StructureSpec } from '../../timber/spec';
-import { specToJson } from '../../timber/normalize';
+import type { StructureSpec } from '../../woodframe/spec';
+import { specToJson } from '../../woodframe/normalize';
 
 export type Route =
   | { name: 'picker' }

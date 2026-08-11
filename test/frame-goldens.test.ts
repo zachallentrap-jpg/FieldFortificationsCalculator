@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { generateFrame, type BuildingInput } from '../src/timber/frame';
+import { generateFrame, type BuildingInput } from '../src/woodframe/frame';
 
 const DIR = fileURLToPath(new URL('./goldens/frame', import.meta.url));
 

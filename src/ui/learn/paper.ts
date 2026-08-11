@@ -3,14 +3,14 @@
 // The browser half of the paper deck: ask which way the printer flips, render the sheets, and
 // print them from an off-screen frame. Everything that decides WHAT goes on the paper — the
 // mirror, the sheet layout, the padding of a short last sheet — is pure and tested in
-// `src/timber/train/print.ts`. This is the DOM.
+// `src/woodframe/train/print.ts`. This is the DOM.
 //
 // Printing from a frame rather than a pop-up for the reason the command packet learned the
 // hard way: asking anything first spends the user gesture, so `window.open` comes back null
 // and the fallback prints the page the operator was already looking at.
 
-import { DUPLEX_LABEL, paperDeckHtml, type DuplexMode } from '../../timber/train/print';
-import type { DeckSpec } from '../../timber/train/core';
+import { DUPLEX_LABEL, paperDeckHtml, type DuplexMode } from '../../woodframe/train/print';
+import type { DeckSpec } from '../../woodframe/train/core';
 import { cardArt } from './art';
 
 const esc = (s: string): string =>

@@ -1,4 +1,4 @@
-// TIMBER-2 — session state (plan §5.5).
+// WOODFRAME-2 — session state (plan §5.5).
 //
 // Storage is INJECTED, so every rule below is node-testable without a browser. Three of them
 // are the ones that actually bite in the field:
@@ -15,10 +15,10 @@
 //   customSeq never decreases — a deleted custom-3 does not free the id for reuse, so a share
 //   link or a printout naming custom-3 can never resolve to a different building later.
 
-import type { StructureSpec } from '../../timber/spec';
-import type { FamilyId } from '../../timber/catalog';
-import { familyById, shippedFamilies } from '../../timber/catalog';
-import { normalizeSpec } from '../../timber/normalize';
+import type { StructureSpec } from '../../woodframe/spec';
+import type { FamilyId } from '../../woodframe/catalog';
+import { familyById, shippedFamilies } from '../../woodframe/catalog';
+import { normalizeSpec } from '../../woodframe/normalize';
 
 export const STORAGE_KEY = 'timber2-session';
 export const SESSION_VERSION = 1;
@@ -81,7 +81,7 @@ export function loadSession(storage: StorageLike): LoadResult {
   if (obj.version !== SESSION_VERSION) {
     return {
       state: emptySession(),
-      notices: ['Saved builds were made by a different version of TIMBER and have been reset.'],
+      notices: ['Saved builds were made by a different version of Woodframe and have been reset.'],
     };
   }
 

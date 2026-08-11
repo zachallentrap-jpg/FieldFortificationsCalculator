@@ -15,8 +15,8 @@
 // number stored is a session ordinal that this module increments. That is what makes the whole
 // trainer replayable from a saved blob.
 
-import type { DeckProgress } from '../../timber/train/core';
-import { emptyProgress } from '../../timber/train/core';
+import type { DeckProgress } from '../../woodframe/train/core';
+import { emptyProgress } from '../../woodframe/train/core';
 
 export const STORAGE_KEY = 'timber2-train';
 export const TRAIN_VERSION = 1;

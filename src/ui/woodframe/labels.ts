@@ -1,4 +1,4 @@
-// TIMBER-2 — the plain-language dictionary (plan §5.3, §11.1, I-14).
+// WOODFRAME-2 — the plain-language dictionary (plan §5.3, §11.1, I-14).
 //
 // Two lines per role, and they do different jobs:
 //   PLAIN  what a carpenter CALLS it — the name that appears on the member card and the strip.
@@ -8,7 +8,7 @@
 // tool can build but cannot name is a member the tool cannot teach, and the sync test fails
 // the build rather than showing a raw enum value like `headerJoist` to a Marine.
 
-import type { MemberRole } from '../../timber/types';
+import type { MemberRole } from '../../woodframe/types';
 
 export const PLAIN: Record<MemberRole, string> = {
   // Foundation & floor

@@ -1,4 +1,4 @@
-// TIMBER-2 — the boot file. Wires the router, the picker and the workbench together and owns
+// WOODFRAME-2 — the boot file. Wires the router, the picker and the workbench together and owns
 // nothing else: every behavior lives in `src/ui/woodframe/*`, and everything that can be pure
 // is pure and node-tested (plan §4.1, R9).
 //
@@ -6,16 +6,16 @@
 // to the workbench, where the config panel edits a spec and the scene is regenerated from it —
 // the scene never edits itself, so the model on screen is always exactly what the spec says.
 
-import type { StructureModel } from '../timber/families/index';
-import type { StructureSpec, BuildingSpec, RoofSpec, FoundationSpec, OpeningSpec, OpeningKind, OpeningFill } from '../timber/spec';
-import { familyById, type FamilyId } from '../timber/catalog';
+import type { StructureModel } from '../woodframe/families/index';
+import type { StructureSpec, BuildingSpec, RoofSpec, FoundationSpec, OpeningSpec, OpeningKind, OpeningFill } from '../woodframe/spec';
+import { familyById, type FamilyId } from '../woodframe/catalog';
 import { onPropAssetsReady } from './three-viewer';
 import { renderPicker } from './woodframe/picker';
 import { createStudio, type StudioHandles } from './woodframe/studio';
 import { regenerateFrom } from './woodframe/regen';
 import { configSchemaFor, type PanelRow } from './woodframe/config';
-import { HUT } from '../timber/doctrine';
-import { layoutStrip } from '../timber/elevation';
+import { HUT } from '../woodframe/doctrine';
+import { layoutStrip } from '../woodframe/elevation';
 import {
   loadSession, saveSession, commitBuild, buildFromFamily, findBuild, nextCustomId,
   unlockToCustom, recentBuilds, type SessionState, type StoredBuild,

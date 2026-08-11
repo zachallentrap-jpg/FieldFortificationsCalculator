@@ -24,10 +24,10 @@
 // The view angle never changes, so flipping through a deck still reads as one building being
 // pointed at rather than as thirty unrelated photographs.
 
-import { familyById, type FamilyId } from '../../timber/catalog';
-import { portraitCached, type PortraitOptions } from '../../timber/portrait';
-import type { CardSpec, SceneHighlight } from '../../timber/train/core';
-import type { StructureSpec } from '../../timber/spec';
+import { familyById, type FamilyId } from '../../woodframe/catalog';
+import { portraitCached, type PortraitOptions } from '../../woodframe/portrait';
+import type { CardSpec, SceneHighlight } from '../../woodframe/train/core';
+import type { StructureSpec } from '../../woodframe/spec';
 
 export interface ArtSource {
   /** The deck's own structure, used when a highlight does not name one. */

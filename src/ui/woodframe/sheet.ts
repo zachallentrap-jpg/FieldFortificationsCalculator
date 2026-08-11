@@ -5,7 +5,7 @@
 // built, out of what, in what order, what has to be drawn from supply, and what is still
 // pending a page check — with the pending parts printed in the open rather than buried.
 //
-// This file is now a THIN ADAPTER. The packet is compiled in `src/timber/packet/model.ts` and
+// This file is now a THIN ADAPTER. The packet is compiled in `src/woodframe/packet/model.ts` and
 // rendered in `packet/html.ts`, both pure and both node-tested, because the decisions that
 // matter — what counts as a life-safety value in this build, what a crew ceiling is, whether a
 // citation is pending — are decisions that have to be checkable without a browser. What is
@@ -17,14 +17,14 @@
 //   · Every (PH) citation stays visible. The point of a command packet is that the person
 //     signing it can see which numbers have been page-checked and which have not.
 
-import type { StructureModel } from '../../timber/families/index';
-import { packetHtml } from '../../timber/packet/html';
-import { packetModel } from '../../timber/packet/model';
-import { csvFilename, packetCsv } from '../../timber/packet/csv';
-import { thumbnailFor } from '../../timber/thumbnails';
+import type { StructureModel } from '../../woodframe/families/index';
+import { packetHtml } from '../../woodframe/packet/html';
+import { packetModel } from '../../woodframe/packet/model';
+import { csvFilename, packetCsv } from '../../woodframe/packet/csv';
+import { thumbnailFor } from '../../woodframe/thumbnails';
 import { plainName } from './labels';
-import { DEFAULT_STOCK_FT } from '../../timber/purchase';
-import { DEFAULT_PRODUCTIVE_HOURS } from '../../timber/packet/labor';
+import { DEFAULT_STOCK_FT } from '../../woodframe/purchase';
+import { DEFAULT_PRODUCTIVE_HOURS } from '../../woodframe/packet/labor';
 
 export interface SheetInput {
   model: StructureModel;

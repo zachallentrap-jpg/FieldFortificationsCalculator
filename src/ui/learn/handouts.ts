@@ -8,14 +8,14 @@
 // hard way: any dialog first spends the user gesture, so `window.open` comes back null and the
 // fallback prints whatever page the operator was already looking at.
 
-import { drawPortrait, portraitCached } from '../../timber/portrait';
-import { familyById, type FamilyId } from '../../timber/catalog';
-import { generateStructure } from '../../timber/families/index';
+import { drawPortrait, portraitCached } from '../../woodframe/portrait';
+import { familyById, type FamilyId } from '../../woodframe/catalog';
+import { generateStructure } from '../../woodframe/families/index';
 import {
   GUTTER, SHEET_H, SHEET_W, pickWorksheetItems, posterHtml, worksheetHtml,
   type PosterStage, type WorksheetItem,
-} from '../../timber/train/worksheet';
-import type { DeckSpec } from '../../timber/train/core';
+} from '../../woodframe/train/worksheet';
+import type { DeckSpec } from '../../woodframe/train/core';
 
 /**
  * What comes OFF a worksheet drawing: everything that closes a building in.

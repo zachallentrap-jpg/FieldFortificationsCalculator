@@ -1,4 +1,4 @@
-// TIMBER-2 T0 — "no new dist assets" made verifiable (plan §7 T0, I-10).
+// WOODFRAME-2 T0 — "no new dist assets" made verifiable (plan §7 T0, I-10).
 //
 // The deploy sandbox is the regime the OOM class lives in, and the plan's answer is that
 // picker art is SELF-GENERATED at runtime (TD11) — nothing new ever enters the bundler's
@@ -23,11 +23,11 @@ const CODE_PATTERNS: RegExp[] = [
   /^[\w.-]+\.(js|css|html|map)$/, // unhashed entries: woodframe.js, index.html, sw.js
 ];
 
-// Non-code files that ship on purpose. Everything here was in dist before TIMBER-2 started.
+// Non-code files that ship on purpose. Everything here was in dist before WOODFRAME-2 started.
 const ASSET_ALLOWLIST = new Set([
   'manifest.webmanifest',
   'SAP-1_drawing_reference.svg',
-  'icon.svg', // public/icons/icon.svg — the toolkit's app icon (pre-TIMBER-2 baseline)
+  'icon.svg', // public/icons/icon.svg — the toolkit's app icon (pre-WOODFRAME-2 baseline)
   'favicon.svg',
   'icon-192.png',
   'icon-512.png',
@@ -77,7 +77,7 @@ walk(DIST, '');
 if (offenders.length > 0) {
   console.error('check-assets: FAIL — unlisted asset(s) in dist/:');
   for (const f of offenders) console.error(`  ${f}`);
-  console.error('\nPicker art is runtime-generated SVG (TIMBER2_PLAN TD11) — no image files should appear.');
+  console.error('\nPicker art is runtime-generated SVG (WOODFRAME2_PLAN TD11) — no image files should appear.');
   console.error('If an asset is genuinely intended, add its basename to ASSET_ALLOWLIST in scripts/check-assets.ts');
   console.error('in the SAME change, so review sees the addition.');
   process.exit(1);

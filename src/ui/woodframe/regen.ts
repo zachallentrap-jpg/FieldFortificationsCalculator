@@ -1,4 +1,4 @@
-// TIMBER-2 — one workbench regenerate step (plan §4.1, mandate #2).
+// WOODFRAME-2 — one workbench regenerate step (plan §4.1, mandate #2).
 //
 // THE ORDER IS THE WHOLE POINT, WHICH IS WHY IT IS A FUNCTION AND NOT THREE LINES IN THE BOOT
 // FILE. `normalizeSpec` reports what it had to REPAIR — an opening slid back inside a wall the
@@ -16,8 +16,8 @@
 // One normalize pass, one report, and the panel reads one list: the repairs, then what the member
 // checks found on the frame that came out of them.
 
-import { generateStructure, type StructureModel } from '../../timber/families/index';
-import type { StructureSpec } from '../../timber/spec';
+import { generateStructure, type StructureModel } from '../../woodframe/families/index';
+import type { StructureSpec } from '../../woodframe/spec';
 
 export interface RegenResult {
   /** The spec that was actually built — repaired, and safe to write back to the stored build. */

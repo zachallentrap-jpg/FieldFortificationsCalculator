@@ -1,4 +1,4 @@
-// TIMBER-2 — the cutaway (plan §4.2, mandate #5: EVERY structure has one).
+// WOODFRAME-2 — the cutaway (plan §4.2, mandate #5: EVERY structure has one).
 //
 // A renderer CLIP PLANE, not member filtering. The difference matters: filtering can only
 // remove whole members, so a 20-ft sill either vanishes or blocks the view. A clip plane cuts
@@ -12,7 +12,7 @@
 //
 // Pure: no three.js import, so all of it is node-testable.
 
-import type { CutawaySpec } from '../../timber/catalog';
+import type { CutawaySpec } from '../../woodframe/catalog';
 
 export interface Aabb {
   min: [number, number, number];

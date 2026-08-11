@@ -1,4 +1,4 @@
-// TIMBER-2 — the workbench (plan §4.1, §5.3).
+// WOODFRAME-2 — the workbench (plan §4.1, §5.3).
 //
 // One scene, driven entirely by a `StructureModel`. Every mesh carries the id of the Member it
 // projects, so selection, the cut list, the layout strips and the 3D view are the same data
@@ -16,12 +16,12 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { lumberPiece, cutLumberPiece, plywoodSheet, roofingSheet, screenSheet, disposeObject, toonGradient } from '../three-viewer';
 import type { LumberSize } from '../three-viewer';
-import type { Member } from '../../timber/types';
-import type { StructureModel } from '../../timber/families/index';
-import { bomSummary } from '../../timber/bom';
-import { fastenerTakeoff, sheetTakeoff } from '../../timber/fasteners';
+import type { Member } from '../../woodframe/types';
+import type { StructureModel } from '../../woodframe/families/index';
+import { bomSummary } from '../../woodframe/bom';
+import { fastenerTakeoff, sheetTakeoff } from '../../woodframe/fasteners';
 import { FEATURES } from './mode';
-import { COVER_DEPTH_NOTE } from '../../timber/doctrine';
+import { COVER_DEPTH_NOTE } from '../../woodframe/doctrine';
 import { plainName, whatItDoes } from './labels';
 import {
   planeForState, initialCutawayState, toggleAxis, setDepth, passesCut, CUT_AXES, axisById,
@@ -29,10 +29,10 @@ import {
 } from './cutaway';
 import { cameraRigsFor, memberAabb, type CameraRig } from './camera';
 import { roofingTiling } from './tiling';
-import { seatCutsFor, seatProfile, type SeatCut } from '../../timber/birdsMouth';
-import { stringerEndProfile, stairStringerProfile, ridgeHeadProfile, levelFootProfile } from '../../timber/stringerCuts';
-import { riserLidOf, seatOpeningsFor, seatOpeningPath } from '../../timber/riserSeats';
-import { fmtFtIn } from '../../timber/units';
+import { seatCutsFor, seatProfile, type SeatCut } from '../../woodframe/birdsMouth';
+import { stringerEndProfile, stairStringerProfile, ridgeHeadProfile, levelFootProfile } from '../../woodframe/stringerCuts';
+import { riserLidOf, seatOpeningsFor, seatOpeningPath } from '../../woodframe/riserSeats';
+import { fmtFtIn } from '../../woodframe/units';
 
 export interface StudioHandles {
   setModel(model: StructureModel): void;

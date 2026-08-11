@@ -14,7 +14,7 @@
 // NO CLOCK. The scheduler counts sessions (FD9); nothing on this page calls Date.now, which is
 // what lets a whole session be replayed from a saved blob in a test.
 
-import { allDecks, type DeckEntry, type DeckStyle } from '../../timber/train/decks';
+import { allDecks, type DeckEntry, type DeckStyle } from '../../woodframe/train/decks';
 import {
   buildSession,
   deckMastery,
@@ -26,11 +26,11 @@ import {
   type CitedFact,
   type DeckSpec,
   type QuizMode,
-} from '../../timber/train/core';
-import { buildQuestion, isSelfGraded, promptFor, type Question } from '../../timber/train/drill';
+} from '../../woodframe/train/core';
+import { buildQuestion, isSelfGraded, promptFor, type Question } from '../../woodframe/train/drill';
 import { PLAIN, WHAT, plainName, whatItDoes } from '../woodframe/labels';
-import { familyById, shippedFamilies, type FamilyId } from '../../timber/catalog';
-import { generateStructure } from '../../timber/families/index';
+import { familyById, shippedFamilies, type FamilyId } from '../../woodframe/catalog';
+import { generateStructure } from '../../woodframe/families/index';
 import { cardArt, deckArt, stageArt } from './art';
 import { printPaperDeck } from './paper';
 import { printStagePoster, printWorksheet } from './handouts';

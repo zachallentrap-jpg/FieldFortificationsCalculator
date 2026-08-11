@@ -5,7 +5,7 @@
 // counters bake the input order in, TD5), numbers at full IEEE round-trip precision so an exact
 // deep-equal is meaningful and the 1e-12 epsilon fallback only ever forgives real FP wobble.
 
-import type { Member } from '../../src/timber/types';
+import type { Member } from '../../src/woodframe/types';
 
 export const GOLDEN_FORMAT = 1;
 

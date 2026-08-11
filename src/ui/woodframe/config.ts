@@ -1,4 +1,4 @@
-// TIMBER-2 — the config panel schema (plan §3.7, §5.3).
+// WOODFRAME-2 — the config panel schema (plan §3.7, §5.3).
 //
 // THE PANEL IS THE PLANNER'S DECISION ORDER, top to bottom. You decide what you are building,
 // then how big, then what ground it stands on, then what it stands on, and only then the frame,
@@ -18,10 +18,10 @@
 // to a custom build". A lock the user cannot get past is a tool telling them no; a lock that
 // explains itself and offers a door is a tool teaching them why.
 
-import type { FamilyDef, FamilyId } from '../../timber/catalog';
-import { familyById, shippedFamilies } from '../../timber/catalog';
-import { COVER_DEPTH_NOTE } from '../../timber/doctrine';
-import { SPEC_PATH_DEFS, specPath } from '../../timber/spec';
+import type { FamilyDef, FamilyId } from '../../woodframe/catalog';
+import { familyById, shippedFamilies } from '../../woodframe/catalog';
+import { COVER_DEPTH_NOTE } from '../../woodframe/doctrine';
+import { SPEC_PATH_DEFS, specPath } from '../../woodframe/spec';
 
 export type ControlKind = 'number' | 'select' | 'toggle' | 'openings-editor' | 'family';
 

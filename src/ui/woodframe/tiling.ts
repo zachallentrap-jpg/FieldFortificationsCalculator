@@ -19,7 +19,7 @@
 // fractional repeat is not a compromise: it is a cut sheet, ending mid-rib exactly where the
 // snips went through.
 
-import type { Member } from '../../timber/types';
+import type { Member } from '../../woodframe/types';
 
 /** The real width one tile of each roofing texture is drawn at, in inches. */
 export const ROOFING_TILE_IN = { corrugated: 26, roll: 36 } as const;
