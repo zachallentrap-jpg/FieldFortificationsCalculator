@@ -46,7 +46,8 @@ test('a joist genuinely past its table warns, and says nothing was resized', () 
   };
   const warnings = spanWarnings([joist], { joistSpacingIn: 16, rafterSpacingIn: 16 });
   assert.equal(warnings.length, 1);
-  assert.equal(warnings[0]!.allowedFt, 9.5);
+  // 10 ft: FM 5-426 Table 6-2, Group I without plastered ceiling, 2x6 @ 16 in o.c.
+  assert.equal(warnings[0]!.allowedFt, 10);
   assert.ok(warnings[0]!.message.includes('has NOT changed it'), 'the message must say nothing was resized');
 });
 

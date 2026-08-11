@@ -1819,3 +1819,171 @@ move × 999. Everything else in the default fixture is byte-identical, labor inc
   it is live, and the residual is marked at the definition. `subsystems/floorSystem.ts`'s
   `SMALL_PLAN_WIDTH_FT` re-export and `families/tower.ts`'s `TOWER_HEIGHTS` are the sibling
   pass's files and were not touched here.
+
+- **D47 — The register is held to the retrieved publications: every woodframe rule judged
+  against source text, five wrong values adjudicated, 51 page-check flags cleared, and not
+  one golden moved.** (2026-08-11.) A source-verification pass read FM 5-426 (1995 —
+  content-identical to the 2013 TM 3-34.47/MCRP 3-40D.3 reprint; the Jul 2022 edition under
+  that designation governs today and was NOT diffed, so this entry is the standing record
+  that every dual-designation cite below was verified against the 1995 text), the full
+  15 March 2024 EM 385-1-1, and UFC 1-200-01 (2022 C4),
+  and judged all 271 audited register rows against what those texts actually say. This entry
+  applies the verdicts to `src/woodframe/doctrine.ts` — values AND citations — and records
+  what moved, measured before and after from real builds.
+
+  **The five value-wrong rows, adjudicated (three applied, two mirror-locked).**
+
+  - `SPAN.joist` — the shipped cells matched NO column of FM 5-426 Table 6-2: they straddled
+    the Group I plastered and unplastered columns. Adopted the table's **Group I,
+    without-plastered-ceiling** column verbatim (the TO case; species groups per Table 6-3),
+    including the table's own 12-in-spacing column — the leaf shape (nominal row → spacing
+    cell) carries it without restructuring, the spacing knobs offer only 16/24, and the span
+    checker reads the nearest column at or above a spacing, so the extra column changes no
+    current check. Cells at 16/24 in: 2x6 9.5→**10**/8.25→**8**, 2x8 12.5→**13.5**/10.75→**11**,
+    2x10 15.75→**16.5**/13.5→**14**, 2x12 19→**20**/16.5→**16.5**. The cite now names the
+    group — Table 6-2 is meaningless without it. Predicted movement: span-check verdicts
+    only, since the engine sizes joists before the check reads them. Measured over the whole
+    8,823-build card-and-panel corpus: the span-warning census is IDENTICAL before and after
+    (5,987 `span|joist` warnings both sides — every one driven by the unchanged ceiling
+    table or far past both readings), and the one cell that TIGHTENED (2x6 @ 24 in,
+    8.25→8.0) fires on nothing the corpus can build (the girderless floor rule caps clear
+    spans below 8 ft). One test expectation legitimately moved with the value:
+    `test/woodframe2-spans.test.ts` reads 10 ft where the row now says 10 ft (was 9.5).
+
+  - `RAIL.requiredAboveFt` **2.5 → 4 ft** — the 2.5 appears in NO retrieved source, and the
+    old cite hung it on EM 385-1-1. The 2024 EM offers exactly two thresholds: 6 ft
+    construction-wide (21-8.a(1)) and **4 ft on USACE-owned/operated permanent facilities at
+    open-sided floors and platforms (21-8.a(2))**. Adopted 4 ft — the tool's decks, towers
+    and platforms are occupied structures in service, and 4 ft is the conservative of the
+    two the EM states. (The defensible alternative — keep 2.5 ft and cite IBC 1015.2/IRC
+    R312.1.1's 30-in guard trigger via UFC 1-200-01 §2-23 — is recorded here so the choice
+    can be revisited with the packet's reviewer; what was NOT defensible was 2.5 wearing the
+    EM's name.) Predicted movement: rails vanish on walking surfaces between 2.5 and 4 ft —
+    reachable from the platform card's panel, on no shipped preset. Measured with the live
+    register (old value re-imported, same builds): platform decks at 2.5/3.0/3.375/3.75 ft
+    each carried 37 rail members (25 deck rail + 12 stair rail) and now carry **0**
+    (members 140→103, 147→110, 153→116, 158→121); the 4-ft preset is byte-identical
+    (37 rails, 161 members); the gp-frame entry steps (2.42-ft rise) were already under the
+    old threshold and emit nothing new. No preset, golden or fixture moved.
+
+  - `ROOFING.rollSideLapIn` **2 → 4 in** — FM ch. 7, smooth-surfaced roll roofing for TO
+    work: "at least **4-inch side laps** and 6-inch end laps." The shipped 2 was FM's
+    TWO-PLY head lap and felt top lap, mis-filed. Predicted movement per the dossier: course
+    coverage and roll purchase. Measured: **none** — no code reads this leaf. The coverings
+    generator laps courses up the slope by `ROOFING.rollEndLapIn` (6 in — conservative
+    against the corrected 4-in side lap, which is the figure FM applies course-to-course in
+    horizontal application), and the purchase page reports roll goods as area covered with
+    laps deliberately excluded (its own printed note says so). The corrected value sits in
+    the register for the consumer-wiring pass; the coverings lap-axis naming is flagged
+    there, not silently rewired here.
+
+  - `NAILING.headerJoist` and `NAILING.solePlateToJoists` — **deliberately NOT applied.**
+    FM's schedules are real and different (floor openings: headers to trimmers and tails
+    with "three 20d nails", header plies "16d nails spaced 6 inches apart"; sole plate: "two
+    16d or 20d nails at each joist it crosses"). But the ONLY emitters of these two strings
+    are the C-10 frozen modules — `floor.ts` (stair-opening headers), `roof.ts` (attic
+    scuttle), `walls.ts` (sole plate) — and nothing reads the register for them. The
+    two-way mirror test makes a register-side value change either a homeless emitted string
+    or a dead mirror, and both directions are the defect the table exists to stop. The
+    values therefore stay as frozen-branch mirrors, and their CITES now tell the truth the
+    audit found: the sole-plate string is IRC Table R602.3(1)'s rule, the header string is
+    frozen-branch practice, and each cite states what FM prescribes instead, so the delta is
+    on the record where the next C-10 ceremony can pick it up.
+
+  **The 34 cite-wrong rows, corrected.** Every one now cites what the source pass could
+  actually verify: real EM 385-1-1 (2024) paragraph numbers (guardrails 21-8.d, thresholds
+  21-8.a, access 24-8 — no 2014-edition numbering survives), FM locations under the dual
+  designation `TM 3-34.47/MCRP 3-40D.3 (FM 5-426 …)`, or an honest re-tier to IRC/ANSI/
+  standard practice. The load-bearing corrections: the EM (2024) has NO stair riser cap, NO
+  tread minimum, NO stair headroom, NO ladder rung-spacing dimension and NO ladder-cage rule
+  — `STAIR.maxRiserIn`/`minTreadIn` are now declared tool ceilings (values kept),
+  `STAIR.headroomIn`'s 80 in turned out to be a page-verified FM value hiding under the
+  wrong pub (Fig 6-51 draws 6 ft 8 in), `LADDER.rungSpacingIn` re-homes to ANSI/ASC A14.4
+  via the EM's 24-8.c(7) referral, and the two "cage threshold" rows now cite what the
+  20-ft figure really is: EM 24-8.h(1)'s stairway requirement, which is exactly the
+  behavior `normalizeSpec` already forces. Every corrugated-roofing dimension shed its FM
+  attribution (FM's Metal Roofs section says to replace metal roofing; its corrugated data
+  is siding-only) — including `FASTENER.corrugationPitchIn`, now labeled the derivation it
+  is. `SPAN.rafter` stopped citing "FM Table 6-3" (that table is the species-group
+  classification); rafter/ceiling-joist/header tables are labeled the conservative practice
+  defaults they are, because FM has no such tables. Nine FOUNDATION rows and the two
+  PLATFORM pads re-tiered to standard practice with their IRC anchors named.
+
+  **Confirmed rows upgraded, and the page-check ledger.** Tier-(a) confirmations — value
+  read from the retrieved text this session, quote in the cite — carry the dual designation
+  and clear `ph`: **51 flags cleared** (register: 6 page-checked → 57 of 308; life-safety
+  pending 55 → 36). The packet's honesty strip and LS table move with it arithmetically —
+  their tests assert self-consistency and stay green. Rows the source only brackets keep
+  their pending flag on purpose: `ROOFING.rollMinSlopePer12` (the 2-in/ft figure is
+  page-verified as FM's built-up breakpoint; reading it as the roll minimum is an inference,
+  and the course card printing "(PH)" is pinned by the coverings suite — the register and
+  the card agree), `RAIL.postNominal` (EM minimum is 2x4; the 4x4 is TM 5-302 lineage) and
+  `RAIL.memberNominal` (the EM's listed midrail stock is 1x6, not the register's 2x4 — a
+  `note` now flags the 150-lb-load reading for review rather than passing it silently), and
+  every NAILING row whose emitted string prints "(PH)": the crew-visible marker and the
+  flag are test-pinned equals, and the strings are frozen-branch bytes.
+
+  **The five reported-missing entries: three added, two refused by the mirror.** Added,
+  unwired (consumer wiring is the follow-on pass): `TOWER.cabPostNominal` 4x4 and
+  `FOUNDATION.skidRunners` 3 (TM 5-302 lineage, PH) and `OPENING.shutterPropNominal` 2x2
+  (standard practice) — each mirrors a literal its generator still carries. NOT added:
+  `NAILING.deckBoardAtRafters` and `NAILING.shutterPropStick`. Both strings exist in
+  sibling generators, but neither is reachable from any catalog card plus one or two panel
+  moves — no card offers a board roof deck, and no card or panel row sets propped shutters
+  — so a NAILING entry for either would mirror nothing the walked corpus emits and the
+  mirror test rightly refuses a dead mirror. They land WITH the wiring/reachability change,
+  as one reviewed unit.
+
+  **Pieces-per-pound is now FM's own table.** FM 5-426 carries one — Figure 2-5, p 2-6,
+  recovered from the embedded page image — and the shipped values were the common
+  commercial figures instead; only 8d agreed. Adopted: 6d 180→**200**, 10d 69→**74**,
+  12d 63→**57**, 16d 49→**46**, 20d 31→**29**, 8d 106 (already FM's), roofing-nail 250
+  kept as standard practice (not in the figure) and the cite says which is which. Measured
+  across all fourteen shipped cards: every fastener COUNT identical, pounds move a few
+  percent on the moved sizes — worst single line squad-hut 16d 44.4→47.3 lb (FM's 46/lb is
+  heavier iron than the commercial 49/lb — conservative for supply); typical: gp-frame 16d
+  44→46.9 lb, 10d 1→0.9 lb, 6d 2→1.8 lb. No test pinned a pound figure; none weakened.
+
+  **Labor rates: values pinned, attribution honest.** `LABOR.mhPerBoardFoot` 0.055 stays —
+  the compat test pins the rates — but is now labeled what the audit proved it is: a
+  conservative composite ABOVE every element rate in FM Table C-1 (joists/sills 25, beams
+  30, wall frames/plates 45, rafters 45 MH per 1,000 board feet), with TM 5-303 still
+  unretrieved. `LABOR.mhPerPanel` 0.5 was carrying the wrong table number: the 16 MH/1,000
+  sq ft that backs it (≈0.51 MH per 4x8 sheet) is Table **C-2**, and the cite now says so,
+  page-checked.
+
+  **Collar ties: the FM rule adopted as the value it evaluates to, and the frozen mirror
+  never moved.** FM ch. 7: ties "5 feet apart or every third rafter, whichever is less."
+  At 16-in spacing that IS 4 ft; at 24-in it allows 5 ft — but ties land on rafters, so the
+  widest interval a 24-in grid realizes under 5 ft is two bays, 4 ft again. The flat 4 the
+  register ships is therefore the FM rule's realized value at BOTH legal spacings, and
+  `roof.ts`'s frozen `TIE_MAX_FT = 4` stays byte-identical with zero tie-count movement —
+  predicted from the arithmetic, confirmed by the lockstep suite and the untouched goldens.
+  The leaf's cite now carries both homes (IRC R802.3.1, with its 2021 renumbering to
+  R802.4.6 noted, and the FM sentence), and its `ph` stays true because the frozen tie card
+  prints "(PH page)" and the mirror test holds the two equal — the register may not claim
+  the sourcing settled while the card the crew reads says pending; both clear together in a
+  C-10 ceremony or not at all. `NAILING.collarTie` keeps its IRC-corrected string and
+  IRC-first cite (both test-pinned from the 2026-08-07 correction); the cite now records
+  FM's alternative for the register's 2-in tie — three 16d each end — for that same
+  ceremony.
+
+  **Goldens: none regenerated, and that was the prediction.** The frozen generators were
+  not touched, so `test/goldens/frame`, `test/goldens/frame-compat`, the thumb SVGs and the
+  train vectors are byte-identical (git-clean, suites green). The fourteen shipped cards
+  were digested member-by-member before and after: geometry hashes (id/role/nominal/length/
+  position/rotation) are EQUAL on all fourteen; only member-card citation text moved
+  (doctrineRef strings now print the corrected cites, and page-checked rows drop the "(PH)"
+  suffix), which no golden captures.
+
+  **io.ts bounds re-examined.** The magnitude comment claimed the register's largest
+  shipped value was 100 (BUNKER.soilPcf); `FASTENER.perPound`'s roofing nail has shipped
+  250 since D46, and the comment now says so. The 1000 bound itself stays right: 4× headroom
+  over the largest shipped value, still refusing the transposed-digit class, and the one
+  class that could legitimately grow toward it — pieces-per-pound — tops at 900/lb (2d) in
+  FM's own Figure 2-5, inside the bound. The citation-bound comment now names the new
+  longest shipped cite (214 characters, `ROOFING.rollMinSlopePer12`).
+
+  **Verification.** Full suite after the pass: **1084 tests, 1084 pass, 0 fail**; typecheck
+  clean. One test expectation changed in the whole pass (the 9.5→10 span figure above), and
+  it moved because the VALUE moved — nothing was weakened to make a value land.

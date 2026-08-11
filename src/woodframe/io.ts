@@ -26,9 +26,11 @@ import { getByPath, doctrinePaths, shippedLeaf } from './doctrine';
 
 export const WOODFRAME_DOCTRINE_VERSION = 1;
 
-// Numeric sanity bound. The largest magnitude the register ships is 100 (BUNKER.soilPcf, lb/cf),
-// so 1000 is an order of magnitude of headroom while still refusing the transposed-digits class
-// of transcription error — a 75-ft riser is not a correction, it is a slip.
+// Numeric sanity bound. The largest magnitude the register ships is 250 (FASTENER.perPound's
+// roofing nail, pieces/lb), so 1000 is 4× headroom while still refusing the transposed-digits
+// class of transcription error — a 75-ft riser is not a correction, it is a slip. Pieces-per-
+// pound is also the one class that could legitimately grow toward the bound: FM 5-426 Fig 2-5's
+// own column tops at 900/lb (2d), and 1000 still admits every row of it.
 const MAX_MAGNITUDE = 1000;
 
 // String-value bound. Nailing schedules and nominals are one-line strings a member card prints;
@@ -36,7 +38,8 @@ const MAX_MAGNITUDE = 1000;
 // corrected schedule to say more without admitting a pasted paragraph where a card expects a line.
 const MAX_STRING = 200;
 
-// Citation bound — the longest shipped cite is 123 characters (the NOTCH practice citation).
+// Citation bound — the longest shipped cite is 214 characters (ROOFING.rollMinSlopePer12,
+// which names its source, its inference and the practice rule beside it).
 const MAX_CITE = 300;
 
 // How deep a structured leaf value may nest. The deepest shipped shape is a span table
