@@ -4,6 +4,7 @@
 // sortKey then id).
 
 import { compute } from './compute';
+import { normalizeTeamSize, roundHours } from './stages';
 import type { MissionItem, MissionBomLine } from './types';
 
 export interface MissionResult {
@@ -55,13 +56,19 @@ export function aggregateMission(items: MissionItem[], opts: MissionOptions = {}
 
   lines.sort((a, b) => (a.sortKey - b.sortKey) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
-  const teamSize = Math.max(1, Math.round(opts.teamSize ?? maxTeam));
-  const elapsedHours = Math.round((totalManHours / teamSize) * 10) / 10;
+  // Same normalization compute() applies to a team size, shared from stages.ts so the mission
+  // clock and the per-position clock can never disagree about the same number: the local
+  // max(1, round(x)) had no upper bound, so a team of 500 divided the mission man-hours by 500
+  // while every position inside the rollup had already been computed for a team of 50, and a
+  // non-finite team size produced teamSize: NaN and elapsedHours: NaN in the rollup itself.
+  // The unreadable case falls back to a team of one — the longest elapsed, never the shortest.
+  const teamSize = normalizeTeamSize(opts.teamSize ?? maxTeam);
+  const elapsedHours = roundHours(totalManHours / teamSize);
 
   return {
     lines,
     totalPositions,
-    totalManHours: Math.round(totalManHours * 10) / 10,
+    totalManHours: roundHours(totalManHours),
     elapsedHours,
     teamSize,
     placeholderLines: lines.filter((l) => l.fromPlaceholder).length,

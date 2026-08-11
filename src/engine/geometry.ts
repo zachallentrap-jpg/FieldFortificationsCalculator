@@ -5,6 +5,8 @@
 
 import { parapet, berm, overhead } from '../doctrine/protection';
 import { soils } from '../doctrine/soils';
+import { camo, sump as sumpMat } from '../doctrine/materials';
+import { firingStep, mortarPit, access } from '../doctrine/positions';
 import type { ShapeId } from '../doctrine/positions';
 import type { RoofPath } from './types';
 import type { Calc } from './compute';
@@ -21,6 +23,51 @@ export interface SumpMark {
   yFt: number;
 }
 
+/**
+ * The roof footprint, published once for the bill and both views.
+ *
+ * SIGN CONVENTION — READ THIS BEFORE USING ANY FIELD HERE. `frontFt`, `rearFt` and `endFt` are
+ * OUTWARD extensions past the corresponding hole wall, in feet, measured at grade. They are
+ * >= 0 by construction: a consumer that SUBTRACTS one is drawing the roof on the wrong side of
+ * the wall it exists to clear. The overhead-cover setback is measured FROM THE HOLE EDGE
+ * OUTWARD to where the supports begin (modeling spec §2.b), and the stringers then run PAST
+ * those supports and bear on undisturbed ground — a roof inset over its own hole cannot bear
+ * on anything.
+ *
+ * `frontEdgeFt` / `rearEdgeFt` / `endEdgeFt` publish the same footprint as ABSOLUTE
+ * coordinates in the section's own frame (hole centre = 0, front negative, rear positive), so
+ * a view never has to do the arithmetic — and so an accidental sign flip is not expressible.
+ */
+export interface RoofModel {
+  frontFt: number;
+  rearFt: number; // identical to frontFt: the rule is orientation-blind, a rear support is a support
+  endFt: number; // the flank lap — no stringer end lands here, so neither setback nor bearing applies
+  entranceNotchFt: number; // deck omitted across this much of the REAR, so the entrance is not roofed shut
+  setbackFt: number; // stage 1: how far the supports stand back from the lip (what the dimension line labels)
+  bearingFt: number; // stage 2: how far the stringers overhang each support
+  frontEdgeFt: number; // = −(holeW/2 + frontFt)
+  rearEdgeFt: number; // = +(holeW/2 + rearFt)
+  endEdgeFt: number; // = +(holeL/2 + endFt)
+  areaFt2: number; // deck plan area, entrance notch removed — the area the BOM prices
+  coverT: number;
+  stringer: {
+    count: number;
+    spacingFt: number;
+    axis: 'frontBack'; // the axis a stringer RUNS along; they are laid out across the frontage
+    lengthFt: number; // the full deck run they cover, front edge to rear edge
+    sectionFt: number; // dressed square section of the size the engine resolved
+    sizeLabel: string;
+  };
+}
+
+export interface SubBay {
+  xFt: number; // centre, frontage axis
+  zFt: number; // centre, front-to-back axis (positive = rear)
+  L: number;
+  W: number;
+  depthFt: number;
+}
+
 export interface GeometryModel {
   shape: ShapeId;
   hasAnything: boolean; // false ⇒ nothing to draw; renderer shows a prompt, not a blank box
@@ -32,17 +79,27 @@ export interface GeometryModel {
     parapetW: number;
     sectors: { present: boolean; leftDeg: number; rightDeg: number };
     sumps: SumpMark[];
+    // The grenade sump AS BILLED — one box, the same one compute prices (materials.sump). Both
+    // views drew their own sump size before this, neither of them the one the BOM paid for.
+    sumpBox: { L: number; W: number; D: number };
     elbows: SumpMark[];
     platform: { L: number; W: number } | null;
+    // The rear stem / side arm of a compound position, from the position's own subBay leaves —
+    // the plan and the 3D model each used to derive it from the hole with their own factors.
+    subBays: SubBay[];
+    // Camouflage net plan extent. √drapeFactor per axis, so the drawn plane's area IS the area
+    // the BOM orders; heightFt is how high above grade it flies.
+    camoNet: { L: number; W: number; heightFt: number } | null;
     enemy: 'front';
   };
   section: {
     depthOfCut: number;
     holeW: number;
+    holeL: number;
     parapetW: number;
     parapetH: number;
-    setback: number;
-    rearOverhang: number;
+    /** The whole roof footprint and its sign convention — null when nothing is roofed. */
+    roof: RoofModel | null;
     // How far the excavation wall flares outward at grade vs. the floor (feet), for an
     // unrevetted earth wall in loose soil — 0 when revetted (revetment holds the wall vertical
     // regardless of soil) or the soil needs no batter. Same formula the 3D model already used
@@ -53,8 +110,18 @@ export interface GeometryModel {
     coverT: number;
     stringers: number;
     hasPlatform: boolean;
-    platformDepth: number;
+    /**
+     * The firing platform: UNDISTURBED EARTH LEFT STANDING inside the bay. `riseFt` > 0 means
+     * its surface stands that far ABOVE the bay floor — it is the dirt the crew does NOT dig,
+     * which is why the excavation subtracts it. L/W are already clamped to the hole, once, in
+     * compute, so the bill and all three views share one footprint.
+     */
+    platform: { L: number; W: number; riseFt: number } | null;
     firingStepOn: boolean;
+    /** The rifle-position firing-step ledge (not the crew-served platform above). */
+    firingStep: { heightFt: number; runFt: number };
+    /** Getting in and out: the rear entrance passage and the graded way down. */
+    access: { entranceGapFt: number; stairMaxRiserFt: number; stairTreadFt: number };
     sump: boolean;
   };
   dims: DimSpec[];
@@ -69,7 +136,9 @@ const rampSlopeStatus = (): 'PLACEHOLDER' | 'DOCTRINE' => vehicleRamp.slopeRatio
 
 function sumpMarks(count: number, holeL: number, holeW: number): SumpMark[] {
   if (count <= 0) return [];
-  const yFt = holeW / 2 - 0.5; // near the rear wall
+  // The mark IS the sump's centre, so it sits half a sump in from the rear wall — the section
+  // draws the billed box centred here and the 3D model reads the same point.
+  const yFt = holeW / 2 - sumpMat.W.value / 2;
   const marks: SumpMark[] = [];
   for (let i = 0; i < count; i++) {
     // Spread evenly across the frontage.
@@ -101,8 +170,16 @@ function elbowMarks(count: number, holeL: number, holeW: number): SumpMark[] {
 // holds it), and round/vehicle excavations use their own shape (never this rect-family taper).
 // Identical formula to the 3D model's pushBayBox taperAmount so the two views agree on the same
 // doctrine-driven slope instead of the 2D section silently drawing every soil as a plumb wall.
+// A MORTAR PIT is the exception in both directions: its walls are always battered, in every
+// soil and under every revetment, because the batter is sized for repeated firing concussion
+// rather than soil stability. That ratio used to live in the 3D renderer, so the 3D drew a
+// flared pit while the plan drew a plain circle and the section drew plumb walls — three views
+// of one pit, one of them alone knowing its shape.
 function wallTaperFt(calc: Calc): number {
-  if (calc.isVehicle || calc.isCircular || calc.inputs.revetment !== 'none') return 0;
+  if (calc.isCircular) {
+    return Math.min(mortarPit.batterRatio.value * calc.depthOfCut, calc.parapetW * 0.9);
+  }
+  if (calc.isVehicle || calc.inputs.revetment !== 'none') return 0;
   const soilRow = soils[calc.inputs.soil];
   if (!soilRow) return 0;
   return Math.min(
@@ -110,6 +187,61 @@ function wallTaperFt(calc: Calc): number {
     calc.parapetW * 0.9,
     Math.min(calc.holeL, calc.holeW) * 0.35,
   );
+}
+
+// The rear entrance passage. An ATGM launcher needs a genuinely open rear lane clear of hard
+// vertical surfaces for its backblast, not a person-sized slot; every other position takes the
+// passage width, or the whole frontage when the position is narrower than one person-passage.
+function entranceGapFt(calc: Calc): number {
+  if (calc.inputs.positionType === 'atgm_javelin') return calc.holeL * access.backblastLaneFrac.value;
+  return Math.min(access.passWidthFt.value, calc.holeL);
+}
+
+// The rear stem (inverted-T) or side arm (L-shape), placed off the main bay from the position's
+// own subBay leaves.
+function subBaysOf(calc: Calc): SubBay[] {
+  const sb = calc.position.subBay;
+  if (!sb) return [];
+  const L = sb.L.value;
+  const W = sb.W.value;
+  const depthFt = calc.depthOfCut * sb.depthFrac.value;
+  if (calc.position.shape === 'inverted_t') {
+    return [{ xFt: 0, zFt: calc.holeW / 2 + W / 2, L, W, depthFt }];
+  }
+  if (calc.position.shape === 'l_shape') {
+    return [{ xFt: calc.holeL / 2 + L / 2, zFt: calc.holeW / 2 - W / 2, L, W, depthFt }];
+  }
+  return [];
+}
+
+// The roof, published as ONE footprint with its sign convention on the type. Front and rear
+// are the same number because the doctrinal rule is orientation-blind — the earlier model gave
+// the rear a max(bearing, ¼-cut) of its own, which is the arithmetic of ALTERNATIVES applied to
+// two SEQUENTIAL stages, and it dropped the threat-scaled floor the front had to clear. Same
+// roof, same munition, two supports, and the rear one was held to half the front's standoff.
+function roofModel(calc: Calc): RoofModel | null {
+  if (!(calc.coverOn && calc.roofPath === 'earth_on_stringers')) return null;
+  return {
+    frontFt: calc.roofEdgeFt,
+    rearFt: calc.roofEdgeFt,
+    endFt: calc.roofEndFt,
+    entranceNotchFt: calc.roofNotchFt,
+    setbackFt: calc.setback,
+    bearingFt: calc.bearingEachEnd,
+    frontEdgeFt: -(calc.holeW / 2 + calc.roofEdgeFt),
+    rearEdgeFt: calc.holeW / 2 + calc.roofEdgeFt,
+    endEdgeFt: calc.holeL / 2 + calc.roofEndFt,
+    areaFt2: calc.coverArea,
+    coverT: calc.coverT,
+    stringer: {
+      count: calc.stringers,
+      spacingFt: overhead.stringerSpacing.value,
+      axis: 'frontBack',
+      lengthFt: calc.coverW,
+      sectionFt: calc.stringerSectionFt,
+      sizeLabel: calc.stringerSize,
+    },
+  };
 }
 
 export function buildGeometry(calc: Calc): GeometryModel {
@@ -177,42 +309,45 @@ export function buildGeometry(calc: Calc): GeometryModel {
         rightDeg: az ? az.rightDeg : 45,
       },
       sumps: sumpMarks(calc.sumpCount, calc.holeL, calc.holeW),
+      sumpBox: { L: sumpMat.L.value, W: sumpMat.W.value, D: sumpMat.D.value },
       elbows: elbowMarks(calc.position.elbowHoles, calc.holeL, calc.holeW),
-      // Drawn footprint only — clamped to the hole's own size (fifty_cal's doctrine platform.W
-      // is 3.0 ft in a 2.0 ft-wide hole; drawn at full size it overhung the excavation by 1 ft
-      // in both the plan and the 3D model, a platform floating a foot past the wall of the hole
-      // it's built in). The BOM/labor volume still uses the true, unclamped doctrine value
-      // (calc.position.firingPlatform via platformVol in compute.ts) — this clamp is rendering-
-      // only and never touches the doctrine leaf itself.
-      platform:
-        calc.hasPlatform && calc.position.firingPlatform
-          ? {
-              L: Math.min(calc.position.firingPlatform.L.value, calc.holeL),
-              W: Math.min(calc.position.firingPlatform.W.value, calc.holeW),
-            }
-          : null,
+      // One footprint, clamped once in compute — the bill, the plan, the section and the 3D
+      // model all read this. It used to be clamped HERE, for drawing only, while the bill kept
+      // billing an impossible platform: the picture was right and the spoil figure was wrong.
+      platform: calc.hasPlatform ? { L: calc.platformL, W: calc.platformW } : null,
+      subBays: subBaysOf(calc),
+      camoNet: calc.inputs.camouflage
+        ? {
+            // drapeFactor is an AREA factor, so the plane's LINEAR extension per axis is its
+            // square root — that way the drawn plane's area is exactly the area billed.
+            L: calc.outerL * Math.sqrt(camo.drapeFactor.value),
+            W: calc.outerW * Math.sqrt(camo.drapeFactor.value),
+            heightFt: camo.drapeHeightFt.value,
+          }
+        : null,
       enemy: 'front',
     },
     section: {
       depthOfCut: calc.depthOfCut,
       holeW: calc.holeW,
+      holeL: calc.holeL,
       parapetW: calc.parapetW,
       parapetH: calc.parapetH,
-      setback: calc.setback,
-      // The roof's REAR overhang past the hole edge — a purely structural "dead-man bearing
-      // shelf" requirement (stringers must land on undisturbed earth, ≥ bearingEachEnd OR ¼ of
-      // the cut depth, whichever is greater — ATP 5-238/FM 5-103), NOT the threat-safety
-      // standoff that governs the FRONT (`setback` above): the threat approaches from the
-      // front only, so the rear has no aperture-clearance concern, just a bearing one.
-      rearOverhang: Math.max(overhead.bearingEachEnd.value, overhead.setbackDepthFrac.value * calc.depthOfCut),
+      roof: roofModel(calc),
       wallTaper: wallTaperFt(calc),
       coverOn: calc.coverOn,
       roofPath: calc.roofPath,
       coverT: calc.coverT,
       stringers: calc.stringers,
       hasPlatform: calc.hasPlatform,
-      platformDepth: calc.hasPlatform && calc.position.firingPlatform ? calc.position.firingPlatform.depthBelowHole.value : 0,
+      platform: calc.hasPlatform ? { L: calc.platformL, W: calc.platformW, riseFt: calc.platformRise } : null,
       firingStepOn: calc.firingStepOn,
+      firingStep: { heightFt: firingStep.heightFt.value, runFt: firingStep.runFt.value },
+      access: {
+        entranceGapFt: entranceGapFt(calc),
+        stairMaxRiserFt: access.stairMaxRiserFt.value,
+        stairTreadFt: access.stairTreadFt.value,
+      },
       sump: calc.sumpCount > 0,
     },
     dims,

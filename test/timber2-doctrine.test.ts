@@ -31,11 +31,90 @@ import { seatCutsFor, seatDepthWarnings } from '../src/timber/birdsMouth';
 import { LS_CONSUMERS, type LsConsumer } from '../src/timber/packet/lsgate';
 import type { RoofSpec, StructureSpec } from '../src/timber/spec';
 
-test('every doctrine constant carries a citation, and unverified ones are visibly (PH)', () => {
+// ── Citation tiers ───────────────────────────────────────────────────────────
+//
+// The gate here used to be `cite.length > 8`, which is a bar every string in the table clears
+// and which cannot tell the two things a citation can be:
+//
+//   LOCATABLE — a publication AND a place in it: "IRC R403.1.6", "FM 5-426 Table 6-2". Someone
+//   can open the book at that page and say yes or no.
+//
+//   TOPIC — a publication and a SUBJECT, with no place in it: "EM 385-1-1 stair riser maximum".
+//   It says where to go looking. It does not say what was read, and nobody can confirm it
+//   without doing the search themselves.
+//
+//   PRACTICE — no publication at all: "standard heavy-timber practice: caps drift-pinned to what
+//   they bear on". Honest, and deliberately not dressed up as a citation; the tier exists so
+//   those stay visible as what they are rather than passing for sourced.
+//
+// Most life-safety numbers in this tree sit in the topic tier. That is the true state of the
+// sourcing and the gate now says so out loud instead of averaging it away — the fix for a topic
+// citation is somebody reading the page, never a section number invented to clear a bar.
+type CiteTier = 'locatable' | 'topic' | 'practice';
+
+/** A publication designator: the pub series plus its number ("FM 5-426", "IRC", "EM 385-1-1"). */
+const PUB = /\b(?:EM|FM|TM|ATP|TC|UFC|IRC|IBC|AFM|NFPA|OSHA)\s+[0-9A-Z][0-9A-Za-z.\-]*/g;
+
+/**
+ * A place INSIDE a publication. Each one demands a number, because that is the whole
+ * distinction: "Table 6-2" is a place, "header table by span" is a subject with the word table
+ * in it, and a pattern that accepted the bare word would sort the second with the first.
+ */
+const LOCATORS: RegExp[] = [
+  /\bTable\s+[A-Z]?\d/i,
+  /\bch(?:apter|\.)\s*\d/i,
+  /§\s*\S/,
+  /\b[A-Z]\d+(?:\.\d+)+/, // IRC-style section: R403.1.6
+  /\bfig(?:ure|\.)\s*[A-Z]?\d/i,
+  /\bappendix\s+[A-Z0-9]/i,
+  /\bpara(?:graph|\.)\s*[A-Z0-9]/i,
+];
+
+/** The cite as a claim about a source — the (PH) bookkeeping is not part of what it cites. */
+const spokenCite = (cite: string): string => cite.replace(/\(PH[^)]*\)/g, ' ');
+
+function citeTier(cite: string): CiteTier {
+  const s = spokenCite(cite);
+  PUB.lastIndex = 0;
+  if (!PUB.test(s)) return 'practice';
+  return LOCATORS.some((r) => r.test(s)) ? 'locatable' : 'topic';
+}
+
+/** What a cite says once its publication designators are struck out — its subject. */
+function citeSubject(cite: string): string {
+  PUB.lastIndex = 0;
+  return spokenCite(cite).replace(PUB, ' ').replace(/[^A-Za-z]+/g, ' ').trim();
+}
+
+/** Why this citation is not usable as one, or `null` when it is. */
+function citeObjection(cite: string): string | null {
+  const tier = citeTier(cite);
+  if (tier === 'locatable') return null; // a pub and a place in it needs no subject line
+  if (tier === 'topic') {
+    return citeSubject(cite).replace(/\s/g, '').length >= 3
+      ? null
+      : 'names a publication and nothing in it — no place, no subject';
+  }
+  return spokenCite(cite).trim().length >= 20
+    ? null
+    : 'cites no publication and does not say what it rests on instead';
+}
+
+/** id → tier, over any slice of the register. The census the tests report themselves with. */
+function citeTiers(entries: { id: string; cite: string }[]): Map<string, CiteTier> {
+  return new Map(entries.map((e) => [e.id, citeTier(e.cite)]));
+}
+const census = (tiers: Map<string, CiteTier>): string =>
+  (['locatable', 'topic', 'practice'] as const)
+    .map((t) => `${t} ${[...tiers.values()].filter((x) => x === t).length}`)
+    .join(', ');
+
+test('every doctrine constant carries a usable citation, and unverified ones are visibly (PH)', () => {
   const entries = allDoctrineEntries();
   assert.ok(entries.length > 40, `expected a real doctrine table, got ${entries.length} entries`);
   for (const e of entries) {
-    assert.ok(e.cite.length > 8, `${e.id}: citation too thin ("${e.cite}")`);
+    const objection = citeObjection(e.cite);
+    assert.equal(objection, null, `${e.id}: citation ${objection} ("${e.cite}")`);
     assert.notEqual(e.value, undefined, `${e.id}: no value`);
   }
   // The (PH) discipline: a pending cite must SAY so wherever it renders.
@@ -44,6 +123,29 @@ test('every doctrine constant carries a citation, and unverified ones are visibl
   for (const e of pending) {
     assert.ok(citeOf({ value: e.value, cite: e.cite, ph: true }).includes('(PH)'), `${e.id}: (PH) must render`);
   }
+});
+
+test('the register knows which tier every citation is in, and both tiers are really populated', () => {
+  const entries = allDoctrineEntries();
+  const tiers = citeTiers(entries);
+  assert.equal(tiers.size, entries.length, 'every entry is classified');
+  const count = (t: CiteTier): number => [...tiers.values()].filter((x) => x === t).length;
+  // Not a floor to be raised by writing section numbers — a check that the classifier is still
+  // telling the two apart at all. A build where everything lands in one tier means the patterns
+  // stopped discriminating, and the gate would be back to what it replaced.
+  assert.ok(count('locatable') > 0, `nothing is locatable any more — ${census(tiers)}`);
+  assert.ok(count('topic') > 0, `nothing is in the topic tier — ${census(tiers)}`);
+});
+
+test('a citation that names no place in a pub cannot be marked page-checked', () => {
+  // `ph: false` is a claim that somebody read the page. A topic citation names no page, so there
+  // is no page anyone could have read: clearing the flag against one records a check that cannot
+  // have happened. Practice-tier entries are exempt because they claim no publication at all —
+  // they say in the open what they rest on, and there is nothing to turn to.
+  const wrong = allDoctrineEntries()
+    .filter((e) => !e.ph && citeTier(e.cite) === 'topic')
+    .map((e) => `${e.id}: page-checked against "${e.cite}", which names no section, table or figure`);
+  assert.deepEqual(wrong, [], `page checks recorded against citations with no page:\n  ${wrong.join('\n  ')}`);
 });
 
 test('the life-safety register holds every fall / collapse / overload number', () => {
@@ -60,11 +162,37 @@ test('the life-safety register holds every fall / collapse / overload number', (
     assert.ok(ids.has(required), `${required} must be life-safety tagged`);
   }
   for (const e of ls) {
-    assert.ok(e.cite.length > 8, `${e.id}: an LS constant with a thin cite is the worst case`);
+    const objection = citeObjection(e.cite);
+    assert.equal(objection, null, `${e.id}: an LS constant whose citation ${objection} is the worst case ("${e.cite}")`);
   }
   // While (PH), an LS cite must announce that a review is owed.
   const suffix = citeOf({ value: 42, cite: RAIL.topHeightIn.cite, ph: true, lifeSafety: true });
   assert.ok(suffix.includes('LIFE-SAFETY, review required'), suffix);
+});
+
+test('a life-safety number nobody can look up says so on the packet', () => {
+  // The tier split matters most here and is worst here: the fall, collapse and overload numbers
+  // are mostly cited to a publication and a subject — "EM 385-1-1 stair riser maximum" — which
+  // is a pointer, not a page. That is not something a test can fix, and inventing a section
+  // number to promote a row would be the one genuinely dangerous response. What CAN be held is
+  // that such a row never reads as settled: an LS value whose citation names no place in a pub
+  // must still print "LIFE-SAFETY, review required" to whoever signs the packet.
+  const ls = lifeSafetyRegister();
+  const tiers = citeTiers(ls);
+  const unreviewable = ls.filter((e) => tiers.get(e.id) !== 'locatable');
+  assert.ok(
+    unreviewable.length > 0,
+    `every LS citation now names a place in a pub (${census(tiers)}) — if that is real, delete this test; `
+    + 'if a pattern merely started matching prose, fix the pattern',
+  );
+  const silent = unreviewable
+    .filter((e) => !citeOf({ value: e.value, cite: e.cite, ph: e.ph, lifeSafety: true }).includes('LIFE-SAFETY, review required'))
+    .map((e) => `${e.id} (${tiers.get(e.id)}): "${e.cite}" reads as reviewed`);
+  assert.deepEqual(
+    silent,
+    [],
+    `life-safety values cited to no page that print as settled anyway — ${census(tiers)}:\n  ${silent.join('\n  ')}`,
+  );
 });
 
 test('the safety block cites EM 385-1-1 — LS numbers have a doctrinal home (TD27)', () => {

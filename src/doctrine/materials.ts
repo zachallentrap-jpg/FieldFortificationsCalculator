@@ -70,8 +70,14 @@ export const revetments: Record<string, RevetRow> = {
 };
 
 // ── Camouflage ───────────────────────────────────────────────────────────────
+// drapeFactor is an AREA factor over the position's footprint — the BOM's own quantity. The
+// 3D view used to stretch its net plane 1.1× per axis (1.21× area) and hang it at a height of
+// its own invention, so the plane a viewer measured was not the net the bill ordered. The plane
+// now takes √drapeFactor per axis, which reproduces the billed area exactly, and its height is
+// a leaf rather than a renderer constant.
 export const camo = {
   drapeFactor: P(1.25, { note: 'camo net area factor over footprint (illustrative)' }),
+  drapeHeightFt: P(1.8, { unit: 'ft', note: 'height the net is flown above grade (illustrative)' }),
 };
 
 // ── Grenade sump — dimensions in feet ──────────────────────────────────────────

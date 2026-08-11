@@ -80,7 +80,7 @@ const DAY: Palette = {
     cover: 0xb39c72,
     engineeredCover: 0xff5a4d, // hazard accent — untouched in both themes
     stringer: 0x6b5138,
-    platform: 0x6b5138,
+    platform: 0x8a6a48, // ground left undug — the bay-wall dirt tone, not the timber one
     firingStep: 0x6b5138,
     entryStep: 0x8a6a48, // cut-earth steps — same dirt tone as the bay wall
     sump: 0x241b12,
@@ -138,7 +138,7 @@ const NIGHT: Palette = {
     cover: 0x8a8272,
     engineeredCover: 0xff6a55, // hazard accent, slightly lifted for the dark
     stringer: 0x52493c,
-    platform: 0x52493c,
+    platform: 0x6e6456, // ground left undug — night dirt tone, not the timber one
     firingStep: 0x52493c,
     entryStep: 0x6e6456, // cut-earth steps — night dirt tone
     sump: 0x241c12,

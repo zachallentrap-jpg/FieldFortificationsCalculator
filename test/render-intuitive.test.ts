@@ -10,7 +10,7 @@ import { drawSection } from '../src/render/drawSection';
 import { drawIso } from '../src/render/drawIso';
 import { buildScene3D } from '../src/render3d/scene3d';
 import { positions } from '../src/doctrine/positions';
-import { overhead } from '../src/doctrine/protection';
+import { overhead, threats } from '../src/doctrine/protection';
 import type { GeometryModel } from '../src/engine/geometry';
 import type { Inputs } from '../src/engine/types';
 import { defaultInputs } from './helpers';
@@ -104,50 +104,77 @@ test('section carries header, standing figure + scale, single-accent dims, cover
   assertNoDimCollision(section, 'section');
 });
 
-test('a firing platform never draws wider/longer than the hole it\'s built in', () => {
-  // fifty_cal's doctrine firingPlatform.W (3.0 ft) exceeds its own hole.W (2.0 ft) — drawn at
-  // full size the platform overhangs the excavation by 1 ft in both the plan and the 3D model,
-  // a standing surface floating past the wall of the hole it's supposedly built in. geo.plan.
-  // platform is clamped to the hole's own L/W so the DRAWING never claims a platform bigger
-  // than the hole that contains it; the BOM/labor volume is untouched (still the true doctrine
-  // value, via compute.ts's platformVol) since this is a rendering-only clamp.
+test('the firing platform is one footprint — the same one the bill digs around and all three views draw', () => {
+  // What this used to pin: geometry clamped the DRAWING to the hole while compute went on
+  // billing the raw doctrine value, so fifty_cal's 3.0-ft platform in a 2.0-ft trench made the
+  // picture right and the spoil figure wrong. The table is consistent now (fifty_cal's platform
+  // spans its trench) and the clamp lives in compute, once, so bill and views cannot diverge.
+  //
+  // The section is the view that used to invent its own: it drew the platform's front-to-back
+  // run as holeW × 0.35 — 0.700 ft where the plan and the 3D model both drew 2.000 — a fixed
+  // 2.86× disagreement between two views of one object.
   for (const [id, pos] of Object.entries(positions)) {
     if (!pos.firingPlatform) continue;
     const r = compute(defaultInputs({ positionType: id }));
     const geo = r.geometry as GeometryModel;
     assert.ok(geo.plan.platform, id + ': platform present');
-    assert.ok(geo.plan.platform!.W <= geo.plan.holeW + 1e-9, id + ": drawn platform.W (" + geo.plan.platform!.W + ") must not exceed hole.W (" + geo.plan.holeW + ")");
-    assert.ok(geo.plan.platform!.L <= geo.plan.holeL + 1e-9, id + ": drawn platform.L (" + geo.plan.platform!.L + ") must not exceed hole.L (" + geo.plan.holeL + ")");
+    assert.ok(geo.section.platform, id + ': the section carries the platform too, with its rise');
+    assert.ok(geo.plan.platform!.W <= geo.plan.holeW + 1e-9, id + ": platform.W (" + geo.plan.platform!.W + ") must not exceed hole.W (" + geo.plan.holeW + ")");
+    assert.ok(geo.plan.platform!.L <= geo.plan.holeL + 1e-9, id + ": platform.L (" + geo.plan.platform!.L + ") must not exceed hole.L (" + geo.plan.holeL + ")");
+    // The source table is itself consistent — the clamp is a fail-safe, not the thing making
+    // the picture right.
+    assert.ok(pos.firingPlatform.W.value <= pos.hole.W.value + 1e-9, id + ': the doctrine table describes a platform that fits its own hole');
+    assert.ok(pos.firingPlatform.L.value <= pos.hole.L.value + 1e-9, id + ': same on the frontage axis');
+    assert.ok(geo.section.platform!.riseFt > 0 && geo.section.platform!.riseFt <= geo.section.depthOfCut + 1e-9, id + ': the bench stands above the floor and no higher than the cut is deep');
 
-    // Cross-check the 3D model's platform box uses the SAME clamped footprint, not the raw
-    // doctrine value directly (it reads geo.plan.platform, so this mostly guards against a
-    // future refactor that reintroduces a second, unclamped read of the doctrine leaf).
+    // All three views read the ONE footprint.
     const scene = buildScene3D(r);
-    const platformBox = scene.parts.find((p) => p.kind === 'box' && p.role === 'platform') as { d: number; w: number } | undefined;
+    const platformBox = scene.parts.find((p) => p.kind === 'box' && p.role === 'platform') as { d: number; w: number; h: number } | undefined;
     assert.ok(platformBox, id + ': 3D platform box present');
-    assert.ok(platformBox!.d <= geo.plan.holeW + 1e-9, id + ': 3D platform depth must not exceed the hole either');
+    assert.ok(Math.abs(platformBox!.d - geo.plan.platform!.W) < 1e-9, id + ': 3D depth == published platform.W');
+    assert.ok(Math.abs(platformBox!.w - geo.plan.platform!.L) < 1e-9, id + ': 3D width == published platform.L');
+    assert.ok(Math.abs(platformBox!.h - geo.section.platform!.riseFt) < 1e-9, id + ': 3D height == published rise');
+
+    // And the section draws its front-to-back run at that same width, in earth rather than
+    // timber: a plank tone taught a built deck that appears in no BOM line, over ground the
+    // crew never dug.
+    const section = drawSection(r);
+    const bayMatch = section.match(/<polygon points="([\d.,\- ]+)" fill="var\(--draw-bay\)"/);
+    assert.ok(bayMatch, id + ': bay polygon present');
+    const bayXs = bayMatch![1]!.split(' ').map((pt) => Number(pt.split(',')[0]));
+    const bayW = Math.max(...bayXs) - Math.min(...bayXs);
+    // The bay polygon spans the hole PLUS its wall flare at grade, so the scale is recovered
+    // from that full span, not from holeW alone.
+    const pxPerFt = bayW / (geo.section.holeW + 2 * geo.section.wallTaper);
+    const platRe = /<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)"[^>]*fill="var\(--draw-bay\)"/g;
+    const platMatch = platRe.exec(section);
+    assert.ok(platMatch, id + ': the section draws the platform in earth (draw-bay), not timber');
+    const drawnRunFt = Number(platMatch![2]) / pxPerFt;
+    assert.ok(
+      Math.abs(drawnRunFt - geo.plan.platform!.W) < 0.02,
+      id + ': section draws the platform ' + drawnRunFt.toFixed(3) + ' ft front-to-back, the plan and 3D draw ' + geo.plan.platform!.W,
+    );
   }
 });
 
-test('the section\'s grenade sump sits at the REAR, matching the plan\'s own sump marks and the 3D model', () => {
-  // geometry.ts's sumpMarks() places every sump "near the rear wall" (yFt > 0), and scene3d.ts
-  // reads that same yFt straight through for the 3D sump box — but drawSection.ts's sump notch
-  // used to be anchored at -halfBay*0.85 (the FRONT), directly under the front-sited firing
-  // step/platform. On a narrow position that put the sump notch visually on top of the firing
-  // step in the very same picture (two_man's 2 ft front-to-back caught it); on every position it
-  // silently drew the sump on the opposite wall from its own plan view and 3D model.
+test('the section\'s grenade sump is the sump the BOM bills, at the plan\'s own rear-wall mark', () => {
+  // Two defects in one place. WHERE: drawSection used to anchor the notch at -halfBay*0.85 (the
+  // FRONT), directly under the front-sited firing step, while geometry.ts's sumpMarks put every
+  // sump "near the rear wall" and the 3D model read that mark straight through. WHAT SIZE: the
+  // section notched a wedge of its own (min(0.9, holeW×0.22) wide × 0.7 deep), the 3D drew an
+  // elongated trough of its own, and the BOM billed a third box — one hole, three sizes, and
+  // the one the crew is paid to dig was in neither picture.
   for (const positionType of ['one_man', 'two_man', 'mg_crew']) {
     const r = compute(defaultInputs({ positionType, sump: true, firingStep: true, overheadCover: false }));
     const geo = r.geometry as GeometryModel;
     for (const s of geo.plan.sumps) assert.ok(s.yFt > 0, positionType + ": plan's own sump marks sit at the rear (yFt > 0)");
 
     const section = drawSection(r);
-    // Positions with a structural firing PLATFORM (mg_crew) also draw a draw-timber rect for
-    // it, before the sump — so match by proximity to the sump's own callout label, not just
-    // "the first draw-timber rect", or a platform-carrying position would grab the wrong one.
+    // Positions with a structural firing PLATFORM (mg_crew) also draw a rect for it, before the
+    // sump — so match by proximity to the sump's own callout label, not just "the first rect".
     const sumpLabelIdx = section.indexOf('aria-label="Grenade catch-pit (sump)"');
     assert.ok(sumpLabelIdx > 0, positionType + ': sump callout label present');
-    const rectRe = /<rect x="([\d.]+)"[^>]*fill="var\(--draw-timber\)"/g;
+    const rectRe = /<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)" height="([\d.]+)"[^>]*fill="var\(--draw-timber\)"/g;
     let sumpMatch: RegExpExecArray | null = null;
     for (let m = rectRe.exec(section); m; m = rectRe.exec(section)) {
       if (m.index < sumpLabelIdx) sumpMatch = m;
@@ -157,8 +184,25 @@ test('the section\'s grenade sump sits at the REAR, matching the plan\'s own sum
     assert.ok(bayMatch, positionType + ': bay polygon present');
     const bayXs = bayMatch![1]!.split(' ').map((pt) => Number(pt.split(',')[0]));
     const bayCenterX = (Math.min(...bayXs) + Math.max(...bayXs)) / 2;
-    const sumpX = Number(sumpMatch![1]);
-    assert.ok(sumpX > bayCenterX, positionType + ": sump notch sits right of the bay's own center (rear, since FRONT is drawn on the left)");
+    const pxPerFt = (Math.max(...bayXs) - Math.min(...bayXs)) / (geo.section.holeW + 2 * geo.section.wallTaper);
+    const notchX = Number(sumpMatch![1]);
+    const notchW = Number(sumpMatch![2]);
+    const notchH = Number(sumpMatch![3]);
+    assert.ok(notchX + notchW / 2 > bayCenterX, positionType + ": sump notch sits behind the bay's own center (rear, since FRONT is drawn on the left)");
+
+    // Drawn at the billed box, and centred on the plan's own mark.
+    const box = geo.plan.sumpBox;
+    assert.ok(Math.abs(notchW / pxPerFt - Math.min(box.W, geo.section.holeW)) < 0.02, positionType + ': notch width ' + (notchW / pxPerFt).toFixed(3) + ' ft != billed sump width ' + box.W);
+    assert.ok(Math.abs(notchH / pxPerFt - box.D) < 0.02, positionType + ': notch depth ' + (notchH / pxPerFt).toFixed(3) + ' ft != billed sump depth ' + box.D);
+    const markFt = geo.plan.sumps[geo.plan.sumps.length - 1]!.yFt;
+    const drawnCentreFt = (notchX + notchW / 2 - bayCenterX) / pxPerFt;
+    assert.ok(Math.abs(drawnCentreFt - markFt) < 0.02, positionType + ': notch centre ' + drawnCentreFt.toFixed(3) + ' ft != plan mark ' + markFt);
+
+    // And the 3D model digs the same box at the same mark.
+    const scene = buildScene3D(r);
+    const sump3d = scene.parts.find((p) => p.kind === 'box' && p.role === 'sump') as { w: number; h: number; d: number; z: number } | undefined;
+    assert.ok(sump3d, positionType + ': 3D sump box present');
+    assert.ok(Math.abs(sump3d!.w - box.L) < 1e-9 && Math.abs(sump3d!.d - box.W) < 1e-9 && Math.abs(sump3d!.h - box.D) < 1e-9, positionType + ': the 3D sump is the billed box');
   }
 });
 
@@ -264,23 +308,82 @@ test('a vehicle defilade never draws a roof or engineered-hazard block, matching
   }
 });
 
-test('the roof\'s rear overhang is the structural bearing shelf, not the parapet\'s own thickness', () => {
-  // geo.section.rearOverhang = max(bearingEachEnd, setbackDepthFrac * depthOfCut) — a doctrine
-  // leaf about how far stringers must land on undisturbed earth, NOT parapetW (an unrelated
-  // doctrine value: how thick the earthen parapet WALL is). Reusing parapetW here previously
-  // overstated the roof's rear extent by ~2-3x versus the same bearing-shelf math the front
-  // edge and the 3D model both use — this pins rearOverhang to its own formula so a future edit
-  // can't silently swap back to parapetW (drawSection.ts's slabX2) without a test noticing.
+test('the roof reaches OUTWARD past both lips, by the same setback + bearing on each', () => {
+  // Three defects the one published footprint replaces.
+  //
+  // SIGN. The 2D section inset its front edge INTO the hole by the setback and clamped it at
+  // halfBay − 0.25 ft, so on a narrow position the drawn roof covered only the rear of the bay
+  // while the 3D model extended the same edge outward — two views facing opposite directions on
+  // a safety-critical standoff. The setback is measured FROM THE HOLE EDGE OUTWARD to where the
+  // supports begin, so a roof edge offset is never negative and never crosses the hole edge.
+  //
+  // STAGES. The rear took max(bearingEachEnd, setbackDepthFrac × depth): the arithmetic of
+  // ALTERNATIVES applied to two SEQUENTIAL stages (the supports stand back by the setback, THEN
+  // the stringers overhang them by the bearing), and it replaced the setback's own threat-scaled
+  // floor with a bearing leaf. Measured at HEAD: one_man / 155 mm / deliberate gave the front
+  // 2.0 ft and the rear 1.0 ft — same roof, same munition, two supports, the rear one held to
+  // half the standoff the front had to clear.
+  //
+  // SYMMETRY. The rule is orientation-blind: a rear support is a support.
   for (const [standard, threat] of [['hasty', 'sa-556'], ['deliberate', 'sa-556'], ['reinforced', 'sa-556'], ['deliberate', 'ind-art-155']] as const) {
     const r = compute(defaultInputs({ positionType: 'one_man', overheadCover: true, standard, threat, sump: false }));
     const geo = r.geometry as GeometryModel;
-    const expected = Math.max(overhead.bearingEachEnd.value, overhead.setbackDepthFrac.value * geo.section.depthOfCut);
-    assert.ok(
-      Math.abs(geo.section.rearOverhang - expected) < 1e-9,
-      standard + '/' + threat + ': rearOverhang ' + geo.section.rearOverhang + ' != bearing-shelf formula ' + expected,
-    );
-    assert.notEqual(geo.section.rearOverhang, geo.section.parapetW, standard + '/' + threat + ': rearOverhang must not equal parapetW');
+    const roof = geo.section.roof;
+    assert.ok(roof, standard + '/' + threat + ': the fixture must exercise the earth roof');
+    const setback = Math.max(threats[threat]!.standoffMin.value, overhead.setbackDepthFrac.value * geo.section.depthOfCut);
+    const expected = setback + overhead.bearingEachEnd.value;
+    assert.ok(Math.abs(roof!.frontFt - expected) < 1e-9, standard + '/' + threat + ': front ' + roof!.frontFt + ' != setback + bearing ' + expected);
+    assert.equal(roof!.rearFt, roof!.frontFt, standard + '/' + threat + ': a rear support is a support — same rule, same number');
+    assert.ok(roof!.frontFt > 0 && roof!.endFt > 0, 'every roof edge offset is an OUTWARD extension, never zero or negative');
+    // Absolute edges, in the section's own frame: front strictly outboard of the front wall,
+    // rear strictly outboard of the rear wall. A coordinate cannot be sign-flipped by accident
+    // the way an offset can.
+    assert.ok(roof!.frontEdgeFt <= -geo.section.holeW / 2, 'front edge is outboard of the front wall');
+    assert.ok(roof!.rearEdgeFt >= geo.section.holeW / 2, 'rear edge is outboard of the rear wall');
+    // (The older guard here was "rearOverhang != parapetW", written when the rear edge had once
+    // been the parapet's own wall thickness. The exact equality above subsumes it — the edge is
+    // pinned to the two roof leaves — and on one_man / 155 mm the two happen to coincide at
+    // 3.0 ft, so the inequality would now fail on a correct roof.)
   }
+
+  // The FLANK ends take neither stage: no stringer end lands there, so the setback (a support
+  // rule) and the bearing (an overhang past a support) are both inapplicable, and the deck takes
+  // the flank lap instead. The 3D used to reuse the rear figure on the end walls.
+  const wide = compute(defaultInputs({ positionType: 'bunker_op_cp', overheadCover: true, threat: 'ind-mtr-81' }));
+  const wroof = (wide.geometry as GeometryModel).section.roof!;
+  assert.ok(Math.abs(wroof.endFt - overhead.endLap.value) < 1e-9, 'the ends take endLap, not the front/rear figure');
+  assert.notEqual(wroof.endFt, wroof.rearFt, 'and on a deep cut that is a different number from the bearing edge');
+});
+
+test('a roofed position is never roofed shut — the deck is notched across its own entrance', () => {
+  // R10 (docs/REALISM_PASS_3D_PLAN.md): extended its full rear bearing, the bunker's roof runs
+  // straight over the position's only way in. Its stated fix — stop the rear edge at the
+  // excavation wall and shorten the stringers to match — contradicts its own acceptance
+  // criterion once the stringers run front-to-back: every one of them becomes a cantilever off
+  // the front support. So the DECK is notched across the passage width and the STRINGERS keep
+  // their full rear bearing on undisturbed ground.
+  const r = compute(defaultInputs({ positionType: 'bunker_op_cp', overheadCover: true, threat: 'ind-mtr-81' }));
+  const geo = r.geometry as GeometryModel;
+  const roof = geo.section.roof!;
+  assert.ok(roof.entranceNotchFt > 0, 'the one roofed position in the catalog notches its deck');
+  assert.ok(Math.abs(roof.entranceNotchFt - geo.section.access.entranceGapFt) < 1e-9, 'the notch is exactly the entrance it exists to keep open');
+  // Every other position has no ring tall enough to seal it and takes no notch.
+  for (const positionType of ['one_man', 'two_man', 'mg_crew', 'connecting_trench']) {
+    const other = compute(defaultInputs({ positionType, overheadCover: true, threat: 'ind-mtr-81' }));
+    const oroof = (other.geometry as GeometryModel).section.roof;
+    if (oroof) assert.equal(oroof.entranceNotchFt, 0, positionType + ': no notch');
+  }
+  // A–A cuts on the centreline, which is where the notch is — so the section draws the deck
+  // stopping at the rear wall line rather than silently drawing the full slab across it.
+  const section = drawSection(r);
+  const slab = /<rect x="([\d.]+)" y="[\d.]+" width="([\d.]+)"[^>]*fill="url\(#pat-cover\)"/.exec(section);
+  assert.ok(slab, 'the section draws the cover slab');
+  const bayMatch = section.match(/<polygon points="([\d.,\- ]+)" fill="var\(--draw-bay\)"/)!;
+  const bayXs = bayMatch[1]!.split(' ').map((pt) => Number(pt.split(',')[0]));
+  const pxPerFt = (Math.max(...bayXs) - Math.min(...bayXs)) / (geo.section.holeW + 2 * geo.section.wallTaper);
+  const centreX = (Math.min(...bayXs) + Math.max(...bayXs)) / 2;
+  const drawnRearFt = (Number(slab![1]) + Number(slab![2]) - centreX) / pxPerFt;
+  assert.ok(Math.abs(drawnRearFt - geo.section.holeW / 2) < 0.03, 'on the notch centreline the drawn deck stops at the rear wall line, got ' + drawnRearFt.toFixed(3));
 });
 
 test('sectors of fire render for positions that have them, with the enemy arrow', () => {

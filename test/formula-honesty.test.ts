@@ -8,6 +8,8 @@ import assert from 'node:assert/strict';
 import { compute } from '../src/engine/compute';
 import { resolveCover } from '../src/engine/protection';
 import { positions, vehicleRamp } from '../src/doctrine/positions';
+import { standards } from '../src/doctrine/standards';
+import { excavation, sump as sumpMat } from '../src/doctrine/materials';
 import { berm, overhead, spanSizes } from '../src/doctrine/protection';
 import { defaultInputs } from './helpers';
 import type { BomLine, Result } from '../src/engine/types';
@@ -18,11 +20,16 @@ const approx = (a: number, b: number, eps = 1e-6): void => assert.ok(Math.abs(a 
 
 // ── Stringer axis + span fail-safe ───────────────────────────────────────────
 
-test('stringers span the SHORT axis and are counted along the LONG axis', () => {
-  // two-man: 7 ft frontage × 2 ft front-to-back. Stringers bridge the 2 ft span, laid along 7 ft.
+test('stringers run FRONT-TO-BACK and are counted across the DECK they hold up', () => {
+  // two-man: 7 ft frontage × 2 ft front-to-back. The doctrinal support layout is 2 front and 1
+  // rear — supports lying along the frontage — so the beams laid on them run front-to-back and
+  // are laid out ACROSS the frontage. They are counted over the DECK, which laps endLap past
+  // each end wall (7 + 2×1 = 9 ft), not over the bare hole: counting over the hole left 2 ft of
+  // billed slab with nothing under it on every position in the catalog.
   const r = compute(defaultInputs({ positionType: 'two_man' }));
   const spacing = overhead.stringerSpacing.value;
-  assert.equal(qty(r.bom, 'stringers'), Math.ceil(7 / spacing) + 1, 'counted along the 7 ft long axis');
+  const deckFrontage = 7 + 2 * overhead.endLap.value;
+  assert.equal(qty(r.bom, 'stringers'), Math.ceil(deckFrontage / spacing) + 1, 'counted across the 9 ft deck');
   // Clear span 2 ft ≤ 4 ft table → a real size, not engineered.
   const d = r.derivations.find((x) => x.key === 'stringers')!;
   assert.ok(d.label.includes('4×4') || d.label.includes('4x4'), 'labels the doctrine stringer size: ' + d.label);
@@ -144,4 +151,50 @@ test('engineered threats still emit zero cover thickness and no cover BOM', () =
   const r = compute(defaultInputs({ threat: 'at-rpg', overheadCover: true }));
   assert.equal(r.cover.thickness, 0);
   assert.ok(!r.bom.some((l) => l.id === 'sandbags_cover' || l.id === 'cover_soil_fill' || l.id === 'stringers'));
+});
+
+// ── The firing platform is a CUT that is not made ────────────────────────────
+
+test('a crew-served position\'s excavation SUBTRACTS the platform left undug, and says so in the trace', () => {
+  // The platform is undisturbed original earth left standing — the gun/launcher stand the crew
+  // bays are dug down around ("this is a CUT, not a build", modeling spec §2.f). Both drawings
+  // have always shown it that way; compute ADDED its volume, so the spoil figure and the picture
+  // could not both be right. Re-derived here from the doctrine leaves, not from engine helpers.
+  const swell = excavation.swellFactor.value;
+  const sumpVolOf = (n: number): number => n * (sumpMat.L.value * sumpMat.W.value * sumpMat.D.value);
+  for (const id of ['mg_crew', 'fifty_cal', 'atgm_javelin']) {
+    const pos = positions[id]!;
+    const plat = pos.firingPlatform!;
+    for (const standard of ['hasty', 'deliberate', 'reinforced'] as const) {
+      const r = compute(defaultInputs({ positionType: id, standard, sump: true, overheadCover: false, threat: 'none' }));
+      const depth = pos.hole.D.value * standards[standard]!.depthMul.value;
+      const bank =
+        pos.hole.L.value * pos.hole.W.value * depth
+        - Math.min(plat.L.value, pos.hole.L.value) * Math.min(plat.W.value, pos.hole.W.value) * Math.min(plat.riseAboveFloor.value, depth)
+        + sumpVolOf(pos.grenadeSumps);
+      approx(qty(r.bom, 'excavation_loose'), bank * swell, 1e-6);
+    }
+  }
+  // A position with no platform is unaffected, and the subtraction is visible in the trace
+  // rather than hidden inside a single excavBank operand.
+  const withPlatform = compute(defaultInputs({ positionType: 'mg_crew' }));
+  const trace = withPlatform.derivations.find((d) => d.key === 'excavLoose')!;
+  assert.match(trace.formula, /−\s*platform left undug/, 'the trace states the subtraction: ' + trace.formula);
+  assert.ok(trace.operands.some((o) => o.name === 'platformLeftUndug'), 'and itemizes the term, with its placeholder flag');
+  const noPlatform = compute(defaultInputs({ positionType: 'two_man' }));
+  assert.ok(!noPlatform.derivations.find((d) => d.key === 'excavLoose')!.operands.some((o) => o.name === 'platformLeftUndug'));
+});
+
+test('a compound position discloses that the trench it draws is outside the volume it bills', () => {
+  // All three views now draw the T-stem / L-arm from the position's own subBay leaves — but
+  // holeVol is still the main bay's bounding prism, so the drawn trench is not in the number.
+  // The fidelity statement was keyed on volumeModel alone and never said so.
+  for (const id of ['mg_crew']) {
+    assert.match(compute(defaultInputs({ positionType: id })).fidelity.volume, /rear stem trench is drawn but not billed/, id);
+  }
+  for (const id of ['fifty_cal', 'atgm_javelin']) {
+    assert.match(compute(defaultInputs({ positionType: id })).fidelity.volume, /side arm trench is drawn but not billed/, id);
+  }
+  // A plain rectangular position claims nothing of the sort.
+  assert.ok(!/drawn but not billed/.test(compute(defaultInputs({ positionType: 'two_man' })).fidelity.volume));
 });

@@ -178,11 +178,23 @@ export const berm = {
 };
 
 // Overhead-cover chain constants (§8, §9). setbackMin / setbackDepthFrac are standoff
-// (safety-critical). bearingEachEnd and stringerSpacing drive cover geometry + counts.
+// (safety-critical). bearingEachEnd, endLap and stringerSpacing drive cover geometry + counts.
+//
+// SETBACK AND BEARING ARE SEQUENTIAL STAGES OF ONE ASSEMBLY, NOT ALTERNATIVES. The supports are
+// set back from the hole edge by the setback (≥ setbackMin OR setbackDepthFrac × the depth of
+// cut, whichever is greater — measured FROM THE HOLE EDGE OUTWARD to where the supports begin);
+// the stringers are then laid across them overhanging bearingEachEnd PAST the supports on each
+// side. So the roof deck's front and rear edges stand setback + bearingEachEnd outward of the
+// hole wall. Combining the two with max() gives a roof a setback OR a bearing and never both.
 export const overhead = {
   setbackMin: P(1.0, { unit: 'ft', safetyCritical: true, note: 'minimum roof setback/standoff (illustrative)' }),
   setbackDepthFrac: P(0.25, { safetyCritical: true, note: 'setback as fraction of depth (illustrative)' }),
-  bearingEachEnd: P(1.0, { unit: 'ft', note: 'stringer bearing each end (illustrative)' }),
+  bearingEachEnd: P(1.0, { unit: 'ft', note: 'stringer overhang past its support, each end (illustrative)' }),
+  // The flank ends of the deck carry no stringer end — the stringers span front-to-back onto the
+  // front and rear supports — so neither the setback nor the bearing rule governs them. Nothing
+  // in the corpus gives a figure for how far the deck laps onto the flank parapet, so this is
+  // seeded at what the app already drew and bills there, and nothing moves.
+  endLap: P(1.0, { unit: 'ft', note: 'roof-deck lap onto the flank parapet past the hole end wall — no published figure (illustrative)' }),
   stringerSpacing: P(1.0, { unit: 'ft', note: 'center-to-center stringer spacing (illustrative)' }),
   sheathingThickness: P(0.083, { unit: 'ft', note: 'roof sheathing ~1 in (illustrative)' }),
   dustproofThickness: P(0.02, { unit: 'ft', note: 'dustproof layer (illustrative)' }),
@@ -192,17 +204,40 @@ export const overhead = {
 export interface SpanSize {
   maxSpan: Provenance<number>;
   sizeLabel: string;
+  // Dressed square section of that stringer, in FEET. The engine has always resolved the size
+  // label and printed it on the BOM line, but the label never reached GeometryModel — so both
+  // views drew one fixed cross-section for every case (the 3D even labelled its own literal
+  // "per doctrine") while the bill said 8×8. A drawn beam thickness is a length a viewer
+  // measures against the scale bar, so it comes from here — and it is safety-critical for the
+  // same reason its own maxSpan is: this is the member holding the earth roof up, and a fill
+  // that shrinks it draws a hairline beam under a foot of dirt.
+  sectionFt: Provenance<number>;
 }
 export const spanSizes: SpanSize[] = [
-  { maxSpan: P(4.0, { unit: 'ft', safetyCritical: true, note: 'illustrative span limit' }), sizeLabel: '4×4' },
-  { maxSpan: P(6.0, { unit: 'ft', safetyCritical: true, note: 'illustrative span limit' }), sizeLabel: '6×6' },
-  { maxSpan: P(8.0, { unit: 'ft', safetyCritical: true, note: 'illustrative span limit' }), sizeLabel: '8×8' },
+  { maxSpan: P(4.0, { unit: 'ft', safetyCritical: true, note: 'illustrative span limit' }), sizeLabel: '4×4', sectionFt: P(0.292, { unit: 'ft', safetyCritical: true, note: 'dressed section of a 4×4 stringer (illustrative)' }) },
+  { maxSpan: P(6.0, { unit: 'ft', safetyCritical: true, note: 'illustrative span limit' }), sizeLabel: '6×6', sectionFt: P(0.458, { unit: 'ft', safetyCritical: true, note: 'dressed section of a 6×6 stringer (illustrative)' }) },
+  { maxSpan: P(8.0, { unit: 'ft', safetyCritical: true, note: 'illustrative span limit' }), sizeLabel: '8×8', sectionFt: P(0.625, { unit: 'ft', safetyCritical: true, note: 'dressed section of an 8×8 stringer (illustrative)' }) },
 ];
 export function stringerSizeForSpan(spanFt: number): string {
   for (const s of spanSizes) {
     if (spanFt <= s.maxSpan.value) return s.sizeLabel;
   }
   return 'engineered'; // beyond tabulated span → designer decides
+}
+// The drawn cross-section that goes with that size. Beyond the table there IS no size, so the
+// views fall back to the smallest tabulated section rather than inventing one — nothing is
+// drawn on that path anyway (§2.7 routes it to the hazard marker, never a roof).
+export function stringerSectionForSpan(spanFt: number): number {
+  for (const s of spanSizes) {
+    if (spanFt <= s.maxSpan.value) return s.sectionFt.value;
+  }
+  return spanSizes[0]!.sectionFt.value;
+}
+export function stringerSectionLeafForSpan(spanFt: number): Provenance<number> {
+  for (const s of spanSizes) {
+    if (spanFt <= s.maxSpan.value) return s.sectionFt;
+  }
+  return spanSizes[0]!.sectionFt;
 }
 
 // Retaining / revetment wall limits (structural → safety-critical).

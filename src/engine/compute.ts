@@ -5,11 +5,11 @@
 // byte-identical Result (asserted by the determinism test).
 
 import '../doctrine/index'; // side-effect: registers every Provenance leaf + freezes structure
-import { positions, vehicleRamp, parapetModeFor } from '../doctrine/positions';
+import { positions, vehicleRamp, parapetModeFor, access } from '../doctrine/positions';
 import { soils } from '../doctrine/soils';
 import { standards } from '../doctrine/standards';
 import { sandbag, revetments, camo, sump, excavation, machine } from '../doctrine/materials';
-import { parapet, berm, overhead, threats, standoffMinFor, standoffLeafFor, stringerSizeForSpan, radiationHalving } from '../doctrine/protection';
+import { parapet, berm, overhead, threats, standoffMinFor, standoffLeafFor, stringerSizeForSpan, stringerSectionForSpan, radiationHalving } from '../doctrine/protection';
 import type { ShieldMaterial } from '../doctrine/protection';
 import { counts } from '../doctrine/registry';
 import type { PositionRow } from '../doctrine/positions';
@@ -73,19 +73,29 @@ export interface Calc {
   coverT: number;
   coverMaterial: string;
   coverLeaf: Provenance<number> | undefined;
-  coverL: number;
-  coverW: number;
+  bearingEachEnd: number; // stringer overhang PAST its support, each end
+  roofEdgeFt: number; // OUTWARD extent of the deck past the front AND rear hole walls (setback + bearing)
+  roofEndFt: number; // OUTWARD extent of the deck past each flank wall (endLap)
+  roofNotchFt: number; // width of the rear entrance notch cut out of the deck (0 = none)
+  coverL: number; // deck extent along the FRONTAGE (holeL + 2 × endLap)
+  coverW: number; // deck extent FRONT-TO-BACK (holeW + 2 × roofEdgeFt)
+  coverArea: number; // deck plan area, notch removed
   coverVol: number;
   stringers: number;
-  stringerSpan: number; // clear span the stringers bridge (the SHORT axis)
+  stringerSpan: number; // clear span the stringers bridge (front-to-back, the axis they cross)
   stringerSize: string; // doctrine size label for that span ('' when no earth roof)
+  stringerSectionFt: number; // dressed square section that goes with that size
   radHalvingLeaf: Provenance<number> | undefined; // fallout halving-thickness for the cover material
   radHalvingLayers: number; // how many halving-thicknesses the earth cover provides (fallout)
 
   // volumes
   holeVol: number;
   hasPlatform: boolean;
-  platformVol: number;
+  platformL: number; // clamped to the hole it stands in — one footprint for bill and both views
+  platformW: number;
+  platformRise: number; // how far the platform surface stands ABOVE the bay floor
+  undugPlatformVol: number; // earth LEFT STANDING — subtracts from the excavation, never adds
+  platformClamped: boolean;
   firingStepOn: boolean;
   sumpOn: boolean;
   sumpCount: number;
@@ -175,10 +185,16 @@ function computeCalc(raw: Inputs): Calc {
   const standoffLeaf = standoffLeafFor(threat);
   const setback = Math.max(standoffMin, setbackDepthFrac * depthOfCut);
 
-  // Stringers span the SHORT axis (smallest clear span → smallest timber); they are laid out
-  // along the LONG axis at doctrine spacing. The pre-Phase-1 count keyed on the short axis —
-  // which implied stringers spanning the frontage, teaching wrong assembly.
-  const clearSpan = Math.min(holeL, holeW);
+  // Stringers cross FRONT-TO-BACK, because that is where the supports are: the doctrinal roof
+  // support layout is "3 total — 2 front and 1 rear" (modeling spec §2.b), i.e. supports lying
+  // along the frontage at the front and rear lips, so the beams laid on them run front-to-back
+  // and are laid out ALONG the frontage at doctrine spacing. min(holeL, holeW) coincided with
+  // that on every catalog position except the one-man hole (2.5 ft frontage / 4.0 ft
+  // front-to-back), where it rotated the roof 90° against the support layout.
+  const clearSpan = holeW;
+  // The access ramp is cut across the NARROW side of a vehicle position — its own axis, kept
+  // separate from the roof's span so a change to one never silently moves the other.
+  const rampWidth = Math.min(holeL, holeW);
 
   const coverOn = inputs.overheadCover && threat !== 'none';
   const cover = resolveCover(threat, coverOn, standard.coverMul.value, clearSpan);
@@ -198,13 +214,28 @@ function computeCalc(raw: Inputs): Calc {
 
   // Access ramp (vehicle positions): a wedge as long as slopeRatio × depth, as wide as the
   // vehicle side of the cut — the DOMINANT excavation volume of a defilade.
-  const rampVol = isVehicle ? 0.5 * vehicleRamp.slopeRatio.value * depthOfCut * depthOfCut * clearSpan : 0;
-  // §9 literal: platformVol keys purely on whether the POSITION has a firing platform
+  const rampVol = isVehicle ? 0.5 * vehicleRamp.slopeRatio.value * depthOfCut * depthOfCut * rampWidth : 0;
+  // §9 literal: the platform term keys purely on whether the POSITION has a firing platform
   // (a structural feature of crew-served positions), NOT on the firingStep input toggle.
+  //
+  // The platform is UNDISTURBED EARTH LEFT STANDING — the gun/launcher stand the crew bays are
+  // dug down around ("this is a CUT, not a build", modeling spec §2.f). So its volume is dug
+  // OUT of the excavation total, not added to it: this is the dirt nobody moves. Both drawings
+  // have always shown it that way; only the bill was inverted.
+  //
+  // The footprint is clamped to the hole it stands in HERE, in the one place the bill and both
+  // views all read, so a table that describes an impossible platform can never again leave the
+  // picture right and the spoil figure wrong. The rise is clamped to the cut for the same
+  // reason — a bench cannot stand taller than the floor is deep.
   const hasPlatform = position.firingPlatform !== undefined;
-  const platformVol = position.firingPlatform
-    ? position.firingPlatform.L.value * position.firingPlatform.W.value * position.firingPlatform.depthBelowHole.value
-    : 0;
+  const rawPlatform = position.firingPlatform;
+  const platformL = rawPlatform ? Math.min(rawPlatform.L.value, holeL) : 0;
+  const platformW = rawPlatform ? Math.min(rawPlatform.W.value, holeW) : 0;
+  const platformRise = rawPlatform ? Math.min(rawPlatform.riseAboveFloor.value, depthOfCut) : 0;
+  const platformClamped = rawPlatform !== undefined && (
+    platformL !== rawPlatform.L.value || platformW !== rawPlatform.W.value || platformRise !== rawPlatform.riseAboveFloor.value
+  );
+  const undugPlatformVol = platformL * platformW * platformRise;
   // The firingStep input drives the section-drawing firing-step ledge (§10) — a minor cut
   // §9 folds into holeVol. It adds no fabricated volume or labor of its own. A one-man position
   // is dug armpit-deep for standing fire and takes NO firing step (modeling spec §2.f), so the
@@ -226,17 +257,38 @@ function computeCalc(raw: Inputs): Calc {
   const sumpVol = sumpCount * oneSumpVol;
   const gravelVol = sumpCount * sump.gravelFt3.value;
 
-  const excavBank = holeVol + platformVol + sumpVol + rampVol;
+  // The platform SUBTRACTS: it is the one part of the footprint the crew does not dig.
+  const excavBank = holeVol - undugPlatformVol + sumpVol + rampVol;
   const excavLoose = excavBank * excavation.swellFactor.value;
 
+  // ── Roof footprint ───────────────────────────────────────────────────────────
+  // One signed convention, three views. Every extent below is measured OUTWARD from the
+  // corresponding hole wall and is ≥ 0 by construction; a consumer that subtracts one is
+  // drawing the roof on the wrong side of the wall it has to clear.
+  //
+  // FRONT and REAR are the SAME number, because the rule is orientation-blind: a rear support
+  // is a support. Supports stand back from the lip by `setback`; stringers are then laid across
+  // them overhanging `bearingEachEnd` past each one, and the deck follows the stringers. The
+  // ENDS take neither — no stringer end lands there — so they take the flank lap.
   const bearingEachEnd = overhead.bearingEachEnd.value;
-  const coverL = holeL + 2 * bearingEachEnd;
-  const coverW = holeW + 2 * bearingEachEnd;
+  const roofEdgeFt = setback + bearingEachEnd;
+  const roofEndFt = overhead.endLap.value;
+  // A roofed bunker/OP is the one position whose parapet ring is tall enough to seal it shut:
+  // extended the full rear bearing, the deck roofs over the rear entrance corridor. The DECK is
+  // notched across the passage width so the corridor stays open to the sky; the stringers keep
+  // their full rear bearing (you duck under a beam, you do not climb over a roof).
+  const roofNotchFt = position.shape === 'rect_roofed' ? Math.min(access.passWidthFt.value, holeL) : 0;
+  const coverL = holeL + 2 * roofEndFt;
+  const coverW = holeW + 2 * roofEdgeFt;
+  const coverArea = coverL * coverW - roofNotchFt * roofEdgeFt;
   const buildsEarthRoof = coverOn && roofPath === 'earth_on_stringers';
-  const coverVol = buildsEarthRoof ? coverL * coverW * coverT : 0;
+  const coverVol = buildsEarthRoof ? coverArea * coverT : 0;
   const spacing = overhead.stringerSpacing.value;
-  const stringers = buildsEarthRoof ? ceilInt(Math.max(holeL, holeW) / spacing) + 1 : 0;
+  // Counted over the DECK the same block bills, not over the bare hole — the old count left
+  // 2 ft of billed slab with no stringer under it on every position.
+  const stringers = buildsEarthRoof ? ceilInt(coverL / spacing) + 1 : 0;
   const stringerSize = buildsEarthRoof ? stringerSizeForSpan(clearSpan) : '';
+  const stringerSectionFt = stringerSectionForSpan(clearSpan);
 
   // Fallout attenuation the earth roof happens to provide, expressed in halving-thicknesses
   // (each layer roughly halves the dose). Consumes the radiationHalving doctrine leaf so those
@@ -335,17 +387,27 @@ function computeCalc(raw: Inputs): Calc {
     coverT,
     coverMaterial,
     coverLeaf: cover.thicknessLeaf,
+    bearingEachEnd,
+    roofEdgeFt,
+    roofEndFt,
+    roofNotchFt,
     coverL,
     coverW,
+    coverArea,
     coverVol,
     stringers,
     stringerSpan: clearSpan,
     stringerSize,
+    stringerSectionFt,
     radHalvingLeaf,
     radHalvingLayers,
     holeVol,
     hasPlatform,
-    platformVol,
+    platformL,
+    platformW,
+    platformRise,
+    undugPlatformVol,
+    platformClamped,
     firingStepOn,
     sumpOn,
     sumpCount,
@@ -397,6 +459,16 @@ const VOLUME_FIDELITY: Record<PositionRow['volumeModel'], string> = {
   cylinder: 'approximate — circular-pit volume model (π/4 of the bounding square)',
   prism_ramp: 'approximate — box cut plus access-ramp wedge',
 };
+// A compound position's rear stem / side arm is DRAWN (all three views now draw it from the
+// same doctrine leaves) but it is not in the volume model — holeVol is the main bay's bounding
+// prism only. Keying the fidelity statement on volumeModel alone meant the sheet never said so,
+// and a reader had no way to know the trench in the picture is outside the number.
+function volumeFidelity(pos: PositionRow): string {
+  const base = VOLUME_FIDELITY[pos.volumeModel];
+  if (pos.shape === 'inverted_t') return base + '; the rear stem trench is drawn but not billed';
+  if (pos.shape === 'l_shape') return base + '; the side arm trench is drawn but not billed';
+  return base;
+}
 const LABOR_FIDELITY = 'approximate — flat base rate plus per-volume dig rate; same base for every position type';
 
 export function compute(inputs: Inputs): Result {
@@ -404,7 +476,7 @@ export function compute(inputs: Inputs): Result {
   const c = counts();
   return {
     inputs: calc.inputs,
-    fidelity: { volume: VOLUME_FIDELITY[calc.position.volumeModel], labor: LABOR_FIDELITY },
+    fidelity: { volume: volumeFidelity(calc.position), labor: LABOR_FIDELITY },
     resolved: {
       holeL: calc.holeL,
       holeW: calc.holeW,

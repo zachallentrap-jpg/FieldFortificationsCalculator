@@ -8,6 +8,9 @@ import { labor } from '../src/doctrine/labor';
 import { compute } from '../src/engine/compute';
 import { defaultInputs } from './helpers';
 import type { BomLine } from '../src/engine/types';
+import { importDoctrine } from '../src/doctrine/io';
+import { getByPath } from '../src/doctrine/registry';
+import { DOCTRINE_VERSION } from '../src/version';
 
 // Independent re-derivation of the §9 chain (inline rounding, no engine internals) to prove
 // compute() wires the formula together correctly — not a tautology against its own helpers.
@@ -39,15 +42,19 @@ test('§9 chain: two-man / deliberate / loam / fragmentation matches an independ
   const sumpCount = pos.grenadeSumps; // sump toggle on
   const sumpVol = sumpCount * (sumpMat.L.value * sumpMat.W.value * sumpMat.D.value);
   const gravel = sumpCount * sumpMat.gravelFt3.value;
-  const excavBank = holeVol + 0 + sumpVol;
+  const excavBank = holeVol - 0 /* two-man has no firing platform to leave undug */ + sumpVol;
   const excavLoose = excavBank * excavation.swellFactor.value;
 
+  // The deck reaches OUTWARD past the hole on every side: setback + bearing front and rear
+  // (the supports stand back from the lip, the stringers overhang the supports), and the flank
+  // lap on the ends, where no stringer bears.
   const bearing = overhead.bearingEachEnd.value;
-  const coverL = holeL + 2 * bearing;
-  const coverW = holeW + 2 * bearing;
-  const coverVol = coverL * coverW * coverT;
-  // Stringers span the SHORT axis, laid out along the LONG axis at doctrine spacing.
-  const stringers = ceil(Math.max(holeL, holeW) / overhead.stringerSpacing.value) + 1;
+  const coverL = holeL + 2 * overhead.endLap.value;
+  const coverW = holeW + 2 * (setback + bearing);
+  const coverVol = coverL * coverW * coverT; // two_man is not a roofed bunker — no entrance notch
+  // Stringers run front-to-back onto the front and rear supports; they are counted across the
+  // DECK's frontage, which is the slab the same block bills.
+  const stringers = ceil(coverL / overhead.stringerSpacing.value) + 1;
 
   const bagVol = sandbag.L.value * sandbag.W.value * sandbag.H.value;
   const waste = sandbag.wasteFactor.value;
@@ -109,3 +116,56 @@ test('count scales qtyTotal and man-hours', () => {
   assert.equal(parapetTen.qtyTotal, parapetOne.qtyPerPosition * 10);
   approx(ten.labor.manHoursTotal, Math.round(one.labor.manHoursPerPosition * 10 * 10) / 10);
 });
+
+// ── The roof's three edges answer to three different leaves ──────────────────
+
+test('the flank lap, the bearing and the setback each move the edge they govern, and only that one', () => {
+  // All three are 1.0 ft / 1.25 ft today, so a consumer that reads the WRONG one is invisible
+  // to any test that only checks today's numbers — which is exactly how the rear edge came to
+  // read a bearing leaf where the rule wanted a setback, and how the ends came to read the rear
+  // figure. Filling each leaf apart, through the sanctioned importer, is what tells them apart.
+  const before = compute(defaultInputs({ positionType: 'two_man', threat: 'ind-mtr-81', overheadCover: true }));
+  const baseRoof = (before.geometry as { section: { roof: { frontFt: number; rearFt: number; endFt: number } } }).section.roof;
+
+  withDoctrine({ 'protection.overhead.endLap': 2.5 }, () => {
+    const r = compute(defaultInputs({ positionType: 'two_man', threat: 'ind-mtr-81', overheadCover: true }));
+    const roof = (r.geometry as { section: { roof: { frontFt: number; rearFt: number; endFt: number } } }).section.roof;
+    approx(roof.endFt, 2.5);
+    approx(roof.frontFt, baseRoof.frontFt);
+    approx(roof.rearFt, baseRoof.rearFt);
+    // …and the deck the BOM prices follows the ends, not the edges.
+    approx(qty(r.bom, 'stringers'), Math.ceil((7 + 2 * 2.5) / overhead.stringerSpacing.value) + 1);
+  });
+
+  withDoctrine({ 'protection.overhead.bearingEachEnd': 0.25 }, () => {
+    const r = compute(defaultInputs({ positionType: 'two_man', threat: 'ind-mtr-81', overheadCover: true }));
+    const roof = (r.geometry as { section: { roof: { frontFt: number; rearFt: number; endFt: number } } }).section.roof;
+    approx(roof.endFt, baseRoof.endFt, 1e-9); // the ends carry no stringer end — untouched
+    approx(roof.frontFt, baseRoof.frontFt - 0.75);
+    approx(roof.rearFt, baseRoof.rearFt - 0.75);
+  });
+
+  withDoctrine({ 'protection.overhead.setbackMin': 3.0, 'protection.threats.ind-mtr-81.standoffMin': 3.0 }, () => {
+    const r = compute(defaultInputs({ positionType: 'two_man', threat: 'ind-mtr-81', overheadCover: true }));
+    const roof = (r.geometry as { section: { roof: { frontFt: number; rearFt: number; endFt: number } } }).section.roof;
+    approx(roof.endFt, baseRoof.endFt, 1e-9);
+    approx(roof.frontFt, 3.0 + overhead.bearingEachEnd.value);
+    approx(roof.rearFt, roof.frontFt, 1e-9); // front and rear move together — one rule
+  });
+});
+
+// Fill leaves through the sanctioned importer and put them back afterwards, so the fixture is a
+// fill a qualified user could actually have made.
+function withDoctrine(values: Record<string, number>, body: () => void): void {
+  const fileOf = (v: Record<string, number>): unknown => ({
+    doctrineVersion: DOCTRINE_VERSION,
+    entries: Object.entries(v).map(([path, value]) => ({ path, value, status: 'PLACEHOLDER', source: getByPath(path)!.source })),
+  });
+  const restore = Object.fromEntries(Object.keys(values).map((k) => [k, getByPath(k)!.value as number]));
+  assert.ok(importDoctrine(fileOf(values)).ok, 'fixture fill applies');
+  try {
+    body();
+  } finally {
+    assert.ok(importDoctrine(fileOf(restore)).ok, 'doctrine restored');
+  }
+}

@@ -193,3 +193,33 @@ reintroduce one without tripping a gate. They are worth one focused pass, but th
 rank below the phase-2 work: the rule↔rendering defects (C1, C2, C3, C7) are live
 disagreements between the rules and the drawings today, which is the failure the
 tool cannot afford.
+
+---
+
+## 7. Found during remediation, not by the audit
+
+Two findings surfaced only when adversarial reviewers swept input spaces and
+compared one consumer's answer against another's for the same job. Both are
+recorded here because the audit missed them, which says something about what
+reading code cannot catch.
+
+- **C27 (S1) — the build-stage schedule ignored `count`.** `scheduleStages`
+  partitions one position's man-hours and never multiplies by
+  `result.inputs.count`, so a multi-position job was certified ready on a single
+  position's clock. Measured on two_man/loam/deliberate, team 4, 24 h budget:
+  ten positions reported 3.0 h, feasible, 21 h to spare, against `compute()`'s
+  own 30.3 h for the same job; 999 positions still reported 3.0 h against
+  3,022 h. The planner exists to answer "are we dug in by stand-to", and it
+  answered better than reality by exactly the count. Found by sweeping counts
+  and diffing the scheduler against `compute()`, not by reading either.
+- **C28 (S2) — a crib bunker's entrance header was governed by nothing.** The
+  header is a 6x8 timber cut from the cap beam; `SPAN.header`'s table stops at
+  2x12, so no row could rate it, while the packet printed both the header size
+  and the span limit as values its doorway rested on. Found by the life-safety
+  register gate on its first run, after the same defect class had been fixed
+  three times by hand.
+
+The lesson both share: a defect that lives in the *gap between* two consumers is
+invisible to a reviewer looking at either one. The checks that caught them —
+cross-consumer agreement, and coverage driven by what the generators emit rather
+than by what a register claims — are the ones worth keeping.

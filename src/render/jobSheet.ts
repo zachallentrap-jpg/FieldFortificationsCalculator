@@ -10,6 +10,7 @@ import { drawSection } from './drawSection';
 import { DAY_TOKENS_CSS } from './print-tokens';
 import { APP_VERSION } from '../version';
 import { positions } from '../doctrine/positions';
+import { overhead } from '../doctrine/protection';
 import { fmtLength, fmtBomQty } from '../doctrine/units';
 import { getFillState } from '../doctrine/io';
 import { computeStages } from '../engine/stages';
@@ -63,7 +64,12 @@ export function jobSheet(result: Result, meta: JobSheetMeta): string {
     specRow('Front-to-back', fmtLength(r.holeW, unit)) +
     specRow('Overall (L×W)', fmtLength(r.outerL, unit) + ' × ' + fmtLength(r.outerW, unit)) +
     specRow('Parapet', fmtLength(r.parapetW, unit) + ' thick, ' + fmtLength(r.parapetH, unit) + ' high') +
-    specRow('Roof setback', fmtLength(r.setback, unit)) +
+    // Two stages of one assembly, printed as two rows: the supports stand back from the hole
+    // edge by the setback, and the stringers then overhang each support by the bearing. One row
+    // under one label taught them as one number, and a reader had no way to see the roof edge
+    // sits at the sum of both, outward of the lip.
+    specRow('Roof support setback (outward from hole edge)', fmtLength(r.setback, unit)) +
+    specRow('Stringer bearing past each support', fmtLength(overhead.bearingEachEnd.value, unit)) +
     (result.cover.roofPath === 'earth_on_stringers'
       ? specRow('Overhead cover', fmtLength(result.cover.thickness, unit) + ' ' + result.cover.material)
       : result.cover.roofPath === 'engineered_required'
@@ -120,7 +126,9 @@ function engineerBlock(result: Result): string {
   const rows =
     specRow('Threat to defeat', threatName(result)) +
     specRow('Clear span to roof', fmtLength(result.resolved.holeL, u) + ' × ' + fmtLength(result.resolved.holeW, u)) +
-    specRow('Standoff achieved', fmtLength(result.resolved.setback, u)) +
+    // This is the OVERHEAD-COVER SUPPORT setback, not a threat keep-out distance — printed
+    // under "standoff achieved" a reader takes it for the latter.
+    specRow('Roof support setback', fmtLength(result.resolved.setback, u)) +
     specRow('Depth of cut', fmtLength(result.resolved.depthOfCut, u));
   return (
     '<section><h2>Take this to the engineer (roof must be engineered)</h2>' +

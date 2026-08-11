@@ -4,7 +4,9 @@
 // (protection desc, then man-hours asc, then a fixed tie-break key).
 
 import { compute } from './compute';
-import { clamp, finite } from './round';
+import { revetments } from '../doctrine/materials';
+import { normalizeTeamSize } from './stages';
+import { finite } from './round';
 import type { Inputs, RoofPath } from './types';
 
 export interface PlanRequest {
@@ -16,7 +18,8 @@ export interface PlanRequest {
 export interface PlanOption {
   inputs: Inputs;
   standard: Inputs['standard'];
-  overheadCover: boolean;
+  overheadCover: boolean; // what this option ASKED for
+  deliversCover: boolean; // what it actually BUILDS — an engineered roof delivers nothing
   revetment: string;
   manHoursTotal: number;
   elapsedHours: number;
@@ -36,25 +39,42 @@ export interface PlanResult {
 
 const STANDARDS: Inputs['standard'][] = ['reinforced', 'deliberate', 'hasty'];
 const STANDARD_RANK: Record<Inputs['standard'], number> = { hasty: 1, deliberate: 2, reinforced: 3 };
-const REVETS = ['none', 'sandbag_facing', 'pickets_wire'];
+// Swept from the same doctrine table the main revetment select is built from
+// (layout/controls.ts renders optionsFrom(revetments)), so the "best plan" is chosen from every
+// facing the operator can actually build. The hand-written list here held three of the five —
+// corrugated_metal and timber_plywood were offered in the UI but could never be proposed.
+const REVETS = Object.keys(revetments);
 
-function protectionScore(std: Inputs['standard'], coverOn: boolean, roofPath: RoofPath, revet: string): number {
+// Scored on what the option BUILDS, not on what it asked for: an engineered roof contributes no
+// cover, no stringers, no cover BOM and no overhead labor anywhere else in the engine, so it
+// contributes no protection here either.
+function protectionScore(std: Inputs['standard'], deliversCover: boolean, revet: string): number {
   let s = STANDARD_RANK[std] * 4;
-  if (coverOn && roofPath === 'earth_on_stringers') s += 3;
+  if (deliversCover) s += 3;
   if (revet !== 'none') s += 1;
   return s;
 }
 
 // Fixed tie-break so ordering is fully deterministic regardless of iteration nuances.
 function tieKey(o: PlanOption): string {
-  return String(4 - STANDARD_RANK[o.standard]) + (o.overheadCover ? '0' : '1') + o.revetment;
+  // Cover rank, best first: a roof that gets built; then no roof asked for; LAST the option that
+  // asked for cover the engine refuses to size. That last pair is otherwise indistinguishable —
+  // identical protection score (nothing is built) and identical man-hours (no overhead labor is
+  // charged) — and ranking the request ahead of its honest twin put "overhead cover: yes" at the
+  // top of the plan for every threat that forces an engineered roof.
+  const cover = o.deliversCover ? '0' : o.overheadCover ? '2' : '1';
+  return String(4 - STANDARD_RANK[o.standard]) + cover + o.revetment;
 }
 
 export function planForTime(req: PlanRequest): PlanResult {
-  // Match compute()'s own [1,50] clamp exactly (engine/compute.ts) — a local reimplementation
-  // that only floors, not ceilings, let an option's "Use" button push an out-of-range team size
+  // compute()'s own [1,50] normalization, shared from stages.ts — a local reimplementation that
+  // only floored, not ceilinged, let an option's "Use" button push an out-of-range team size
   // (e.g. 500) into the live store even though every number shown was computed for a team of 50.
-  const teamSize = clamp(Math.round(finite(req.teamSize, 1)), 1, 50);
+  const teamSize = normalizeTeamSize(req.teamSize);
+  // An unreadable budget certifies nothing, so it becomes zero hours: no option is reported as
+  // fitting, and the echoed budget is a number the caller can print ("nothing fits 0 hr")
+  // instead of the NaN that used to be handed straight back out.
+  const budgetHours = finite(req.availableHours, 0);
   const options: PlanOption[] = [];
 
   for (const standard of STANDARDS) {
@@ -62,18 +82,23 @@ export function planForTime(req: PlanRequest): PlanResult {
       for (const revetment of REVETS) {
         const inputs: Inputs = { ...req.base, standard, overheadCover, revetment, teamSize };
         const r = compute(inputs);
+        // The only roof path that puts material overhead. 'engineered_required' means the engine
+        // refuses to size a roof for this threat, and 'none' means none was asked for; in both
+        // cases nothing is built, so the option delivers no cover however it was requested.
+        const deliversCover = r.cover.roofPath === 'earth_on_stringers';
         options.push({
           // compute()'s own clamped echo, not the locally-built `inputs` — keeps this in sync
           // if compute() ever normalizes anything else about the inputs beyond count/team.
           inputs: r.inputs,
           standard,
           overheadCover,
+          deliversCover,
           revetment,
           manHoursTotal: r.labor.manHoursTotal,
           elapsedHours: r.labor.elapsedHours,
           roofPath: r.cover.roofPath,
-          protectionScore: protectionScore(standard, r.cover.roofPath === 'none' ? false : overheadCover, r.cover.roofPath, revetment),
-          feasible: r.labor.elapsedHours <= req.availableHours,
+          protectionScore: protectionScore(standard, deliversCover, revetment),
+          feasible: r.labor.elapsedHours <= budgetHours,
           hasErrors: r.validation.some((v) => v.severity === 'error'),
         });
       }
@@ -95,7 +120,7 @@ export function planForTime(req: PlanRequest): PlanResult {
   const infeasible = options.filter((o) => !o.feasible).sort(rank);
 
   return {
-    budgetHours: req.availableHours,
+    budgetHours,
     teamSize,
     feasible,
     infeasibleBest: infeasible[0] ?? null,

@@ -67,35 +67,68 @@ test('the 3D engineered-roof hazard marker\'s footprint matches the 2D section\'
   }
 });
 
-test('3D roof cover\'s front/rear insets exactly match the 2D section\'s own setback and rearOverhang', () => {
-  // geo.section.setback (threat-aware, front-only) and geo.section.rearOverhang (structural
-  // bearing-shelf only, no threat concern) are the SAME engine-computed values the 2D section
-  // draws and the specs panel reports — the 3D cover box is asymmetric (front != rear) and must
-  // recover EXACTLY these two values from its own footprint, or the views disagree on a
-  // safety-critical (front) or structural (rear) dimension.
+test('the 3D roof recovers exactly the published footprint — both edges, both ends, uncapped stringers', () => {
+  // geo.section.roof is the ONE footprint the bill and both drawings read, published as OUTWARD
+  // extents and as absolute edge coordinates in the section's own frame. The 3D cover box must
+  // recover them from its own geometry, front and rear independently (no symmetry assumed), or
+  // the views disagree about where a safety-critical edge is.
   for (const threat of ['sa-556', 'ind-mtr-81', 'ind-art-105', 'ind-art-155', 'blast-demo']) {
     const r = compute(defaultInputs({ positionType: 'one_man', overheadCover: true, threat, sump: false }));
-    const geo = r.geometry as { section: { setback: number; rearOverhang: number; roofPath: string }; plan: { holeW: number } };
+    const geo = r.geometry as { section: { roof: { frontEdgeFt: number; rearEdgeFt: number; endEdgeFt: number; frontFt: number; rearFt: number; endFt: number; entranceNotchFt: number; stringer: { count: number; sectionFt: number } } | null; roofPath: string }; plan: { holeW: number } };
     assert.equal(geo.section.roofPath, 'earth_on_stringers', threat + ': fixture must exercise the earth roof path');
+    const roof = geo.section.roof!;
     const scene = buildScene3D(r);
-    const cover = scene.parts.find((p) => p.kind === 'box' && p.role === 'cover') as { z: number; d: number } | undefined;
+    const cover = scene.parts.find((p) => p.kind === 'box' && p.role === 'cover') as { x: number; z: number; w: number; d: number } | undefined;
     assert.ok(cover, threat + ': cover box present');
-    // z axis: negative = front (enemy side), positive = rear (file header convention). The box
-    // is centered at z with total depth d, so its two edges recover each inset independently —
-    // no assumption of symmetry, unlike halving the total overhang would require.
     const frontEdgeZ = cover!.z - cover!.d / 2;
     const rearEdgeZ = cover!.z + cover!.d / 2;
-    const frontInset3d = -frontEdgeZ - geo.plan.holeW / 2;
-    const rearInset3d = rearEdgeZ - geo.plan.holeW / 2;
-    assert.ok(
-      Math.abs(frontInset3d - geo.section.setback) < 1e-9,
-      threat + ': 3D front inset ' + frontInset3d.toFixed(3) + ' ft != 2D/specs-panel setback ' + geo.section.setback.toFixed(3) + ' ft',
-    );
-    assert.ok(
-      Math.abs(rearInset3d - geo.section.rearOverhang) < 1e-9,
-      threat + ': 3D rear inset ' + rearInset3d.toFixed(3) + ' ft != 2D rearOverhang ' + geo.section.rearOverhang.toFixed(3) + ' ft',
-    );
+    assert.ok(Math.abs(frontEdgeZ - roof.frontEdgeFt) < 1e-9, threat + ': 3D front edge ' + frontEdgeZ.toFixed(3) + ' != published ' + roof.frontEdgeFt.toFixed(3));
+    assert.ok(Math.abs(rearEdgeZ - roof.rearEdgeFt) < 1e-9, threat + ': 3D rear edge ' + rearEdgeZ.toFixed(3) + ' != published ' + roof.rearEdgeFt.toFixed(3));
+    // The ENDS take the flank lap, not the rear figure — the 3D used to reuse the rear bearing
+    // on the x axis, applying a bearing requirement where no stringer bears.
+    assert.ok(Math.abs(cover!.w / 2 - roof.endEdgeFt) < 1e-9, threat + ': 3D end edge != published endEdgeFt');
+    assert.ok(roof.frontFt > roof.endFt || roof.frontFt === roof.endFt, threat + ': ends and edges are separate quantities');
+    // Every stringer the BOM bills is drawn, at the section the engine resolved for the span —
+    // the old cap of 8 and the fixed 0.35 × 0.30 ft beam are both gone.
+    const beams = scene.parts.filter((p) => p.kind === 'box' && p.role === 'stringer') as Array<{ w: number; h: number; d: number }>;
+    assert.equal(beams.length, roof.stringer.count, threat + ': drawn stringer count == billed count');
+    for (const b of beams) {
+      assert.ok(Math.abs(b.w - roof.stringer.sectionFt) < 1e-9 && Math.abs(b.h - roof.stringer.sectionFt) < 1e-9, threat + ': beam drawn at its resolved section');
+      assert.ok(Math.abs(b.d - (roof.rearEdgeFt - roof.frontEdgeFt)) < 1e-9, threat + ': beams run FRONT-TO-BACK across the whole deck, onto their bearing at both ends');
+    }
   }
+});
+
+test('the uncapped stringer count reaches the view that used to draw eight of them', () => {
+  // Measured at HEAD: connecting_trench billed 16 and drew 8; bunker_op_cp 11 → 8; fifty_cal
+  // 10 → 8; mg_crew 9 → 8. The picture and the bill counted different roofs.
+  for (const positionType of ['connecting_trench', 'bunker_op_cp', 'fifty_cal', 'mg_crew']) {
+    const r = compute(defaultInputs({ positionType, overheadCover: true, threat: 'ind-mtr-81' }));
+    const billed = r.bom.find((l) => l.id === 'stringers')!.qtyPerPosition;
+    assert.ok(billed > 8, positionType + ': fixture must bill more stringers than the old cap');
+    const drawn = buildScene3D(r).parts.filter((p) => p.kind === 'box' && p.role === 'stringer').length;
+    assert.equal(drawn, billed, positionType + ': drew ' + drawn + ' of ' + billed + ' billed stringers');
+  }
+});
+
+test('the bunker\'s roof leaves its own entrance open, and the stringers keep their rear bearing', () => {
+  const r = compute(defaultInputs({ positionType: 'bunker_op_cp', overheadCover: true, threat: 'ind-mtr-81' }));
+  const geo = r.geometry as { section: { roof: { entranceNotchFt: number; rearEdgeFt: number; frontEdgeFt: number; endEdgeFt: number } | null; holeW: number } };
+  const roof = geo.section.roof!;
+  assert.ok(roof.entranceNotchFt > 0, 'the fixture is the roofed position');
+  const scene = buildScene3D(r);
+  const covers = scene.parts.filter((p) => p.kind === 'box' && p.role === 'cover') as Array<{ x: number; z: number; w: number; d: number }>;
+  assert.equal(covers.length, 3, 'a main deck plus the two rear wings flanking the notch');
+  // Nothing covers the corridor: the notch centreline is clear behind the rear wall line.
+  const rearOfWall = covers.filter((c) => c.z + c.d / 2 > geo.section.holeW / 2 + 1e-9);
+  for (const c of rearOfWall) {
+    assert.ok(Math.abs(c.x) - c.w / 2 >= roof.entranceNotchFt / 2 - 1e-9, 'no deck over the entrance corridor');
+  }
+  // The stringers are NOT shortened — R10's acceptance criterion is that their ends still bear
+  // on undisturbed ground, which a deck trim would have taken away from every one of them.
+  const beams = scene.parts.filter((p) => p.kind === 'box' && p.role === 'stringer') as Array<{ d: number }>;
+  assert.ok(beams.length > 0);
+  for (const b of beams) assert.ok(Math.abs(b.d - (roof.rearEdgeFt - roof.frontEdgeFt)) < 1e-9, 'every stringer keeps its full front and rear bearing');
 });
 
 test('parapet and cover exist and are never tagged with the revetment\'s finish, regardless of choice', () => {
@@ -248,13 +281,34 @@ test('a revetted wall never tapers, regardless of how steep the soil would other
 
 test('a deep walk-in position gets a graded entry stair; a tight fighting hole does not', () => {
   // Regression guard for R6. The bunker is deep AND roomy front-to-back (8 ft) → walk-in stair.
-  const deep = buildScene3D(compute(defaultInputs({ positionType: 'bunker_op_cp' })));
+  const deepResult = compute(defaultInputs({ positionType: 'bunker_op_cp' }));
+  const deep = buildScene3D(deepResult);
   const steps = deep.parts.filter((p) => p.kind === 'box' && p.role === 'entryStep') as Array<{ y: number; h: number; z: number }>;
   assert.ok(steps.length >= 2, 'a deep walk-in cut has ≥2 entry steps');
-  for (const s of steps) {
-    assert.ok(s.y + s.h / 2 < 0, 'every step top is below grade');
-    assert.ok(s.z > 0, 'entry steps sit at the rear (+z), the entrance side');
+  for (const s of steps) assert.ok(s.y + s.h / 2 < 0, 'every step top is below grade');
+  // The flight starts at the REAR inner wall (+z, the entrance side — never through the frontal
+  // parapet facing the threat) and marches forward as it drops. It used to be asserted as "every
+  // step has z > 0", which held only because there were exactly two of them; a stair with risers
+  // a person can climb needs real run, and on the bunker's 6.5 ft cut that run reaches just past
+  // the bay's centreline. Anchored-at-the-rear plus monotonic descent is the invariant that was
+  // actually meant, and it says more than the old one did.
+  const byDepth = [...steps].sort((a, b) => (b.y + b.h / 2) - (a.y + a.h / 2));
+  assert.ok(byDepth[0]!.z > 0, 'the flight starts at the rear (+z), the entrance side');
+  for (let i = 1; i < byDepth.length; i++) {
+    assert.ok(byDepth[i]!.z < byDepth[i - 1]!.z, 'each step is further forward than the one above it');
   }
+  // And every riser is one a person can actually climb. The count used to be a flat two treads
+  // sharing whatever the cut happened to be: measured at HEAD, the bunker's 6.5 ft cut gave a
+  // 2.167 ft (26 in) rise on a 6-in tread, which is a fall with a ledge, not a way down.
+  const access = (deepResult.geometry as { section: { access: { stairMaxRiserFt: number } } }).section.access;
+  const depth = (deepResult.geometry as { section: { depthOfCut: number } }).section.depthOfCut;
+  const tops = steps.map((s) => -(s.y + s.h / 2)).sort((a, b) => a - b);
+  let previous = 0;
+  for (const t of tops) {
+    assert.ok(t - previous <= access.stairMaxRiserFt + 1e-9, 'riser ' + (t - previous).toFixed(3) + ' ft exceeds the climbable rise ' + access.stairMaxRiserFt);
+    previous = t;
+  }
+  assert.ok(depth - previous <= access.stairMaxRiserFt + 1e-9, 'the last step down to the floor is climbable too');
   // A 2-ft-deep (front-to-back) fighting hole is a drop-in — a staircase would eat the whole
   // floor, so it gets none.
   const tight = buildScene3D(compute(defaultInputs({ positionType: 'two_man', revetment: 'none' })));

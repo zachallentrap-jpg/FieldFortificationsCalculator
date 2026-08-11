@@ -60,8 +60,34 @@ test('every position has a known shape and complete hole geometry', () => {
       assert.equal(typeof pos.hole[dim].value, 'number');
     }
     if (pos.firingPlatform) {
-      assert.equal(typeof pos.firingPlatform.depthBelowHole.value, 'number');
+      assert.equal(typeof pos.firingPlatform.riseAboveFloor.value, 'number');
     }
+  }
+});
+
+test('every firing platform fits inside the hole it stands in, at the shallowest standard', () => {
+  // The table used to describe a geometrically impossible position: fifty_cal's platform was
+  // 3.0 ft wide inside its own 2.0 ft trench. The DRAWINGS clamped it and the BOM did not, so
+  // the picture was right and the spoil figure was wrong — a clamp is a fail-safe, never the
+  // thing that makes a table true. These are the invariants that make the impossible state
+  // unrepresentable in source, checked against the live table so a source edit trips them.
+  const shallowest = Math.min(...Object.values(standards).map((st) => st.depthMul.value));
+  for (const [id, pos] of Object.entries(positions)) {
+    const plat = pos.firingPlatform;
+    if (!plat) continue;
+    assert.ok(plat.L.value <= pos.hole.L.value, id + ': platform.L ' + plat.L.value + ' exceeds hole.L ' + pos.hole.L.value);
+    assert.ok(plat.W.value <= pos.hole.W.value, id + ': platform.W ' + plat.W.value + ' exceeds hole.W ' + pos.hole.W.value);
+    // Evaluated at the SHALLOWEST cut the app can produce, not at deliberate: a bench taller
+    // than the floor is deep is an inverted position, and hasty is where that bites first.
+    assert.ok(
+      plat.riseAboveFloor.value <= pos.hole.D.value * shallowest,
+      id + ': platform rise ' + plat.riseAboveFloor.value + ' exceeds the hasty cut ' + (pos.hole.D.value * shallowest),
+    );
+    // A bench covering the entire floor is not a bench — the crew bays have to exist.
+    assert.ok(
+      plat.L.value * plat.W.value < pos.hole.L.value * pos.hole.W.value,
+      id + ': the platform covers the whole bay floor, leaving no crew bay beside it',
+    );
   }
 });
 

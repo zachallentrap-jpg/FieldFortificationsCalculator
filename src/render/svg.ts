@@ -71,6 +71,10 @@ export const CALLOUTS: Record<string, CalloutDef> = {
   ramp: { n: 14, label: 'Vehicle access ramp' },
   elbow: { n: 15, label: 'Elbow rest (aiming support)' },
   backblast: { n: 16, label: 'Backblast danger area — keep clear' },
+  // The crew-served firing platform is NOT the firing step: it is ground nobody dug, the stand
+  // the bays are cut down around. It borrowed the firing-step line for years, which taught a
+  // built step where doctrine leaves earth.
+  platform: { n: 17, label: 'Ground left undug to stand/mount on (firing platform)' },
 };
 
 // Disc sizes meet the legibility floor (--disc-min-px 16, --label-min-px 11).

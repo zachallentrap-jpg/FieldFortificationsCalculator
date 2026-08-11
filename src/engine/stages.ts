@@ -13,9 +13,36 @@
 import { excavationSplit, STAGE_ORDER, STAGE_BOM } from '../doctrine/stages';
 import { labor as laborDoctrine } from '../doctrine/labor';
 import { revetments } from '../doctrine/materials';
-import { round1 } from './round';
+import { round1, clamp, finite } from './round';
 import type { StageId } from '../doctrine/stages';
 import type { BomLine, Result } from './types';
+
+// ── Input normalization shared with the other planners ─────────────────────────
+// compute() normalizes a team size as clamp(round(finite(x, 1)), 1, 50) before it divides
+// man-hours by it. Every clock downstream of compute() must use THAT normalization or the two
+// disagree about the same input: a local floor-with-no-ceiling scheduled a team of 500 at
+// 12.1 mh / 500 = 0.02 h → "0 hr" while compute()'s own elapsed figure for the identical
+// position (team clamped to 50) was 0.2 hr. plan.ts had already fixed its own copy; this
+// module and mission.ts had not, so the definition now lives in one place and they import it.
+// compute.ts still holds its own copy of the expression — the cross-module agreement is locked
+// by test/engine-input-guards.test.ts, which compares this against compute()'s echoed inputs.
+const TEAM_MIN = 1;
+const TEAM_MAX = 50;
+
+export function normalizeTeamSize(raw: unknown): number {
+  // Character-for-character compute()'s expression. The fallback is also the pessimistic end:
+  // an unreadable team size becomes a team of ONE — the smallest crew, hence the longest
+  // build. An unreadable input may never shorten a clock.
+  return clamp(Math.round(finite(raw, TEAM_MIN)), TEAM_MIN, TEAM_MAX);
+}
+
+// round1() maps a non-finite value to 0 (round.ts) — right for a material count, catastrophic
+// for a clock, because it turns "this could not be worked out" into "it takes no time at all".
+// Times therefore keep a non-finite value rather than collapsing to zero: a schedule may look
+// broken, but it may never look finished.
+export function roundHours(n: number): number {
+  return Number.isFinite(n) ? round1(n) : n;
+}
 
 // Whether the position total actually CHARGED revetment labor — the truth is the resolved
 // row's buildsFace (exactly what compute.ts keys on), NOT a raw `revetment !== 'none'` string
@@ -109,15 +136,38 @@ export interface ScheduledStep extends StageStep {
 export interface Schedule {
   steps: ScheduledStep[];
   totalElapsedHours: number;
-  availableHours: number;
+  availableHours: number; // the NORMALIZED budget this schedule was judged against
   feasible: boolean; // completes by stand-to?
   shortfallHours: number; // hours past stand-to (0 if feasible)
   effectiveDiggers: number; // team × posture
+  inputsUsable: boolean; // false when an option was unreadable and a fallback was scheduled
 }
 
+// The digging fraction's range. Both ends are arithmetic, not doctrinal: a posture of zero is a
+// division by zero (an infinite clock) and a posture above one is more diggers than the team has.
+const POSTURE_MIN = 0.01;
+const POSTURE_MAX = 1;
+
 export function scheduleStages(plan: StagePlan, opts: ScheduleOpts): Schedule {
-  const team = Math.max(1, Math.floor(opts.teamSize));
-  const posture = Math.min(1, Math.max(0.01, opts.securityPostureFrac));
+  // A non-finite scheduling option may never shorten the clock or certify stand-to. Each is
+  // normalized to the pessimistic end of its own range instead of being passed into the math:
+  //   teamSize          → 1 (compute()'s fallback; the smallest crew, so the longest build)
+  //   securityPosture   → POSTURE_MIN (the fewest hands on the tools)
+  //   availableHours    → 0 (a budget that cannot be read certifies nothing)
+  // and inputsUsable records that a fallback was used, so a caller never presents the fallback
+  // clock as the operator's own numbers. Before this guard, securityPostureFrac: NaN reached
+  // Math.max(0.01, NaN) = NaN, flowed through effectiveDiggers into the cumulative sum, and
+  // round1(NaN) returned 0 — the schedule came back totalElapsedHours: 0, feasible: true, i.e.
+  // "the position is already dug". That is the one answer this function must never give.
+  // A NaN availableHours was the mirror image: feasible false with a shortfall of 0 hours.
+  const inputsUsable =
+    Number.isFinite(opts.teamSize) &&
+    Number.isFinite(opts.securityPostureFrac) &&
+    Number.isFinite(opts.availableHours);
+  const team = normalizeTeamSize(opts.teamSize);
+  // clamp() returns its minimum for a non-finite input, which is the pessimistic end here.
+  const posture = clamp(opts.securityPostureFrac, POSTURE_MIN, POSTURE_MAX);
+  const availableHours = finite(opts.availableHours, 0);
   // Machine assist is NOT re-applied here: compute.ts already scales the excavation man-hours
   // by machine.excavationFactor when inputs.machineAssist is on (the total this plan partitions,
   // result.labor.manHoursPerPosition, is already the machine-adjusted figure). Dividing by an
@@ -129,16 +179,20 @@ export function scheduleStages(plan: StagePlan, opts: ScheduleOpts): Schedule {
   let cumulative = 0;
   const steps: ScheduledStep[] = plan.steps.map((s) => {
     cumulative += s.manHours / effectiveDiggers;
-    return { ...s, cumulativeHours: round1(cumulative) };
+    return { ...s, cumulativeHours: roundHours(cumulative) };
   });
-  const totalElapsedHours = round1(cumulative);
-  const feasible = totalElapsedHours <= opts.availableHours + 1e-9;
+  const totalElapsedHours = roundHours(cumulative);
+  // A non-finite total (only reachable from a hand-built StagePlan — computeStages derives every
+  // stage from compute()'s finite total) fails this comparison, so it can never come back
+  // feasible; roundHours keeps it visible rather than reporting it as zero hours of work.
+  const feasible = totalElapsedHours <= availableHours + 1e-9;
   return {
     steps,
     totalElapsedHours,
-    availableHours: opts.availableHours,
+    availableHours,
     feasible,
-    shortfallHours: feasible ? 0 : round1(totalElapsedHours - opts.availableHours),
+    shortfallHours: feasible ? 0 : roundHours(totalElapsedHours - availableHours),
     effectiveDiggers: round1(effectiveDiggers),
+    inputsUsable,
   };
 }

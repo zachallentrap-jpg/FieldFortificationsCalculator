@@ -3,6 +3,11 @@
 // roof hazard block — never a fabricated thickness, §2.7), firing step/platform, grenade
 // sump, a standing figure + scale bar for real-world scale, and single-accent dimensions.
 // FRONT is drawn on the left to stay consistent with the plan's front (enemy) side.
+//
+// Every element that depicts a PHYSICAL feature carries data-feature="<callout key>" — the same
+// key set the callout registry already owns. It is invisible and additive, and it is what lets
+// the cross-view sweep read this drawing's own numbers back off the page instead of guessing at
+// a feature by fill colour and label proximity.
 
 import { el, group, textEl, callout } from './svg';
 import { makeProjector } from './project';
@@ -40,7 +45,9 @@ export function drawSection(result: Result): string {
   const engineered = !isVehicle && s.roofPath === 'engineered_required';
   const halfBay = s.holeW / 2;
   const aboveTop = s.parapetH + (earthRoof ? s.coverT + 0.4 : 0) + (engineered ? 1.6 : 0);
-  const margin = Math.max(1, s.parapetW);
+  // The roof extends OUTWARD past the front lip, so the drawing's own left bound has to reach
+  // past it — the frame follows the structure, never the other way round.
+  const margin = Math.max(1, s.parapetW, earthRoof && s.roof ? s.roof.frontFt : 0);
   const dm = new Map<string, DimSpec>(geo.dims.map((d) => [d.key, d]));
   const dl = (k: string): string => fmtLength(dm.get(k)?.valueFt ?? 0, unit);
   // A vehicle drives DOWN a graded ramp to reach the pit — the ramp run (§ ramp_run DimSpec,
@@ -75,7 +82,7 @@ export function drawSection(result: Result): string {
   const bayGradeL = px(-halfBay - s.wallTaper, 0);
   parts.push(el('polygon', {
     points: bayFloorL.join(',') + ' ' + bayFloorR.join(',') + ' ' + bayGradeR.join(',') + ' ' + bayGradeL.join(','),
-    fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-cut)',
+    fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-cut)', 'data-feature': 'bay',
   }));
   used.add('bay');
   parts.push(callout('bay', ...px(halfBay * 0.15, s.depthOfCut * 0.62), used));
@@ -89,7 +96,7 @@ export function drawSection(result: Result): string {
   const paraFront = px(-(halfBay + s.parapetW), -s.parapetH);
   const paraW = proj.lenPx(s.parapetW);
   const paraH = proj.lenPx(s.parapetH);
-  parts.push(el('rect', { x: paraFront[0], y: paraFront[1], width: paraW, height: paraH, fill: 'var(--draw-parapet)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
+  parts.push(el('rect', { x: paraFront[0], y: paraFront[1], width: paraW, height: paraH, fill: 'var(--draw-parapet)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)', 'data-feature': 'parapet' }));
   const frontKey = isVehicle ? 'berm' : 'parapet';
   used.add(frontKey);
   parts.push(callout(frontKey, ...px(-(halfBay + s.parapetW / 2), -s.parapetH * 0.5), used));
@@ -118,16 +125,27 @@ export function drawSection(result: Result): string {
   }
 
   // ── Firing platform (crew-served) or firing-step ledge (rifle) ─────────────────
-  if (s.hasPlatform) {
-    const stepTL = px(-halfBay, s.depthOfCut - s.platformDepth);
-    parts.push(el('rect', { x: stepTL[0], y: stepTL[1], width: proj.lenPx(s.holeW * 0.35), height: proj.lenPx(s.platformDepth), fill: 'var(--draw-timber)', opacity: '0.85', stroke: 'var(--draw-outline)', 'stroke-width': 1 }));
-    used.add('firing_step');
-    parts.push(callout('firing_step', ...px(-halfBay + s.holeW * 0.175, s.depthOfCut - s.platformDepth / 2), used));
+  if (s.platform) {
+    // Earth left standing, not a built deck: the gun/launcher stand is undisturbed original
+    // ground and the crew bays are dug down around it, so it is drawn in the same earth as the
+    // bay it stands in — a timber tone taught a plank platform that nothing in the BOM builds.
+    // Its front-to-back run is the platform's OWN width, the same figure the plan, the 3D model
+    // and the bill read; the section used to invent holeW × 0.35 and drew it 2.9× too narrow.
+    const stepTL = px(-halfBay, s.depthOfCut - s.platform.riseFt);
+    parts.push(el('rect', { x: stepTL[0], y: stepTL[1], width: proj.lenPx(s.platform.W), height: proj.lenPx(s.platform.riseFt), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 1, 'data-feature': 'platform' }));
+    // A–A is cut THROUGH the bench, so the deeper crew-bay floor either side of it is behind
+    // the cut plane — hidden line, the drafting convention for exactly that.
+    parts.push(el('line', {
+      x1: stepTL[0], y1: px(0, s.depthOfCut)[1], x2: px(-halfBay + s.platform.W, s.depthOfCut)[0], y2: px(0, s.depthOfCut)[1],
+      stroke: 'var(--draw-outline)', 'stroke-width': 1, 'stroke-dasharray': '5 3', opacity: '0.7',
+    }));
+    used.add('platform');
+    parts.push(callout('platform', ...px(-halfBay + s.platform.W / 2, s.depthOfCut - s.platform.riseFt / 2), used));
   } else if (s.firingStepOn) {
-    const ledgeH = Math.min(0.8, s.depthOfCut * 0.25);
-    const ledgeW = Math.min(0.9, s.holeW * 0.3);
+    const ledgeH = Math.min(s.firingStep.heightFt, s.depthOfCut);
+    const ledgeW = Math.min(s.firingStep.runFt, s.holeW);
     const stepTL = px(-halfBay, s.depthOfCut - ledgeH);
-    parts.push(el('rect', { x: stepTL[0], y: stepTL[1], width: proj.lenPx(ledgeW), height: proj.lenPx(ledgeH), fill: 'var(--draw-parapet)', stroke: 'var(--draw-outline)', 'stroke-width': 1 }));
+    parts.push(el('rect', { x: stepTL[0], y: stepTL[1], width: proj.lenPx(ledgeW), height: proj.lenPx(ledgeH), fill: 'var(--draw-parapet)', stroke: 'var(--draw-outline)', 'stroke-width': 1, 'data-feature': 'firing_step' }));
     used.add('firing_step');
     parts.push(callout('firing_step', stepTL[0] + 12, stepTL[1] + 8, used));
   }
@@ -140,46 +158,66 @@ export function drawSection(result: Result): string {
   // position (two_man's 2 ft front-to-back) the sump notch visually collided with the firing
   // step in the very same picture, and every position's section silently drew the sump on the
   // opposite wall from where its own plan view and 3D model put it.
-  const sumpWFt = Math.min(0.9, s.holeW * 0.22);
+  // Drawn at the size the BOM bills (geo.plan.sumpBox = materials.sump): the section used to
+  // notch a wedge of its own invention, the 3D drew a third size, and the bill paid for none of
+  // them. A dug feature is drawn at the volume it is dug to.
+  const sumpWFt = Math.min(geo.plan.sumpBox.W, s.holeW);
   if (s.sump) {
     const sW = proj.lenPx(sumpWFt);
-    const sH = proj.lenPx(0.7);
-    const sTL = px(halfBay * 0.85 - sumpWFt, s.depthOfCut);
-    parts.push(el('rect', { x: sTL[0], y: sTL[1], width: sW, height: sH, fill: 'var(--draw-timber)', stroke: 'var(--draw-outline)', 'stroke-width': 1 }));
+    const sH = proj.lenPx(geo.plan.sumpBox.D);
+    // Sited at the plan's own rear-wall sump mark rather than a fraction of the bay of its own —
+    // one location, read off the same block the plan draws from and the 3D model reads.
+    const sumpCentreFt = geo.plan.sumps[geo.plan.sumps.length - 1]?.yFt ?? halfBay - sumpWFt / 2;
+    const sTL = px(sumpCentreFt - sumpWFt / 2, s.depthOfCut);
+    parts.push(el('rect', { x: sTL[0], y: sTL[1], width: sW, height: sH, fill: 'var(--draw-timber)', stroke: 'var(--draw-outline)', 'stroke-width': 1, 'data-feature': 'sump' }));
     used.add('sump');
     parts.push(callout('sump', sTL[0] + sW + 9, sTL[1] + 7, used));
   }
 
   // ── Overhead cover (earth on stringers) OR engineered-roof hazard block ─────────
-  if (earthRoof) {
-    // Cover bears on the parapets and spans the hole, set back from the FRONT edge by the
-    // roof setback to leave a firing gap. slabW is always > 0 (no self-cancelling inset).
-    // The REAR edge overhangs by rearOverhang (structural bearing only, no threat clearance
-    // needed) — NOT the full parapet thickness (s.parapetW is the earthen wall's own thickness,
-    // an unrelated doctrine value; reusing it here overstated the roof's rear extent by ~2x-3x
-    // versus the same bearing-shelf math the front edge and the 3D model both already use).
-    const slabX1 = px(Math.min(halfBay - 0.25, -halfBay + s.setback), 0)[0];
-    const slabX2 = px(halfBay + s.rearOverhang, 0)[0];
+  if (earthRoof && s.roof) {
+    const roof = s.roof;
+    // The roof reaches OUTWARD past both lips onto undisturbed ground — the supports stand back
+    // from the hole edge by the setback, and the stringers overhang those supports by the
+    // bearing, so the deck edge sits setback + bearing beyond the wall. This used to be drawn
+    // INSET into the hole by the setback, which put the safety-critical front edge on the wrong
+    // side of the lip (on a narrow position the drawn roof covered only the rear of the bay)
+    // and left the 2D and 3D views facing opposite directions on the same dimension.
+    const slabX1 = px(roof.frontEdgeFt, 0)[0];
+    // A–A cuts on the centreline, which on a roofed bunker/OP is exactly where the entrance
+    // notch is — so the section shows the deck stopping at the rear wall line, not the full
+    // slab it would otherwise draw straight across the position's only way in.
+    const rearDrawFt = roof.entranceNotchFt > 0 ? halfBay : roof.rearEdgeFt;
+    const slabX2 = px(rearDrawFt, 0)[0];
     const slabW = Math.max(6, slabX2 - slabX1);
     const slabBottomY = px(0, -s.parapetH)[1]; // rests on parapet tops
     const slabTopY = px(0, -(s.parapetH + s.coverT))[1];
     const slabH = Math.max(3, slabBottomY - slabTopY);
 
-    const n = Math.max(1, Math.min(s.stringers, 8));
-    for (let i = 0; i < n; i++) {
-      const frac = n === 1 ? 0.5 : i / (n - 1);
-      parts.push(el('rect', { x: slabX1 + frac * (slabW - 4), y: slabBottomY - 1, width: 4, height: 7, fill: 'var(--draw-timber)' }));
-    }
+    // A–A is a front-to-back slice and the stringers RUN front-to-back, so the cut plane runs
+    // along ONE of them: it is drawn in profile at its resolved cross-section, spanning the full
+    // deck run onto its bearing at both ends. (The count is a plan-view fact — the frontage
+    // layout — and is dimensioned in the plan, not fabricated as a row of ends here.)
+    const stringerX1 = px(roof.frontEdgeFt, 0)[0];
+    const stringerX2 = px(roof.rearEdgeFt, 0)[0];
+    const stringerH = Math.max(3, proj.lenPx(roof.stringer.sectionFt));
+    parts.push(el('rect', { x: stringerX1, y: slabBottomY, width: Math.max(6, stringerX2 - stringerX1), height: stringerH, fill: 'var(--draw-timber)', stroke: 'var(--draw-outline)', 'stroke-width': 1, 'data-feature': 'stringers' }));
     used.add('stringers');
-    parts.push(callout('stringers', slabX1 + 12, slabBottomY + 4, used));
+    parts.push(callout('stringers', stringerX1 + 12, slabBottomY + stringerH + 8, used));
 
-    parts.push(el('rect', { x: slabX1, y: slabTopY, width: slabW, height: slabH, fill: 'url(#pat-cover)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
+    parts.push(el('rect', { x: slabX1, y: slabTopY, width: slabW, height: slabH, fill: 'url(#pat-cover)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)', 'data-feature': 'overhead' }));
     used.add('overhead');
     parts.push(callout('overhead', slabX1 + slabW / 2, slabTopY + slabH / 2, used));
 
-    parts.push(hDim(px(-halfBay, 0)[0], slabX1, slabTopY - 14, dl('setback')));
+    // The two stages, drawn as two dimensions, because they are two different requirements and
+    // one number under one label taught them as one: the lip to the support line (the setback),
+    // then the support line to the deck edge (the stringer's bearing overhang).
+    const lipX = px(-halfBay, 0)[0];
+    const supportX = px(-(halfBay + roof.setbackFt), 0)[0];
+    parts.push(hDim(supportX, lipX, slabTopY - 14, dl('setback')));
     used.add('setback');
-    parts.push(callout('setback', (px(-halfBay, 0)[0] + slabX1) / 2, gradeY - 6, used));
+    parts.push(callout('setback', (lipX + supportX) / 2, gradeY - 6, used));
+    parts.push(hDim(slabX1, supportX, slabTopY - 32, fmtLength(roof.bearingFt, unit)));
     parts.push(vDim(slabTopY, slabBottomY, slabX2 + 16, dl('cover_t')));
   } else if (engineered) {
     const hzTL = px(-(halfBay + s.parapetW * 0.5), -(s.parapetH + 1.4));

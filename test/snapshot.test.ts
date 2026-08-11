@@ -24,20 +24,27 @@ test('default fixture (two-man / deliberate / loam / 81mm mortar) snapshot', () 
     // 33), NOT the full ring (was 168). The parapet's protective mass is spoil, charged via
     // fillDemand.
     sandbags_parapet: 33,
-    sandbags_cover: 157,
-    // Phase 1 (DECISIONS D29): stringers now count along the LONG axis (7 ft frontage → 8),
-    // spanning the 2 ft short axis — the pre-Phase-1 count keyed on the short axis (3) and
-    // implied stringers spanning the frontage, teaching wrong assembly.
-    stringers: 8,
+    // The roof deck reaches setback + bearing OUTWARD past the front and rear walls (2.25 ft
+    // each on this fixture) and endLap past each flank: 9.00 × 6.50 ft, 58.50 ft², 68.445 ft³
+    // of cover, 255 bags. Billed short at 157 while the two drawings put the same slab in two
+    // other places entirely — see the roof-footprint entry in DECISIONS.md.
+    sandbags_cover: 255,
+    // Counted over the DECK the block bills (9.0 ft of frontage), not over the bare 7 ft hole:
+    // the old count left 2 ft of billed slab with no stringer under it on every position.
+    stringers: 10,
     gravel_sump: 2,
   });
   // Growth by phase: 275 (baseline) → 279 (P1: berm W/H, blade-hour rate, ramp slope; +1 SC)
   // → 283 (P4: 4 excavation-split fractions) → 293 (P6: connecting-trench + ATGM hole/platform
   // leaves + backblast clearance; +1 SC) → 295 (earth-parapet pass: sandbag.frontWallHeight +
-  // sandbag.basicLoad, both non-SC). 295 total, 189 safety-critical.
-  assert.equal(r.placeholderReport.total, 295);
-  assert.equal(r.placeholderReport.remaining, 295);
-  assert.equal(r.placeholderReport.safetyCriticalRemaining, 189);
+  // sandbag.basicLoad, both non-SC) → 317 (rule↔rendering pass: every physical magnitude the
+  // renderers used to hold — overhead.endLap, the three stringer sections (+3 SC, the member
+  // that holds the roof up), camo.drapeHeightFt, the firing-step ledge, the mortar-pit batter,
+  // the entrance/stair access group, the three compound positions' sub-bay trenches, and the
+  // vehicle ramp/pan split). 317 total, 192 safety-critical.
+  assert.equal(r.placeholderReport.total, 317);
+  assert.equal(r.placeholderReport.remaining, 317);
+  assert.equal(r.placeholderReport.safetyCriticalRemaining, 192);
 });
 
 test('earth-parapet rifle position bills firing-rest bags only; bunker keeps the full sandbag ring', () => {

@@ -28,8 +28,11 @@ export function drawIso(result: Result): string {
   const cx = W / 2;
   const cy = (HEADER_H + 20 + (H - LEGEND_H)) / 2;
 
-  // Scale so the footprint fits comfortably.
-  const spanFt = Math.max(p.outerL, p.outerW) + depth;
+  // The frontal-protection block stands at the height the rules give it (parapet.H, or berm.H
+  // for a vehicle position — geometry publishes whichever applies). It was a flat 0.6 ft here
+  // for every position: 1.2× the parapet it drew and 0.3× the berm, so the one view whose whole
+  // job is "grasp the shape" was the view that got the shape wrong.
+  const frontalH = geo.section.parapetH;
   const k = Math.min(210 / (p.outerL * COS30 + p.outerW * COS30), 150 / (depth + (p.outerL + p.outerW) * SIN30));
 
   // Iso projection: feet (x right, y back, z up) → screen, centered.
@@ -45,7 +48,7 @@ export function drawIso(result: Result): string {
 
   // Outer top face (grade) + two visible side walls of the parapet block.
   const tA = iso(-hl, -hw, 0), tB = iso(hl, -hw, 0), tC = iso(hl, hw, 0), tD = iso(-hl, hw, 0);
-  const bB = iso(hl, -hw, -0.6), bC = iso(hl, hw, -0.6), bD = iso(-hl, hw, -0.6);
+  const bB = iso(hl, -hw, -frontalH), bC = iso(hl, hw, -frontalH), bD = iso(-hl, hw, -frontalH);
   parts.push(poly([tD, tC, bC, bD], 'var(--draw-parapet)')); // front-facing wall
   parts.push(poly([tB, tC, bC, bB], 'var(--draw-parapet)')); // side wall
   parts.push(poly([tA, tB, tC, tD], 'var(--draw-parapet)')); // top

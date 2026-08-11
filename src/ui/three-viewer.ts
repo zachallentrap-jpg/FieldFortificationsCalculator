@@ -1202,6 +1202,14 @@ function buildPartInner(group: THREE.Group, part: Part3, bags: SandbagBatcher): 
         buildPicketWall(group, part.x, part.y, part.z, part.w, part.h, part.d, part.picketSpacing ?? 2);
       } else if (part.role === 'bayWall' && part.finish === 'timber') {
         buildPlywoodWall(group, part.x, part.y, part.z, part.w, part.h, part.d, part.taperAxis ?? (part.w >= part.d ? 2 : 0), part.taperSign ?? 1);
+      } else if (part.role === 'platform') {
+        // The firing platform is undisturbed ground the crew bays are dug down around — a CUT
+        // that is not made, never a build. It was routed through the plank-deck builder, whose
+        // own comment says it makes "built lumber, not bare earth mounds": the model laid a
+        // timber deck that appears in no BOM line, over dirt nobody ever moved.
+        const dirt = new THREE.BoxGeometry(Math.max(0.05, part.w), Math.max(0.05, part.h), Math.max(0.05, part.d));
+        const bench = addToonMesh(group, dirt, ROLE_COLOR.platform, { map: dirtTexture() });
+        bench.position.set(part.x, part.y, part.z);
       } else if (part.role === 'stringer') {
         // Roof stringers are dimensional timber per doctrine (stringerSizeForSpan) — the 4x4
         // prop scaled to the descriptor's own cross-section, laid across the bay.
@@ -1209,7 +1217,7 @@ function buildPartInner(group: THREE.Group, part: Part3, bags: SandbagBatcher): 
         const beam = lumberPiece(group, '4x4', alongX ? part.w : part.d, part.h, alongX ? part.d : part.w);
         if (!alongX) beam.rotation.y = Math.PI / 2;
         beam.position.set(part.x, part.y, part.z);
-      } else if (part.role === 'platform' || part.role === 'firingStep') {
+      } else if (part.role === 'firingStep') {
         buildPlankDeck(group, part.x, part.y, part.z, part.w, part.h, part.d, ROLE_COLOR[part.role]);
       } else {
         const geometry = new THREE.BoxGeometry(Math.max(0.05, part.w), Math.max(0.05, part.h), Math.max(0.05, part.d));

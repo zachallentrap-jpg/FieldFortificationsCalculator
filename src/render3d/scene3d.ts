@@ -22,7 +22,8 @@
 
 import { soils } from '../doctrine/soils';
 import { revetments, sandbag } from '../doctrine/materials';
-import { positions, parapetModeFor } from '../doctrine/positions';
+import { positions, parapetModeFor, vehicleRamp } from '../doctrine/positions';
+import { REF_FIGURE_FT } from '../render/chrome';
 import type { GeometryModel } from '../engine/geometry';
 import type { Result } from '../engine/types';
 
@@ -259,9 +260,11 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     // shapes' earth-only taper this applies even when sandbag-revetted (the previous code only
     // sloped an UNrevetted earth face, matching soil angle-of-repose logic that doesn't apply
     // here). MORTAR_PIT_BATTER is a fixed doctrine ratio, independent of the soil-driven
-    // slopeRatio used for bare unrevetted rectangular walls elsewhere in this file.
-    const MORTAR_PIT_BATTER = 0.25; // 1 ft horizontal per 4 ft vertical
-    const rTop = Math.min(rHole + Math.min(MORTAR_PIT_BATTER * s.depthOfCut, p.parapetW * 0.9), rOuter - 0.2);
+    // slopeRatio used for bare unrevetted rectangular walls elsewhere in this file. The ratio
+    // itself is a doctrine leaf (features.mortarPit.batterRatio) and reaches every view through
+    // geo.section.wallTaper — while it lived here as a constant, this was the only view that
+    // knew the pit was flared at all: the plan drew a plain circle and the section plumb walls.
+    const rTop = Math.min(rHole + s.wallTaper, rOuter - 0.2);
     // Grade margin matches pushBayBox's rationale exactly (see there): a sliver above grade to
     // close the crust seam — the terrain's true hole cutout made the old bigger margin obsolete.
     const gradeMargin = 0.08;
@@ -294,7 +297,7 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     // alone is allowed to be honest about shape at the cost of being literal about scale.
     const depthEx = s.depthOfCut * RELIEF_EXAGGERATION;
     const base = -(depthEx + 1); // shared floor so ramp and pan never gap
-    const rampLen = runLen * 0.65; // grade in — the DOMINANT feature so it reads as a ramp, not a wall
+    const rampLen = runLen * vehicleRamp.rampRunFrac.value; // grade in — the DOMINANT feature so it reads as a ramp, not a wall
     const panLen = runLen - rampLen; // level position the vehicle sits on
     // Ramp: full-height box from z=0 (entry) to z=-rampLen, top sheared from grade (0) at the +z
     // entry edge down to -depthEx at the ramp/pan break.
@@ -317,8 +320,12 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     // flanking the ramp, which taught exactly the wrong mental model — now a low, flattened
     // spoil residue, not exaggerated with the cut's own RELIEF_EXAGGERATION (that multiplier
     // exists to keep the CUT legible at scale; applying it to the berm too made "flattened"
-    // spoil read as a deliberately-built rampart instead).
-    const bermH = Math.max(0.3, p.parapetW * 0.15);
+    // spoil read as a deliberately-built rampart instead). How high the berm stands is still a
+    // RULE (protection.berm.H, published as s.parapetH) and not this view's to decide: the local
+    // formula drew it at 0.6 ft while the 2D section drew the doctrine's 2.0 ft, so the two
+    // views of one berm stood 3.3× apart. If the berm should be lower, the leaf is where to
+    // say so — a renderer override says it in a place the bill and the section never read.
+    const bermH = s.parapetH;
     parts.push({ kind: 'box', x: -(halfL + p.parapetW / 2), y: bermH / 2, z: -runLen / 4, w: p.parapetW, h: bermH, d: runLen, role: 'rampBerm', finish: 'earth' });
     parts.push({ kind: 'box', x: halfL + p.parapetW / 2, y: bermH / 2, z: -runLen / 4, w: p.parapetW, h: bermH, d: runLen, role: 'rampBerm', finish: 'earth' });
     // Terrain hole matches the DRAWN (exaggerated) staircase, not the doctrinal depthOfCut —
@@ -343,8 +350,7 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     // anywhere, including on the ATGM's backblast side (a 6-inch dirt lip isn't the "hard
     // reflecting surface" the backblast concern is about — that's a real risk for a tall
     // sandbag wall, which is why the bunker's ring below still gets one).
-    const isAtgm = result.inputs.positionType === 'atgm_javelin';
-    const entranceGap = isAtgm ? p.holeL * 0.85 : Math.min(3, p.holeL * 0.4);
+    const entranceGap = s.access.entranceGapFt;
     pushGroundFrame(parts, 0, 0, p.outerL + 4, p.outerW + 4, p.holeL, p.holeW);
     if (ringMode === 'earth') {
       // One continuous mounded piece (rounded, beveled cross-section — not 4 flat-topped boxes
@@ -377,7 +383,7 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     // A graded way DOWN at the rear entrance: a short flight of earth steps from grade to floor,
     // so a deep hole isn't a sheer drop you'd have to jump into. Only when the cut is deep enough
     // to warrant it and there's a rear opening to descend through.
-    pushEntrySteps(parts, p.holeL, p.holeW, s.depthOfCut, entranceGap, wallT);
+    pushEntrySteps(parts, p.holeL, p.holeW, s.depthOfCut, entranceGap, wallT, s.access);
 
     // Hole envelopes expand past the excavation by the wall taper (bare sloped earth flares
     // OUTWARD toward the top — same formula as pushBayBox's taperAmount, INCLUDING the bay-size
@@ -389,35 +395,42 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     const e = taperFor(p.holeL, p.holeW, 1, 1) + 0.05;
     terrainOuter = { x: 0, z: 0, w: p.outerL + 4, d: p.outerW + 4 };
 
-    if (geo.shape === 'inverted_t') {
+    const subBay = p.subBays[0];
+    if (geo.shape === 'inverted_t' && subBay) {
       // A narrower connecting trench extends toward the rear from the bay's center (the "shaft"
       // of the inverted-T) — a doctrinal crew/ammo trench, not a separately-parapeted position
       // in its own right, so unlike the main bay it gets NO raised parapet ring: just the
       // excavated trench walls (previously it wrongly got a full ring scaled off the MAIN
       // parapet's thickness, which for a trench this narrow ballooned out wide enough to
       // swallow most of the main bay's own footprint).
-      const stemW = Math.max(2, p.holeL * 0.3);
-      const stemLen = p.holeW * 1.1;
-      const stemZ = halfW + stemLen / 2;
-      pushBayBox(parts, 0, stemZ, stemW, stemLen, s.depthOfCut * 0.85, wallT * 0.8, finish, slopeRatio, picketSpacing, p.parapetW * 0.7, Math.min(2.5, stemW));
+      // The stem's own dimensions come from the position's subBay leaves, the same block the
+      // plan view reads — this was a second copy of the same trench, derived from the hole with
+      // its own factors, so the two views could and did disagree about a real dug volume.
+      const stemW = subBay.L;
+      const stemLen = subBay.W;
+      const stemDepth = subBay.depthFt;
+      const stemZ = subBay.zFt;
+      pushBayBox(parts, 0, stemZ, stemW, stemLen, stemDepth, wallT * 0.8, finish, slopeRatio, picketSpacing, p.parapetW * 0.7, Math.min(2.5, stemW));
       // One T-shaped union outline (main bay ∪ stem) — two rect holes sharing an edge would
       // be degenerate for shape triangulation.
-      const es = taperFor(stemW, stemLen, 0.85, 0.7) + 0.05;
+      const es = taperFor(stemW, stemLen, stemDepth / s.depthOfCut, 0.7) + 0.05;
       const HL = halfL + e, HW = halfW + e, SW = stemW / 2 + es, SZ = halfW + stemLen + es;
       terrainHoles.push({
         kind: 'poly', depth: finite(s.depthOfCut),
         pts: [[-HL, -HW], [HL, -HW], [HL, HW], [SW, HW], [SW, SZ], [-SW, SZ], [-SW, HW], [-HL, HW]],
       });
-    } else if (geo.shape === 'l_shape') {
+    } else if (geo.shape === 'l_shape' && subBay) {
       // A perpendicular arm attached at one end (crew/ammo alcove) forming an L — same
       // reasoning as the inverted-T's shaft: a connecting trench, not its own parapeted position.
-      const armW = p.holeW * 0.9;
-      const armLen = Math.max(2.5, p.holeL * 0.6);
-      const armX = halfL + armLen / 2;
-      const armZ = halfW - armW / 2;
-      pushBayBox(parts, armX, armZ, armLen, armW, s.depthOfCut * 0.85, wallT * 0.8, finish, slopeRatio, picketSpacing, p.parapetW * 0.7);
+      // Same source as the plan view's arm, for the same reason.
+      const armW = subBay.W;
+      const armLen = subBay.L;
+      const armDepth = subBay.depthFt;
+      const armX = subBay.xFt;
+      const armZ = subBay.zFt;
+      pushBayBox(parts, armX, armZ, armLen, armW, armDepth, wallT * 0.8, finish, slopeRatio, picketSpacing, p.parapetW * 0.7);
       // One L-shaped union outline (main bay ∪ side arm), same single-polygon reasoning.
-      const es = taperFor(armLen, armW, 0.85, 0.7) + 0.05;
+      const es = taperFor(armLen, armW, armDepth / s.depthOfCut, 0.7) + 0.05;
       const HL = halfL + e, HW = halfW + e, AZ = halfW - armW - es, AX = halfL + armLen + es;
       terrainHoles.push({
         kind: 'poly', depth: finite(s.depthOfCut),
@@ -434,31 +447,51 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
   // matching the parapet.
   const earthRoof = s.coverOn && s.roofPath === 'earth_on_stringers';
   const engineeredRoof = s.roofPath === 'engineered_required';
-  if (earthRoof && geo.shape !== 'vehicle_ramp') {
-    // The roof's edges are NOT symmetric — front and rear answer different doctrinal questions:
-    //   FRONT (s.setback, -z): the threat approaches from here, so this edge must clear the
-    //   SAME safety-critical, threat-aware standoff (max of the selected threat's standoffMin
-    //   and the depth fraction) that drives the 2D section's "Roof setback" dimension and the
-    //   specs panel — both now read from the engine's own s.setback rather than a locally
-    //   re-derived, threat-blind copy (the old flat 1.0 ft floor silently ignored the threat).
-    //   REAR (s.rearOverhang, +z): purely a structural "dead-man bearing shelf" (stringers must
-    //   land on undisturbed earth, ≥1 ft OR ¼ of the cut depth, whichever is greater — ATP
-    //   5-238/FM 5-103) — no threat clearance needed since the aperture faces front only. Also
-    //   reused for the LEFT/RIGHT (x/L-axis) overhang, which has the same no-threat bearing-only
-    //   requirement. Both values come from geometry.ts (geo.section) so the 2D section, the 3D
-    //   model, and the specs panel can never drift apart on the same doctrine leaves again.
-    const frontInset = s.setback;
-    const rearInset = s.rearOverhang;
+  if (earthRoof && s.roof && geo.shape !== 'vehicle_ramp') {
+    // ONE published footprint, read as absolute edge coordinates in the section's own frame, so
+    // the 3D model cannot drift from the 2D section or from the slab the BOM bills. Every extent
+    // is OUTWARD past the corresponding hole wall (see GeometryModel.RoofModel): the supports
+    // stand back from the lip by the setback, the stringers overhang them by the bearing, and
+    // the deck follows the stringers onto undisturbed ground. Front and rear are the same number
+    // — a rear support is a support. The ENDS take the flank lap instead, because no stringer
+    // end lands there; this used to reuse the rear figure on the end walls, which is a bearing
+    // requirement applied where nothing bears.
+    const roof = s.roof;
     const coverY = s.coverT / 2 + 0.15;
-    const coverZ = (rearInset - frontInset) / 2;
-    const coverD = p.holeW + frontInset + rearInset;
-    const coverW = p.holeL + 2 * rearInset;
-    parts.push({ kind: 'box', x: 0, y: coverY, z: coverZ, w: coverW, h: s.coverT, d: coverD, role: 'cover', label: 'Roof cover', finish: 'sandbag' });
-    const n = Math.max(1, Math.min(s.stringers, 8));
+    const coverD = roof.rearEdgeFt - roof.frontEdgeFt;
+    const coverW = 2 * roof.endEdgeFt;
+    const stringerY = coverY - s.coverT / 2 - roof.stringer.sectionFt / 2;
+    if (roof.entranceNotchFt > 0) {
+      // A roofed bunker/OP: extended its full rear bearing, the deck roofs over the position's
+      // own entrance corridor and seals it shut. The DECK is notched across the passage width so
+      // the corridor stays open to the sky. The STRINGERS are not shortened — they keep their
+      // full rear bearing on undisturbed ground, which is the whole point of the setback; you
+      // duck under a beam to walk in, you do not climb over a roof.
+      const wingW = (coverW - roof.entranceNotchFt) / 2;
+      const mainD = s.holeW / 2 - roof.frontEdgeFt;
+      parts.push({ kind: 'box', x: 0, y: coverY, z: roof.frontEdgeFt + mainD / 2, w: coverW, h: s.coverT, d: mainD, role: 'cover', label: 'Roof cover', finish: 'sandbag' });
+      for (const sign of [-1, 1]) {
+        parts.push({
+          kind: 'box', x: sign * (roof.entranceNotchFt + wingW) / 2, y: coverY, z: s.holeW / 2 + roof.rearFt / 2,
+          w: wingW, h: s.coverT, d: roof.rearFt, role: 'cover', label: 'Roof cover', finish: 'sandbag',
+        });
+      }
+    } else {
+      parts.push({ kind: 'box', x: 0, y: coverY, z: (roof.frontEdgeFt + roof.rearEdgeFt) / 2, w: coverW, h: s.coverT, d: coverD, role: 'cover', label: 'Roof cover', finish: 'sandbag' });
+    }
+    // The stringers RUN front-to-back (the supports lie along the frontage at the front and rear
+    // lips) and are laid out ACROSS the frontage — the count is the engine's own, uncapped: the
+    // old cap of 8 drew a connecting trench's 16 beams as 8, so the picture and the bill counted
+    // different roofs. Their cross-section is the size the engine resolved for the span, not one
+    // fixed section for every case.
+    const n = Math.max(1, roof.stringer.count);
     for (let i = 0; i < n; i++) {
       const frac = n === 1 ? 0.5 : i / (n - 1);
-      const sx = -halfL - rearInset + frac * coverW;
-      parts.push({ kind: 'box', x: sx, y: coverY - s.coverT / 2 - 0.15, z: coverZ, w: 0.35, h: 0.3, d: coverD, role: 'stringer' });
+      const sx = -roof.endEdgeFt + frac * coverW;
+      parts.push({
+        kind: 'box', x: sx, y: stringerY, z: (roof.frontEdgeFt + roof.rearEdgeFt) / 2,
+        w: roof.stringer.sectionFt, h: roof.stringer.sectionFt, d: coverD, role: 'stringer',
+      });
     }
   } else if (engineeredRoof && geo.shape !== 'vehicle_ramp') {
     // Footprint matches the 2D section's hazard block exactly (holeW + parapetW there) — this
@@ -471,28 +504,39 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
   }
 
   // ── Firing platform / firing step ─────────────────────────────────────────
-  if (p.platform) {
-    parts.push({ kind: 'box', x: 0, y: -s.depthOfCut + s.platformDepth / 2, z: -halfW + p.platform.W / 2, w: p.platform.L, h: s.platformDepth, d: p.platform.W, role: 'platform', label: 'Standing platform' });
+  if (s.platform) {
+    // Undisturbed ground the crew bays are dug down AROUND — earth left standing, not a built
+    // stand, so it is labelled as what it is. Its rise and footprint are the engine's own, the
+    // same ones the excavation SUBTRACTS.
+    parts.push({ kind: 'box', x: 0, y: -s.depthOfCut + s.platform.riseFt / 2, z: -halfW + s.platform.W / 2, w: s.platform.L, h: s.platform.riseFt, d: s.platform.W, role: 'platform', label: 'Ground left undug (firing platform)' });
   } else if (s.firingStepOn) {
-    // A firing step / elbow rest is a 6-8 in ledge at the front of the hole (ATP 5-254,
-    // source-verified) — not the up-to-9.6 in the old depth×0.25 produced on a deep cut.
-    const ledgeH = Math.min(0.67, Math.max(0.5, s.depthOfCut * 0.15));
-    parts.push({ kind: 'box', x: 0, y: -ledgeH / 2, z: -halfW + 0.4, w: Math.min(p.holeL * 0.6, p.holeL - 0.5), h: ledgeH, d: 0.8, role: 'firingStep', label: 'Step up' });
+    // The ledge's size is a rule now, not a renderer constant: no published doctrinal firing-step
+    // height exists (the doctrinal platform is at grade), which is why the leaf ships as an
+    // openly model-derived placeholder — and why the citation that used to sit on this line had
+    // to go. The 2D section and this view drew it at two different sizes for as long as each
+    // held its own formula.
+    const ledgeH = Math.min(s.firingStep.heightFt, s.depthOfCut);
+    const ledgeRun = Math.min(s.firingStep.runFt, p.holeW);
+    // The ledge runs the full frontage of the bay, like the firing rest above it — its width
+    // used to be min(holeL × 0.6, holeL − 0.5), two invented fractions of the hole.
+    parts.push({ kind: 'box', x: 0, y: -ledgeH / 2, z: -halfW + ledgeRun / 2, w: p.holeL, h: ledgeH, d: ledgeRun, role: 'firingStep', label: 'Step up' });
   }
 
   // ── Sumps (grenade catch pits) ────────────────────────────────────────────
-  // A grenade sump is a dug CHANNEL at the floor, ~3 ft long × 6 in wide (FM 5-103), that a
-  // grenade rolls into — an elongated trough reads as that, where the old vertical cylinder
-  // read as a post-hole. Runs along the frontage at each sump mark; its bottom stays inside the
-  // terrain floor plug (0.7 ft thick) so nothing pokes out underneath.
+  // Drawn at the size the BOM bills it (materials.sump, via geo.plan.sumpBox). This used to be a
+  // trough of the renderer's own proportions — a third size for one hole, after the section's
+  // notch and the volume the bill charged for.
   for (const sump of p.sumps) {
-    const sumpL = Math.min(2.8, Math.max(1.0, p.holeL * 0.5));
-    parts.push({ kind: 'box', x: sump.xFt, y: -s.depthOfCut - 0.25, z: sump.yFt, w: sumpL, h: 0.5, d: 0.5, role: 'sump', label: 'Grenade sump' });
+    const box = p.sumpBox;
+    parts.push({ kind: 'box', x: sump.xFt, y: -s.depthOfCut - box.D / 2, z: sump.yFt, w: box.L, h: box.D, d: box.W, role: 'sump', label: 'Grenade sump' });
   }
 
   // ── Camouflage net (translucent plane above the position) ────────────────
-  if (result.inputs.camouflage) {
-    parts.push({ kind: 'box', x: 0, y: 1.8, z: 0, w: p.outerL * 1.1, h: 0.05, d: p.outerW * 1.1, role: 'camoNet', label: 'Camouflage' });
+  // Extent and height both published: the plane's area is now exactly the net area the BOM
+  // orders (drapeFactor is an AREA factor, so the linear stretch per axis is its square root),
+  // where this used to stretch 1.1× per axis and fly at a height of its own invention.
+  if (p.camoNet) {
+    parts.push({ kind: 'box', x: 0, y: p.camoNet.heightFt, z: 0, w: p.camoNet.L, h: 0.05, d: p.camoNet.W, role: 'camoNet', label: 'Camouflage' });
   }
 
   // ── Orientation: enemy arrow + sectors of fire ────────────────────────────
@@ -515,7 +559,9 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     : geo.shape === 'l_shape'
     ? -(halfL + p.parapetW + 1.3)
     : halfL + p.parapetW + 1.3;
-  parts.push({ kind: 'figure', x: figureX, z: 1.5, heightFt: 5.83 });
+  // ONE scale-figure height for the whole app: the 2D drawings' standing figure and this one
+  // are the same person, and they were two separate literals.
+  parts.push({ kind: 'figure', x: figureX, z: 1.5, heightFt: REF_FIGURE_FT });
 
   // The vehicle ramp's visual depth is exaggerated (RELIEF_EXAGGERATION) well past depthOfCut —
   // frame the camera to that actual drawn depth, not the real doctrinal one, or the deep end
@@ -641,17 +687,30 @@ function pushFrontSandbagRest(parts: Part3[], holeL: number, holeW: number): voi
 // dirt. Only emitted for a cut deep enough to need it, and only where there's a rear opening
 // (gapW) to descend through. The steps hug x=0 (centered in the rear gap) and march forward
 // (−z) into the bay as they drop.
-function pushEntrySteps(parts: Part3[], holeL: number, holeW: number, depth: number, gapW: number, wallT: number): void {
+function pushEntrySteps(
+  parts: Part3[],
+  holeL: number,
+  holeW: number,
+  depth: number,
+  gapW: number,
+  wallT: number,
+  access: { stairMaxRiserFt: number; stairTreadFt: number },
+): void {
   // Only a WALK-IN position earns a stair: a deep cut, a rear opening, AND enough front-to-back
   // room to fit the treads and still leave a floor to stand on. A tight rifle position's
   // front-to-back run is intentionally shallow (a narrow slot — see doctrine/positions.ts) —
   // stuffing a staircase in there would eat the whole floor, so it's a drop-in instead. A roomy
   // position (the bunker's 8 ft) earns the stair; a two-man's 2 ft does not.
-  const n = 2;
-  const tread = 0.5; // z-run of each step, shallower than a full 1-ft stair tread
-  if (depth <= 2.0 || gapW <= 0 || holeW < n * tread + 2.5) return;
+  //
+  // The step COUNT follows from the rise a person can climb, rather than a fixed two treads
+  // sharing whatever the cut happened to be — two treads down a 6.5 ft bunker put every riser at
+  // 2.17 ft (26 in) on a 6-in tread, which is not a stair, it is a fall with a ledge. A cut too
+  // shallow to need two steps gets none, and a position without the floor to spare gets none.
+  const tread = access.stairTreadFt;
+  const n = Math.max(0, Math.ceil(depth / access.stairMaxRiserFt) - 1);
+  if (n < 2 || gapW <= 0 || holeW < n * tread + gapW) return;
   const hw = holeW / 2;
-  const stepW = Math.min(gapW * 0.85, holeL * 0.5);
+  const stepW = Math.min(gapW, holeL);
   const riser = depth / (n + 1);
   for (let i = 0; i < n; i++) {
     const topY = -(i + 1) * riser; // this tread's top, descending from grade

@@ -15,10 +15,33 @@ export type ShapeId =
   | 'vehicle_ramp'
   | 'rect_roofed';
 
+// The firing platform is UNDISTURBED ORIGINAL EARTH LEFT STANDING inside the position's
+// footprint — the gun/launcher stand the crew bays are dug down AROUND. It is a cut that is
+// NOT made, never a built structure: "leave the firing-platform / elbow-shelf of undisturbed
+// original earth between the front lip and where the frontal cover will go — this is a CUT,
+// not a build" (docs/ONE_MAN_POSITION_MODELING_SPEC.md §2.f). Raised, built-up firing steps
+// belong to trenches and vehicle positions, not to the individual crew-served hole.
+//
+// So the leaf below names its DATUM as well as its direction: the platform surface stands
+// `riseAboveFloor` feet ABOVE the fighting-bay floor, equivalently the bays are dug that much
+// deeper than the stand. It is therefore volume LEFT UNDUG and SUBTRACTS from the excavation.
+// The old name (`depthBelowHole`) named neither datum nor sign, and three consumers read it
+// three different ways — the bill added it, both drawings subtracted it.
 export interface FiringPlatform {
   L: Provenance<number>;
   W: Provenance<number>;
-  depthBelowHole: Provenance<number>; // platform floor is this far below the fighting bay floor
+  riseAboveFloor: Provenance<number>; // platform surface stands this far ABOVE the bay floor
+}
+
+// The secondary trench a compound position digs off its main bay — the inverted-T's rear stem,
+// the L-shape's side arm. L is its frontage-axis extent, W its front-to-back extent, depthFrac
+// how deep it is cut relative to the main bay. These were duplicated literals in drawPlan.ts and
+// scene3d.ts (two renderers deriving the same dug volume from the hole's dimensions, each with
+// its own factors); a dug trench is a physical dimension, so it belongs to the position.
+export interface SubBay {
+  L: Provenance<number>;
+  W: Provenance<number>;
+  depthFrac: Provenance<number>;
 }
 
 export interface PositionRow {
@@ -31,6 +54,7 @@ export interface PositionRow {
   volumeModel: 'prism' | 'cylinder' | 'prism_ramp';
   hole: { L: Provenance<number>; W: Provenance<number>; D: Provenance<number> }; // feet
   firingPlatform?: FiringPlatform;
+  subBay?: SubBay;
   grenadeSumps: number; // count
   elbowHoles: number; // count
   storageCompartment: boolean;
@@ -65,6 +89,9 @@ export function parapetModeFor(pos: PositionRow): ParapetMode {
 // equipment operator in minutes (EXECUTION_PLAN Phase 1).
 export const vehicleRamp = {
   slopeRatio: P(5.0, { unit: 'ratio', note: 'access-ramp run per foot of cut depth (illustrative)' }),
+  // How much of the position's run is the graded way IN versus the level pan the vehicle parks
+  // on. A shape proportion of a real cut, so it belongs here rather than in the view that draws it.
+  rampRunFrac: P(0.65, { note: 'share of the position run taken by the graded ramp, the rest being the level pan (illustrative)' }),
 };
 
 export const positions: Record<string, PositionRow> = {
@@ -102,7 +129,12 @@ export const positions: Record<string, PositionRow> = {
     firingPlatform: {
       L: ft(3.0, 'platform length'),
       W: ft(2.0, 'platform width'),
-      depthBelowHole: ft(1.5, 'platform below bay'),
+      riseAboveFloor: ft(1.5, 'bay floor below platform'),
+    },
+    subBay: {
+      L: ft(2.4, 'rear crew/ammo trench width across the frontage'),
+      W: ft(2.2, 'rear crew/ammo trench run behind the bay'),
+      depthFrac: P(0.85, { note: 'stem depth as a fraction of the main bay cut (illustrative)' }),
     },
     grenadeSumps: 2,
     elbowHoles: 0,
@@ -115,10 +147,19 @@ export const positions: Record<string, PositionRow> = {
     shape: 'l_shape',
     volumeModel: 'prism',
     hole: { L: ft(9.0, 'frontage'), W: ft(2.0, 'width'), D: ft(4.0, 'depth') },
+    // Platform width matches the trench it stands in. The engine bills this position as a
+    // single 9×2×D prism (volumeModel 'prism'), so a 3.0-ft platform inside a 2.0-ft trench
+    // described a geometrically impossible position: the drawings clamped it and the bill did
+    // not, which is exactly backwards — the picture was right and the spoil figure was wrong.
     firingPlatform: {
       L: ft(4.0, 'platform length'),
-      W: ft(3.0, 'platform width'),
-      depthBelowHole: ft(1.0, 'platform below bay'),
+      W: ft(2.0, 'platform spans the full trench width (illustrative)'),
+      riseAboveFloor: ft(1.0, 'bay floor below platform'),
+    },
+    subBay: {
+      L: ft(5.4, 'side crew/ammo alcove reach past the bay end'),
+      W: ft(1.8, 'side crew/ammo alcove width'),
+      depthFrac: P(0.85, { note: 'arm depth as a fraction of the main bay cut (illustrative)' }),
     },
     grenadeSumps: 2,
     elbowHoles: 0,
@@ -192,7 +233,12 @@ export const positions: Record<string, PositionRow> = {
     firingPlatform: {
       L: ft(4.0, 'launcher platform length'),
       W: ft(3.0, 'launcher platform width'),
-      depthBelowHole: ft(0.5, 'platform below bay'),
+      riseAboveFloor: ft(0.5, 'bay floor below platform'),
+    },
+    subBay: {
+      L: ft(4.8, 'side crew/ammo alcove reach past the bay end'),
+      W: ft(2.7, 'side crew/ammo alcove width'),
+      depthFrac: P(0.85, { note: 'arm depth as a fraction of the main bay cut (illustrative)' }),
     },
     grenadeSumps: 1,
     elbowHoles: 0,
@@ -200,6 +246,41 @@ export const positions: Record<string, PositionRow> = {
     sectorsOfFire: true,
     crewSize: 2,
   },
+};
+
+// ── Position features the DRAWINGS build and the rules must own ───────────────
+// Every magnitude below was, until this pass, a literal inside a renderer — and in each case
+// two renderers held different literals for the same physical feature, so the 2D section and
+// the 3D model drew the same object at two sizes. A length a viewer can measure against the
+// drawing's own scale bar is a rule, not an art parameter, so it lives here and both views
+// read it. All are ILLUSTRATIVE PLACEHOLDERS with no fabricated source.
+
+// The firing-step ledge (the rifle-position ledge, not the crew-served platform above).
+// docs/ONE_MAN_POSITION_MODELING_SPEC.md §2.f and §18 are explicit that NO doctrinal
+// firing-step height exists — the doctrinal firing platform is at grade, and any numeric
+// height is model-derived and must be flagged as such. So these are seeded at what the 3D
+// view already drew and carry that fact in their notes; neither gets a citation.
+export const firingStep = {
+  heightFt: P(0.67, { unit: 'ft', note: 'firing-step ledge height above the bay floor — no published doctrinal figure exists (illustrative, model-derived)' }),
+  runFt: P(0.8, { unit: 'ft', note: 'firing-step ledge front-to-back run — no published doctrinal figure exists (illustrative, model-derived)' }),
+};
+
+// A mortar pit's wall batter is sized for repeated firing concussion, not soil stability, so it
+// applies in every soil and with every revetment — unlike the rectangular family's soil-driven
+// taper. The ratio lived in scene3d.ts, which meant the 3D drew a flared pit while both 2D
+// views drew it plumb.
+export const mortarPit = {
+  batterRatio: P(0.25, { note: 'mortar-pit wall batter, run per foot of depth (illustrative)' }),
+};
+
+// Getting in and out. The rear entrance passage width also sets the roof's entrance notch on a
+// roofed position (the roof must not seal the corridor shut) and the width of the graded way
+// down. The stair riser is what makes a deep cut climbable rather than a fall.
+export const access = {
+  passWidthFt: P(3.0, { unit: 'ft', note: 'rear entrance passage width (illustrative)' }),
+  backblastLaneFrac: P(0.85, { note: 'share of the frontage an ATGM position keeps open to the rear for backblast (illustrative)' }),
+  stairMaxRiserFt: P(0.83, { unit: 'ft', note: 'maximum rise per earth step on the way down (illustrative)' }),
+  stairTreadFt: P(0.5, { unit: 'ft', note: 'earth-step tread run (illustrative)' }),
 };
 
 // ATGM backblast clearance — the danger area to the REAR that must be clear of the crew, walls,

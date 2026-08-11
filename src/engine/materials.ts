@@ -77,10 +77,16 @@ export function buildBom(calc: Calc): BomLine[] {
     21,
     isPh(berm.W.status, berm.H.status) || dimsPh,
   );
-  // coverVol (both lines below) is computed from coverL/coverW (holeL/W + 2×bearingEachEnd) —
-  // bearingEachEnd and the hole dims were never checked, so a cover thickness confirmed against
-  // doctrine could still report "fully doctrine-backed" while its footprint wasn't.
-  const coverFootprintPh = isPh(overhead.bearingEachEnd.status) || dimsPh;
+  // coverVol (both lines below) is computed from the roof footprint, and that footprint now
+  // depends on the SETBACK as well as the bearing: front and rear reach setback + bearingEachEnd
+  // past the hole, the ends reach endLap. Checking bearingEachEnd alone would let both cover
+  // lines report "fully doctrine-backed" while the slab they price rests on four placeholders —
+  // the standoff (the munition's own, or the global minimum when no threat is named), the depth
+  // fraction and the depth multiplier that scale it, and the flank lap.
+  const coverFootprintPh =
+    isPh(overhead.bearingEachEnd.status, overhead.endLap.status, overhead.setbackDepthFrac.status, calc.standard.depthMul.status) ||
+    isPh((calc.standoffLeaf ?? overhead.setbackMin).status) ||
+    dimsPh;
   add(
     'sandbags_cover',
     'Sandbags — overhead cover',
@@ -121,9 +127,9 @@ export function buildBom(calc: Calc): BomLine[] {
     'ea',
     calc.stringers,
     60,
-    // count = ceilInt(max(holeL,holeW) / stringerSpacing) + 1 — the spacing leaf feeds this
-    // directly and was never checked, only the hole dims were.
-    isPh(overhead.stringerSpacing.status) || dimsPh,
+    // count = ceilInt(deck frontage / stringerSpacing) + 1, and the deck's frontage is the hole
+    // plus twice the flank lap — so the lap leaf feeds the count as directly as the spacing does.
+    isPh(overhead.stringerSpacing.status, overhead.endLap.status) || dimsPh,
   );
   add('gravel_sump', 'Sump gravel', 'ft³', calc.gravelVol, 70, isPh(sumpMat.gravelFt3.status));
   add(

@@ -48,8 +48,12 @@ export function drawPlan(result: Result): string {
   // The inverted-T's rear stem, the L-shape's side arm, and a vehicle's access ramp (see the
   // shape-specific draw below) extend past the plain rectangle's own footprint — pad the
   // projector bounds so they never clip off-canvas instead of sizing bounds only for the bay.
-  const stemLen = geo.shape === 'inverted_t' ? p.holeW * 1.1 : 0;
-  const armLen = geo.shape === 'l_shape' ? Math.max(2.5, p.holeL * 0.6) : 0;
+  // The rear stem / side arm comes from the position's own subBay leaves now — the same block
+  // the 3D model reads. Both renderers used to derive it from the hole with their own factors,
+  // two copies of one dug trench that nothing kept in step.
+  const subBay = p.subBays[0];
+  const stemLen = geo.shape === 'inverted_t' && subBay ? subBay.W : 0;
+  const armLen = geo.shape === 'l_shape' && subBay ? subBay.L : 0;
   const rampRunFt = isVehicle ? dm.get('ramp_run')?.valueFt ?? 0 : 0;
   const rampWidthFt = Math.min(p.holeL, p.holeW);
   // ATGM/Javelin backblast: a rear danger area the doctrine flags SAFETY-CRITICAL
@@ -122,7 +126,14 @@ export function drawPlan(result: Result): string {
     const rHole = Math.max(p.holeL, p.holeW) / 2;
     const c = px(0, 0);
     parts.push(el('circle', { cx: c[0], cy: c[1], r: proj.lenPx(rOuter), fill: 'var(--draw-parapet)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
-    parts.push(el('circle', { cx: c[0], cy: c[1], r: proj.lenPx(rHole), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
+    // A mortar pit's walls are battered for firing concussion in every soil and under every
+    // revetment (features.mortarPit.batterRatio, published as section.wallTaper). At grade the
+    // pit's MOUTH is that much wider than its floor — the plan drew one plain circle and taught
+    // a plumb-walled pit while the 3D model alone flared it.
+    parts.push(el('circle', { cx: c[0], cy: c[1], r: proj.lenPx(rHole + geo.section.wallTaper), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)', 'data-feature': 'bay' }));
+    if (geo.section.wallTaper > 0) {
+      parts.push(el('circle', { cx: c[0], cy: c[1], r: proj.lenPx(rHole), fill: 'none', stroke: 'var(--draw-outline)', 'stroke-width': 1, 'stroke-dasharray': '5 3', opacity: '0.7' }));
+    }
   } else if (isVehicle) {
     // Vehicle defilade: a pan (no full ring — front berm only) with a graded access ramp
     // extending REAR-ward, matching the 3D scene and the actual excavation doctrine (the ramp
@@ -147,19 +158,14 @@ export function drawPlan(result: Result): string {
     }
     const hTL = px(-p.holeL / 2, -p.holeW / 2);
     parts.push(
-      el('rect', { x: hTL[0], y: hTL[1], width: proj.lenPx(p.holeL), height: proj.lenPx(p.holeW), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }),
+      el('rect', { x: hTL[0], y: hTL[1], width: proj.lenPx(p.holeL), height: proj.lenPx(p.holeW), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)', 'data-feature': 'bay' }),
     );
     // The inverted-T's rear connecting trench / the L-shape's side alcove — same footprint
     // math as scene3d.ts's 3D branches for these two shapes, so the plan matches the model
     // instead of flattening every non-rectangular design down to a plain rectangle.
-    if (geo.shape === 'inverted_t') {
-      const stemW = Math.max(2, p.holeL * 0.3);
-      const sTL = px(-stemW / 2, p.holeW / 2);
-      parts.push(el('rect', { x: sTL[0], y: sTL[1], width: proj.lenPx(stemW), height: proj.lenPx(stemLen), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
-    } else if (geo.shape === 'l_shape') {
-      const armW = p.holeW * 0.9;
-      const aTL = px(p.holeL / 2, p.holeW / 2 - armW);
-      parts.push(el('rect', { x: aTL[0], y: aTL[1], width: proj.lenPx(armLen), height: proj.lenPx(armW), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)' }));
+    for (const sb of p.subBays) {
+      const sTL = px(sb.xFt - sb.L / 2, sb.zFt - sb.W / 2);
+      parts.push(el('rect', { x: sTL[0], y: sTL[1], width: proj.lenPx(sb.L), height: proj.lenPx(sb.W), fill: 'var(--draw-bay)', stroke: 'var(--draw-outline)', 'stroke-width': 'var(--w-outline)', 'data-feature': 'subbay' }));
     }
   }
   if (isVehicle) {
@@ -175,12 +181,14 @@ export function drawPlan(result: Result): string {
   used.add('bay');
   parts.push(callout('bay', ...px(-p.holeL * 0.22, 0), used));
 
-  // Firing platform (crew-served) at the front of the bay.
+  // Firing platform (crew-served) at the front of the bay — undisturbed ground left standing,
+  // so it is drawn in earth, not the timber tone that taught a built deck, and it carries its
+  // own legend line instead of borrowing the firing step's.
   if (p.platform) {
     const plTL = px(-p.platform.L / 2, -p.holeW / 2);
-    parts.push(el('rect', { x: plTL[0], y: plTL[1], width: proj.lenPx(p.platform.L), height: proj.lenPx(p.platform.W), fill: 'var(--draw-timber)', opacity: '0.85' }));
-    used.add('firing_step');
-    parts.push(callout('firing_step', ...px(0, -p.holeW / 2 + p.platform.W / 2), used));
+    parts.push(el('rect', { x: plTL[0], y: plTL[1], width: proj.lenPx(p.platform.L), height: proj.lenPx(p.platform.W), fill: 'var(--draw-parapet)', opacity: '0.85', stroke: 'var(--draw-outline)', 'stroke-width': 1, 'data-feature': 'platform' }));
+    used.add('platform');
+    parts.push(callout('platform', ...px(0, -p.holeW / 2 + p.platform.W / 2), used));
   }
 
   // Sumps.

@@ -41,7 +41,7 @@ export function buildDerivations(calc: Calc): Derivation[] {
   d.push({
     key: 'setback',
     label: 'Roof setback',
-    formula: 'max(munitionStandoff, setbackDepthFrac × depthOfCut)',
+    formula: 'max(munitionStandoff, setbackDepthFrac × depthOfCut) — measured OUTWARD from the hole edge to where the roof supports begin',
     operands: [
       op('munitionStandoff', calc.standoffMin, 'ft', calc.standoffLeaf ?? overhead.setbackMin),
       op('setbackDepthFrac', overhead.setbackDepthFrac.value, '×', overhead.setbackDepthFrac),
@@ -104,9 +104,15 @@ export function buildDerivations(calc: Calc): Derivation[] {
   d.push({
     key: 'excavLoose',
     label: 'Spoil to move (loose)',
-    formula: '(bay + platform + sumps) × swellFactor',
+    // The platform SUBTRACTS: it is undisturbed ground left standing, the dirt nobody moves.
+    // With only excavBank exposed the subtraction was invisible in the trace, so the term and
+    // its placeholder flag are listed explicitly.
+    formula: '(bay − platform left undug + sumps) × swellFactor',
     operands: [
       op('excavBank', calc.excavBank, 'ft³'),
+      ...(calc.hasPlatform
+        ? [op('platformLeftUndug', calc.undugPlatformVol, 'ft³', calc.position.firingPlatform?.riseAboveFloor)]
+        : []),
       op('swellFactor', excavation.swellFactor.value, '×', excavation.swellFactor),
     ],
     result: calc.excavLoose,
@@ -195,10 +201,15 @@ export function buildDerivations(calc: Calc): Derivation[] {
     d.push({
       key: 'coverSoilFill',
       label: 'Overhead cover — fill volume',
-      formula: 'coverL × coverW × coverThickness',
+      // The deck reaches setback + bearing OUTWARD past the front and rear walls and endLap past
+      // each flank; naming only the bearing leaf hid three of the four leaves the slab rests on.
+      formula: '(frontage + 2×endLap) × (frontToBack + 2×(setback + bearing)) × coverThickness, less the entrance notch',
       operands: [
-        op('coverL', calc.coverL, 'ft', overhead.bearingEachEnd),
+        op('coverL', calc.coverL, 'ft', overhead.endLap),
         op('coverW', calc.coverW, 'ft', overhead.bearingEachEnd),
+        op('setback', calc.setback, 'ft', calc.standoffLeaf ?? overhead.setbackMin),
+        op('bearingEachEnd', calc.bearingEachEnd, 'ft', overhead.bearingEachEnd),
+        op('deckArea', calc.coverArea, 'ft²'),
         op('coverThickness', calc.coverT, 'ft', calc.coverLeaf),
       ],
       result: calc.coverFill,
@@ -308,11 +319,14 @@ export function buildDerivations(calc: Calc): Derivation[] {
     d.push({
       key: 'stringers',
       label: 'Overhead stringers' + (calc.stringerSize && calc.stringerSize !== 'engineered' ? ' (' + calc.stringerSize + ')' : ''),
-      formula: 'ceil(longAxis ÷ stringerSpacing) + 1 — stringers span the SHORT axis, laid out along the long one',
+      // Counted over the DECK the same block bills, not over the bare hole — the old count left
+      // 2 ft of billed slab with no stringer under it. Stringers run FRONT-TO-BACK onto the
+      // front and rear supports and are laid out ACROSS the frontage at doctrine spacing.
+      formula: 'ceil(deckFrontage ÷ stringerSpacing) + 1 — stringers run FRONT-TO-BACK, laid out across the frontage',
       operands: [
-        op('longAxis', Math.max(calc.holeL, calc.holeW), 'ft', calc.holeL >= calc.holeW ? calc.position.hole.L : calc.position.hole.W),
+        op('deckFrontage', calc.coverL, 'ft', overhead.endLap),
         op('stringerSpacing', overhead.stringerSpacing.value, 'ft', overhead.stringerSpacing),
-        op('clearSpan', calc.stringerSpan, 'ft'),
+        op('clearSpan', calc.stringerSpan, 'ft', calc.position.hole.W),
       ],
       result: calc.stringers,
       unit: 'ea',

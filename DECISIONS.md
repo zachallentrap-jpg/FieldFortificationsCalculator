@@ -1538,3 +1538,204 @@ this change, per `test/frame-goldens.test.ts`'s stated obligation. **Every chang
 plus the manifest/index hashes that cover them** — verified by diffing with those two patterns
 excluded, which leaves nothing. No member was added, removed or moved: member counts and every
 geometric field are byte-identical, because only the printed reference changed.
+
+## 2026-08-11 — One roof, one platform, one sump: the rules and the drawings stop disagreeing
+
+The doctrine tables are the single source the geometry model and every 2D/3D drawing derive
+from — and several physical quantities were reaching the bill, the section and the 3D model
+with different meanings, so the drawings and the quantities disagreed about the same position.
+Measured at 114c8cf, before anything below: the two-man fixture billed a 9.00 × 4.00 ft roof
+slab, the 3D model drew 9.00 × 4.25 with its front edge 2.25 ft in FRONT of the hole, and the
+2D section drew the same edge INSET over the hole. Three footprints, one roof.
+
+### The roof: one signed convention, three views
+
+**Direction.** The overhead-cover setback is measured FROM THE HOLE EDGE OUTWARD to where the
+supports begin (`docs/ONE_MAN_POSITION_MODELING_SPEC.md` §2.b/§2.f; `docs/REALISM_PASS_3D_PLAN.md`
+requires the stringer ends to bear on undisturbed ground, which an inward inset cannot do). So
+the 3D model had the direction right and `drawSection.ts` was the defect. Every roof extent is
+now an OUTWARD extension, `>= 0` by construction, and the engine additionally publishes
+ABSOLUTE edge coordinates in the section's own frame (`frontEdgeFt`, `rearEdgeFt`,
+`endEdgeFt`) — a coordinate cannot be sign-flipped by accident the way an offset can. Both
+renderers stopped doing arithmetic on the setback. The convention is documented on the TYPE
+(`GeometryModel.RoofModel`), which is the only place a renderer author reliably reads.
+
+**Stages, not alternatives.** The supports stand back from the lip by the setback; the
+stringers are then laid across them overhanging `bearingEachEnd` PAST each support. Those are
+two sequential stages of one assembly, so the deck edge is `setback + bearing`. The old model
+took `max()` of them on the rear — the arithmetic of alternatives — and substituted a bearing
+leaf for the setback's own threat-scaled floor. Measured at HEAD: one_man / 155 mm /
+deliberate gave the front 2.000 ft and the rear 1.000 ft. Same roof, same munition, two
+supports, the rear one held to half the standoff the front had to clear. Front and rear are
+now the same number, because the rule is orientation-blind: a rear support is a support.
+
+**C23 is corrected, not implemented.** The audit filed `rearOverhang`'s use of
+`setbackDepthFrac` as reuse of a standoff leaf for a bearing dimension, citing the spec's
+warning at §18. That warning is against reusing the 1-ft/quarter-cut figure for the FRONTAL-BERM
+standoff — a quantity this engine never computes. `setbackDepthFrac` IS the quarter-cut half of
+the OHC-support setback rule, and a rear OHC support is exactly what that rule governs, so the
+fraction belonged there. The real defect was the other prong and the `max()`. The front is not
+a conflation either: `standoffMinFor()` falls back to `overhead.setbackMin`, so the munition's
+standoff and the global minimum are one quantity at two granularities.
+
+**The ends take neither stage.** No stringer end lands on a flank, so neither the setback nor
+the bearing applies there, and nothing in the corpus gives a figure for how far the deck laps
+onto the flank parapet. New leaf `overhead.endLap`, PLACEHOLDER, seeded at 1.0 ft **because
+that is what the app already drew and billed there** — the ends do not move. The 3D used to
+reuse the REAR bearing figure on the end walls, which is why its ends already disagreed with
+the BOM wherever a quarter-cut exceeded a foot (bunker 1.625 vs 1.000).
+
+**The roofed position is no longer roofed shut.** `REALISM_PASS_3D_PLAN.md` R10 is real —
+measured, the bunker's 3D roof overhung its rear wall by 1.625 ft across a 3.0 ft entrance. But
+R10's stated fix (stop the rear edge at the wall, shorten the stringers) contradicts its own
+acceptance criterion once the stringers run front-to-back: every one becomes a cantilever off
+the front support. Resolved as a NOTCH IN THE DECK ONLY: the earth cover is omitted across the
+entrance passage so the corridor opens to the sky, and the stringers keep their full rear
+bearing. You duck under a beam to walk in; you do not climb over a roof.
+
+**Span axis.** ATP 5-261 as transcribed at §2.b gives 3 supports, 2 front and 1 rear — supports
+lying along the frontage — so the stringers cross FRONT-TO-BACK and are laid out ACROSS the
+frontage. `min(holeL, holeW)` coincided with that everywhere except `one_man` (2.5 ft frontage
+/ 4.0 ft front-to-back), where it rotated the roof 90° against the support layout. Clear span
+is now `holeW`; measured, the only position that moves is one_man, 2.500 → 4.000 ft, and its
+size stays 4×4 — but it now sits EXACTLY on `spanSizes[0].maxSpan`, so any fill that lowers
+that leaf flips it to 6×6. That is a fail-safe fact, recorded here rather than discovered.
+The vehicle access ramp keeps its own axis (`rampWidth = min(L, W)`) so the two cannot drift
+into each other; measured, no vehicle number moves.
+
+**Stringers are counted over the deck they hold up**, not the bare hole: at HEAD every position
+billed a slab 2.0 ft wider than the stringer field under it.
+
+### The firing platform is a CUT that is not made
+
+`ONE_MAN_POSITION_MODELING_SPEC.md` §2.f is direct: leave the firing-platform / elbow-shelf of
+undisturbed original earth — "this is a CUT, not a build". Both renderers had always drawn it
+that way; `compute` added `L × W × depthBelowHole` to the excavation, which is the opposite.
+The leaf is renamed `riseAboveFloor` because the defect WAS a name that stated neither datum
+nor direction ("below" WHAT surface?), and three consumers read it three ways. The excavation
+now subtracts it, and the trace says so instead of hiding it inside one `excavBank` operand.
+
+The magnitude is untouched and stays PLACEHOLDER: §18 states flatly that no doctrinal
+firing-step height exists and any numeric height is model-derived. We adopt the principle and
+adopt no number.
+
+`fifty_cal.firingPlatform.W` 3.0 → 2.0 ft. The engine bills that position as a single 9×2×D
+prism, so a 3.0-ft platform inside a 2.0-ft trench described an impossible position. Geometry
+clamped it FOR DRAWING and the BOM billed the unclamped 12 ft³ — the picture was right and the
+spoil figure was wrong, which is exactly backwards. The clamp now lives once, in `compute`, so
+bill and all three views read one footprint, and `test/doctrine-refintegrity.test.ts` asserts
+the source table satisfies the invariants (platform fits its hole; the rise clears the
+SHALLOWEST standard's cut, not deliberate's; the bench never covers the whole floor) so a
+future source edit trips before the clamp ever has to.
+
+### Physical constants out of the renderers
+
+Every magnitude below was a literal inside a view, and in each case two views held different
+ones for the same object. Each becomes a PLACEHOLDER leaf with an honest note and no fabricated
+source, or a derived value on `GeometryModel`: the firing-step ledge (2D `min(0.8, d×0.25)` vs
+3D `min(0.67, max(0.5, d×0.15))`; the 3D's "ATP 5-254, source-verified" comment had to go,
+since §18 says no such figure exists), the grenade sump (billed 1×1×1, drawn as two other
+boxes), the stringer size the engine already resolved and printed on the BOM line but never
+published, the mortar-pit wall batter (only the 3D knew the pit was flared at all), the
+inverted-T stem and L-arm (duplicated literals in two renderers, for a real dug trench), the
+vehicle berm height (3D 0.600 ft vs the section's doctrinal 2.000), the camouflage net (1.21×
+footprint drawn against 1.25× billed — the plane now takes √drapeFactor per axis so the drawn
+area IS the ordered area), the rear entrance passage, the entry stair, the ramp/pan split, and
+the isometric's flat 0.6 ft parapet block. The 8-stringer draw cap is gone; the iso reads the
+frontal height it is drawing.
+
+The entry stair's step COUNT now follows a climbable rise instead of a flat two treads sharing
+whatever the cut happened to be — measured at HEAD, the bunker's 6.5 ft cut gave a 2.167 ft
+(26 in) riser on a 6-in tread, which is a fall with a ledge, not a way down.
+
+### What moved, measured before and after (both from a build, not derived)
+
+Roof / cover, deliberate, loam. `sandbags_cover` and `cover_soil_fill` scale with the deck:
+
+| position / threat | bags or fill, HEAD | after | stringers |
+|---|---|---|---|
+| two_man / 81 mm (the pinned fixture) | 157 bags | 255 | 8 → 10 |
+| two_man / 155 mm | 100.80 ft³ | 201.60 | 8 → 10 |
+| one_man / 81 mm | 118 bags | 167 | 5 → 6 |
+| one_man / 155 mm | 75.60 ft³ | 126.00 | 5 → 6 |
+| mg_crew / 81 mm | 174 bags | 283 | 9 → 11 |
+| fifty_cal / 81 mm | 192 bags | 311 | 10 → 12 |
+| mortar_pit / 81 mm | 435 bags | 544 | 9 → 11 |
+| connecting_trench / 81 mm | 333 bags | 537 | 16 → 18 |
+| connecting_trench / 155 mm | 214.20 ft³ | 404.60 | 16 → 18 |
+| bunker_op_cp / 81 mm (notched) | 522 bags | 658 | 11 → 13 |
+| atgm_javelin / 81 mm | 218 bags | 327 | 9 → 11 |
+
+Direction is uniformly UP: today's roof was billed short. Labor does not move on this axis —
+`overheadAdd` is a flat adder.
+
+Excavation and labor, from the platform's sign (the only three positions with one):
+
+| position | spoil HEAD → after (deliberate) | mh | hasty spoil | hasty mh |
+|---|---|---|---|---|
+| mg_crew | 93.75 → 71.25 ft³ (−24.0%) | 13.5 → 12.1 | 61.75 → 39.25 | 6.9 → 5.4 |
+| fifty_cal | 107.50 → 82.50 ft³ (−23.3%) | 14.4 → 12.8 | 71.50 → 46.50 | 7.5 → 5.9 |
+| atgm_javelin | 128.75 → 113.75 ft³ (−11.7%) | 15.7 → 14.8 | 80.75 → 65.75 | 8.1 → 7.1 |
+
+fifty_cal's figure carries both halves: the sign flip alone gives 77.50 ft³, and narrowing the
+platform to its own trench brings it back to 82.50 — Part B on its own makes the position
+slightly MORE expensive, because the bench left undug is smaller.
+
+**A new user-visible warning.** At HASTY, `SPOIL_SHORT` now fires for mg_crew and fifty_cal:
+the smaller dig no longer yields enough spoil for the parapet ring. That is a true planning
+fact in the safe direction, but it is new output on two positions and is recorded as such.
+
+BOM SHAPE is unchanged — no line added or removed, and `grenade_sumps`, `sandbags_parapet`,
+`gravel_sump`, `berm_fill` and `camo_net` are byte-identical. The vehicle positions, one_man,
+two_man, mortar_pit, bunker and connecting_trench show no excavation change at all (no
+platform), and no vehicle ever reaches the earth-roof branch (its 12 ft span forces
+`engineered_required` for every threat).
+
+### The goldens
+
+**No golden or snapshot file under `test/goldens/` is touched**, and `test/fixtures/
+train-vectors.json` is untouched: those are all wood-frame subsystem artifacts and this path
+does not reach them (verified by running the full suite — the only failures were the SAP-1 pins
+below). `test/frame-goldens.test.ts`'s same-PR obligation is therefore satisfied vacuously, and
+this paragraph is the record that it was checked rather than assumed.
+
+The SAP-1 pins that moved, each regenerated deliberately and each exactly what the contract
+predicts: `test/snapshot.test.ts` `sandbags_cover` 157 → 255 and `stringers` 8 → 10 (the deck
+is 9.00 × 6.50 ft where it was 9.00 × 4.00, and the count is taken over the 9 ft deck rather
+than the 7 ft hole); `placeholderReport` 295/295/189 → 317/317/192 (22 new leaves, three of
+them safety-critical — the stringer sections, which are the member holding the roof up);
+`test/units-format.test.ts`'s large-total case 156843 → 254745, which is the same cover-bag
+move × 999. Everything else in the default fixture is byte-identical, labor included.
+
+### Decisions taken on the designs' open questions
+
+- **Front and rear are the same number** rather than the front alone carrying the munition
+  standoff. `standoffMinFor()` already falls back to `overhead.setbackMin`, so the two are one
+  quantity, and the spec states the rule symmetrically.
+- **`bearingEachEnd` feeds the roof FOOTPRINT**, not only the stringer length. §2.f step 7 says
+  the stringers overhang the supports, and the deck follows the stringers; a deck that stops at
+  the support line has no bearing under its own edge.
+- **The stringer sections are tagged safetyCritical**, with their `maxSpan` siblings — a fill
+  that shrinks one draws a hairline beam under a foot of earth. `bearingEachEnd` itself is NOT
+  retagged here: that is audit A5's call, and the safety-critical roster lives in a document
+  this phase does not own.
+- **No `PLATFORM_CLAMPED` advisory.** Every validation code must be reachable from inputs
+  alone (`test/validate.test.ts` asserts it), and with the table now consistent this one is
+  not. The guard is the source-table invariant test plus the single clamp in `compute`.
+- **The job sheet prints the setback and the bearing as the two stages they are**, and its
+  "Standoff achieved" row is relabelled "Roof support setback" — it was printing an OHC-support
+  setback under a name a reader takes for a threat keep-out distance.
+
+### Known residuals, named rather than closed
+
+- **C4** — `parapet.H` (0.5 ft) and `sandbag.frontWallHeight` (0.83 ft) still describe one
+  object and disagree; the 3D mound is built to the greater of them and the section dimensions
+  the lesser. No rendering contract can settle which table is right, so the cross-view sweep
+  names that field as deliberately absent instead of asserting a fact neither table supports.
+- **C16** — a circular position's roof still uses its bounding rectangle with no π/4 factor, so
+  the mortar pit's corrected deck inherits the same square-for-circle overestimate.
+- **C20** — the T-stem and L-arm are now DRAWN from doctrine in all three views but are still
+  outside the volume model; the fidelity statement now says so per shape, which it did not.
+- The `RENDERED_PROTECTION` register and the import-time invariants in `src/doctrine/io.ts`
+  would be the right home for the platform and roof-footprint guards; that file is outside this
+  phase's ownership and the guards live in tests instead.
