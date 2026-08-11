@@ -69,6 +69,17 @@ export interface LsConsumer {
    * — a role named unmeasurable that the check turns out to measure fails, the same as a role
    * named measured that it does not — and the packet can print the caveat beside the row instead
    * of leaving the signer to assume the check covered everything of that name in the build.
+   *
+   * CANNOT REACH, NOT DOES NOT REACH — AND THIS IS NOT A PLACE TO PUT A ROLE THAT NEEDS A FIX.
+   * The two are not the same claim, and only the first belongs here. "The check does not measure
+   * it" is a fact about a branch somebody wrote, and it becomes true the moment they delete the
+   * branch; writing a sentence here would then close the gate over the exact defect it exists to
+   * catch, and print a caveat about a member the check had been measuring perfectly well. What
+   * belongs here is a limit that cannot be READ against the member: a hip's seat, whose double
+   * cheek over the corner is geometry `birdsMouth.ts` does not derive, or a size with no row in
+   * the table — a 6x8 cap beam against a table that runs 2x4 to 2x12. `timber2-doctrine.test.ts`
+   * enforces exactly that line: for a span limit it asks the MEMBER and the TABLE, not the check,
+   * and refuses any role whose members carry a length and a nominal the limit's own table lists.
    */
   readonly unmeasured?: Readonly<Partial<Record<MemberRole, string>>>;
 }

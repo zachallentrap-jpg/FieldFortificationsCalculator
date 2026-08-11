@@ -398,6 +398,125 @@ test('the smallest thickness the shipped shielding table carries is NOT called u
   assert.deepEqual(importDoctrine(fullFill(), { dryRun: true }).warnings, [], 'the shipped table is quiet');
 });
 
+// The roof is not the only protection the app prints. A parapet's frontal cover, a hull-down's
+// spoil berm and an ATGM's rear backblast area are each safety-critical, each drawn to scale and
+// dimensioned through the same length formatter, and none has an engineered fail-safe behind it.
+test('every protective magnitude the app dimensions is checked, not only the roof', () => {
+  const tiny = 1e-9;
+  const paths = ['protection.parapet.W', 'protection.berm.W', 'weapons.backblast.clearanceFt'];
+  const rep = importDoctrine(fixture(paths.map((path) => ({ path, value: tiny }))), { dryRun: true });
+
+  assert.ok(rep.ok, 'plausibility reports, never blocks');
+  for (const path of paths) {
+    const w = rep.warnings.find((x) => x.path === path);
+    assert.ok(w, 'no finding for ' + path + ' — a protective magnitude nobody can read is not doctrine');
+    assert.match(w!.reason, /rounds to zero as displayed/, path + ': ' + w!.reason);
+  }
+  // …and exactly zero reads as ABSENT, the same as it does on the shielding table.
+  const zeroed = importDoctrine(fixture(paths.map((path) => ({ path, value: 0 }))), { dryRun: true });
+  for (const path of paths) {
+    assert.match(zeroed.warnings.find((x) => x.path === path)?.reason ?? '', /MISSING value/, path);
+  }
+});
+
+test('a parapet filled to a thickness the panel shows as nothing still gets drawn and billed', () => {
+  // The state at stake: the operator reads a parapet of no thickness off the plan while the BOM
+  // bills exactly the same work to build it, so the warning above is the only thing standing
+  // between the fill and a position with no frontal cover.
+  const path = 'protection.parapet.W';
+  const inputs = defaultInputs({ positionType: 'two_man' });
+  const bagsBefore = compute(inputs).bom.find((b) => b.id === 'sandbags_parapet')?.qtyTotal;
+  const rep = importDoctrine(fixture([{ path, value: 1e-9 }]));
+  try {
+    assert.ok(rep.ok, 'plausibility never blocks');
+    assert.ok(rep.warnings.some((w) => w.path === path), 'the fill is reported');
+
+    const result = compute(inputs);
+    const geo = result.geometry as GeometryModel;
+    const dim = geo.dims.find((d) => d.key === 'parapet_w');
+    assert.ok(dim, 'the parapet thickness is a dimension the drawing carries');
+    assert.ok(dim!.valueFt > 0, 'strictly positive, so nothing downstream refuses it');
+    assert.ok(!/[1-9]/.test(fmtLength(dim!.valueFt, 'imperial')), 'the plan would dimension it ' + fmtLength(dim!.valueFt, 'imperial'));
+    assert.equal(
+      result.bom.find((b) => b.id === 'sandbags_parapet')?.qtyTotal, bagsBefore,
+      'the BOM bills the parapet work unchanged while the cover it protects with has gone',
+    );
+  } finally {
+    restore();
+  }
+});
+
+test('the display check stays off the safety-critical values that are not protective lengths', () => {
+  // The threshold is DISPLAY precision of a length, so it has no meaning for a unitless ratio, a
+  // first-fit span limit, a warning threshold or a divisor — extending it to them would fire on
+  // fills that are merely small and train the filler to ignore the check. The span limits and the
+  // shoring threshold answer to their own rules instead, and a non-positive halving thickness
+  // already reads as no attenuation.
+  const quiet = [
+    { path: 'protection.overhead.setbackDepthFrac', value: 1e-9 },
+    { path: 'protection.overhead.setbackMin', value: 1e-9 },
+    { path: 'protection.retainingWall.thickness', value: 1e-9 },
+    { path: 'protection.retainingWall.maxHeight', value: 1e-9 },
+    { path: 'protection.radiationHalving.steel', value: 1e-9 },
+    // ascending, so the whole-table first-fit invariant is satisfied and only display is at issue
+    ...spanSizes.map((_, i) => ({ path: 'protection.spanSizes[' + i + '].maxSpan', value: (i + 1) * 1e-9 })),
+  ];
+  const rep = importDoctrine(fixture(quiet), { dryRun: true });
+  assert.ok(rep.ok);
+  assert.deepEqual(rep.warnings, [], 'none of these is a protective length the panel prints');
+});
+
+test('a cover multiplier of zero is named even when every thickness it scales is unusable too', () => {
+  // The one import where the product walk has nothing to work with: every shielding leaf is
+  // flagged on its own row and excluded, so no legible thickness survives to quote. A multiplier
+  // of zero needs none — it is absent in its own right, and would otherwise be the only bad value
+  // in the file nobody was told about.
+  const shieldingPaths = Object.keys(shielding).flatMap((id) => shieldMaterials.map((m) => 'protection.shielding.' + id + '.' + m));
+  const mulPath = 'standards.hasty.coverMul';
+  const rep = importDoctrine(
+    fixture([...shieldingPaths.map((path) => ({ path, value: 0 })), { path: mulPath, value: 0 }]),
+    { dryRun: true },
+  );
+
+  assert.ok(rep.ok, 'plausibility reports, never blocks');
+  const on = rep.warnings.filter((w) => w.path === mulPath);
+  assert.equal(on.length, 1, 'the multiplier draws exactly one finding of its own');
+  assert.match(on[0]!.reason, /MISSING value/, 'reported as an absent value: ' + on[0]!.reason);
+  // The shielding rows still own their own problem — the multiplier finding does not replace them.
+  const warned = new Set(rep.warnings.map((w) => w.path));
+  for (const p of shieldingPaths) assert.ok(warned.has(p), 'no finding for ' + p);
+});
+
+test('with no legible thickness left, a POSITIVE multiplier is left to the rows that own the problem', () => {
+  // Deliberate, not an oversight: a positive multiplier can only be convicted by a thickness that
+  // reads fine on its own, and every thickness here is already reported on its own row. Naming the
+  // standards table too would send the filler there to correct the shielding table. Nothing is
+  // silent, and the moment one legible thickness lands the product is re-derived against this same
+  // multiplier and it is named then — which the next case proves.
+  const shieldingPaths = Object.keys(shielding).flatMap((id) => shieldMaterials.map((m) => 'protection.shielding.' + id + '.' + m));
+  const mulPath = 'standards.hasty.coverMul';
+  const rep = importDoctrine(
+    fixture([...shieldingPaths.map((path) => ({ path, value: 1e-9 })), { path: mulPath, value: 1e-9 }]),
+    { dryRun: true },
+  );
+
+  assert.ok(rep.ok);
+  assert.ok(!rep.warnings.some((w) => w.path.startsWith('standards.')), 'no wrong-table blame');
+  const warned = new Set(rep.warnings.map((w) => w.path));
+  for (const p of shieldingPaths) assert.ok(warned.has(p), 'no finding for ' + p + ' — the fill is not silent');
+
+  // …and it really does self-heal: land one legible thickness against that same live multiplier
+  // and the multiplier is named on its own.
+  const applied = importDoctrine(fixture([...shieldingPaths.map((path) => ({ path, value: 1e-9 })), { path: mulPath, value: 1e-9 }]));
+  try {
+    assert.ok(applied.ok);
+    const later = importDoctrine(fixture([{ path: 'protection.shielding.sa-556.soil', value: 2 }]), { dryRun: true });
+    assert.ok(later.warnings.some((w) => w.path === mulPath), 'the live multiplier is judged against the newly legible thickness');
+  } finally {
+    restore();
+  }
+});
+
 test('a stored fill that no longer matches the registry is refused, not trusted', async () => {
   const adapter = new MemoryAdapter();
   await adapter.set('doctrine-fill', JSON.stringify({ doctrineVersion: 1, entries: [{ path: 'gone.path', value: 1, status: 'DOCTRINE', source: 'FM' }] }));

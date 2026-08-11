@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   LUMBER, PANEL, LAYOUT, FOUNDATION, STAIR, LADDER, RAIL, RAMP, ROOFING, SIDING, LABOR, NAILING,
-  allDoctrineEntries, lifeSafetyRegister, citeOf,
+  SPAN, IN_PER_FT, allDoctrineEntries, lifeSafetyRegister, citeOf,
 } from '../src/timber/doctrine';
 import { FULL_FIXTURES, MATRIX_FIXTURES } from './fixtures/frameFixtures';
 import { DRESSED, type Member } from '../src/timber/types';
@@ -28,7 +28,7 @@ import { configSchemaFor, type PanelRow } from '../src/ui/woodframe/config';
 import { HUT } from '../src/timber/doctrine';
 import { spanWarnings, type SpanWarning } from '../src/timber/spans';
 import { seatCutsFor, seatDepthWarnings } from '../src/timber/birdsMouth';
-import { LS_CONSUMERS, type LsCheck } from '../src/timber/packet/lsgate';
+import { LS_CONSUMERS, type LsConsumer } from '../src/timber/packet/lsgate';
 import type { RoofSpec, StructureSpec } from '../src/timber/spec';
 
 test('every doctrine constant carries a citation, and unverified ones are visibly (PH)', () => {
@@ -523,8 +523,19 @@ test('the (PH) a crew reads and the ph the register reports cannot disagree', ()
 // dropped, and that declaration is held to account in both directions: a role called unmeasurable
 // that the check turns out to measure fails here as loudly as a role called measured that it does
 // not. Silence is what let the first three through.
+//
+// AND THE DECLARATION IS NOT A WAY OUT OF THE FIRST TWO. It was, briefly, and it let the tail
+// joist straight back in: take the branch out of `spans.ts`, move `tailJoist` from `roles` to
+// `unmeasured` with a sentence, and the whole section went green. Two things made that work, and
+// both are gone. The exemplars were collected from what the register CLAIMED, so a declaration
+// deleted its own evidence; they are now collected from what the generators emit, which no line of
+// the register can touch. And "unmeasurable" was judged by asking whether the check measures the
+// role — a question that answers itself the moment somebody removes the branch. It is now judged
+// against the member and the doctrine table instead: a role whose members carry a length and wear
+// a nominal the limit's own table lists is a role that limit CAN rate, so it must, and no sentence
+// is accepted in place of the branch.
 
-/** One exemplar of a distinct thing `spanWarnings` can be asked about. */
+/** One exemplar of a distinct thing `spanWarnings` could be asked about, for EVERY role emitted. */
 interface SpanClass {
   member: Member;
   family: string;
@@ -538,14 +549,28 @@ interface LsWalk {
   rolesByFamily: Map<string, Set<string>>;
   /** `check|role|cite` some build produced on its own, with nothing rigged. */
   observed: Set<string>;
-  /** Roles `birdsMouth.ts` derives a seat for — its subject list, warning or not. */
+  /**
+   * Roles `birdsMouth.ts` derives a seat for — its subject list, warning or not.
+   *
+   * WHY THIS ONE IS NOT SELF-VALIDATING, WHICH THE SPAN SIDE WAS. It is read off `seatCutsFor`
+   * over every member of every build, and `seatCutsFor` has never heard of `LS_CONSUMERS`: nothing
+   * anybody writes in the register can add to it or take from it. That is exactly what the span
+   * side lacked — there, declaring a role unmeasurable used to delete its exemplars and so delete
+   * the evidence, and the declaration came out true by construction. A seat declaration cannot
+   * touch its own refutation; it can only be true when the module really does not seat the role.
+   *
+   * AND THE GEOMETRY IS NOT A BETTER CRITERION HERE, WHICH IS WHY THE SUBJECT LIST IS THE ONE USED.
+   * The obvious analogue of the span criterion — "would `seatCutFor` return a cut for this member
+   * if the list allowed?" — gives the wrong answer for the hip. Squash a hip roof to a 4 ft plan
+   * and its hips swing to within 17° of a wall line, `runAxisOf` snaps them onto that axis, and the
+   * primitive duly returns a notch. It is not the hip's joint: a hip meets its plates canted, and
+   * a seat solved as though it ran square to one is a number, not a measurement. What decides the
+   * seat check's reach is whether the cut it derives IS the member's joint, which is a modelling
+   * judgment `birdsMouth.ts` states in the open and the viewer draws.
+   */
   seated: Set<string>;
   spanClasses: Map<string, SpanClass>;
 }
-
-/** The roles some span-checked row of the register claims. Nothing else needs an exemplar. */
-const rolesClaimedBy = (check: LsCheck): Set<string> =>
-  new Set(Object.values(LS_CONSUMERS).filter((c) => c.checkedBy === check).flatMap((c) => [...c.roles]));
 
 /**
  * Everything `spanWarnings` reads when deciding whether a member is measured AT ALL: the role
@@ -566,14 +591,22 @@ function newLsWalk(): LsWalk {
   return { rolesByFamily: new Map(), observed: new Set(), seated: new Set(), spanClasses: new Map() };
 }
 
+/**
+ * What the app emits, recorded WITHOUT consulting the register.
+ *
+ * NOTHING WRITTEN IN `LS_CONSUMERS` MAY NARROW THIS. The walk used to keep a class only for roles
+ * some span row claimed, which handed the register a way to delete the evidence against itself:
+ * moving a role out of `roles` and into `unmeasured` removed its exemplars, removed them from every
+ * probe, and left the declaration with nothing that could contradict it — so declaring a role
+ * unmeasurable made it unmeasurable. The corpus is what the generators produced; the register is
+ * the claim being tested against it, and a claim does not get to choose its own evidence.
+ */
 function recordLs(w: LsWalk, model: StructureModel, where: string): void {
   const family = model.spec.family;
   const floorTopY = model.levels.subfloorTop;
-  const claimed = rolesClaimedBy('span');
   for (const m of model.members) {
     if (!w.rolesByFamily.has(m.role)) w.rolesByFamily.set(m.role, new Set());
     w.rolesByFamily.get(m.role)!.add(family);
-    if (!claimed.has(m.role)) continue;
     const key = spanClassKey(family, m, floorTopY);
     const prev = w.spanClasses.get(key);
     if (!prev || m.cutLength > prev.member.cutLength) {
@@ -607,15 +640,81 @@ const spanProbe = (c: SpanClass): SpanWarning[] =>
   spanWarnings([{ ...c.member, cutLength: c.member.cutLength * 4 }], c.spacing, c.floorTopY);
 
 /**
+ * The plan run a span row is read against, derived here from the member alone.
+ *
+ * A span table row is a PLAN dimension — feet measured on the ground, not along a sloping stick —
+ * and every member carries the pitch to reduce its length to one. Restated here rather than
+ * borrowed from `spans.ts` on purpose: what follows has to be able to disagree with the check.
+ */
+const planRunOf = (m: Member): number => (m.cutLength / IN_PER_FT) * Math.abs(Math.cos(m.rotation[2] ?? 0));
+
+/** The doctrine table a span row IS. `SPAN.ceilingJoist` is read on `SPAN.ceilingJoist`. */
+function spanTableOf(id: string): Record<string, unknown> | undefined {
+  const [group, key] = id.split('.');
+  if (group !== 'SPAN' || !key) return undefined;
+  const d = (SPAN as unknown as Record<string, { value: unknown } | undefined>)[key];
+  return d && typeof d.value === 'object' && d.value !== null ? (d.value as Record<string, unknown>) : undefined;
+}
+
+/**
+ * The member classes this span limit COULD be read against — asked of the members and of the
+ * limit's own table, and of nothing in `spans.ts`.
+ *
+ * THIS IS WHY A DECLARATION CANNOT SUBSTITUTE FOR A FIX. Asking "does the check measure this
+ * role?" is the wrong question for an escape hatch, because that question answers itself: it is
+ * true exactly when someone has broken or omitted the branch, which is the case the hatch must
+ * refuse. The right question is whether the limit CAN be read against the member at all, and a
+ * span limit needs two things and only two:
+ *
+ *   A NUMBER OF FEET. Every member has a position, a pitch and a cut length, so a plan run always
+ *   exists, and the clear span the check derives from it — a bay between bearing lines, a run less
+ *   its bearings — is bounded by it. Nothing about a member makes those feet unobtainable.
+ *
+ *   A ROW TO READ THEM ON. The table is a list of nominals; a size that is not in it has no
+ *   maximum here. THIS is the real limit of a span row's reach, and it is a doctrinal fact rather
+ *   than a fact about the code: a bunker's 6x8 cap beam carried across a doorway cannot be rated
+ *   by a table whose rows run 2x4 to 2x12, no matter what branch anyone writes.
+ *
+ * So: a role whose members are in this row's scope, carry a length, and wear a nominal the row's
+ * own table lists is a role this limit must MEASURE. Declaring it unmeasurable is refused, and the
+ * refusal names the class, because the fix is a branch or a narrower scope — never a sentence.
+ */
+function ratableSpanClasses(w: LsWalk, id: string, c: LsConsumer, role: string): string[] {
+  const table = spanTableOf(id);
+  if (!table) return [`${id} names no span table of its own, so nothing here can hold the claim up`];
+  const out: string[] = [];
+  for (const [key, cls] of w.spanClasses) {
+    if (cls.member.role !== role) continue;
+    if (c.families && !(c.families as readonly string[]).includes(cls.family)) continue;
+    if (!Object.prototype.hasOwnProperty.call(table, cls.member.nominal)) continue;
+    const run = planRunOf(cls.member);
+    if (!(run > 0) || !Number.isFinite(run)) continue;
+    out.push(`${key} runs ${run.toFixed(1)} ft and ${cls.member.nominal} is a row of this very table`);
+  }
+  return out;
+}
+
+/**
  * Every test below passes trivially against an empty walk, so the walk is asserted before it is
  * read. A refactor that quietly narrowed the corpus — or a `recordLs` that stopped recording —
  * would otherwise leave the whole section green while proving nothing at all.
  */
 function assertCorpusIsReal(w: LsWalk): void {
-  assert.ok(w.rolesByFamily.size > 40, `the walk saw ${w.rolesByFamily.size} member roles across every card and panel`);
-  assert.ok(w.spanClasses.size > 15, `the walk found ${w.spanClasses.size} distinct span-checked member classes`);
-  assert.ok(w.observed.size > 4, `the corpus raised ${w.observed.size} kinds of check result unaided`);
-  assert.ok(w.seated.size > 0, 'the seat check derived no seats anywhere in the corpus');
+  // THE FLOORS SIT JUST UNDER WHAT THE WALK ACTUALLY PRODUCES — 70 roles, 208 member classes, 7
+  // unaided results, 2 seated roles. A floor at half the real figure is the shape of guard that
+  // watches the wrong failure: what narrows a corpus is a walk that stopped walking or a recorder
+  // that stopped recording, and either takes most of a set, not a member of it. `observed` was the
+  // thinnest of the four and it is the one that matters most, so it is also asserted by NAME
+  // below: it is the only place a check is seen measuring a role on a build the app really ships,
+  // and losing both joist rows would drop it from 7 to 5 — through a floor of 4 without a word.
+  assert.ok(w.rolesByFamily.size > 60, `the walk saw ${w.rolesByFamily.size} member roles across every card and panel`);
+  assert.ok(w.spanClasses.size > 180, `the walk found ${w.spanClasses.size} distinct member classes`);
+  assert.ok(w.observed.size > 5, `the corpus raised ${w.observed.size} kinds of check result unaided`);
+  assert.ok(w.seated.size > 1, `the seat check derived seats for ${w.seated.size} roles in the corpus`);
+  const kinds = new Set([...w.observed].map((o) => o.split('|').slice(0, 2).join('|')));
+  for (const kind of ['span|joist', 'span|rafter', 'span|jackRafter', 'span|hipRafter', 'seat|rafter', 'seat|jackRafter']) {
+    assert.ok(kinds.has(kind), `no build the app ships raises ${kind} unaided any more — the corpus has lost its reach`);
+  }
 }
 
 test('every role the life-safety register declares is a role some shipped build emits', () => {
@@ -696,12 +795,28 @@ test('no member a SPAN limit claims falls through every branch of the span check
   );
 });
 
-test('a role the register calls unmeasurable is one its check really cannot reach', () => {
-  // The escape hatch, held shut from both sides. Without this, "declared unmeasurable" is a way
-  // to make the two tests above green by writing a sentence, and the sentence goes onto the
-  // packet in front of the person signing it.
+test('a role the register calls unmeasurable is one its check really CANNOT reach', () => {
+  // The escape hatch, held shut against the thing it is easiest to use it for. Without this,
+  // "declared unmeasurable" is a way to make the two tests above green by writing a sentence, and
+  // the sentence goes onto the packet in front of the person signing it — worse than silence,
+  // because it prints as a caveat where the check was in fact working perfectly well.
+  //
+  // CANNOT, NOT DOES NOT. That distinction is the whole load this test carries. "The check does
+  // not measure this role" is not a fact about the role, it is a fact about the branch someone
+  // wrote, and it becomes TRUE the moment they delete the branch — so a gate that asks it accepts
+  // exactly the defect it exists to refuse. Every claim below is therefore held against something
+  // the declaration itself cannot move: for a span, the member's own length and the row of the
+  // limit's own table it wears (`ratableSpanClasses`); for a seat, the subject list `birdsMouth.ts`
+  // derives its notches from, which no register edit can reach (see `LsWalk.seated` for why that
+  // list, and not the geometry, is the right criterion on that side).
   const w = lsWalk();
   assertCorpusIsReal(w);
+  // "Measured" is what the check is SEEN to do — its unaided warnings plus the length probe over
+  // every class the app emits, which is now every class, claimed or not. A role the register has
+  // written off that the probe still measures is a declaration contradicted by the check itself.
+  const measured = new Set(w.observed);
+  for (const c of w.spanClasses.values()) for (const s of spanProbe(c)) measured.add(`span|${s.role}|${s.cite}`);
+
   const wrong: string[] = [];
   for (const [id, c] of Object.entries(LS_CONSUMERS)) {
     for (const [role, why] of Object.entries(c.unmeasured ?? {})) {
@@ -709,12 +824,32 @@ test('a role the register calls unmeasurable is one its check really cannot reac
       if ((c.roles as readonly string[]).includes(role)) wrong.push(`${id}: ${role} is listed as measured and unmeasured at once`);
       if (!why || why.length < 30) wrong.push(`${id}: ${role} is called unmeasured with no reason a reader could act on`);
       if (!w.rolesByFamily.has(role)) wrong.push(`${id}: ${role} is a caveat about a member no build has`);
-      if (c.checkedBy && w.observed.has(`${c.checkedBy}|${role}|${citeFor(id)}`)) {
+      if (c.checkedBy && measured.has(`${c.checkedBy}|${role}|${citeFor(id)}`)) {
         wrong.push(`${id}: the ${c.checkedBy} check DOES measure ${role} — it belongs in roles, not here`);
+      }
+      if (c.checkedBy === 'span') {
+        for (const evidence of ratableSpanClasses(w, id, c, role)) {
+          wrong.push(
+            `${id}: ${role} carries everything this limit is read on — ${evidence} — so the limit CAN rate it and `
+            + 'must; give it a branch or scope the row off it, not a sentence',
+          );
+        }
       }
       if (c.checkedBy === 'seat' && w.seated.has(role)) {
         wrong.push(`${id}: birdsMouth.ts now derives a seat for ${role}, so the limit reaches it`);
       }
+    }
+  }
+  // And the other direction on the seat side: every role the module DOES seat has to be accounted
+  // for by the row that names it, one way or the other. A role added to `birdsMouth.ts`'s subject
+  // list and not to the register is a member being measured against a life-safety limit that the
+  // packet never tells its signer was measured — the same silence as the reverse, read the other
+  // way round.
+  for (const [id, c] of Object.entries(LS_CONSUMERS)) {
+    if (c.checkedBy !== 'seat') continue;
+    const accounted = new Set<string>([...c.roles, ...Object.keys(c.unmeasured ?? {})]);
+    for (const role of w.seated) {
+      if (!accounted.has(role)) wrong.push(`${id}: birdsMouth.ts seats ${role} and this row says nothing about it`);
     }
   }
   assert.deepEqual(wrong, [], `unmeasurable declarations that do not hold up:\n  ${wrong.join('\n  ')}`);

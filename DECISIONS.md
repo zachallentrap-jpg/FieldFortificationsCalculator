@@ -557,6 +557,79 @@ option, implement it, and log it here.
   the panel can only show as zero, through a leaf or through a product, is reported at the
   moment the fill is made, in a message that quotes what the panel would show.
 
+- **D42 — A life-safety row that names a check must be watched doing the checking, and a
+  declaration may never stand in for the branch.** Four separate rows have now told a packet's
+  signer that a member was held to a limit nothing measured: the hip's bird's-mouth seat, the hip
+  and jack rafters' spans, a tail joist at CEILING level (skipped by the floor table for sitting
+  above the deck and by the ceiling table for not being called `joist`), and the bunker's 6x8
+  entrance header under `SPAN.header`. The first three were found by hand and two of them grew back
+  after the round that fixed the one before, which is the tell that the register was being
+  maintained by care rather than by a gate; the fourth nobody had spotted at all, and the gate
+  described here is what found it. `LsConsumer` therefore gains two fields. **`checkedBy`** names
+  the module that MEASURES the members against the value — a size the emitter cut from is consumed by
+  the member simply existing, but a LIMIT is only consumed if something compared a member to it,
+  and a row that cannot name what did the comparing is a row claiming an examination.
+  **`unmeasured`** is a role the value governs in the abstract that the named check cannot reach,
+  carrying the reason, and it exists because the previous fix for the hip's seat was to delete
+  `hipRafter` from the list: true of `roles`, and silent in a way the next reader takes for
+  coverage. **The gate is four tests over the card-and-panel corpus** (`timber2-doctrine.test.ts`,
+  the same walk the nailing register is proved against — 70 member roles, 208 distinct member
+  classes, 7 unaided check results, 2 seated roles, each floored just under its measured value and
+  the unaided results named individually as well, because a walk that stopped walking loses most of
+  a set and a floor at half the real figure would sit there green through it): every declared role
+  is one some shipped build emits; every role a LIMIT
+  declares is one its named check is SEEN to measure — by the check's own warnings where a shipped
+  design breaks its row, and otherwise by handing the checker that build's own member at four
+  times its length, because a member inside its row and a member no branch reaches are the same
+  silence from outside; no member CLASS a row claims falls through every branch, per class rather
+  than per role, because a tail joist at ceiling level is the same declared role as one on the
+  deck and only one of the two was ever measured; and no `unmeasured` declaration that does not
+  hold up. **That fourth test is the one that had to be rewritten, because as first built the
+  escape hatch validated itself.** It asked "does the check fail to measure this role?" — which is
+  trivially true exactly when somebody has broken or omitted the branch, i.e. in precisely the case
+  it exists to refuse. Demonstrated, not theorised: revert the tail-joist branch in `spans.ts` and,
+  instead of fixing it, move `tailJoist` from `roles` into `unmeasured` on both joist rows with a
+  plausible sentence, and the whole file went green — the same file that had caught that identical
+  defect twice. Two things made it work and both are gone. The exemplar set was built from what the
+  register CLAIMED, so a declaration deleted its own evidence; it is now built from what the
+  generators emit, which nothing written in `LS_CONSUMERS` can touch. And "unmeasurable" is no
+  longer asked of the check at all. **The criterion is derivability, and for a span it is the
+  member and the table, not the code.** A span limit needs two things: a number of feet, which
+  every member yields because it carries a position, a pitch and a cut length — the clear span the
+  check derives is bounded by that plan run and nothing about a member makes it unobtainable — and
+  a row of THIS limit's own table for the member's nominal, which is the real edge of a span row's
+  reach and a doctrinal fact rather than a fact about anyone's branch. A role in scope that has
+  both is a role the limit CAN rate, so it must, and the refusal names the class: replanting the
+  bypass now fails with `SPAN.joist` AND `SPAN.ceilingJoist` each told that `tailJoist` "carries
+  everything this limit is read on — building · tailJoist · 2x8 · on the deck runs 11.9 ft and 2x8
+  is a row of this very table". **The seat side is held by `birdsMouth.ts`'s own subject list, and
+  that is not the same trap.** `seatCutsFor` runs over every member of every build and has never
+  heard of the register, so a declaration cannot suppress its own refutation — which is exactly
+  what the span side could do. The geometric analogue would be WORSE there: squash a hip roof to a
+  4 ft plan and its hips swing to within 17° of a wall line, `runAxisOf` snaps them onto that axis,
+  and `seatCutFor` duly returns a notch that is not the hip's joint at all. What decides that
+  check's reach is whether the cut IS the member's joint, a modelling judgment the module states
+  in the open and the viewer draws — so the subject list is the criterion, and the gate now refuses
+  the reverse, a role the module seats that the row says nothing about. **The packet gained a NOT
+  EXAMINED channel rather than staying silent.** A build with hips on it prints the seat-depth row
+  — earned by its commons and jacks — with `NOT EXAMINED: …no hip rafter in this build was
+  measured` inside the row itself, not in a footnote, because a row saying "held to this" and a
+  note elsewhere saying which members it skipped are read minutes apart if at all; the CSV carries
+  the same text in its own column, since the CSV is the half of the packet that gets separated from
+  the other half. Caveats print only for the unmeasured members the build actually contains — a
+  shed is not owed a sentence about hips. **`LUMBER.headerNominal` and `SPAN.header` are scoped off
+  the bunker family**, which is a scope fix and not a check fix on purpose. A crib or post-and-
+  lagging bunker continues its 6x8 CAP BEAM across the doorway (the emitter cuts it at
+  `BUNKER.capNominal` and cites it), and both of those rows are dimension-lumber values: the size
+  is what a stud wall puts over a window, and the span table's rows run 2x4 to 2x12. Listed
+  unscoped they printed on a bunker packet as the values its doorway rested on, with a limit no row
+  of the table could be read against — the honest answer is that they do not govern that member,
+  not that the check should be taught to guess. **The residual, stated plainly:** `checkedBy` is
+  still a declaration, so a row that names no check is only held to "some build emits this role";
+  the span criterion refuses a declaration but cannot invent the branch, so the fix is always
+  someone's; and the hip's seat remains the one open item, unchanged — when the double-cheek
+  geometry is derived, `hipRafter` goes back on that register line and the caveat comes off.
+
 ## 2026-08-02 — The catalog is complete, and the last three gaps closed the way they should have
 
 T7 finished the roster at 14 cards and T8's leftovers closed behind it. Four things worth
@@ -1256,6 +1329,14 @@ nothing shipped is over the limit today — the case is not urgent, it is unwatc
 means solving the same two cuts in the hip's own vertical plane with the traverse taken across the
 corner (a plate width of W is crossed over W√2 along the diagonal), and it would put a notch on the
 hips in the 3D viewer as well. When it is derived, `hipRafter` goes back on that register line.
+
+**Read this entry against D42, which changed how the same conclusion is expressed.** The
+resolution above is stated as pure omission — the role dropped off the register line, the row gone
+from a tower cab's packet — and that is no longer the whole of it. Dropping a role says nothing to
+the next reader, who cannot tell a judgment from an oversight; the hip is now DECLARED unmeasurable
+with its reason, so on a roof that also has commons and jacks the row does print, earned by them,
+with `NOT EXAMINED: …no hip rafter in this build was measured` beside it on the page and in the
+CSV. The geometry, the open item and the promise in the paragraph above are unchanged.
 
 ## 2026-08-11 — A hip roof's longest members are now the ones that get measured
 

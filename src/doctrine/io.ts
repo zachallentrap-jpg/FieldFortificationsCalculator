@@ -15,7 +15,8 @@
 
 import { DOCTRINE_VERSION } from '../version';
 import { all, getByPath, counts } from './registry';
-import { shielding, shieldMaterials, spanSizes, threats } from './protection';
+import { berm, parapet, shielding, shieldMaterials, spanSizes, threats } from './protection';
+import { backblast } from './positions';
 import { standards } from './standards';
 import { excavationSplit } from './stages';
 import { fmtLength } from './units';
@@ -320,6 +321,24 @@ function coverMultiplierWarnings(p: Prospective, flagged: ReadonlySet<string>): 
   const roofed = Object.entries(threats).filter(([, t]) => t.roof === 'earth_on_stringers');
   for (const std of Object.values(standards)) {
     const mul = p.valueOf(std.coverMul);
+    // A multiplier of zero or less is ABSENT in its own right and needs no victim to prove it:
+    // it scales away every thickness the table could ever carry, and the engine already reads it
+    // as the missing 'cover_multiplier'. Asked BEFORE the product walk so it is still named in
+    // the one import that also leaves every shielding leaf unusable — the walk skips leaves that
+    // are flagged on their own row, so with the whole table flagged there would be no legible
+    // thickness left to quote and this multiplier would be the only absent value in the file
+    // nobody was told about.
+    if (!(mul > 0)) {
+      out.push({
+        path: p.pathOf(std.coverMul),
+        reason:
+          'a ' + std.label + ' roof is built to ' + mul + ' × the doctrinal cover — a multiplier of' +
+          ' zero or less scales every thickness in the table away and reads as a MISSING value, so' +
+          ' the roof falls to an engineered design whatever the shielding table says; applied,' +
+          ' confirm against the build standard',
+      });
+      continue;
+    }
     let worst: { label: string; mat: string; ft: number } | undefined;
     let affected = 0;
     for (const [id, t] of roofed) {
@@ -330,6 +349,15 @@ function coverMultiplierWarnings(p: Prospective, flagged: ReadonlySet<string>): 
       affected++;
       if (worst === undefined || ft > worst.ft) worst = { label: t.label, mat: t.coverMaterial, ft };
     }
+    // No victim to quote. Either this multiplier leaves every legible thickness buildable —
+    // nothing to say — or every thickness it touches is itself unusable and already reported on
+    // its own row. In that second case the multiplier is not being excused: a POSITIVE multiplier
+    // can only be convicted by a thickness that reads fine on its own, and none is left to convict
+    // it with, so naming it here would send the filler to the standards table to correct the
+    // shielding table. Nothing goes unsaid — every one of those rows carries its own finding in
+    // this same report, the engine refuses to size a roof from any of them, and the moment one
+    // legible thickness lands the product is re-derived against this same live multiplier and it
+    // is named then.
     if (worst === undefined) continue;
     const w = worst;
     const scope = affected + ' of the ' + roofed.length + ' munitions that get an earth roof';
@@ -347,6 +375,73 @@ function coverMultiplierWarnings(p: Prospective, flagged: ReadonlySet<string>): 
         '; applied, confirm against the build standard',
     );
     if (reason !== undefined) out.push({ path: p.pathOf(std.coverMul), reason });
+  }
+  return out;
+}
+
+// The two protection ladders are not the whole of what the operator is SHOWN as protection.
+// Three more safety-critical leaves are protective magnitudes in their own right and reach the
+// panel and the drawing through the SAME length formatter, so the reading above applies to them
+// leaf by leaf and unchanged:
+//   · parapet.W — the frontal cover of an earth parapet. The plan dimensions it and the job
+//     sheet prints it as the parapet's thickness.
+//   · berm.W — the same frontal cover for a vehicle hull-down, where the dozed spoil berm is the
+//     ONLY protection the position has.
+//   · backblast.clearanceFt — the rear danger area an ATGM crew must keep clear of people and
+//     hard surfaces. The plan draws the zone to scale and dimensions it.
+// Zero or less means ABSENT (no thickness of earth stops a round, and no crew is safe standing
+// at no backblast clearance); a hair above zero is a magnitude nobody can read off the screen,
+// check against a pub, or build to. Neither state is caught anywhere downstream: unlike the roof,
+// none of these has an engineered fail-safe behind it — the app dimensions a parapet of no
+// thickness while the BOM still bills the sandbag rest along its face, and a hull-down still
+// bills a berm fill of effectively nothing — so this report is the only place such a fill is
+// questioned.
+//
+// The REST of the safety-critical set is deliberately not here, because it is not a protective
+// length the app prints: overhead.setbackDepthFrac is a unitless RATIO and spanSizes[].maxSpan is
+// a span LIMIT, and the span limits already answer to a stricter whole-table check that REFUSES
+// the file. retainingWall.maxHeight is the threshold that trips the shoring warning rather than a
+// thickness anyone builds to, and retainingWall.thickness feeds no formula. radiationHalving is
+// consumed as a divisor for a layer count and never printed as a length — a non-positive one
+// already reads as no attenuation. overhead.setbackMin is only the fallback standoff for
+// threat 'none'/unknown and never reaches the formatter alone; what the panel prints is
+// max(setbackMin, setbackDepthFrac × depthOfCut).
+const RENDERED_PROTECTION: { leaf: Provenance<number>; subject: string; kind: string; consequence: string }[] = [
+  {
+    leaf: parapet.W,
+    subject: 'the frontal cover of an earth parapet',
+    kind: 'thickness',
+    consequence: 'the plan still dimensions a parapet and the BOM still bills the sandbag rest along its face',
+  },
+  {
+    leaf: berm.W,
+    subject: 'the frontal cover of a vehicle spoil berm',
+    kind: 'thickness',
+    consequence: 'that berm is the only protection a hull-down position has, and the BOM still bills a fill for it',
+  },
+  {
+    leaf: backblast.clearanceFt,
+    subject: 'the rear backblast danger area of an ATGM position',
+    kind: 'clearance',
+    consequence: 'the plan still draws the danger zone and the crew is still told to keep it clear before firing',
+  },
+];
+
+function protectiveMagnitudeWarnings(p: Prospective): DoctrineFinding[] {
+  const out: DoctrineFinding[] = [];
+  for (const m of RENDERED_PROTECTION) {
+    const v = p.valueOf(m.leaf);
+    const reason = unbuildableMagnitude(
+      v,
+      () =>
+        m.subject + ' would be ' + v + ' ft — a protective ' + m.kind + ' of zero or less reads as a' +
+        ' MISSING value, yet ' + m.consequence + '; applied, confirm against the pub',
+      (shown) =>
+        m.subject + ' would be ' + v + ' ft — that rounds to zero as displayed (the panel can only' +
+        ' show it as ' + shown + '), so nobody can read or build it, yet ' + m.consequence +
+        '; applied, confirm against the pub',
+    );
+    if (reason !== undefined) out.push({ path: p.pathOf(m.leaf), reason });
   }
   return out;
 }
@@ -393,6 +488,7 @@ function unbuildableWarnings(p: Prospective): DoctrineFinding[] {
     );
     if (reason !== undefined) out.push({ path: p.pathOf(t.standoffMin), reason });
   }
+  out.push(...protectiveMagnitudeWarnings(p));
   return out;
 }
 
