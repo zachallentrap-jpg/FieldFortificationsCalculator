@@ -6,6 +6,7 @@ import { sandbag, excavation, sump as sumpMat } from '../src/doctrine/materials'
 import { parapet, overhead, shielding, coverMaterialDefault, threats } from '../src/doctrine/protection';
 import { labor } from '../src/doctrine/labor';
 import { compute } from '../src/engine/compute';
+import { computeStages } from '../src/engine/stages';
 import { defaultInputs } from './helpers';
 import type { BomLine } from '../src/engine/types';
 import { importDoctrine } from '../src/doctrine/io';
@@ -151,6 +152,48 @@ test('the flank lap, the bearing and the setback each move the edge they govern,
     approx(roof.endFt, baseRoof.endFt, 1e-9);
     approx(roof.frontFt, 3.0 + overhead.bearingEachEnd.value);
     approx(roof.rearFt, roof.frontFt, 1e-9); // front and rear move together — one rule
+  });
+});
+
+// ── A labor fill reaches every consumer of the labor table, together ─────────
+
+test('a doctrine fill of the labor table moves compute(), the stage clock and the trace as one', () => {
+  // compute() bills from the labor leaves, stages.ts recovers the excavation share by
+  // SUBTRACTING the adders from that bill, and explain.ts prints the same leaves as the trace's
+  // own operands. Three readers, one mutable table: if any reader holds a copy taken at module
+  // load, a sanctioned import splits them — the bill keeps the pre-import rates while the stage
+  // clock subtracts the post-import adders from that stale total (per-stage man-hours go
+  // negative and whole stages silently drop off the plan), and the trace prints live operands
+  // that no longer multiply out to its own printed result.
+  const inputs = defaultInputs({ camouflage: true, revetment: 'pickets_wire', machineAssist: true });
+  const before = compute(inputs);
+  const paths = ['labor.baseMH', 'labor.perVolMH', 'labor.machinePerVolMH', 'labor.overheadAdd', 'labor.revetAdd', 'labor.sumpAdd', 'labor.camoAdd'];
+  const raised = Object.fromEntries(paths.map((p) => [p, (getByPath(p)!.value as number) * 4]));
+  withDoctrine(raised, () => {
+    const r = compute(inputs);
+    // (a) the bill moves with the fill: every labor rate went ×4, so the per-position total is
+    // ×4 too, within the display rounding both figures carry.
+    approx(r.labor.manHoursPerPosition, before.labor.manHoursPerPosition * 4, 0.25);
+    approx(r.labor.machineHoursPerPosition!, before.labor.machineHoursPerPosition! * 4, 0.25);
+    // (b) the stage plan still PARTITIONS the new total: no stage negative, none lost.
+    const plan = computeStages(r);
+    let staged = 0;
+    for (const s of plan.steps) {
+      assert.ok(s.manHours >= 0, s.id + ' stage went negative: ' + s.manHours + ' mh');
+      staged += s.manHours;
+    }
+    approx(staged, r.labor.manHoursPerPosition, 1e-9);
+    // (c) the trace's own operands still multiply out to its printed result.
+    const trace = r.derivations.find((d) => d.key === 'manHoursPerPosition')!;
+    const opOf = (name: string): number => trace.operands.find((o) => o.name === name)!.value;
+    const named = ['baseMH', 'digFactor', 'laborMul', 'excavBank', 'perVolMH', 'machineFactor'];
+    const adders = trace.operands.filter((o) => !named.includes(o.name)).reduce((a, o) => a + o.value, 0);
+    const recomputed = r1(
+      opOf('baseMH') * opOf('digFactor') * opOf('laborMul') +
+      opOf('excavBank') * opOf('perVolMH') * opOf('machineFactor') +
+      adders,
+    );
+    assert.equal(recomputed, trace.result, 'the trace contradicts its own operands');
   });
 });
 

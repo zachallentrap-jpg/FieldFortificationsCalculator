@@ -12,6 +12,7 @@ import { sandbag, revetments, camo, sump, excavation, machine } from '../doctrin
 import { parapet, berm, overhead, threats, standoffMinFor, standoffLeafFor, stringerSizeForSpan, stringerSectionForSpan, radiationHalving } from '../doctrine/protection';
 import type { ShieldMaterial } from '../doctrine/protection';
 import { counts } from '../doctrine/registry';
+import { labor as laborDoctrine } from '../doctrine/labor';
 import type { PositionRow } from '../doctrine/positions';
 import type { SoilRow } from '../doctrine/soils';
 import type { StandardRow } from '../doctrine/standards';
@@ -340,19 +341,24 @@ function computeCalc(raw: Inputs): Calc {
   const spoilExcess = isVehicle ? Math.max(0, excavLoose - bermFill) : 0;
 
   // ── labor ────────────────────────────────────────────────────────────────────
+  // The labor leaves are read HERE, per call — never copied out to module scope. A sanctioned
+  // doctrine import mutates these leaves in place, and stages.ts / explain.ts read them live:
+  // a module-scope copy kept billing the pre-import rates while the stage clock subtracted the
+  // post-import adders from that stale total, driving per-stage man-hours negative and printing
+  // a trace whose live operands no longer multiplied out to its own result.
   const machineFactor = inputs.machineAssist ? machine.excavationFactor.value : 1;
   const mh =
-    baseLabor.baseMH * soil.digFactor.value * standard.laborMul.value +
-    excavBank * baseLabor.perVolMH * machineFactor +
-    (buildsEarthRoof ? baseLabor.overheadAdd : 0) +
-    (revet.buildsFace ? baseLabor.revetAdd : 0) +
-    (sumpCount > 0 ? baseLabor.sumpAdd : 0) +
-    (inputs.camouflage ? baseLabor.camoAdd : 0);
+    laborDoctrine.baseMH.value * soil.digFactor.value * standard.laborMul.value +
+    excavBank * laborDoctrine.perVolMH.value * machineFactor +
+    (buildsEarthRoof ? laborDoctrine.overheadAdd.value : 0) +
+    (revet.buildsFace ? laborDoctrine.revetAdd.value : 0) +
+    (sumpCount > 0 ? laborDoctrine.sumpAdd.value : 0) +
+    (inputs.camouflage ? laborDoctrine.camoAdd.value : 0);
   const mhPerPos = round1(mh);
   const mhTotal = round1(mhPerPos * count);
   const elapsed = round1(mhTotal / teamSize);
   // Machine time is reported in BLADE-HOURS, its own axis — a dozer hour is not a man-hour.
-  const machineHrsPerPos = inputs.machineAssist ? round1(excavBank * baseLabor.machinePerVolMH) : 0;
+  const machineHrsPerPos = inputs.machineAssist ? round1(excavBank * laborDoctrine.machinePerVolMH.value) : 0;
   const machineHrsTotal = round1(machineHrsPerPos * count);
 
   return {
@@ -437,19 +443,6 @@ function computeCalc(raw: Inputs): Calc {
     machineHrsTotal,
   };
 }
-
-// Labor doctrine values pulled once (kept out of the chain body for readability). Not a
-// bare literal — all values come from doctrine/labor.
-import { labor as laborDoctrine } from '../doctrine/labor';
-const baseLabor = {
-  baseMH: laborDoctrine.baseMH.value,
-  perVolMH: laborDoctrine.perVolMH.value,
-  machinePerVolMH: laborDoctrine.machinePerVolMH.value,
-  overheadAdd: laborDoctrine.overheadAdd.value,
-  revetAdd: laborDoctrine.revetAdd.value,
-  sumpAdd: laborDoctrine.sumpAdd.value,
-  camoAdd: laborDoctrine.camoAdd.value,
-};
 
 // Model-fidelity statements (EXECUTION_PLAN Phase 1): formulas get the same honesty
 // treatment as constants. Every position's volume model is an approximation and says so —

@@ -2260,3 +2260,86 @@ The two verbatim quoted magnitudes (the course height, the carried-bag count) we
 from the comments as the one part that contradicted the policy's no-transcription promise;
 the paragraph citations stay. No value moved anywhere in src/doctrine; doctrine-integrity
 holds (every leaf PLACEHOLDER, every SC leaf sourced).
+
+## 2026-08-11 — The last frozen read thaws, and the sweep learns two features it was blind to
+
+### compute() reads the labor table live (audit C14)
+
+The engine's rule was already "every doctrine read is live" — stages.ts recovers the
+excavation share by subtracting the labor adders it reads at call time, and explain.ts
+prints the same leaves as the trace's own operands. compute() alone kept a module-scope
+copy of the seven labor leaves, taken at module load. A sanctioned import mutates the
+leaves in place, so the copy split three consumers of one table three ways. Measured on
+the default two-man fixture with camo, picket revetment and machine assist, after a ×4
+labor fill through the sanctioned importer: compute() kept billing **12.1 mh** where the
+live table said 48.4; the stage clock subtracted the post-import adders from that stale
+total and reported **deliberate −5.805 mh, parapet −2.58 mh**, silently dropped the
+security and hasty stages, and its "partition" summed to 16.615 mh against a 12.1 mh
+total; the derivation trace printed operands that multiply out to **48.4** above a result
+line reading **12.1**. Every test green throughout, because each consumer was tested
+against itself.
+
+The fix is the same shape the woodframe side already took (its boot-time snapshots fell
+in the "a database edit reaches everything" pass): the leaves are read inside computeCalc,
+per call, and the snapshot block is deleted. The lock is the cross-consumer agreement test
+that was missing — `test/engine-formula.test.ts` imports a labor fill and requires, in one
+test, that (a) compute()'s per-position and blade-hour figures move with the fill, (b) the
+stage plan partitions the new total with no negative stage and no lost stage, and (c) the
+trace's operands recompute to its printed result. Proven by reverting compute.ts to the
+snapshot build: the test fails at `12.1 ≈ 48.4`, and the negative/dropped stages and the
+self-contradicting trace were observed directly under the same revert. Shipped output is
+untouched: at shipped values the snapshot and the live read are the same numbers.
+
+### The wall taper has one home, and the sweep compares what it used to assume
+
+The cross-view sweep's verifier proved two blind spots by mutation: swapping the 3D
+firing-step's height/run leaves, or changing the 3D's local taper clamp 0.35 → 0.28, left
+the entire 1,101-test suite green while the 2D and 3D views drew different objects. Root
+cause, both times: scene3d.ts held its own copy of a formula (the unrevetted-wall flare)
+or its own reading of a leaf pair, and the sweep never compared the affected fields.
+
+- **One formula, one home.** `geometry.ts` now owns the rect-family taper outright:
+  `section.wallTaper` for the main bay (as before) and a `taperFt` published per sub-bay,
+  one `rectTaperFt()` behind both. scene3d.ts takes a taper argument and derives nothing —
+  its duplicate formula (`min(slopeRatio·depth, parapetW·0.9, min(l,w)·0.35)` in
+  pushBayBox and the terrain-envelope `taperFor`) is deleted. The sub-bay copy used a
+  `parapetW·0.7·0.9` clamp where geometry's uses `parapetW·0.9`; measured over every
+  catalog sub-bay × soil × standard, neither clamp ever binds (the `min(l,w)·0.35` bound,
+  at most 0.945 ft, always binds first), so the unification is exact. Verified
+  byte-identical over a 4,390-case corpus (positions × soils × standards × threats ×
+  revetments, plus invalid strings) on every surface — Result, BOM, labor, validation,
+  derivations, all three SVGs, the 3D scene, the stage plan and schedule. The 7 cases
+  with an **unknown revetment string** are the one deliberate change, 3D scene only: the
+  3D used to flare those walls by the soil ratio while the section drew them plumb; both
+  now read the published taper (0). Which answer is right is audit C8 — geometry keys the
+  taper on the raw revetment string, not the resolved row — still open, now in one place.
+- **Two fields join the sweep's contract.** Each observer reads its own view's output:
+  the 3D's firing-step box (`role: 'firingStep'` h/d) and the main bay's front-wall
+  `taperAmount`; the section's `data-feature="firing_step"` rect; geometry's
+  `section.firingStep` and `section.wallTaper`. The must-compare lists grow by
+  `wallTaperFt`, `firingStepHFt`, `firingStepRunFt` (Tier A geometry|3D; the step fields
+  in Tier B geometry|2D-section), so a view that stops drawing either feature fails
+  loudly instead of agreeing vacuously. Both verifier mutations were replanted and both
+  now fail the sweep with the measured figures: firing-step swap →
+  `firingStepHFt: geometry 0.6700 vs 3D 0.8000`; 0.28 clamp →
+  `wallTaperFt: geometry 0.8750 vs 3D 0.7000` (one-man, sloping soils).
+
+### Two silent guards got voices (same pass)
+
+- **PLATFORM_CLAMPED** (advisory, codes 24 → 25): compute has clamped an impossible
+  firing platform to its bay since the rule↔rendering pass, but `platformClamped` was
+  consumed by nothing — an imported fifty-cal platform wider than its 2.0 ft trench was
+  rewritten with zero validation output. The clamp is correct behaviour; the silence was
+  the defect. validate.ts now says what was described vs what will be built (measured:
+  `(described 4×3 ft rising 1 ft; built 4×2 ft rising 1 ft)` for a W=3.0 fill). The
+  shipped catalog fits its own bays, so the advisory is unreachable from inputs alone;
+  the reachability test drives it through a sanctioned import fixture, and the behavior
+  test pins both halves of the message plus the clamped footprint the bill uses. Revert
+  of the wiring fails both by name.
+- **Unreadable job size flags the schedule.** `scheduleStages` normalizes a non-finite
+  `plan.positions` to 1 — the smallest job, the flattering direction — and, unlike the
+  same failure in `teamSize`, reported `inputsUsable: true`. It now flags exactly as the
+  team size does; locked in `test/engine-input-guards.test.ts` (revert observed to fail).
+
+Suite 1,101 → **1,104 tests, 0 failures**; `tsc --noEmit` clean. No shipped number,
+drawing, or BOM line moved anywhere in the pass.

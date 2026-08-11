@@ -171,5 +171,22 @@ export function runValidation(calc: Calc): ValidationIssue[] {
   if (calc.clamped.count) advisories.push(issue(CODES.COUNT_CLAMPED));
   if (calc.clamped.team) advisories.push(issue(CODES.TEAM_CLAMPED));
 
+  // A firing platform the doctrine table describes as bigger than its own bay (or taller than
+  // the cut) is clamped once, in compute, so the bill and all three views build one buildable
+  // footprint. The clamp is the right behaviour; building it silently is not — the shipped
+  // catalog fits its own bays, so this only ever fires on an imported fill, and the filler is
+  // told what their table described versus what will be built.
+  if (calc.platformClamped) {
+    const described = calc.position.firingPlatform!;
+    advisories.push(
+      issue(
+        CODES.PLATFORM_CLAMPED,
+        '(described ' + round1(described.L.value) + '×' + round1(described.W.value) + ' ft rising ' +
+          round1(described.riseAboveFloor.value) + ' ft; built ' + round1(calc.platformL) + '×' +
+          round1(calc.platformW) + ' ft rising ' + round1(calc.platformRise) + ' ft)',
+      ),
+    );
+  }
+
   return [...errors, ...warnings, ...advisories];
 }

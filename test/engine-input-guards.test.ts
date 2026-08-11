@@ -186,6 +186,27 @@ test('a stage plan with unreadable or NEGATIVE work content is never scheduled a
   assert.equal(s.totalElapsedHours, 25, 'the stages it prints are the work it bills');
 });
 
+test('a stage plan whose position count is unreadable is flagged, exactly as an unreadable team size is', () => {
+  // normalizePositions maps a non-finite count to 1 — the SMALLEST job, which is the flattering
+  // direction: the clock that comes back covers fewer holes than whatever the operator asked
+  // for. An unreadable teamSize already sets inputsUsable:false for the same class of failure;
+  // until this guard, an unreadable positions did not, and its fallback was the one that runs
+  // the wrong way.
+  const plan = computeStages(compute(defaultInputs({ count: 10 })));
+  const opts = { teamSize: 4, availableHours: 24, securityPostureFrac: 1 };
+  for (const bad of [NaN, Infinity, -Infinity]) {
+    const s = scheduleStages({ ...plan, positions: bad }, opts);
+    assert.equal(s.inputsUsable, false, 'positions=' + bad + ' must be flagged as unusable');
+    assert.equal(s.positions, 1, 'the fallback is the smallest job — exactly why the flag must be set');
+    assert.equal(s.clampedInputs.positions, false, 'unreadable is not "clamped" — nothing the operator typed was changed');
+    assert.equal(s.workUsable, true, 'the per-position work content itself is readable; the job size is what is not');
+  }
+  // A readable job size stays unflagged, so the flag stays meaningful.
+  const ok = scheduleStages(plan, opts);
+  assert.equal(ok.inputsUsable, true);
+  assert.equal(ok.positions, 10);
+});
+
 test('an unreadable planning budget fits nothing and is never echoed back as NaN', () => {
   const p = planForTime({ availableHours: NaN, teamSize: 4, base: defaultInputs() });
   assert.equal(p.budgetHours, 0, 'unreadable budget is worth no hours');

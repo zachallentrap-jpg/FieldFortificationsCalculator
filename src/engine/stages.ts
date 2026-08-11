@@ -246,6 +246,12 @@ export function scheduleStages(plan: StagePlan, opts: ScheduleOpts): Schedule {
   const posture = clamp(opts.securityPostureFrac, POSTURE_MIN, POSTURE_MAX);
   const availableHours = finite(opts.availableHours, 0);
   const positions = normalizePositions(plan.positions);
+  // The plan's job size is an input with the same failure mode as the options above — and its
+  // fallback runs the FLATTERING way: normalizePositions maps an unreadable count to 1, the
+  // smallest job, so the clock that comes back covers fewer holes than the operator asked for.
+  // A fallback the caller is never told about is exactly what inputsUsable exists to report,
+  // and an unreadable team size already reports it; the job size must too.
+  const positionsReadable = Number.isFinite(plan.positions);
   // Readable but out of range is NOT the same as unreadable: nothing failed, a number the operator
   // typed was changed. compute()'s own convention — compare against the ROUNDED value, so mere
   // fractional rounding is not reported as clamping.
@@ -290,7 +296,7 @@ export function scheduleStages(plan: StagePlan, opts: ScheduleOpts): Schedule {
     feasible,
     shortfallHours: feasible ? 0 : ceilHours(elapsedHours - availableHours),
     effectiveDiggers: round1(effectiveDiggers),
-    inputsUsable: optionsReadable && workUsable,
+    inputsUsable: optionsReadable && positionsReadable && workUsable,
     workUsable,
     clampedInputs,
   };

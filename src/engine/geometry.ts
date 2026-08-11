@@ -66,6 +66,10 @@ export interface SubBay {
   L: number;
   W: number;
   depthFt: number;
+  // The trench's own unrevetted wall flare at grade — the same rule as section.wallTaper,
+  // run on the trench's own dims and depth, so the one view that draws these walls in relief
+  // (the 3D model) never re-derives the formula.
+  taperFt: number;
 }
 
 export interface GeometryModel {
@@ -168,25 +172,34 @@ function elbowMarks(count: number, holeL: number, holeW: number): SumpMark[] {
 // How far an UNREVETTED earth excavation wall flares outward at grade vs. the floor — steeper
 // soils (sand, silt) batter more, revetted walls stay vertical regardless of soil (the facing
 // holds it), and round/vehicle excavations use their own shape (never this rect-family taper).
-// Identical formula to the 3D model's pushBayBox taperAmount so the two views agree on the same
-// doctrine-driven slope instead of the 2D section silently drawing every soil as a plumb wall.
+// This is the ONE home of the rect-family taper rule: the section reads it as wallTaper, the 3D
+// model reads the same field (and taperFt per sub-bay) instead of holding a copy of the formula
+// — while it held one, editing either copy's slope or clamps left the whole suite green with
+// the two views drawing different walls. The two clamps are self-intersection guards, not
+// doctrine: don't let the drawn flare eat the parapet footprint or collide with the opposite
+// wall of a narrow bay (the truthful message for "this soil can't hold this cut" is the
+// REVET_REQUIRED_SOIL error, never a steeper drawing).
 // A MORTAR PIT is the exception in both directions: its walls are always battered, in every
 // soil and under every revetment, because the batter is sized for repeated firing concussion
 // rather than soil stability. That ratio used to live in the 3D renderer, so the 3D drew a
 // flared pit while the plan drew a plain circle and the section drew plumb walls — three views
 // of one pit, one of them alone knowing its shape.
-function wallTaperFt(calc: Calc): number {
-  if (calc.isCircular) {
-    return Math.min(mortarPit.batterRatio.value * calc.depthOfCut, calc.parapetW * 0.9);
-  }
+function rectTaperFt(calc: Calc, bayL: number, bayW: number, depthFt: number): number {
   if (calc.isVehicle || calc.inputs.revetment !== 'none') return 0;
   const soilRow = soils[calc.inputs.soil];
   if (!soilRow) return 0;
   return Math.min(
-    soilRow.wallSlopeRatio.value * calc.depthOfCut,
+    soilRow.wallSlopeRatio.value * depthFt,
     calc.parapetW * 0.9,
-    Math.min(calc.holeL, calc.holeW) * 0.35,
+    Math.min(bayL, bayW) * 0.35,
   );
+}
+
+function wallTaperFt(calc: Calc): number {
+  if (calc.isCircular) {
+    return Math.min(mortarPit.batterRatio.value * calc.depthOfCut, calc.parapetW * 0.9);
+  }
+  return rectTaperFt(calc, calc.holeL, calc.holeW, calc.depthOfCut);
 }
 
 // The rear entrance passage. An ATGM launcher needs a genuinely open rear lane clear of hard
@@ -205,11 +218,12 @@ function subBaysOf(calc: Calc): SubBay[] {
   const L = sb.L.value;
   const W = sb.W.value;
   const depthFt = calc.depthOfCut * sb.depthFrac.value;
+  const taperFt = rectTaperFt(calc, L, W, depthFt);
   if (calc.position.shape === 'inverted_t') {
-    return [{ xFt: 0, zFt: calc.holeW / 2 + W / 2, L, W, depthFt }];
+    return [{ xFt: 0, zFt: calc.holeW / 2 + W / 2, L, W, depthFt, taperFt }];
   }
   if (calc.position.shape === 'l_shape') {
-    return [{ xFt: calc.holeL / 2 + L / 2, zFt: calc.holeW / 2 - W / 2, L, W, depthFt }];
+    return [{ xFt: calc.holeL / 2 + L / 2, zFt: calc.holeW / 2 - W / 2, L, W, depthFt, taperFt }];
   }
   return [];
 }

@@ -13,14 +13,14 @@
 // Parapet + overhead cover are always sandbag construction per doctrine (bagsParapet/bagsCover
 // are computed unconditionally in engine/materials.ts) — they're tagged 'sandbag' unconditionally.
 // The excavation face reflects the operator's actual revetment choice (sandbag / pickets & wire /
-// corrugated metal / timber-plywood), or — when revetment is 'none' — bare, sloped earth, with the
-// slope driven by the SOIL's real wallSlopeRatio (steeper for sand/gravel, nearly vertical for
-// clay/rock), exactly like the doctrine table says. src/ui/three-viewer.ts reads `finish` to
+// corrugated metal / timber-plywood), or — when revetment is 'none' — bare, sloped earth. The
+// SLOPE is never derived here: the soil-driven flare is published once as geo.section.wallTaper
+// (and per sub-bay as taperFt), the same field the 2D section draws its trapezoid from, so the
+// two views cannot hold two copies of one formula. src/ui/three-viewer.ts reads `finish` to
 // decide HOW to build the mesh (sandbag tiling, picket+wire, a textured panel, or a tapered
 // earthen face) — this file only decides WHICH finish applies, from the same doctrine tables the
 // 2D renderer and BOM already consult.
 
-import { soils } from '../doctrine/soils';
 import { revetments, sandbag } from '../doctrine/materials';
 import { positions, parapetModeFor, vehicleRamp } from '../doctrine/positions';
 import { REF_FIGURE_FT } from '../render/chrome';
@@ -226,8 +226,6 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
   const wallT = Math.min(Math.max(0.3, p.parapetW * 0.35), Math.max(0.15, Math.min(p.holeL, p.holeW) * 0.2));
 
   const finish = wallFinishFor(result);
-  const soilRow = soils[result.inputs.soil];
-  const slopeRatio = finish === 'earth' ? (soilRow ? soilRow.wallSlopeRatio.value : 0) : 0;
   const picketSpacing = revetments[result.inputs.revetment]?.spacing?.value ?? 2;
   // The RENDERED parapet height is the COMPUTED one (doctrine × standard), not a hardcoded
   // constant — a previous fixed 1.1 ft drew more than double the doctrine's 0.5 ft of bags,
@@ -379,20 +377,17 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
     } else {
       pushRing(parts, 0, 0, p.holeL, p.holeW, p.parapetW, parapetH, entranceGap);
     }
-    pushBayBox(parts, 0, 0, p.holeL, p.holeW, s.depthOfCut, wallT, finish, slopeRatio, picketSpacing, p.parapetW, entranceGap);
+    pushBayBox(parts, 0, 0, p.holeL, p.holeW, s.depthOfCut, wallT, finish, s.wallTaper, picketSpacing, entranceGap);
     // A graded way DOWN at the rear entrance: a short flight of earth steps from grade to floor,
     // so a deep hole isn't a sheer drop you'd have to jump into. Only when the cut is deep enough
     // to warrant it and there's a rear opening to descend through.
     pushEntrySteps(parts, p.holeL, p.holeW, s.depthOfCut, entranceGap, wallT, s.access);
 
     // Hole envelopes expand past the excavation by the wall taper (bare sloped earth flares
-    // OUTWARD toward the top — same formula as pushBayBox's taperAmount, INCLUDING the bay-size
-    // clamp that keeps a slumping soil's flare from exceeding a narrow bay) plus clearance, so
-    // the terrain block hugs the flared wall top without clipping through it. Sub-bays (the
-    // T-stem / L-arm) compute theirs from their OWN dims below, same formula.
-    const taperFor = (bayL: number, bayW: number, depthMul: number, pwMul: number): number =>
-      finish === 'earth' ? Math.min(slopeRatio * s.depthOfCut * depthMul, p.parapetW * pwMul * 0.9, Math.min(bayL, bayW) * 0.35) : 0;
-    const e = taperFor(p.holeL, p.holeW, 1, 1) + 0.05;
+    // OUTWARD toward the top — the published wallTaper the walls above were built with) plus
+    // clearance, so the terrain block hugs the flared wall top without clipping through it.
+    // Sub-bays (the T-stem / L-arm) carry their own published taperFt.
+    const e = s.wallTaper + 0.05;
     terrainOuter = { x: 0, z: 0, w: p.outerL + 4, d: p.outerW + 4 };
 
     const subBay = p.subBays[0];
@@ -410,10 +405,10 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
       const stemLen = subBay.W;
       const stemDepth = subBay.depthFt;
       const stemZ = subBay.zFt;
-      pushBayBox(parts, 0, stemZ, stemW, stemLen, stemDepth, wallT * 0.8, finish, slopeRatio, picketSpacing, p.parapetW * 0.7, Math.min(2.5, stemW));
+      pushBayBox(parts, 0, stemZ, stemW, stemLen, stemDepth, wallT * 0.8, finish, subBay.taperFt, picketSpacing, Math.min(2.5, stemW));
       // One T-shaped union outline (main bay ∪ stem) — two rect holes sharing an edge would
       // be degenerate for shape triangulation.
-      const es = taperFor(stemW, stemLen, stemDepth / s.depthOfCut, 0.7) + 0.05;
+      const es = subBay.taperFt + 0.05;
       const HL = halfL + e, HW = halfW + e, SW = stemW / 2 + es, SZ = halfW + stemLen + es;
       terrainHoles.push({
         kind: 'poly', depth: finite(s.depthOfCut),
@@ -428,9 +423,9 @@ export function buildScene3D(result: Result, opts: BuildOpts = {}): Scene3DModel
       const armDepth = subBay.depthFt;
       const armX = subBay.xFt;
       const armZ = subBay.zFt;
-      pushBayBox(parts, armX, armZ, armLen, armW, armDepth, wallT * 0.8, finish, slopeRatio, picketSpacing, p.parapetW * 0.7);
+      pushBayBox(parts, armX, armZ, armLen, armW, armDepth, wallT * 0.8, finish, subBay.taperFt, picketSpacing);
       // One L-shaped union outline (main bay ∪ side arm), same single-polygon reasoning.
-      const es = taperFor(armLen, armW, armDepth / s.depthOfCut, 0.7) + 0.05;
+      const es = subBay.taperFt + 0.05;
       const HL = halfL + e, HW = halfW + e, AZ = halfW - armW - es, AX = halfL + armLen + es;
       terrainHoles.push({
         kind: 'poly', depth: finite(s.depthOfCut),
@@ -721,10 +716,13 @@ function pushEntrySteps(
 }
 
 // The excavated bay: a floor (always bare earth — it's never revetted) + 4 walls whose finish
-// matches the operator's actual revetment choice. When finish is 'earth' (no revetment) and the
-// soil calls for a slope, each wall's OUTER face (away from the hole) flares out from bottom
-// (unchanged, matching the floor) to top (wider, matching a real excavation's wider mouth) —
-// clamped to stay within the parapet's own footprint so it never pokes out past the ground plane.
+// matches the operator's actual revetment choice. When the bay's published taper is nonzero
+// (bare earth in a sloping soil), each wall's OUTER face (away from the hole) flares out from
+// bottom (unchanged, matching the floor) to top (wider, matching a real excavation's wider
+// mouth). `taperFt` is the engine's own figure — section.wallTaper for the main bay, the
+// sub-bay's taperFt for a T-stem/L-arm — never a slope this file works out for itself: while
+// this function held its own copy of the taper formula, its clamps could drift from the 2D
+// section's with every view still green against its own tests.
 //
 // rearGapFt (default 0) mirrors pushRing's entrance gap in the excavation wall itself, at the
 // same rear location — without this, the parapet above would show an open entrance sitting
@@ -739,9 +737,8 @@ function pushBayBox(
   depth: number,
   wallT: number,
   finish: WallFinish,
-  slopeRatio: number,
+  taperFt: number,
   picketSpacing: number,
-  parapetW: number,
   rearGapFt = 0,
 ): void {
   parts.push({ kind: 'box', x: cx, y: -depth - 0.05, z: cz, w: l, h: 0.1, d: w, role: 'bayFloor', finish: 'earth' });
@@ -757,13 +754,6 @@ function pushBayBox(
   // contour exactly, so a sliver margin covers that seam too.
   const gradeMargin = 0.08;
   const h = depth + gradeMargin;
-  // Taper (bare-earth flare) clamps to the BAY'S OWN SIZE as well as the parapet footprint: in
-  // a slumping soil (sand, ratio 1.48) a deep cut's raw flare can exceed a narrow bay's whole
-  // width — opposite walls' flares then overlap and poke through each other, rendering a pile of
-  // intersecting flaps instead of an excavation (seen on the 3-ft-deep-axis ATGM in sand). The
-  // truthful message "this soil can't hold this cut" is the REVET_REQUIRED_SOIL error; the 3D
-  // just needs the steepest slope it can draw without self-intersecting.
-  const taperAmount = finish === 'earth' ? Math.min(slopeRatio * depth, parapetW * 0.9, Math.min(l, w) * 0.35) : 0;
   const wall = (x: number, z: number, w2: number, d2: number, taperAxis: 0 | 2, taperSign: 1 | -1): Box3 => ({
     kind: 'box',
     x,
@@ -779,7 +769,7 @@ function pushBayBox(
     // finish renderers can place facing panels against the earth face; amount only when sloping.
     taperAxis,
     taperSign,
-    ...(taperAmount > 0 ? { taperAmount } : {}),
+    ...(taperFt > 0 ? { taperAmount: taperFt } : {}),
   });
   parts.push(wall(cx, cz - hw + wallT / 2, l, wallT, 2, -1)); // front — outer face is -z
   if (rearGapFt > 0 && rearGapFt < l) {
@@ -797,7 +787,7 @@ function pushBayBox(
   // triangular void at all 4 corners where two faces should meet. A small wallT×wallT post,
   // double-tapered (same amount, both axes) so its own flare meets each adjacent wall's flare
   // flush, fills exactly that gap. Only needed when there's a flare to fill.
-  if (taperAmount > 0) {
+  if (taperFt > 0) {
     const corner = (x: number, z: number, signX: 1 | -1, signZ: 1 | -1): Box3 => ({
       kind: 'box',
       x,
@@ -810,7 +800,7 @@ function pushBayBox(
       finish,
       taperAxis: 2,
       taperSign: signZ,
-      taperAmount,
+      taperAmount: taperFt,
       taperAxis2: 0,
       taperSign2: signX,
     });

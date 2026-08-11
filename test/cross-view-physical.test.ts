@@ -82,6 +82,10 @@ function fromGeometry(r: Result): Obs {
     subBayLFt: geo.plan.subBays[0]?.L,
     subBayWFt: geo.plan.subBays[0]?.W,
     wallTaperFt: s.wallTaper,
+    // The firing-step ledge is drawn only when it is the position's raised feature — a
+    // crew-served position's platform takes the same spot in both renderers.
+    firingStepHFt: s.firingStepOn && !s.platform ? s.firingStep.heightFt : undefined,
+    firingStepRunFt: s.firingStepOn && !s.platform ? s.firingStep.runFt : undefined,
   };
 }
 
@@ -107,6 +111,7 @@ function fromScene(scene: { parts: Part3[] }): Obs {
   const covers = byRole('cover');
   const beams = byRole('stringer');
   const platform = byRole('platform')[0];
+  const step = byRole('firingStep')[0];
   const sump = byRole('sump')[0];
   const camo = byRole('camoNet')[0];
   const frame = scene.parts.find((p) => p.kind === 'frame');
@@ -130,6 +135,18 @@ function fromScene(scene: { parts: Part3[] }): Obs {
     out.platformLFt = platform.w;
     out.platformWFt = platform.d;
     out.platformRiseFt = platform.h;
+  }
+  if (step) {
+    out.firingStepHFt = step.h;
+    out.firingStepRunFt = step.d;
+  }
+  // The main bay's wall flare, read off the FRONT wall's own vertex taper (the frontmost
+  // front-facing wall band is the main bay's — a T-stem/L-arm attaches rear or flank). A wall
+  // with no taperAmount is drawn plumb, which is a reading of 0, not "not depicted".
+  const frontWalls = boxes.filter((b) => b.role === 'bayWall' && b.taperAxis === 2 && b.taperSign === -1 && b.taperAxis2 === undefined);
+  if (frontWalls.length > 0) {
+    const front = frontWalls.reduce((a, b) => (b.z < a.z ? b : a));
+    out.wallTaperFt = front.taperAmount ?? 0;
   }
   if (sump) {
     out.sumpLFt = sump.w;
@@ -208,6 +225,11 @@ function fromSection(svg: string, geo: GeometryModel): Obs {
   if (plat) {
     out.platformWFt = ft(plat.width!);
     out.platformRiseFt = ft(plat.height!);
+  }
+  const step = feature(svg, 'firing_step');
+  if (step) {
+    out.firingStepHFt = ft(step.height!);
+    out.firingStepRunFt = ft(step.width!);
   }
   const sump = feature(svg, 'sump');
   if (sump) {
@@ -310,6 +332,7 @@ test('TIER A — the bill, the geometry model and the 3D scene agree on every ph
     ['geometry|3D', 'stringerLengthFt'], ['geometry|3D', 'platformLFt'], ['geometry|3D', 'platformWFt'],
     ['geometry|3D', 'platformRiseFt'], ['geometry|3D', 'sumpLFt'], ['geometry|3D', 'sumpWFt'],
     ['geometry|3D', 'sumpDFt'], ['geometry|3D', 'camoAreaFt2'],
+    ['geometry|3D', 'wallTaperFt'], ['geometry|3D', 'firingStepHFt'], ['geometry|3D', 'firingStepRunFt'],
     ['geometry|BOM', 'roofAreaFt2'], ['geometry|BOM', 'stringerCount'], ['geometry|BOM', 'camoAreaFt2'],
     ['3D|BOM', 'roofAreaFt2'], ['3D|BOM', 'stringerCount'],
   ];
@@ -349,7 +372,7 @@ test('TIER B — the 2D section and plan draw what the bill bills and the 3D mod
   }
   assert.ok(cases > 400, 'the SVG tier must actually sweep — ' + cases + ' cases');
   assert.deepEqual(problems, [], 'the drawings and the rules disagree:\n  ' + problems.join('\n  '));
-  for (const field of ['roofFrontEdgeFt', 'roofRearEdgeFt', 'roofThicknessFt', 'stringerSectionFt', 'stringerLengthFt', 'platformWFt', 'platformRiseFt', 'sumpWFt', 'sumpDFt']) {
+  for (const field of ['roofFrontEdgeFt', 'roofRearEdgeFt', 'roofThicknessFt', 'stringerSectionFt', 'stringerLengthFt', 'platformWFt', 'platformRiseFt', 'firingStepHFt', 'firingStepRunFt', 'sumpWFt', 'sumpDFt']) {
     assert.ok((compared.get('geometry|2D section|' + field) ?? 0) > 0, 'the section never drew ' + field + ' anywhere in the corpus');
   }
   for (const field of ['platformLFt', 'platformWFt', 'subBayLFt', 'subBayWFt']) {

@@ -107,6 +107,11 @@ export const CODES = {
   ),
   COUNT_CLAMPED: def('COUNT_CLAMPED', 'advisory', 'Position count was clamped to the 1–999 range.'),
   TEAM_CLAMPED: def('TEAM_CLAMPED', 'advisory', 'Team size was clamped to the 1–50 range.'),
+  PLATFORM_CLAMPED: def(
+    'PLATFORM_CLAMPED',
+    'advisory',
+    'The doctrine table describes a firing platform that does not fit the bay it stands in — the position is built with the platform cut to the bay, and the bill charges what is built.',
+  ),
 } as const;
 
 export type CodeKey = keyof typeof CODES;

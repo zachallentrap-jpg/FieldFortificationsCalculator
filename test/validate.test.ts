@@ -81,6 +81,11 @@ test('each validation code is reachable', () => {
   withDoctrine({ 'standards.deliberate.coverMul': 0 }, () => {
     for (const c of codesFor({ threat: 'ind-mtr-81', overheadCover: true, standard: 'deliberate' })) fired.add(c);
   });
+  // PLATFORM_CLAMPED likewise: the shipped catalog's platforms all fit their own bays, so only
+  // a fill describing a platform wider than its trench can reach the clamp.
+  withDoctrine({ 'positions.fifty_cal.firingPlatform.W': 3.0 }, () => {
+    for (const c of codesFor({ positionType: 'fifty_cal' })) fired.add(c);
+  });
 
   for (const def of allCodes()) {
     assert.ok(fired.has(def.code), 'code never fired: ' + def.code);
@@ -144,6 +149,26 @@ test('COVER_UNDER_THREAT ranks with the warnings, above every planning-realism n
   const at = v.findIndex((i) => i.code === 'COVER_UNDER_THREAT');
   const firstAdvisory = v.findIndex((i) => i.severity === 'advisory');
   assert.ok(firstAdvisory === -1 || at < firstAdvisory, 'ranked with the warnings, not trailing the advisories');
+});
+
+test('PLATFORM_CLAMPED says what was described and what will be built — and never fires on a platform that fits', () => {
+  // The clamp itself (compute cutting the platform to the bay, once, for the bill and all three
+  // views) is correct behaviour; what this locks is that it no longer happens in silence.
+  const shipped = compute(defaultInputs({ positionType: 'fifty_cal' }));
+  assert.ok(!shipped.validation.some((v) => v.code === 'PLATFORM_CLAMPED'), 'the shipped catalog fits its own bays');
+
+  withDoctrine({ 'positions.fifty_cal.firingPlatform.W': 3.0 }, () => {
+    const r = compute(defaultInputs({ positionType: 'fifty_cal' }));
+    const adv = r.validation.find((v) => v.code === 'PLATFORM_CLAMPED');
+    assert.ok(adv, 'an imported impossible platform is no longer rewritten silently');
+    assert.equal(adv!.severity, 'advisory', 'the build is right; the note is for whoever filled the table');
+    // Both halves of the story: the table's platform, and the buildable one.
+    assert.match(adv!.message, /described 4×3 ft/, 'says what the table described: ' + adv!.message);
+    assert.match(adv!.message, /built 4×2 ft/, 'says what will be built: ' + adv!.message);
+    // And the figure the bill uses IS the built one (the undug volume follows the clamp).
+    const geo = r.geometry as { plan: { platform: { W: number } | null } };
+    assert.equal(geo.plan.platform!.W, 2, 'one clamped footprint for the bill and every view');
+  });
 });
 
 test('REVET_REQUIRED_SOIL is an error and clears when a revetment is chosen', () => {

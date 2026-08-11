@@ -223,3 +223,38 @@ The lesson both share: a defect that lives in the *gap between* two consumers is
 invisible to a reviewer looking at either one. The checks that caught them —
 cross-consumer agreement, and coverage driven by what the generators emit rather
 than by what a register claims — are the ones worth keeping.
+
+### Closing note — C14 fixed, and what verifying the fix found (final pass)
+
+**C14 is closed.** `compute()` now reads the seven labor leaves per call like every
+other consumer; the module-scope snapshot is gone. Verifying the fix the §6 way —
+construct the input, observe the output, prove the lock by revert — measured a
+wider blast radius than the audit's one-line entry: after a sanctioned ×4 labor
+fill, the snapshot build billed the pre-import **12.1 mh** where the live table
+said 48.4; the stage clock, subtracting the post-import adders from that stale
+total, reported the deliberate stage at **−5.8 mh** and the parapet at **−2.6 mh**,
+silently dropped the security and hasty stages, and its "partition" summed to
+16.6 mh against a 12.1 mh total; and the derivation trace printed operands that
+multiply out to 48.4 above a result line reading 12.1. Three consumers of one
+table, split three ways, every test green. The lock is the cross-consumer test
+that was missing (`test/engine-formula.test.ts`): import a labor fill, then
+require compute()'s figures to move with it, the stage plan to partition it with
+no negative stage, and the trace's own operands to recompute to its printed
+result — reverted to the snapshot, it fails on the first count (`12.1 ≈ 48.4`),
+and the other two were observed directly under the revert.
+
+The same pass replanted two mutations the C27 method (mutate one consumer, diff
+the others) had shown the cross-view sweep could not see: swapping the 3D
+firing-step's height/run leaves (drawn 0.80 ft tall where the section drew 0.67)
+and re-deriving the bay-wall taper locally with the clamp moved 0.35 → 0.28 (3D
+flare 0.70 ft against the section's 0.875 on a one-man in sloping soil) — both
+previously left the entire suite green. The taper rule now has one home
+(`geometry.ts` publishes `section.wallTaper` and a `taperFt` per sub-bay;
+`scene3d.ts` reads them), verified byte-identical over a 4,390-case corpus, and
+the sweep compares the firing step and the wall taper from each view's own
+output; both replants now fail it with exactly those figures. One residual is
+deliberately unchanged: the 7 corpus cases with an *unknown revetment string*
+moved in the 3D scene only — the 3D used to flare those walls by the soil ratio
+while the section drew them plumb; both now read the published taper, but which
+answer is *right* is C8 (geometry keys the taper on the raw revetment string,
+not the resolved row), which remains open in its one home rather than two.
