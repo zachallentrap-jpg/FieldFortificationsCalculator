@@ -1,12 +1,16 @@
 // TIMBER-2 — doctrine data integrity and the dictionary lockstep (plan §8.6, I-11, I-14).
 //
-// Three things are checked that reviews miss:
+// Four things are checked that reviews miss:
 //   1. every magnitude carries a citation, and unverified ones are visibly (PH);
 //   2. the LS register is real — the fall/collapse/overload numbers are actually tagged, so
 //      the UI badge and the CI ack gate see the same set;
 //   3. `doctrine.ts` and the FROZEN legacy modules agree. The legacy generators keep their own
 //      literals (editing them is a stop-the-line event, C-10), so the values are mirrored —
-//      and mirrors drift unless something watches them.
+//      and mirrors drift unless something watches them;
+//   4. and the register's claims are KEPT: a row naming a member it says was measured is held
+//      against the check that was supposed to measure it, over every build the app ships.
+//      Three rows have now promised a check nobody performed; the last section here is why a
+//      fourth cannot merge.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,10 +22,13 @@ import { FULL_FIXTURES, MATRIX_FIXTURES } from './fixtures/frameFixtures';
 import { DRESSED, type Member } from '../src/timber/types';
 import { BF_PER_LF, classifyNominal, bomSummary } from '../src/timber/bom';
 import { generateFrame, specFromBuildingInput, type BuildingInput } from '../src/timber/frame';
-import { generateStructure } from '../src/timber/families/index';
+import { generateStructure, type StructureModel } from '../src/timber/families/index';
 import { FAMILY_TABLE } from '../src/timber/catalog';
 import { configSchemaFor, type PanelRow } from '../src/ui/woodframe/config';
 import { HUT } from '../src/timber/doctrine';
+import { spanWarnings, type SpanWarning } from '../src/timber/spans';
+import { seatCutsFor, seatDepthWarnings } from '../src/timber/birdsMouth';
+import { LS_CONSUMERS, type LsCheck } from '../src/timber/packet/lsgate';
 import type { RoofSpec, StructureSpec } from '../src/timber/spec';
 
 test('every doctrine constant carries a citation, and unverified ones are visibly (PH)', () => {
@@ -366,8 +373,16 @@ function shippedSpecs(): { id: string; spec: StructureSpec }[] {
   return out;
 }
 
-/** Every distinct `nailing` string a set of builds emits, mapped to the roles and one build. */
-function emittedNailingFrom(specs: { id: string; spec: StructureSpec }[]): Map<string, { roles: Set<string>; where: string }> {
+/**
+ * Every distinct `nailing` string a set of builds emits, mapped to the roles and one build.
+ *
+ * `onModel` is how a second walker rides along: the corpus costs seconds to build and every extra
+ * pass over it buys the same models again.
+ */
+function emittedNailingFrom(
+  specs: { id: string; spec: StructureSpec }[],
+  onModel?: (model: StructureModel, where: string) => void,
+): Map<string, { roles: Set<string>; where: string }> {
   const out = new Map<string, { roles: Set<string>; where: string }>();
   const record = (members: readonly Member[], where: string): void => {
     for (const m of members) {
@@ -378,15 +393,26 @@ function emittedNailingFrom(specs: { id: string; spec: StructureSpec }[]): Map<s
     }
   };
   for (const fx of [...FULL_FIXTURES, ...MATRIX_FIXTURES]) record(generateFrame(fx.input).members, `legacy ${fx.name}`);
-  for (const { id, spec } of specs) record(generateStructure(spec).members, id);
+  for (const { id, spec } of specs) {
+    const model = generateStructure(spec);
+    record(model.members, id);
+    onModel?.(model, id);
+  }
   return out;
 }
 
-// The walk is thousands of builds; three tests read it, and building it three times would triple
-// the suite's runtime for an identical answer.
+// The walk is thousands of builds; several tests read it, and building it once per test would
+// multiply the suite's runtime for an identical answer.
 let cachedEmitted: Map<string, { roles: Set<string>; where: string }> | null = null;
-const emittedNailing = (): Map<string, { roles: Set<string>; where: string }> =>
-  (cachedEmitted ??= emittedNailingFrom(shippedSpecs()));
+let cachedLs: LsWalk | null = null;
+function buildWalk(): void {
+  if (cachedEmitted) return;
+  const ls = newLsWalk();
+  cachedEmitted = emittedNailingFrom(shippedSpecs(), (model, where) => recordLs(ls, model, where));
+  cachedLs = ls;
+}
+const emittedNailing = (): Map<string, { roles: Set<string>; where: string }> => { buildWalk(); return cachedEmitted!; };
+const lsWalk = (): LsWalk => { buildWalk(); return cachedLs!; };
 
 test('doctrine mirrors every nailing schedule a card and its panel can emit with one or two controls moved', () => {
   const emitted = emittedNailing();
@@ -472,4 +498,227 @@ test('the (PH) a crew reads and the ph the register reports cannot disagree', ()
     assert.equal(NAILING[key].ph, false, `NAILING.${key} should carry a real citation`);
     assert.match(NAILING[key].cite, /^IRC /, `NAILING.${key} should cite the IRC section it was corrected against`);
   }
+});
+
+// ── The life-safety register: declaring a role is not measuring it ────────────
+//
+// A row on the packet's LS table says the build rests on that value, and for a LIMIT that reads
+// as "and it was held to it". Three separate rows have now named a member the check they point
+// at never looked at: the hip's bird's-mouth seat, the hip and jack rafters' spans, and a tail
+// joist at CEILING level, which the floor table skipped for sitting above the deck and the
+// ceiling table skipped for not being called `joist`. Every one was found by hand, and two of
+// them grew back after the round that fixed the one before. So the register is held to the
+// corpus instead — the same card-and-panel walk the nailing register above is proved against.
+//
+// TWO THINGS HAVE TO HOLD, AND IT IS THE SECOND THAT KEEPS REGROWING.
+//
+//   Every role a limit declares is one its named check is SEEN to measure. A role no check
+//   reaches is a row printed for an examination that never happened.
+//
+//   And no member the register claims falls through EVERY branch. That is the shape all three
+//   failures had: the role was declared, most members of it were measured, and a whole class of
+//   them was measured by nothing while the row printed on the packet of the build holding them.
+//
+// A role a check genuinely cannot reach is declared `unmeasured` WITH ITS REASON rather than
+// dropped, and that declaration is held to account in both directions: a role called unmeasurable
+// that the check turns out to measure fails here as loudly as a role called measured that it does
+// not. Silence is what let the first three through.
+
+/** One exemplar of a distinct thing `spanWarnings` can be asked about. */
+interface SpanClass {
+  member: Member;
+  family: string;
+  spacing: { joistSpacingIn: number; rafterSpacingIn: number };
+  floorTopY: number;
+  where: string;
+}
+
+interface LsWalk {
+  /** Role → the families that emit it, so a family-scoped row is judged inside its own scope. */
+  rolesByFamily: Map<string, Set<string>>;
+  /** `check|role|cite` some build produced on its own, with nothing rigged. */
+  observed: Set<string>;
+  /** Roles `birdsMouth.ts` derives a seat for — its subject list, warning or not. */
+  seated: Set<string>;
+  spanClasses: Map<string, SpanClass>;
+}
+
+/** The roles some span-checked row of the register claims. Nothing else needs an exemplar. */
+const rolesClaimedBy = (check: LsCheck): Set<string> =>
+  new Set(Object.values(LS_CONSUMERS).filter((c) => c.checkedBy === check).flatMap((c) => [...c.roles]));
+
+/**
+ * Everything `spanWarnings` reads when deciding whether a member is measured AT ALL: the role
+ * picks the branch, which side of the deck it sits on picks which joist table, and the nominal
+ * picks the row. The family rides along so a family-scoped row is never judged on another
+ * family's members. Everything else about a member only moves the number, so one exemplar
+ * answers for its whole class — and the one kept is the LONGEST, because length is the lever the
+ * probe below pulls and the shortest jack at a hip corner is a 1.4 ft stub that is still well
+ * inside its row at four times that. Keeping the first member seen made the probe report the two
+ * jack classes as measured by nothing, which is a false alarm in the gate written to stop them.
+ */
+function spanClassKey(family: string, m: Member, floorTopY: number): string {
+  const where = m.position[1] > floorTopY + 1e-6 ? 'above the deck' : 'on the deck';
+  return `${family} · ${m.role} · ${m.nominal} · ${where}`;
+}
+
+function newLsWalk(): LsWalk {
+  return { rolesByFamily: new Map(), observed: new Set(), seated: new Set(), spanClasses: new Map() };
+}
+
+function recordLs(w: LsWalk, model: StructureModel, where: string): void {
+  const family = model.spec.family;
+  const floorTopY = model.levels.subfloorTop;
+  const claimed = rolesClaimedBy('span');
+  for (const m of model.members) {
+    if (!w.rolesByFamily.has(m.role)) w.rolesByFamily.set(m.role, new Set());
+    w.rolesByFamily.get(m.role)!.add(family);
+    if (!claimed.has(m.role)) continue;
+    const key = spanClassKey(family, m, floorTopY);
+    const prev = w.spanClasses.get(key);
+    if (!prev || m.cutLength > prev.member.cutLength) {
+      w.spanClasses.set(key, { member: m, family, spacing: model.spec.spacing, floorTopY, where });
+    }
+  }
+  for (const s of spanWarnings(model.members, model.spec.spacing, floorTopY)) w.observed.add(`span|${s.role}|${s.cite}`);
+  for (const s of seatDepthWarnings(model.members)) w.observed.add(`seat|${s.role}|${s.cite}`);
+  const byId = new Map(model.members.map((m) => [m.id, m]));
+  for (const id of seatCutsFor(model.members).keys()) w.seated.add(byId.get(id)!.role);
+}
+
+/** The citation a warning carries when it was raised against this register value. */
+const lsCites = new Map<string, string>();
+function citeFor(id: string): string {
+  if (lsCites.size === 0) {
+    for (const e of lifeSafetyRegister()) {
+      lsCites.set(e.id, citeOf({ value: e.value, cite: e.cite, ph: e.ph, lifeSafety: true }));
+    }
+  }
+  return lsCites.get(id)!;
+}
+
+/**
+ * Whether the span check MEASURES a class — which is not whether it warns about one. A member
+ * inside its row is silent and so is a member no branch ever reaches, and from outside the two
+ * are the same silence. Pulling the one lever the check reads — the member's own length — tells
+ * them apart: a class still silent at four times its length is a class nothing is looking at.
+ */
+const spanProbe = (c: SpanClass): SpanWarning[] =>
+  spanWarnings([{ ...c.member, cutLength: c.member.cutLength * 4 }], c.spacing, c.floorTopY);
+
+/**
+ * Every test below passes trivially against an empty walk, so the walk is asserted before it is
+ * read. A refactor that quietly narrowed the corpus — or a `recordLs` that stopped recording —
+ * would otherwise leave the whole section green while proving nothing at all.
+ */
+function assertCorpusIsReal(w: LsWalk): void {
+  assert.ok(w.rolesByFamily.size > 40, `the walk saw ${w.rolesByFamily.size} member roles across every card and panel`);
+  assert.ok(w.spanClasses.size > 15, `the walk found ${w.spanClasses.size} distinct span-checked member classes`);
+  assert.ok(w.observed.size > 4, `the corpus raised ${w.observed.size} kinds of check result unaided`);
+  assert.ok(w.seated.size > 0, 'the seat check derived no seats anywhere in the corpus');
+}
+
+test('every role the life-safety register declares is a role some shipped build emits', () => {
+  // A declaration for a member the app cannot produce is a row that can never print, and it
+  // reads to the next person as coverage that is already in place.
+  const w = lsWalk();
+  assertCorpusIsReal(w);
+  const orphans: string[] = [];
+  for (const [id, c] of Object.entries(LS_CONSUMERS)) {
+    for (const role of c.roles) {
+      const inScope = [...(w.rolesByFamily.get(role) ?? [])]
+        .filter((f) => !c.families || (c.families as readonly string[]).includes(f));
+      if (inScope.length === 0) {
+        orphans.push(`${id} declares ${role}, emitted by ${[...(w.rolesByFamily.get(role) ?? ['nothing'])].join('/')}`);
+      }
+    }
+  }
+  assert.deepEqual(orphans, [], `consumer roles no build in scope emits:\n  ${orphans.join('\n  ')}`);
+});
+
+test('every role a life-safety LIMIT declares is a role its named check is seen to measure', () => {
+  // The register's own invariant, enforced instead of asserted in a comment. Seat roles are
+  // proved by builds that warn about them unaided; span roles by the length probe, because a
+  // shipped design staying inside its table is the design working, not the check looking.
+  const w = lsWalk();
+  assertCorpusIsReal(w);
+  const measured = new Set(w.observed);
+  for (const c of w.spanClasses.values()) for (const s of spanProbe(c)) measured.add(`span|${s.role}|${s.cite}`);
+
+  const unmeasured: string[] = [];
+  for (const [id, c] of Object.entries(LS_CONSUMERS)) {
+    if (!c.checkedBy) continue;
+    for (const role of c.roles) {
+      if (measured.has(`${c.checkedBy}|${role}|${citeFor(id)}`)) continue;
+      unmeasured.push(`${id} declares ${role} and no build's ${c.checkedBy} check ever measured one`);
+    }
+  }
+  assert.deepEqual(
+    unmeasured,
+    [],
+    `life-safety rows promising a check nobody performs:\n  ${unmeasured.join('\n  ')}`,
+  );
+});
+
+test('no member a SPAN limit claims falls through every branch of the span check', () => {
+  // The fail-open the other two rounds left behind, and the reason this one is written per
+  // MEMBER CLASS rather than per role: a tail joist at ceiling level is the same declared role as
+  // one on the deck, and only one of the two was ever measured.
+  //
+  // Span only, and deliberately: what decides whether the seat check reaches a member is the
+  // geometry of the roof it is on, not anything the class key holds, so the seat limit's reach is
+  // proved by the two tests either side of this one instead of by a class walk that would look
+  // exhaustive and not be.
+  //
+  // At least one claimant, not all of them: the floor row and the ceiling row both name `joist`,
+  // and any given joist belongs to exactly one of the two tables by where it sits.
+  const w = lsWalk();
+  assertCorpusIsReal(w);
+  const rows = Object.entries(LS_CONSUMERS).filter(([, c]) => c.checkedBy === 'span');
+  const fallen: string[] = [];
+  for (const [key, c] of w.spanClasses) {
+    const claimants = rows.filter(([, r]) =>
+      (r.roles as readonly string[]).includes(c.member.role)
+      && (!r.families || (r.families as readonly string[]).includes(c.family)));
+    if (claimants.length === 0) continue;
+    const cites = new Set(spanProbe(c).map((s) => s.cite));
+    if (claimants.some(([id]) => cites.has(citeFor(id)))) continue;
+    fallen.push(
+      `${key}: claimed by ${claimants.map(([id]) => id).join(' and ')}, measured by `
+      + `${[...cites].join(' | ') || 'NOTHING'} (e.g. ${c.where})`,
+    );
+  }
+  assert.deepEqual(
+    fallen,
+    [],
+    'member classes a life-safety row claims and no branch measures — give them a branch, scope '
+    + `the row off them, or declare them unmeasured with a reason:\n  ${fallen.join('\n  ')}`,
+  );
+});
+
+test('a role the register calls unmeasurable is one its check really cannot reach', () => {
+  // The escape hatch, held shut from both sides. Without this, "declared unmeasurable" is a way
+  // to make the two tests above green by writing a sentence, and the sentence goes onto the
+  // packet in front of the person signing it.
+  const w = lsWalk();
+  assertCorpusIsReal(w);
+  const wrong: string[] = [];
+  for (const [id, c] of Object.entries(LS_CONSUMERS)) {
+    for (const [role, why] of Object.entries(c.unmeasured ?? {})) {
+      if (!c.checkedBy) wrong.push(`${id}: ${role} is called unmeasured with no check named to be unmeasurable by`);
+      if ((c.roles as readonly string[]).includes(role)) wrong.push(`${id}: ${role} is listed as measured and unmeasured at once`);
+      if (!why || why.length < 30) wrong.push(`${id}: ${role} is called unmeasured with no reason a reader could act on`);
+      if (!w.rolesByFamily.has(role)) wrong.push(`${id}: ${role} is a caveat about a member no build has`);
+      if (c.checkedBy && w.observed.has(`${c.checkedBy}|${role}|${citeFor(id)}`)) {
+        wrong.push(`${id}: the ${c.checkedBy} check DOES measure ${role} — it belongs in roles, not here`);
+      }
+      if (c.checkedBy === 'seat' && w.seated.has(role)) {
+        wrong.push(`${id}: birdsMouth.ts now derives a seat for ${role}, so the limit reaches it`);
+      }
+    }
+  }
+  assert.deepEqual(wrong, [], `unmeasurable declarations that do not hold up:\n  ${wrong.join('\n  ')}`);
+  // And the subject list itself, so "the check cannot reach it" is read off the module rather
+  // than inferred from a silence that a broken check would also produce.
+  assert.ok(w.seated.has('rafter') && w.seated.has('jackRafter'), 'the seat check seats nothing at all');
 });

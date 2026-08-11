@@ -16,6 +16,7 @@
 import { DOCTRINE_VERSION } from '../version';
 import { all, getByPath, counts } from './registry';
 import { shielding, shieldMaterials, spanSizes, threats } from './protection';
+import { standards } from './standards';
 import { excavationSplit } from './stages';
 import { fmtLength } from './units';
 import type { UnitSystem } from './units';
@@ -283,7 +284,8 @@ function severityLadders(): string[][] {
 const DISPLAY_UNITS: UnitSystem[] = ['imperial', 'metric'];
 function displayedAsZero(ft: number): string | undefined {
   // Zero in the rendered string means no significant digit survived the rounding, whatever
-  // shape the formatter gives it (0'-0", 0 cm, 0 m).
+  // shape the formatter gives it — 0'-0" imperial, 0 cm metric. (Metric only reaches the ' m'
+  // branch at a metre or more, and nothing that large rounds away, so there is no '0 m'.)
   return DISPLAY_UNITS.map((u) => fmtLength(ft, u)).find((shown) => !/[1-9]/.test(shown));
 }
 
@@ -294,8 +296,66 @@ function unbuildableMagnitude(v: number, absent: () => string, invisible: (shown
   return shown === undefined ? undefined : invisible(shown);
 }
 
+// The same question without composing a message — the product check below asks it of many
+// combinations and reports only one of them.
+function isUnbuildable(ft: number): boolean {
+  return !(ft > 0) || displayedAsZero(ft) !== undefined;
+}
+
+// The magnitude the operator is SHOWN is not the shielding leaf on its own: an earth roof is
+// built to leaf × the chosen standard's `coverMul`, and coverMul is a fillable doctrine leaf
+// too. So a legible thickness and a legible multiplier can still multiply down to a roof the
+// panel can only print as zero — the same unreadable, unbuildable state, reached through a
+// product no leaf-by-leaf check can see. The build standard is the operator's choice at run
+// time, so every standard's multiplier is in play; only the munitions that actually get an
+// earth roof are, because an engineered roof never multiplies anything.
+//
+// Reported against the MULTIPLIER, and only for shielding values that are legible on their
+// own. When the thickness is the unusable one it is already reported against its own row, and
+// repeating it here would send the filler to the standards table to correct a shielding
+// number — the wrong-table blame ROOF_NO_COVER_MULTIPLIER exists to avoid. One finding per
+// multiplier, quoting the thickest requirement that multiplier scales out of sight.
+function coverMultiplierWarnings(p: Prospective, flagged: ReadonlySet<string>): DoctrineFinding[] {
+  const out: DoctrineFinding[] = [];
+  const roofed = Object.entries(threats).filter(([, t]) => t.roof === 'earth_on_stringers');
+  for (const std of Object.values(standards)) {
+    const mul = p.valueOf(std.coverMul);
+    let worst: { label: string; mat: string; ft: number } | undefined;
+    let affected = 0;
+    for (const [id, t] of roofed) {
+      const leaf = shielding[id]?.[t.coverMaterial];
+      if (!leaf || flagged.has(p.pathOf(leaf))) continue;
+      const ft = p.valueOf(leaf);
+      if (!isUnbuildable(ft * mul)) continue;
+      affected++;
+      if (worst === undefined || ft > worst.ft) worst = { label: t.label, mat: t.coverMaterial, ft };
+    }
+    if (worst === undefined) continue;
+    const w = worst;
+    const scope = affected + ' of the ' + roofed.length + ' munitions that get an earth roof';
+    const reason = unbuildableMagnitude(
+      w.ft * mul,
+      () =>
+        'a ' + std.label + ' roof is built to ' + mul + ' × the doctrinal cover, which scales a real' +
+        ' requirement (' + w.label + ', ' + w.ft + ' ft of ' + w.mat + ') to zero or less — a multiplier' +
+        ' of zero or less reads as a MISSING value, and the roof falls to an engineered design;' +
+        ' affects ' + scope + '; applied, confirm against the build standard',
+      (shown) =>
+        'a ' + std.label + ' roof over ' + w.label + ' is built to ' + w.ft + ' ft of ' + w.mat +
+        ' × ' + mul + ', which the panel can only show as ' + shown + ' — the thickness reads fine' +
+        ' on its own, so it is this multiplier that scales the cover out of sight; affects ' + scope +
+        '; applied, confirm against the build standard',
+    );
+    if (reason !== undefined) out.push({ path: p.pathOf(std.coverMul), reason });
+  }
+  return out;
+}
+
 function unbuildableWarnings(p: Prospective): DoctrineFinding[] {
   const out: DoctrineFinding[] = [];
+  // Which shielding leaves are unusable in their own right — the product check below excludes
+  // them so a bad thickness is blamed on the shielding table once, not on every multiplier.
+  const flagged = new Set<string>();
   for (const [id, row] of Object.entries(shielding)) {
     for (const mat of shieldMaterials) {
       const leaf = row[mat];
@@ -311,9 +371,14 @@ function unbuildableWarnings(p: Prospective): DoctrineFinding[] {
           ' — that rounds to zero as displayed (the panel can only show it as ' + shown + '), so' +
           ' nobody can read or build the cover it asks for; applied, confirm against the pub',
       );
-      if (reason !== undefined) out.push({ path: p.pathOf(leaf), reason });
+      if (reason !== undefined) {
+        const path = p.pathOf(leaf);
+        flagged.add(path);
+        out.push({ path, reason });
+      }
     }
   }
+  out.push(...coverMultiplierWarnings(p, flagged));
   for (const t of Object.values(threats)) {
     const v = p.valueOf(t.standoffMin);
     const reason = unbuildableMagnitude(

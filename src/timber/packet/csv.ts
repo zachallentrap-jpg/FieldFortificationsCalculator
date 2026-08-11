@@ -117,8 +117,11 @@ export function packetCsv(p: PacketModel): string {
       : row(r.crew, r.crewHours.toFixed(1), r.shifts, `${p.labor.productiveHoursPerDay} productive hours per shift, ${p.labor.crewModel} scaling`));
   }
 
-  section('LIFE SAFETY', 'value', 'as used', 'citation', 'status', 'doctrine id');
-  for (const r of p.ls) out.push(row(r.label, r.value, r.cite, r.ph ? 'REVIEW REQUIRED' : 'verified', r.key));
+  // A CSV is the half of the packet that gets separated from the other half, so a row whose
+  // coverage is partial carries WHICH PART here too — the reader of this file may never see the
+  // page the caveat would otherwise have been left on.
+  section('LIFE SAFETY', 'value', 'as used', 'citation', 'status', 'doctrine id', 'not examined');
+  for (const r of p.ls) out.push(row(r.label, r.value, r.cite, r.ph ? 'REVIEW REQUIRED' : 'verified', r.key, r.caveat ?? ''));
 
   section('CITATIONS', 'citation', 'members', 'status');
   for (const c of p.cites) out.push(row(c.cite, c.members, c.ph ? 'PENDING PAGE CHECK' : 'verified'));

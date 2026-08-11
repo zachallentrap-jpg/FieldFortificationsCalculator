@@ -499,6 +499,64 @@ option, implement it, and log it here.
   equation exists ONCE and feeds both the renderer and the raycast filter, so clicking through
   a cut selects what you see; stage scrubbing toggles visibility rather than rebuilding; and
   `unlockToCustom` preserves the family (a tower stays a tower) with a per-family test.
+
+- **D41 — A protection magnitude of zero or less MEANS the value is absent, and every unknown
+  in `resolveCover` leaves by the same door.** Taking a filled zero literally is the reading
+  that produces the worst state this tool can reach: a shielding thickness of 0 ft says "this
+  round needs no cover", which is never true of a real munition, and the engine drew the earth
+  roof, billed its stringers and delivered nothing — silently, because `ROOF_ENGINEERED` cannot
+  fire on an earth roof and `COVER_UNDER_THREAT` needs a delivered thickness above zero to
+  compare against. The import bound (`0 ≤ v < 1000`) accepts a zero, so a perfectly valid fill
+  can put one there. It now reads as ABSENT and fails safe like a missing leaf: engineered
+  roof, zero thickness, §2.7 intact. The same reading covers the resolved product (leaf ×
+  `coverMul`), a non-finite value at either end, and standoff in the import checks. The
+  judgment is the point — the code cannot avoid choosing a meaning for an unusable number, and
+  "absent" is the only choice that fails toward the designer instead of toward a roof nobody
+  can shelter under. **`ROOF_NO_COVER_MULTIPLIER` is its own code**, separate from
+  `ROOF_NO_SHIELDING_DATA`, because `protection.shielding.<threat>.<material>` and
+  `standards.<x>.coverMul` are different tables, confirmed against different pubs by different
+  people; saying "no shielding data" when the shielding row is fine and the standard's
+  multiplier is the zero sends the operator to the wrong table to fix it, which is worse than a
+  generic message. **Both data-gap codes fire only when `calc.coverReason === undefined`** — a
+  deliberate narrowing. The data gap is the only `engineered_required` return that records no
+  `engineeredReason`, so a threat- or span-driven engineered roof is already explained by the
+  rule that fired, and naming a data gap there would blame a doctrine value for a decision
+  doctrine made correctly. The cost is real and accepted: on a roof engineered by threat or
+  span that ALSO has an empty shielding row, the empty row goes unmentioned. What is
+  guaranteed is the part that matters — every engineered roof carries `ROOF_ENGINEERED`, and
+  the one case no rule explains names the value that is missing, so no roof is unexplained.
+  **`DoctrineImportReport` gains a REQUIRED `rejectedTables`.** A `path` in `rejected`
+  addresses a row of the fill table the operator is looking at; `stages.excavationSplit`
+  addresses nothing they can edit. Required rather than optional so every construction site had
+  to be visited and no caller can quietly drop a class of finding on the floor, and rendered as
+  its own block so a reader is never sent hunting for a row that does not exist. **The
+  excavation split keeps its ALL-OR-NOTHING rejection, and that blocks a legitimate single-row
+  correction.** Known cost, accepted. The stage clock partitions ONE excavation total, so the
+  four shares are only meaningful together — accepting three and leaving the fourth stale
+  invents or loses labor in the per-stage breakdown with no other symptom, which is exactly the
+  failure a partial fill is supposed to be safe from. The finding names all four shares and
+  tells the filler to send them in the same file, adjusted to sum to 1: a worse workflow than a
+  one-row edit, and a better one than a partition that silently does not partition. **The
+  importer also warns on a magnitude the app cannot display as anything but zero, and that
+  threshold comes from the DISPLAY, not from doctrine.** A leaf filled to 1e-9 ft is strictly
+  positive, so the fail-safe above passes it and the roof gets built at a billionth of a foot.
+  There is no doctrinal minimum thickness in this repo to test against, and inventing one is
+  precisely the fabrication the placeholder regime exists to prevent — so the check asks the
+  app's own `fmtLength()`, the formatter the specs panel and the printed job sheet render cover
+  with, whether the value keeps any significant digit in EITHER unit system, and reports it if
+  not. No thickness constant is written into the check. It is asked of the PRODUCT as well as
+  of the leaves: an earth roof is built to leaf × `coverMul` and both are fillable, so a
+  legible thickness and a legible multiplier can still multiply down to a roof that prints as
+  nothing — a state neither leaf-by-leaf check can see. That combination is blamed on the
+  multiplier rather than on the shielding row, on the same reasoning as
+  `ROOF_NO_COVER_MULTIPLIER`, and only while the thickness is legible by itself, so an unusable
+  thickness is still corrected in one place. **The residual, stated plainly:** this is a
+  warning and not a refusal, so the value lands and the engine still sizes a roof from it; and
+  display precision is the only floor available, so a thickness that renders as an inch of soil
+  is legible and therefore unreported. What is closed is the silence — every route to a roof
+  the panel can only show as zero, through a leaf or through a product, is reported at the
+  moment the fill is made, in a message that quotes what the panel would show.
+
 ## 2026-08-02 — The catalog is complete, and the last three gaps closed the way they should have
 
 T7 finished the roster at 14 cards and T8's leftovers closed behind it. Four things worth

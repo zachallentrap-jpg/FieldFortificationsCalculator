@@ -598,8 +598,12 @@ export const NAILING = {
   hipRafterAtRidge: doc('3-16d at the ridge; jacks bear on it both sides (PH)', 'FM 5-426 ch. 7 hip roofs'),
   ridgeAtHip: doc('commons and hips 3-16d ea (PH)', 'FM 5-426 ch. 7 ridge: shortened for the hips at each end'),
   // A purlin roof has no sheathing: the purlins ARE what the roofing is fastened through, so each
-  // one is nailed at every rafter it crosses rather than on a spacing of its own. Reachable from
-  // any card whose roof is not the frozen gable — that branch lays a solid deck instead.
+  // one is nailed at every rafter it crosses rather than on a spacing of its own. It takes TWO of
+  // the card's controls together to reach one: `coverings.roofDeck=purlins` asks for them, and
+  // `roof.kind` has to be off the frozen gable, whose branch lays a solid deck whatever the
+  // covering says (C-9). Either alone is inert: a gp-frame moved only to a hip roof emits no
+  // purlin, and moved only to a purlin deck emits no purlin either — both still get a decked
+  // roof. Moved to both, it emits 26 purlins and no roof panel at all.
   purlinAtRafters: doc('2-16d ea rafter (PH)', 'FM 5-426 ch. 7 purlin roof: purlins laid across the rafters under the roofing'),
 
   // ── Interior partitions — subsystems/partitions.ts

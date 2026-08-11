@@ -18,6 +18,15 @@
 // THE GATE: `test/timber2-packet.test.ts` asserts every id in `lifeSafetyRegister()` appears
 // below. A new life-safety constant cannot ship without someone saying, in one line, which
 // members it governs — which is the same question the reviewer will have to answer anyway.
+//
+// AND A SECOND GATE, BECAUSE DECLARING IS NOT MEASURING. Three separate rows have now named a
+// role that the check they point at never looked at: the hip's bird's-mouth seat, the hip and
+// jack rafters' spans, and a tail joist at CEILING level, which the floor table skipped for being
+// above the deck and the ceiling table skipped for not being called `joist`. Each time the packet
+// printed the row and told the signer the build had been held to it. `timber2-doctrine.test.ts`
+// walks every card and panel option the app ships and proves, per role, that the named check
+// actually measures a member of it — and that no member the register claims falls through every
+// check. The corpus lives there because that is where the card-and-panel walk lives.
 
 import type { MemberRole } from '../types';
 import type { StructureSpec } from '../spec';
@@ -45,7 +54,27 @@ export interface LsConsumer {
    */
   readonly label: string;
   readonly families?: readonly Family[];
+  /**
+   * The check that MEASURES these members against this value, where one exists. A size the
+   * emitter cut from is consumed by the member simply existing; a LIMIT is only consumed if
+   * something compared the member to it, and this names what did the comparing so the gate can
+   * go and watch it do so.
+   */
+  readonly checkedBy?: LsCheck;
+  /**
+   * Roles this value governs in the abstract that the check above CANNOT reach, each with the
+   * reason. This is the honest half of `roles`: a role left silently off the list reads as an
+   * oversight to the next reader, and a role quietly added to it prints a row claiming a member
+   * was examined when nothing examined it. Declared here, the gate can hold the claim to account
+   * — a role named unmeasurable that the check turns out to measure fails, the same as a role
+   * named measured that it does not — and the packet can print the caveat beside the row instead
+   * of leaving the signer to assume the check covered everything of that name in the build.
+   */
+  readonly unmeasured?: Readonly<Partial<Record<MemberRole, string>>>;
 }
+
+/** The member checks a life-safety limit can be enforced by. `spans.ts` and `birdsMouth.ts`. */
+export type LsCheck = 'span' | 'seat';
 
 const bunker = (roles: readonly MemberRole[], label: string): LsConsumer => ({ roles, label, families: ['bunker'] });
 const tower = (roles: readonly MemberRole[], label: string): LsConsumer => ({ roles, label, families: ['tower'] });
@@ -57,15 +86,24 @@ export const LS_CONSUMERS: Readonly<Record<string, LsConsumer>> = {
   'LUMBER.girderNominal': { roles: ['girder'] , label: 'Girder stock' },
   'LUMBER.girderPly': { roles: ['girder'] , label: 'Girder plies' },
   'LUMBER.rafterNominal': { roles: ['rafter', 'jackRafter', 'hipRafter'] , label: 'Rafter size' },
-  'LUMBER.headerNominal': { roles: ['header'] , label: 'Header size' },
-  'SPAN.joist': { roles: ['joist', 'tailJoist'] , label: 'Floor-joist span limit' },
-  'SPAN.ceilingJoist': { roles: ['joist'] , label: 'Ceiling-joist span limit' },
+  // NOT THE BUNKER'S ENTRANCE HEADER, WHICH THESE TWO DID NOT SIZE OR RATE. A crib or post-and-
+  // lagging bunker continues its 6x8 CAP BEAM across the doorway — the piece the overhead cover
+  // bears on — and cites `BUNKER.capNominal` for it, because a 2x6 under a foot and a half of
+  // soil is a shim, not a header. Both of these are dimension-lumber values: the size is the one
+  // a stud wall puts over a window, and the span table's rows run 2x4 to 2x12 and have nothing to
+  // say about a solid timber. Listed unscoped, they printed on a bunker packet as the values its
+  // doorway rested on, and the span row was a limit no row of the table could be read against.
+  'LUMBER.headerNominal': { roles: ['header'] , label: 'Header size', families: ['building', 'hut', 'tower', 'platform', 'tentFrame'] },
+  'SPAN.joist': { roles: ['joist', 'tailJoist'] , label: 'Floor-joist span limit', checkedBy: 'span' },
+  // Tails as well as whole joists: an attic hatch frames its opening in the CEILING, so the two
+  // joists it cuts are ceiling joists hung on a header, and they are read on the ceiling's rows.
+  'SPAN.ceilingJoist': { roles: ['joist', 'tailJoist'] , label: 'Ceiling-joist span limit', checkedBy: 'span' },
   // All three, because `spans.ts` reads the run of all three. A hip roof's commons are its
   // SHORTEST sloping members — the jacks are commons cut back to the hip, and the hip runs the
   // diagonal — so a check scoped to `rafter` would leave the longest sticks on the roof silent
   // while this line told the signer they had been held to the table.
-  'SPAN.rafter': { roles: ['rafter', 'jackRafter', 'hipRafter'] , label: 'Rafter span limit' },
-  'SPAN.header': { roles: ['header'] , label: 'Header span limit' },
+  'SPAN.rafter': { roles: ['rafter', 'jackRafter', 'hipRafter'] , label: 'Rafter span limit', checkedBy: 'span' },
+  'SPAN.header': { roles: ['header'] , label: 'Header span limit', families: ['building', 'hut', 'tower', 'platform', 'tentFrame'], checkedBy: 'span' },
   // How much of a rafter its bird's mouth may take.
   //
   // THE ROLES ARE THE ONES THAT GET MEASURED, NOT THE ONES THE RULE APPLIES TO IN THE ABSTRACT.
@@ -76,7 +114,19 @@ export const LS_CONSUMERS: Readonly<Record<string, LsConsumer>> = {
   // none of its members. A row that names a member nothing measured is a false assurance, which
   // is the failure this table's own header calls printing too many. The hip's seat is an open
   // item in DECISIONS.md; when it is derived, it belongs back on this line.
-  'NOTCH.rafterSeatMaxDepthFrac': { roles: ['rafter', 'jackRafter'] , label: 'Bird’s-mouth seat depth limit' },
+  //
+  // Saying so OUT LOUD rather than by omission, because a hip roof has commons and jacks too: on
+  // that build the row does print, earned by them, and a signer reading it would otherwise take
+  // the four hips at the corners to have been examined with the rest.
+  'NOTCH.rafterSeatMaxDepthFrac': {
+    roles: ['rafter', 'jackRafter'],
+    label: 'Bird’s-mouth seat depth limit',
+    checkedBy: 'seat',
+    unmeasured: {
+      hipRafter: 'a hip crosses the corner at 45° on its own shallower pitch, and the double-cheek '
+        + 'seat that makes is geometry the tool does not derive — no hip rafter in this build was measured',
+    },
+  },
 
   // Fall protection. Every one of these is a height or a spacing somebody trusts with a fall.
   'RAIL.topHeightIn': { roles: ['railTop'] , label: 'Top rail height' },
@@ -144,6 +194,23 @@ export const LS_CONSUMERS: Readonly<Record<string, LsConsumer>> = {
   // and if they are there this figure is what put them there.
   'OPENING.entryStepMinRiseFt': { roles: ['tread', 'stringer'] , label: 'Entry-step threshold' },
 };
+
+/**
+ * What this build makes the row's coverage LESS than it reads as — the reasons for exactly those
+ * unmeasured members the build actually contains, or nothing when it contains none.
+ *
+ * A build with no hip on it is not owed a sentence about hips: a caveat printed where it does not
+ * apply is more of the noise that stops the table being read.
+ */
+export function lsCaveatFor(id: string, roles: ReadonlySet<string>): string | undefined {
+  const declared = LS_CONSUMERS[id]?.unmeasured;
+  if (!declared) return undefined;
+  const why = Object.entries(declared)
+    .filter(([role]) => roles.has(role))
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, reason]) => reason);
+  return why.length > 0 ? why.join(' ') : undefined;
+}
 
 /** Which of the register's values this build actually rests on. */
 export function consumedLsIds(

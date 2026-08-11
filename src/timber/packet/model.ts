@@ -22,7 +22,7 @@ import { fastenerTakeoff, type FastenerTakeoff } from '../fasteners';
 import { lifeSafetyRegister, COVER_DEPTH_NOTE } from '../doctrine';
 import { fnv1a } from '../train/core';
 import { laborModel, type LaborModel } from './labor';
-import { consumedLsIds, LS_CONSUMERS } from './lsgate';
+import { consumedLsIds, lsCaveatFor, LS_CONSUMERS } from './lsgate';
 import { SECTIONS } from './copy';
 
 export interface CiteRow {
@@ -41,6 +41,12 @@ export interface LsRow {
   value: string;
   cite: string;
   ph: boolean;
+  /**
+   * Which members of this build the row does NOT cover, when some of them are not covered. A row
+   * on the LS table reads as "the build was held to this"; where a check cannot reach part of
+   * what the value governs, the signer has to be told which part rather than left to assume.
+   */
+  caveat?: string;
 }
 
 export interface ClassRollup {
@@ -189,13 +195,17 @@ function lsRows(model: StructureModel): LsRow[] {
   const consumed = new Set(consumedLsIds(roles, model.spec.family, register.map((e) => e.id)));
   return register
     .filter((e) => consumed.has(e.id))
-    .map((e) => ({
-      key: e.id,
-      label: LS_CONSUMERS[e.id]?.label ?? e.id,
-      value: lsValue(e.value, e.unit),
-      cite: tidyCite(e.cite),
-      ph: e.ph,
-    }))
+    .map((e) => {
+      const caveat = lsCaveatFor(e.id, roles);
+      return {
+        key: e.id,
+        label: LS_CONSUMERS[e.id]?.label ?? e.id,
+        value: lsValue(e.value, e.unit),
+        cite: tidyCite(e.cite),
+        ph: e.ph,
+        ...(caveat ? { caveat } : {}),
+      };
+    })
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 

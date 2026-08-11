@@ -8,6 +8,7 @@ import '../src/doctrine/index';
 import { exportDoctrine, importDoctrine, getFillState, resetFillState } from '../src/doctrine/io';
 import { counts, all, getByPath } from '../src/doctrine/registry';
 import { shielding, shieldMaterials, spanSizes, stringerSizeForSpan } from '../src/doctrine/protection';
+import { standards } from '../src/doctrine/standards';
 import { fmtLength } from '../src/doctrine/units';
 import { compute } from '../src/engine/compute';
 import type { GeometryModel } from '../src/engine/geometry';
@@ -326,13 +327,74 @@ test('a standoff the panel can only show as zero is reported', () => {
   assert.ok(!/[1-9]/.test(fmtLength(tiny, 'imperial')), 'the panel shows ' + fmtLength(tiny, 'imperial'));
 });
 
-test('the smallest thickness the shipped shielding table carries is NOT called unbuildable', () => {
-  // The threshold is display precision, so it has to sit below everything the app itself ships:
-  // a check that fires on the pristine table would train the filler to ignore it.
+// The magnitude the operator actually READS is not the leaf: an earth roof is built to the
+// shielding leaf × the chosen standard's coverMul, and coverMul is a fillable doctrine leaf
+// too. So the unbuildable state is reachable through the PRODUCT with both factors legible.
+test('a thickness that disappears only once the build standard multiplies it is reported, against the multiplier', () => {
+  const path = 'protection.shielding.sa-556.soil';
+  const thin = 0.05;
+  // This one really applies the fill (the engine assertions below need it live), so the restore
+  // is unconditional — a failure here must not leave a thinned table behind for later cases.
+  const rep = importDoctrine(fixture([{ path, value: thin }]));
+  try {
+    assert.ok(rep.ok, 'plausibility reports, never blocks');
+
+    // The premise: the thickness is perfectly readable on its own, so the shielding row is not
+    // the thing to send the filler back to.
+    assert.ok(/[1-9]/.test(fmtLength(thin, 'imperial')), thin + ' ft alone shows as ' + fmtLength(thin, 'imperial'));
+    assert.ok(!rep.warnings.some((w) => w.path === path), 'a legible thickness is not blamed');
+
+    const mulPath = 'standards.hasty.coverMul';
+    const w = rep.warnings.find((x) => x.path === mulPath);
+    assert.ok(w, 'the multiplier that scales the cover out of sight is named instead');
+    assert.match(w!.reason, /can only show as/, 'and says why it is unusable: ' + w!.reason);
+
+    // …and this is the roof the engine really builds: an earth roof, stringers billed under it,
+    // and a thickness the panel prints as nothing.
+    const result = compute(defaultInputs({ positionType: 'bunker_op_cp', standard: 'hasty', threat: 'sa-556' }));
+    assert.equal(result.cover.roofPath, 'earth_on_stringers', 'a roof is still drawn and billed');
+    assert.ok(result.cover.thickness > 0, 'strictly positive, so the engine fail-safe passes it');
+    assert.ok(!/[1-9]/.test(fmtLength(result.cover.thickness, 'imperial')), 'the panel would show ' + fmtLength(result.cover.thickness, 'imperial'));
+  } finally {
+    restore();
+  }
+});
+
+test('a cover multiplier filled small enough to scale every earth roof out of sight is reported', () => {
+  // Nothing in the shielding table is wrong here — the standards table alone deletes the cover.
+  const path = 'standards.deliberate.coverMul';
+  const tiny = 1e-6;
+  const rep = importDoctrine(fixture([{ path, value: tiny }]), { dryRun: true });
+
+  assert.ok(rep.ok, 'plausibility reports, never blocks');
+  const w = rep.warnings.find((x) => x.path === path);
+  assert.ok(w, 'a multiplier is a leaf a file can fill, and this one leaves no cover to read');
+  assert.match(w!.reason, /can only show as/, 'says why it is unusable: ' + w!.reason);
+  assert.ok(!rep.warnings.some((x) => x.path.startsWith('protection.shielding.')), 'no shielding row is blamed for it');
+});
+
+test('an unusable shielding value is blamed on its own row, not on every multiplier as well', () => {
+  // A zeroed thickness makes the product zero under all three standards. Reporting it against
+  // each of them would send the filler to the standards table to correct a shielding number —
+  // the wrong-table blame the separate ROOF_NO_COVER_MULTIPLIER code exists to avoid.
+  const path = 'protection.shielding.sa-556.soil';
+  const rep = importDoctrine(fixture([{ path, value: 0 }]), { dryRun: true });
+  assert.ok(rep.ok);
+  assert.deepEqual(rep.warnings.map((w) => w.path), [path], 'one finding, on the one table that needs correcting');
+});
+
+test('the smallest thickness the shipped shielding table carries is NOT called unbuildable, even through the leanest build standard', () => {
+  // The threshold is display precision, so it has to sit below everything the app itself ships —
+  // and below what it ships once the leanest standard has scaled it, since that PRODUCT is what
+  // the panel prints. A check that fires on the pristine table would train the filler to ignore it.
   const smallest = Object.values(shielding)
     .flatMap((row) => shieldMaterials.map((m) => row[m].value))
     .reduce((a, b) => Math.min(a, b), Infinity);
+  const leanest = Object.values(standards).reduce((a, s) => Math.min(a, s.coverMul.value), Infinity);
   assert.ok(/[1-9]/.test(fmtLength(smallest, 'imperial')), smallest + ' ft shows as ' + fmtLength(smallest, 'imperial'));
+  for (const u of ['imperial', 'metric'] as const) {
+    assert.ok(/[1-9]/.test(fmtLength(smallest * leanest, u)), smallest + ' ft × ' + leanest + ' shows as ' + fmtLength(smallest * leanest, u));
+  }
   assert.deepEqual(importDoctrine(fullFill(), { dryRun: true }).warnings, [], 'the shipped table is quiet');
 });
 

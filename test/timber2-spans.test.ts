@@ -10,7 +10,7 @@ import { spanWarnings, summarizeSpanWarnings } from '../src/timber/spans';
 import { generateStructure } from '../src/timber/families/index';
 import { familyById, shippedFamilies } from '../src/timber/catalog';
 import { headerForSpan } from '../src/timber/normalize';
-import { LUMBER, SPAN } from '../src/timber/doctrine';
+import { citeOf, LUMBER, SPAN } from '../src/timber/doctrine';
 import { DRESSED } from '../src/timber/types';
 import { LS_CONSUMERS } from '../src/timber/packet/lsgate';
 
@@ -202,6 +202,31 @@ test('a doorway header keeps the doorway bearing when its emitter says nothing',
   assert.ok(Math.abs(warning.spanFt - 12) < 0.02, `a 12 ft opening reported as ${warning.spanFt.toFixed(2)} ft`);
 });
 
+// ── A joist above the deck is a ceiling joist, tails included ────────────────
+
+test('a tail joist at CEILING level is measured, and on the ceiling table', () => {
+  // An attic hatch frames its opening in the CEILING, so the two joists it cuts are ceiling
+  // joists hung on a header. They fell between both branches — above the deck for the floor
+  // table, not called `joist` for the ceiling one — so nothing measured them at any length,
+  // while the register's floor row named `tailJoist` and the packet printed the joist span limit
+  // as a value the build had been held to.
+  const spec = preset('gp-frame');
+  spec.atticAccess = true;
+  const model = generateStructure(spec);
+  const tails = model.members.filter((m) => m.role === 'tailJoist');
+  assert.ok(tails.length > 0, 'the fixture frames no attic opening');
+  for (const t of tails) {
+    assert.ok(t.position[1] > model.levels.subfloorTop + 1e-6, 'these tails are meant to sit above the deck');
+  }
+  const over = tails.map((t) => ({ ...t, cutLength: t.cutLength * 4 }));
+  const warned = spanWarnings(over, model.spec.spacing, model.levels.subfloorTop);
+  assert.equal(warned.length, tails.length, `${tails.length} ceiling tail joists at four times their length warned ${warned.length} times`);
+  assert.equal(warned[0]!.cite, citeOf(SPAN.ceilingJoist), 'measured, but against the floor table');
+  // And it says TAIL joist: the crew has two short sticks at the hatch to look at, not every
+  // joist in the ceiling.
+  assert.match(warned[0]!.message, /ceiling tail joist spans/, warned[0]!.message);
+});
+
 // ── A hip roof's longest members ─────────────────────────────────────────────
 //
 // The commons are the SHORTEST sloping members of a hip roof. The jacks are commons cut back to
@@ -228,8 +253,9 @@ test('a hip roof is span-checked on its jacks and its hips, not only on its comm
     assert.ok(present > 0, `the fixture emits no ${role}`);
     assert.ok(warned.has(role), `${present} ${role} members, none of them measured: warned on ${[...warned].join(', ')}`);
   }
-  // Each set is reported against its own members rather than folded into the commons — "26×"
-  // over a roof of 98 sticks points a crew at the wrong ones.
+  // Each set is reported against its own members rather than folded into the commons. This roof
+  // carries 26 commons, 40 jacks and 4 hips — 70 sloping sticks, 71 with the ridge — and a single
+  // "26×" line over all of them sends the crew to the members that are not the problem.
   const lines = summarizeSpanWarnings(warnings);
   assert.ok(lines.some((l) => /\bjack rafter runs\b/.test(l)), lines.join(' | '));
   assert.ok(lines.some((l) => /\bhip rafter runs\b/.test(l)), lines.join(' | '));

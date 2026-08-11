@@ -24,19 +24,22 @@ import {
 } from '../src/timber/packet/labor';
 import { APPROVAL_SCOPE, DECISION_LINE, LS_BANNER } from '../src/timber/packet/copy';
 import { csvFilename, packetCsv } from '../src/timber/packet/csv';
-import { lifeSafetyRegister } from '../src/timber/doctrine';
+import { lifeSafetyRegister, SPAN } from '../src/timber/doctrine';
 import { familyById, shippedFamilies, type FamilyId } from '../src/timber/catalog';
 import { generateStructure } from '../src/timber/families/index';
 import { bomSummary } from '../src/timber/bom';
 import { thumbnailFor } from '../src/timber/thumbnails';
 import { plainName } from '../src/ui/woodframe/labels';
 
-const build = (id: string) => {
+/** A card's packet. `tweak` moves one of the card's own panel controls before building. */
+const build = (id: string, tweak?: (spec: Record<string, unknown>) => void) => {
   const f = familyById(id as FamilyId)!;
-  return packetModel(generateStructure(f.preset), {
+  const spec = JSON.parse(JSON.stringify(f.preset));
+  tweak?.(spec);
+  return packetModel(generateStructure(spec), {
     title: f.name,
     lineage: f.lineage,
-    coverArt: thumbnailFor(f.preset, { width: 440, height: 250 }),
+    coverArt: thumbnailFor(spec, { width: 440, height: 250 }),
     plainName: (r) => plainName(r as never),
   });
 };
@@ -81,6 +84,43 @@ test('R-T3: a tower prints its fall-protection values, all of them', () => {
   for (const need of ['RAIL.topHeightIn', 'RAIL.midHeightIn', 'LADDER.rungSpacingIn', 'TOWER.legNominal']) {
     assert.ok(keys.has(need), `a guard tower packet without ${need} is a packet that skipped a fall`);
   }
+});
+
+test('a life-safety row whose check cannot reach part of THIS build says which part', () => {
+  // The seat-depth limit is earned on a hip roof by the commons and the jacks — same notch, same
+  // plate, same pitch. The four hips at the corners are not measured by it at all: their seat is
+  // a double cheek the tool does not derive. So the row prints, and it prints WHAT IT SKIPPED,
+  // because one line reading "Bird's-mouth seat depth limit" over a hip roof otherwise tells the
+  // person signing it that every rafter on the building was held to that figure.
+  const p = build('gp-frame', (s) => { s.roof = { kind: 'hip', risePer12: 12, overhangFt: 1 }; });
+  const row = p.ls.find((r) => r.key === 'NOTCH.rafterSeatMaxDepthFrac');
+  assert.ok(row, 'a 12/12 hip roof consumes the seat-depth limit through its commons and jacks');
+  assert.ok(/hip/.test(row.caveat ?? ''), `the row says nothing about the hips: ${row.caveat}`);
+  assert.ok(packetHtml(p).includes(`NOT EXAMINED: ${row.caveat}`), 'the caveat never reached the page');
+  assert.ok(packetCsv(p).includes(row.caveat!), 'nor the CSV, which is the half that travels alone');
+  // And a roof with no hip on it is not handed a sentence about hips — a caveat printed where it
+  // does not apply is more of the noise that stops the table being read.
+  assert.equal(build('gp-frame').ls.find((r) => r.key === 'NOTCH.rafterSeatMaxDepthFrac')?.caveat, undefined);
+});
+
+test('a bunker packet does not print the values its entrance header was NOT cut from', () => {
+  // A crib bunker continues its CAP BEAM across the doorway — the piece the overhead cover bears
+  // on — and cites the cap for it. The dimension-lumber header size and the header span table had
+  // no part in that member: the table's rows are 2x stock. Printed on the packet anyway, they
+  // said the doorway rested on two values nobody read it against.
+  const header = generateStructure(familyById('crib-bunker' as FamilyId)!.preset).members.find((m) => m.role === 'header');
+  assert.ok(header, 'the bunker frames no doorway header, so this proves nothing');
+  assert.equal(
+    (SPAN.header.value as Record<string, number>)[header.nominal], undefined,
+    `the header table now has a row for ${header.nominal} — it rates this piece, and both rows belong back on the bunker's packet`,
+  );
+  const bunker = new Set(build('crib-bunker').ls.map((r) => r.key));
+  assert.ok(!bunker.has('LUMBER.headerNominal'), 'a size that sized nothing here');
+  assert.ok(!bunker.has('SPAN.header'), 'a span limit no row of the table could be read against');
+  assert.ok(bunker.has('BUNKER.capNominal'), 'the value the piece WAS cut from must still print');
+  // Both rows are still earned by a building whose headers are the stock the table rates.
+  const gp = new Set(build('gp-frame').ls.map((r) => r.key));
+  assert.ok(gp.has('LUMBER.headerNominal') && gp.has('SPAN.header'));
 });
 
 test('the LS scope is by family, not just by role', () => {

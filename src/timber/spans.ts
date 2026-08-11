@@ -98,6 +98,14 @@ function rafterMessage(m: Member, spanFt: number, col: { spacing: number; allowe
 }
 
 /**
+ * What to call a joist a crew has to go and find. A tail joist is the short one hung on the header
+ * at an opening, and telling somebody a "joist" is over when the offender is one of the two tails
+ * beside the hatch sends them down the length of the building looking at the wrong sticks — the
+ * same reason `birdsMouth.ts` says "jack rafter" rather than "rafter".
+ */
+const joistWord = (role: Member['role']): string => (role === 'tailJoist' ? 'tail joist' : 'joist');
+
+/**
  * Every member that is past its span table. Pure, and scoped to the roles the tables actually
  * cover — a role with no table produces no warning rather than a guess.
  */
@@ -105,12 +113,12 @@ export function spanWarnings(
   members: Member[],
   spacing: { joistSpacingIn: number; rafterSpacingIn: number },
   /**
-   * Top of the floor deck. Members above it that carry the `joist` role are CEILING joists, and
-   * the floor table does not apply to them — a ceiling joist carries a ceiling, not a floor, and
-   * gets its own longer rows. Checking one against the floor table condemned the standard GP
-   * building by four tenths of a foot, which is exactly the kind of false alarm that teaches
-   * people to ignore the real ones. They now have their own table (`SPAN.ceilingJoist`); this
-   * parameter is what tells the two apart.
+   * Top of the floor deck. Joists above it — whole ones and the tails trimmed around an opening
+   * alike — are CEILING joists, and the floor table does not apply to them: a ceiling joist
+   * carries a ceiling, not a floor, and gets its own longer rows. Checking one against the floor
+   * table condemned the standard GP building by four tenths of a foot, which is exactly the kind
+   * of false alarm that teaches people to ignore the real ones. They now have their own table
+   * (`SPAN.ceilingJoist`); this parameter is what tells the two apart.
    */
   floorTopY = Infinity,
 ): SpanWarning[] {
@@ -151,19 +159,26 @@ export function spanWarnings(
       if (col && spanFt > col.allowed + 1e-6) {
         out.push({
           memberId: m.id, role: m.role, nominal: m.nominal, spanFt, allowedFt: col.allowed, spacingIn: col.spacing,
-          message: `${m.nominal} joist spans ${spanFt.toFixed(1)} ft; the table allows ${col.allowed} ft at ${col.spacing} in o.c. Deepen the joist, close the spacing, or add a bearing line — the tool has NOT changed it.`,
+          message: `${m.nominal} ${joistWord(m.role)} spans ${spanFt.toFixed(1)} ft; the table allows ${col.allowed} ft at ${col.spacing} in o.c. Deepen the joist, close the spacing, or add a bearing line — the tool has NOT changed it.`,
           cite: citeOf(SPAN.joist),
         });
       }
-    } else if (m.role === 'joist' && m.position[1] > floorTopY + 1e-6) {
+    } else if ((m.role === 'joist' || m.role === 'tailJoist') && m.position[1] > floorTopY + 1e-6) {
       // Above the deck: a CEILING joist, on its own table.
+      //
+      // A TAIL JOIST BELONGS TO WHICHEVER DECK IT IS IN. The role says a joist was cut short at a
+      // trimmer and hung on a header — a scuttle, a stair well — and the attic hatch puts that
+      // opening in the CEILING, where the tails are ceiling joists carrying a ceiling. Matching
+      // the role only on the floor branch left them measured by nothing: the floor table skipped
+      // them for being above the deck and this branch skipped them for not being called `joist`,
+      // while the packet printed the joist-span limit as a value the build had been held to.
       const row = ceilingTable[m.nominal];
       const col = row && columnFor(row, spacing.joistSpacingIn);
       const spanFt = worstBay(m.cutLength / IN_PER_FT / 2, m.position[2]);
       if (col && spanFt > col.allowed + 1e-6) {
         out.push({
           memberId: m.id, role: m.role, nominal: m.nominal, spanFt, allowedFt: col.allowed, spacingIn: col.spacing,
-          message: `${m.nominal} ceiling joist spans ${spanFt.toFixed(1)} ft; the ceiling table allows ${col.allowed} ft at ${col.spacing} in o.c. Deepen it, close the spacing, or add a bearing partition — the tool has NOT changed it.`,
+          message: `${m.nominal} ceiling ${joistWord(m.role)} spans ${spanFt.toFixed(1)} ft; the ceiling table allows ${col.allowed} ft at ${col.spacing} in o.c. Deepen it, close the spacing, or add a bearing partition — the tool has NOT changed it.`,
           cite: citeOf(SPAN.ceilingJoist),
         });
       }

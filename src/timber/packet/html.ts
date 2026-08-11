@@ -223,8 +223,10 @@ function assumptionsPage(p: PacketModel): string {
   const cites = p.cites
     .map((c) => `<tr><td>${esc(c.cite)}</td><td class="n">${c.members}</td><td>${c.ph ? 'PENDING PAGE CHECK' : 'verified'}</td></tr>`)
     .join('');
+  // The caveat rides IN the row, not in a footnote: a row that says "the build was held to this"
+  // and a note somewhere else saying which members it skipped are read minutes apart, if at all.
   const ls = p.ls
-    .map((r) => `<tr><td>${esc(r.label)}<span class="key">${esc(r.key)}</span></td><td class="n">${esc(r.value)}</td><td>${esc(r.cite)}</td><td>${r.ph ? 'REVIEW REQUIRED' : 'verified'}</td></tr>`)
+    .map((r) => `<tr><td>${esc(r.label)}<span class="key">${esc(r.key)}</span>${r.caveat ? `<div class="fine">NOT EXAMINED: ${esc(r.caveat)}</div>` : ''}</td><td class="n">${esc(r.value)}</td><td>${esc(r.cite)}</td><td>${r.ph ? 'REVIEW REQUIRED' : 'verified'}</td></tr>`)
     .join('');
   const issues = p.issues
     .map((i) => `<li><strong>${esc(i.path)}</strong> — ${esc(i.message)}</li>`)
