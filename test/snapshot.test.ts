@@ -41,10 +41,13 @@ test('default fixture (two-man / deliberate / loam / 81mm mortar) snapshot', () 
   // renderers used to hold — overhead.endLap, the three stringer sections (+3 SC, the member
   // that holds the roof up), camo.drapeHeightFt, the firing-step ledge, the mortar-pit batter,
   // the entrance/stair access group, the three compound positions' sub-bay trenches, and the
-  // vehicle ramp/pan split). 317 total, 192 safety-critical.
+  // vehicle ramp/pan split). 317 total; safety-critical 192 → 196 (SC-tag consistency pass:
+  // parapet.H and berm.H — frontal-cover height covers the firer like its thickness stops the
+  // round; overhead.bearingEachEnd — the stringer end bearing is a collapse mode; and
+  // vehicle.ramp.slopeRatio — a too-steep ramp overturns the vehicle; no new leaves).
   assert.equal(r.placeholderReport.total, 317);
   assert.equal(r.placeholderReport.remaining, 317);
-  assert.equal(r.placeholderReport.safetyCriticalRemaining, 192);
+  assert.equal(r.placeholderReport.safetyCriticalRemaining, 196);
 });
 
 test('earth-parapet rifle position bills firing-rest bags only; bunker keeps the full sandbag ring', () => {

@@ -20,12 +20,17 @@ export const sandbag: Sandbag = {
   H: P(0.33, { unit: 'ft', note: 'filled bag thickness (illustrative)' }),
   wasteFactor: P(1.15, { note: 'sandbag waste factor (illustrative)' }),
   // An earth-parapet rifle/crew position bags ONLY the firing rest: ONE course spanning the
-  // full frontage, laid 2 bags deep (front-to-back), ~10 in tall — ATP 3-21.8 §5-238 "front
-  // retaining wall...at least 10 inches high (2 filled sandbags in-depth)". The dirt U-mound is
-  // built up around and behind it; this is the only concentrated sandbag on the parapet.
-  frontWallHeight: P(0.83, { unit: 'ft', note: '~10 in front retaining-wall course height (illustrative)' }),
-  // Each soldier carries ~5-7 sandbags as a starting set (ATP 3-21.8 note after §5-260,
-  // "five to seven sandbags") — a design needing far more implies on-site fill / resupply.
+  // full frontage, laid bags-in-depth (front-to-back), with the dirt U-mound built up around
+  // and behind it — the only concentrated sandbag on the parapet. That STRUCTURE (a front
+  // retaining-wall course at the firing rest) follows ATP 3-21.8 §5-238; the citation is a
+  // research pointer to where the structure came from, for the qualified user who fills this
+  // leaf, and verifies NO value here. The height below is an ILLUSTRATIVE PLACEHOLDER, not a
+  // transcription — fill the real course height from the current pub via doctrine import (io.ts).
+  frontWallHeight: P(0.83, { unit: 'ft', note: 'front retaining-wall course height (illustrative)' }),
+  // Each soldier carries a small starting set of empty sandbags — a design needing far more
+  // implies on-site fill / resupply. The starting-set STRUCTURE follows the ATP 3-21.8 note
+  // after §5-260; again a research pointer, not a verification stamp. The count below is an
+  // ILLUSTRATIVE PLACEHOLDER to be filled via doctrine import (io.ts).
   basicLoad: P(7, { note: 'sandbags carried per soldier (illustrative)' }),
 };
 

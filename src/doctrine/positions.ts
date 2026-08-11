@@ -64,18 +64,21 @@ export interface PositionRow {
 
 const ft = (v: number, note: string): Provenance<number> => P(v, { unit: 'ft', note });
 
-// What the frontal parapet is BUILT FROM (research-verified — ATP 3-21.8 §5-240 "Use spoil
-// from hole to fill parapets in order of front, flanks, and rear"; FM 5-103 "Parapets are
-// constructed using spoil from the excavation"):
+// What the frontal parapet is BUILT FROM. This classification is QUALITATIVE STRUCTURE, and
+// its lineage is ATP 3-21.8 §5-240 (parapets filled from the hole's spoil, front first) and
+// FM 5-103 (parapets built of excavation spoil; sandbag-walled shelters/bunkers; vehicle
+// spoil dozed flat or hauled). Those citations locate where the STRUCTURE came from — a
+// research pointer for the qualified user who fills this catalog — and are NOT a
+// verification stamp: they verify no magnitude in this file, and every magnitude here ships
+// as an ILLUSTRATIVE PLACEHOLDER until filled through the sanctioned doctrine import (io.ts).
 //   'earth'   — mounded excavated SPOIL. Rifle / crew-served / mortar / ATGM / trench: the
 //               protective mass is dirt; sandbags appear only at the firing rest (aperture),
 //               in overhead cover, and as revetment when the soil is loose — never as the
 //               parapet mass. A hasty rifle position uses zero sandbags.
-//   'sandbag' — built-up sandbag walls ARE the structure. Only the bunker/OP (rect_roofed):
-//               "Walls of fighting and protective positions are built of sandbags" (FM 5-103,
-//               shelters/bunkers section) — the one class that stays mostly sandbag.
+//   'sandbag' — built-up sandbag walls ARE the structure: the bunker/OP (rect_roofed), the
+//               one class that stays mostly sandbag.
 //   'berm'    — dozed spoil berm (vehicle defilade). Already modeled; nobody fills ~450 bags
-//               around a hull-down (FM 5-103: spoil "flattened out or hauled away").
+//               around a hull-down.
 // Derived from existing signals so a new position never silently defaults wrong.
 export type ParapetMode = 'earth' | 'sandbag' | 'berm';
 export function parapetModeFor(pos: PositionRow): ParapetMode {
@@ -86,9 +89,12 @@ export function parapetModeFor(pos: PositionRow): ParapetMode {
 
 // Vehicle-defilade excavation doctrine (shared by the vehicle_ramp shape family). The access
 // ramp is the dominant excavation volume of a defilade — omitting it was falsifiable by any
-// equipment operator in minutes (EXECUTION_PLAN Phase 1).
+// equipment operator in minutes (EXECUTION_PLAN Phase 1). slopeRatio is the grade a
+// multi-ton vehicle drives down into the cut: too steep and the vehicle noses in, slides, or
+// rolls with its crew aboard — a wrong value here overturns something, so it is
+// safety-critical like the structural leaves it stands beside.
 export const vehicleRamp = {
-  slopeRatio: P(5.0, { unit: 'ratio', note: 'access-ramp run per foot of cut depth (illustrative)' }),
+  slopeRatio: P(5.0, { unit: 'ratio', safetyCritical: true, note: 'access-ramp run per foot of cut depth (illustrative)' }),
   // How much of the position's run is the graded way IN versus the level pan the vehicle parks
   // on. A shape proportion of a real cut, so it belongs here rather than in the view that draws it.
   rampRunFrac: P(0.65, { note: 'share of the position run taken by the graded ramp, the rest being the level pan (illustrative)' }),

@@ -2181,3 +2181,82 @@ proven by diverging the leaf instead). No test weakened; two tests repointed at 
 code now reads (`smallPlanWidthFt`, `LUMBER.deckPlankNominal`), asserting the same facts plus
 live-leaf agreement. Full suite after the pass: **1097 tests, 1097 pass, 0 fail** (was 1084 +
 13 added); `tsc --noEmit` clean.
+
+## 2026-08-11 — The fill checklist is generated now, and the citations stopped pretending
+
+The SAP-1 placeholder regime had three consistency defects at its edges: the fill checklist
+had quietly fallen behind the registry it exists to enumerate, four leaves that answer the
+safety-critical principle were untagged while their siblings were tagged, and three source
+comments claimed primary-source verification over leaves whose status says PLACEHOLDER. All
+three are one failure — a claim nothing measures — and each fix here ends with the gate that
+measures it.
+
+### The checklist is regenerated, not patched (DOCTRINE_SOURCES.md)
+
+The old tables were hand-kept prose that covered only part of the registry, with whole
+families (`stages`, `vehicle`, `weapons`, `features`) carrying no section and rows still
+showing pre-correction values (`one_man` L/W pre-swap, all eight `wallSlopeRatio` rows). A
+filler who worked every row to completion would stop short of done and could not know it.
+Patching the rows would fix this instance of the drift; nothing would fix the next one —
+the checklist had grown stale precisely because no test read it.
+
+So the tables are no longer written by hand. `scripts/gen-doctrine-sources.ts` walks
+`all()` and emits **one row per registered leaf** — path, live illustrative value, unit,
+`[SC]` mark, and a per-family "Likely source (TODO)" pointer carried over from the old
+prose (guidance strings only; they assert no value) — between BEGIN/END markers, leaving
+the hand-written prose (header, how-to-read, SC list, source-lineage note, filling
+procedure) untouched. The `Filled?` / `Verified by` cells are the two human columns: the
+generator carries any non-blank cell forward by path, so a qualified user's marks survive
+regeneration (verified: a hand-filled cell survived a regenerate with the gate green).
+`test/doctrine-sources-drift.test.ts` re-runs the generation against the committed file on
+every test run, and separately — without trusting the generator — re-derives the row/leaf
+bijection and the `[SC]` agreement straight from the committed file against the registry,
+so a generator bug that would regenerate the same wrong file both times still fails.
+Proven by planting each defect it exists to catch: a deleted leaf row (the coverage
+defect), a stale value (2.5 → 4 on `positions.one_man.hole.L`, the exact old rot), and a
+stripped `[SC]` mark — each failed the suite, each restored green.
+
+### Four SC tags, one principle (does a wrong value stop a round, hold a roof, or collapse something)
+
+- **`protection.parapet.H` — tagged.** Frontal-cover HEIGHT is as protective as frontal-cover
+  thickness: W is the mass a round must pass through, H is how much of the firer that mass
+  actually covers. W tagged with H untagged was an inconsistency, not a judgment.
+- **`protection.berm.H` — tagged.** Same principle, sharpened: the berm is the ONLY
+  protection a hull-down position has, and it protects the hull exactly up to H.
+- **`protection.overhead.bearingEachEnd` — tagged.** The stringer ends carry the entire roof
+  load through this bearing; too little and the loaded ends slip or crush their seat. That
+  is a collapse mode of the same rank as the span limit, which has been tagged all along.
+- **`vehicle.ramp.slopeRatio` — tagged.** The grade a multi-ton vehicle drives down into
+  the cut; too steep and it noses in, slides, or overturns with the crew aboard. "Collapse
+  something" includes overturning the vehicle the position exists to protect.
+- **`protection.spanSizes[i].sectionFt` — verified already tagged** (by the rule↔rendering
+  pass, for the stated reason: the member's section holds the roof up as much as its span
+  limit does). No change; the docs' SC lists now name the sections alongside the spans.
+- **Left untagged, deliberately:** `vehicle.ramp.rampRunFrac` (how the run splits between
+  graded way and level pan — proportion, not protection), `protection.parapet`'s sibling
+  materials like `sandbag.frontWallHeight` (a firing-rest course height, checked instead by
+  the rendered-protection import warnings), and the `features.access` group (egress and
+  habitability; a wrong stair riser is a bad step, not a stopped round or a dropped roof).
+
+Registry: 317 total (unchanged), safety-critical 192 → 196, all still PLACEHOLDER. The
+snapshot expectation moved 192 → 196 deliberately; both docs' SC lists moved in the same
+pass and the docs-drift lockstep was proven on the change (removing
+`protection.overhead.bearingEachEnd` from the policy's list failed the suite naming exactly
+that omission).
+
+### Citations demoted from verification stamps to research pointers (A1)
+
+Three comment blocks claimed more than the regime allows: soils.ts said the slope ratios
+were "all primary-source verified", materials.ts quoted ATP 3-21.8 paragraph magnitudes
+beside the leaves seeded to match them, and positions.ts called the parapet-mode
+classification "research-verified" — all over leaves whose status is PLACEHOLDER, in a
+codebase whose policy promises it transcribes no real doctrinal number. The lineage is
+genuinely useful (it tells the eventual filler where the STRUCTURE came from), so it was
+demoted, not deleted: each block now states that the cited source governs the SHAPE — which
+soils flare wide, that a rifle position bags only the firing rest, what a parapet is built
+from — that the citation is a research pointer and verifies NO value, and that every
+magnitude remains an illustrative placeholder until filled through the sanctioned import.
+The two verbatim quoted magnitudes (the course height, the carried-bag count) were removed
+from the comments as the one part that contradicted the policy's no-transcription promise;
+the paragraph citations stay. No value moved anywhere in src/doctrine; doctrine-integrity
+holds (every leaf PLACEHOLDER, every SC leaf sourced).

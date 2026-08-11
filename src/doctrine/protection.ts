@@ -163,22 +163,29 @@ export function threatClassOf(threat: string): ThreatClass | 'none' {
   return threats[threat]?.class ?? 'none';
 }
 
-// Parapet default (frontal/flank cover). W (thickness) is protective → safety-critical.
+// Parapet default (frontal/flank cover). Both dimensions are protective — W is the frontal
+// mass a round must pass through, H is how much of the firer the mass actually covers — so
+// both are safety-critical.
 export const parapet = {
   W: P(3.0, { unit: 'ft', safetyCritical: true, note: 'frontal-cover thickness (illustrative)' }),
-  H: P(0.5, { unit: 'ft', note: 'parapet height above grade (illustrative)' }),
+  H: P(0.5, { unit: 'ft', safetyCritical: true, note: 'parapet height above grade (illustrative)' }),
 };
 
 // Protective spoil berm — the frontal protection for VEHICLE defilade positions. A dozed
 // berm of the position's own spoil, not a sandbag parapet (the pre-Phase-1 BOM billed ~450
-// sandbags nobody would ever fill for a hull-down). Thickness is protective → safety-critical.
+// sandbags nobody would ever fill for a hull-down). Thickness and height are both protective
+// — the berm is the only cover a hull-down has, and it covers the hull only up to H — so
+// both are safety-critical.
 export const berm = {
   W: P(4.0, { unit: 'ft', safetyCritical: true, note: 'spoil-berm thickness at protective height (illustrative)' }),
-  H: P(2.0, { unit: 'ft', note: 'spoil-berm height above grade (illustrative)' }),
+  H: P(2.0, { unit: 'ft', safetyCritical: true, note: 'spoil-berm height above grade (illustrative)' }),
 };
 
 // Overhead-cover chain constants (§8, §9). setbackMin / setbackDepthFrac are standoff
-// (safety-critical). bearingEachEnd, endLap and stringerSpacing drive cover geometry + counts.
+// (safety-critical). bearingEachEnd is the bearing the stringer ends carry the whole roof
+// load through — too little and the loaded ends slip or crush their seat, a collapse mode of
+// the same rank as the span limit, so it is safety-critical too. endLap and stringerSpacing
+// drive cover geometry + counts.
 //
 // SETBACK AND BEARING ARE SEQUENTIAL STAGES OF ONE ASSEMBLY, NOT ALTERNATIVES. The supports are
 // set back from the hole edge by the setback (≥ setbackMin OR setbackDepthFrac × the depth of
@@ -189,7 +196,7 @@ export const berm = {
 export const overhead = {
   setbackMin: P(1.0, { unit: 'ft', safetyCritical: true, note: 'minimum roof setback/standoff (illustrative)' }),
   setbackDepthFrac: P(0.25, { safetyCritical: true, note: 'setback as fraction of depth (illustrative)' }),
-  bearingEachEnd: P(1.0, { unit: 'ft', note: 'stringer overhang past its support, each end (illustrative)' }),
+  bearingEachEnd: P(1.0, { unit: 'ft', safetyCritical: true, note: 'stringer overhang past its support, each end (illustrative)' }),
   // The flank ends of the deck carry no stringer end — the stringers span front-to-back onto the
   // front and rear supports — so neither the setback nor the bearing rule governs them. Nothing
   // in the corpus gives a figure for how far the deck laps onto the flank parapet, so this is

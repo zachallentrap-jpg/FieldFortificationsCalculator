@@ -64,12 +64,13 @@ The values that stop rounds, hold up roofs, and keep people out of a backblast c
 - `protection.shielding` — the thickness of each shield material that stops each threat.
 - `protection.threats` — every munition's minimum standoff, which drives the roof setback.
 - `protection.radiationHalving` — the thickness of each material that halves a fallout dose.
-- `protection.spanSizes` — the stringer span limits the roof member is sized from.
+- `protection.spanSizes` — the stringer span limits the roof member is sized from, and the dressed member sections it is drawn and built at.
 - `protection.retainingWall` — the retaining-wall thickness and the height that demands one.
-- `protection.overhead.setbackMin` and `protection.overhead.setbackDepthFrac` — the roof standoff used when no threat is named, and the share of the cut depth the setback is taken from.
-- `protection.parapet.W` — the frontal cover of an earth parapet.
-- `protection.berm.W` — the frontal cover of a vehicle spoil berm, the only protection a hull-down position has.
+- `protection.overhead.setbackMin`, `protection.overhead.setbackDepthFrac` and `protection.overhead.bearingEachEnd` — the roof standoff used when no threat is named, the share of the cut depth the setback is taken from, and the bearing each stringer end carries the roof load through.
+- `protection.parapet` — the frontal cover of an earth parapet: its thickness and the height it stands above grade.
+- `protection.berm` — the thickness and height of a vehicle spoil berm, the only protection a hull-down position has.
 - `weapons.backblast.clearanceFt` — the rear danger area an ATGM crew keeps clear.
+- `vehicle.ramp.slopeRatio` — the grade a vehicle descends into its defilade cut; too steep noses in or overturns it.
 
 A safety-critical value with no real source is exactly the kind of thing you must not field, so the tests require every safety-critical entry to carry a non-empty source.
 
@@ -204,6 +205,7 @@ The regime is not a convention you can quietly drift from — it is checked:
 - **`test/doctrine-io.test.ts`** — the import/export path end to end: a full fill drives the counts to zero and a restore brings them back; `importDoctrine()` refuses out-of-range values, a `DOCTRINE` status with a `TODO` source, unknown paths, newer versions and prototype-polluted files; one bad entry rejects the whole file with nothing mutated; a dry run previews the post-apply counts while the live registry stays untouched; a scrambled span table and a stage split that misses 1 are refused whole; implausible-but-applied fills come back as warnings; and a persisted fill survives a reload.
 - **`test/schema-import.test.ts`** — the *scenario and inputs* schemas, which are a different file format from the doctrine file above and are validated separately.
 - **`test/docs-drift.test.ts`** — this document and its siblings against the code: every file, symbol and registry path named here has to exist, and the safety-critical list above has to match the leaves the registry actually tags.
+- **`test/doctrine-sources-drift.test.ts`** — the fill checklist against the registry: `DOCTRINE_SOURCES.md`'s tables are generated from the live registry by `scripts/gen-doctrine-sources.ts`, and this test regenerates them on every run — a leaf without a checklist row, a row without a leaf, a stale value or a wrong `[SC]` mark fails the suite.
 
 If you add a doctrinal constant, wrap it in `P()`, tag it `safetyCritical` if it stops a round or holds a roof, and let it ship as a placeholder. If you fill values, do it through the export → offline-fill → import path, cite a real source, and read the counts back off the Status panel rather than assuming the fill landed.
 

@@ -3,12 +3,16 @@
 // cut-wall slope (H per 1 V) for stability; revetForced flags soils that doctrinally
 // require revetment regardless of the operator's toggle. None of these are authoritative.
 //
-// wallSlopeRatio magnitudes were corrected against researched angle-of-repose / OSHA max-cut
-// data (FM 5-103 Survivability; OSHA 1926 Subpart P; standard geotech repose tables — all
-// primary-source verified). The ratio is 1/tan(stable face angle from horizontal): a
-// cohesionless soil (sand ~34°) flares WIDE (1.48), a cohesive one (clay ~53°) stands steep
-// (0.75), and intact rock / frozen ground are vertical (0.0). This is what makes the 3D
-// excavation SHAPE differ by soil instead of only its color — sand funnels, rock is a shaft.
+// RESEARCH LINEAGE FOR wallSlopeRatio — STRUCTURE ONLY, NOT VALUE VERIFICATION. The SHAPE
+// of the column follows the angle-of-repose / max-cut literature (FM 5-103 lineage; OSHA
+// 1926 Subpart P; standard geotech repose tables): the ratio is 1/tan(stable face angle
+// from horizontal), so cohesionless soils (sand, gravel) flare WIDE, cohesive ones (clay)
+// stand steep, and intact rock / frozen ground cut vertical. Those citations say where the
+// STRUCTURE came from, for the qualified user who will fill this table — they verify NO
+// value in it. Every ratio below (and the per-row angle callouts describing soil character)
+// remains an ILLUSTRATIVE PLACEHOLDER until filled through the sanctioned doctrine import
+// (io.ts). The structure is what makes the 3D excavation SHAPE differ by soil instead of
+// only its color — sand funnels, rock is a shaft.
 
 import { P } from './types';
 import type { Provenance } from './types';
@@ -46,7 +50,8 @@ const soil = (
 });
 
 export const soils: Record<string, SoilRow> = {
-  // ratio, revetForced, faceLook — face angles from OSHA/repose research (see header)
+  // ratio, revetForced, faceLook — the column's shape follows the repose/max-cut lineage
+  // (see header: structure only, no value verified); the ratios are illustrative placeholders
   sand: soil('Sand', 1.3, 1.48, true, 'cone', 'Cohesionless (~34°); walls slough — revetment forced.'),
   sandy_loam: soil('Sandy loam', 1.15, 1.0, false, 'planar', 'Moderate cohesion (~45°); sloughs as it dries.'),
   loam: soil('Loam', 1.0, 0.65, false, 'planar', 'Baseline workable soil (~57°); holds tool marks.'),
