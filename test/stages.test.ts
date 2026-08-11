@@ -103,6 +103,115 @@ test('machine assist is not re-applied by the schedule clock (compute.ts already
   );
 });
 
+test('INVARIANT: the plan carries the whole job — jobManHours is compute()\'s own manHoursTotal', () => {
+  // The per-stage figures stay per position (that is what a crew digging one hole reads off a job
+  // sheet), so the count has to travel with the plan or the clock silently answers for one hole.
+  for (const over of SPREAD) {
+    for (const count of [1, 2, 37, 999]) {
+      const r = compute(defaultInputs({ ...over, count }));
+      const plan = computeStages(r);
+      assert.equal(plan.positions, r.inputs.count, JSON.stringify(over) + ' count ' + count);
+      assert.equal(plan.jobManHours, r.labor.manHoursTotal, JSON.stringify(over) + ' count ' + count + ': job man-hours');
+      assert.equal(plan.totalManHours, r.labor.manHoursPerPosition, 'and the stage total stays per position');
+    }
+  }
+});
+
+test('the schedule bills every position the operator asked for, not just the first one', () => {
+  // count is an operator control (1–999). N positions built by one team is N times the work, and
+  // the clock said otherwise: a 10-position job came back "3.0 hr, ready, 21 hr to spare" against
+  // a 24 hr stand-to while compute() published 30.3 hr for the very same job.
+  const budget = 24;
+  const one = compute(defaultInputs({ count: 1, teamSize: 4 }));
+  const ten = compute(defaultInputs({ count: 10, teamSize: 4 }));
+  const sOne = scheduleStages(computeStages(one), { teamSize: 4, availableHours: budget, securityPostureFrac: 1 });
+  const sTen = scheduleStages(computeStages(ten), { teamSize: 4, availableHours: budget, securityPostureFrac: 1 });
+
+  assert.equal(sOne.totalElapsedHours, one.labor.elapsedHours, 'one position agrees with compute()');
+  assert.equal(sTen.totalElapsedHours, ten.labor.elapsedHours, 'ten positions agree with compute()');
+  assert.ok(
+    sTen.totalElapsedHours > sOne.totalElapsedHours * 9,
+    'ten positions is ten times the work (' + sTen.totalElapsedHours + ' vs ' + sOne.totalElapsedHours + ')',
+  );
+  assert.equal(sOne.feasible, true, 'one position does make stand-to');
+  assert.equal(sTen.feasible, false, 'ten do not, and must not be certified as if they did');
+  assert.ok(sTen.shortfallHours > 0, 'the crew is told how far short they are');
+  assert.equal(sTen.positions, 10, 'the schedule says how many positions it covers');
+
+  // Every stage of the job is worked once per position too, not once for the whole job.
+  const lastOne = sOne.steps[sOne.steps.length - 1]!.cumulativeHours;
+  const lastTen = sTen.steps[sTen.steps.length - 1]!.cumulativeHours;
+  assert.ok(lastTen > lastOne * 9, 'the stage clock scales with the job (' + lastTen + ' vs ' + lastOne + ')');
+});
+
+test('the stage clock lands on the same figure the schedule is judged on', () => {
+  // The judged total comes from compute()'s published job man-hours; the per-stage clock comes
+  // from the stages. They may differ only by the display rounding step, never by a stage.
+  for (const over of SPREAD) {
+    for (const count of [1, 5, 999]) {
+      for (const posture of [1, 0.5]) {
+        const plan = computeStages(compute(defaultInputs({ ...over, count })));
+        const s = scheduleStages(plan, { teamSize: 4, availableHours: 1e9, securityPostureFrac: posture });
+        const last = s.steps[s.steps.length - 1]!.cumulativeHours;
+        assert.ok(
+          Math.abs(last - s.totalElapsedHours) <= 0.1 + 1e-9,
+          JSON.stringify(over) + ' count ' + count + ': last stage H+' + last + ' against a total of ' + s.totalElapsedHours,
+        );
+      }
+    }
+  }
+});
+
+test('feasibility is judged on the true clock, not on the rounded one', () => {
+  // Rounding before the comparison certified a job that was over budget by up to half a display
+  // step: 12.1 mh with 22 diggers is a true 0.55 hr, which came back "0.5 hr, ready, short 0"
+  // against a 0.5 hr stand-to. The same rounding-in-the-unsafe-direction the cover check had.
+  const plan = computeStages(compute(defaultInputs()));
+  const budget = 0.5;
+  const s = scheduleStages(plan, { teamSize: 22, availableHours: budget, securityPostureFrac: 1 });
+  const trueClock = plan.jobManHours / 22;
+  assert.ok(trueClock > budget, 'fixture check: the true clock (' + trueClock + ') is over the budget');
+  assert.equal(s.feasible, false, 'a job that does not fit is not certified because it rounds down');
+  assert.ok(s.shortfallHours > 0, 'and the shortfall is never rounded away to zero');
+
+  // A job that genuinely fits still fits, exactly at the boundary.
+  const exact = scheduleStages(plan, { teamSize: 22, availableHours: trueClock, securityPostureFrac: 1 });
+  assert.equal(exact.feasible, true, 'a job that fits its budget exactly is feasible');
+  assert.equal(exact.shortfallHours, 0);
+});
+
+test('a scheduling value that was CHANGED to schedule it is reported as changed', () => {
+  // Out of range is not the same as unreadable: nothing failed, the operator\'s own number was
+  // altered. For the posture the alteration runs the fast way — 1.5, 2 and 500 all become 1, the
+  // most hands the range allows — so a caller echoing the box the operator typed in would be
+  // showing a number this clock did not use.
+  const plan = computeStages(compute(defaultInputs()));
+  const opts = { teamSize: 4, availableHours: 24, securityPostureFrac: 1 };
+  const clean = scheduleStages(plan, opts);
+  assert.deepEqual(clean.clampedInputs, { teamSize: false, securityPostureFrac: false, positions: false });
+  assert.equal(clean.teamSize, 4, 'the schedule says which team it was built on');
+  assert.equal(clean.securityPostureFrac, 1, 'and which posture');
+
+  for (const posture of [1.5, 2, 500]) {
+    const s = scheduleStages(plan, { ...opts, securityPostureFrac: posture });
+    assert.equal(s.clampedInputs.securityPostureFrac, true, 'posture ' + posture + ' was changed to schedule it');
+    assert.equal(s.securityPostureFrac, 1, 'and the clock was built on the changed value');
+    assert.equal(s.inputsUsable, true, 'a readable value is still readable');
+  }
+  for (const team of [51, 500, 1e9]) {
+    const s = scheduleStages(plan, { ...opts, teamSize: team });
+    assert.equal(s.clampedInputs.teamSize, true, 'team ' + team + ' was changed to schedule it');
+    assert.equal(s.teamSize, 50);
+  }
+  // Fractions are rounded, not clamped — compute()'s own convention, so a 4.4-man team is not
+  // reported as an out-of-range number.
+  assert.equal(scheduleStages(plan, { ...opts, teamSize: 4.4 }).clampedInputs.teamSize, false);
+  // And a job size out of range is reported the same way.
+  const huge = scheduleStages({ ...plan, positions: 5000 }, opts);
+  assert.equal(huge.clampedInputs.positions, true, 'a job of 5000 positions was cut to the range');
+  assert.equal(huge.positions, 999);
+});
+
 test('security posture: fewer diggers on the tools (more on watch) lengthens the build', () => {
   const plan = computeStages(compute(defaultInputs()));
   const allDigging = scheduleStages(plan, { teamSize: 4, availableHours: 24, securityPostureFrac: 1 });

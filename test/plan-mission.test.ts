@@ -2,7 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { planForTime } from '../src/engine/plan';
 import { aggregateMission } from '../src/engine/mission';
+import { compute } from '../src/engine/compute';
 import { revetments } from '../src/doctrine/materials';
+import { threats } from '../src/doctrine/protection';
+import { soils } from '../src/doctrine/soils';
 import { defaultInputs } from './helpers';
 
 test('planForTime: generous budget yields feasible options ranked by protection then buildability', () => {
@@ -90,6 +93,44 @@ test('planForTime: the sweep proposes every revetment the operator can actually 
   for (const key of Object.keys(revetments)) assert.ok(swept.has(key), 'revetment never proposed by the planner: ' + key);
 });
 
+test('planForTime: the face-building revetments tie on every ranked axis, so the recommendation follows the doctrine table order and is pinned there', () => {
+  // Every revetment that builds a face charges the same labor and scores the same +1, so they tie
+  // on validity, protection AND man-hours: the LAST tie-break alone decides which one an operator
+  // is shown at #0. That made the top recommendation alphabetical, and widening the sweep from a
+  // hand-written list to the doctrine table silently moved it (pickets_wire → corrugated_metal)
+  // for every threat and soil with no test to notice. Order by the table the revetment select is
+  // built from instead, and pin the result.
+  const faces = Object.keys(revetments).filter((k) => revetments[k]!.buildsFace);
+  assert.ok(faces.length > 1, 'more than one revetment builds a face — the tie is real');
+
+  const r = planForTime({ availableHours: 500, teamSize: 4, base: defaultInputs() });
+  const top = r.feasible[0]!;
+  const tied = r.feasible.filter(
+    (o) => o.standard === top.standard && o.overheadCover === top.overheadCover && faces.includes(o.revetment),
+  );
+  assert.equal(tied.length, faces.length, 'every face-building revetment is offered at the top tier');
+  for (const o of tied) {
+    assert.equal(o.hasErrors, top.hasErrors, o.revetment + ' ties on validity');
+    assert.equal(o.protectionScore, top.protectionScore, o.revetment + ' ties on protection');
+    assert.equal(o.manHoursTotal, top.manHoursTotal, o.revetment + ' ties on man-hours');
+  }
+  assert.deepEqual(
+    tied.map((o) => o.revetment),
+    faces,
+    'tied revetments are ranked in the doctrine table\'s own order, which is the order the operator is offered them in',
+  );
+
+  // Pinned: the same #0 facing for every threat and every soil. If the doctrine table is reordered
+  // this fails loudly instead of moving the recommendation behind the operator's back.
+  for (const threat of Object.keys(threats)) {
+    for (const soil of Object.keys(soils)) {
+      const p = planForTime({ availableHours: 500, teamSize: 4, base: defaultInputs({ threat, soil }) });
+      assert.equal(p.feasible[0]!.revetment, faces[0], 'top recommendation for ' + threat + ' / ' + soil);
+      assert.equal(p.feasible[0]!.standard, 'reinforced', 'top recommendation for ' + threat + ' / ' + soil);
+    }
+  }
+});
+
 test('planForTime: impossible budget → no feasible options but a best-effort fallback', () => {
   const r = planForTime({ availableHours: 0.001, teamSize: 1, base: defaultInputs() });
   assert.equal(r.feasible.length, 0);
@@ -119,6 +160,55 @@ test('aggregateMission: on-hand produces a shortfall', () => {
   assert.equal(line.onHand, 5);
   assert.equal(line.shortfall, Math.max(0, line.qtyTotal - 5));
   assert.ok(line.shortfall! >= 0);
+});
+
+test('aggregateMission: a mixed job is not rolled up on the biggest crew in it', () => {
+  // Dividing every item's man-hours by the LARGEST team among them made a mixed job read better
+  // than the app's own per-position screens: positions planned for teams of 4 and 10 rolled up to
+  // 6.1 hr against the 9.1 + 2.4 = 11.5 hr those two positions publish individually.
+  const small = defaultInputs({ positionType: 'two_man', count: 3, teamSize: 4 });
+  const large = defaultInputs({ positionType: 'mg_crew', count: 2, teamSize: 10 });
+  const m = aggregateMission([{ inputs: small }, { inputs: large }]);
+  const rs = compute(small);
+  const rl = compute(large);
+
+  assert.equal(m.teamSize, 4, 'the rollup assumes the smallest crew any item was planned for');
+  assert.equal(m.manning, 'smallest-item-team', 'and says so');
+  assert.ok(
+    m.elapsedHours >= rs.labor.elapsedHours + rl.labor.elapsedHours,
+    'the rollup (' + m.elapsedHours + ' hr) may not beat the per-position screens it is made of (' +
+      rs.labor.elapsedHours + ' + ' + rl.labor.elapsedHours + ' hr)',
+  );
+
+  // An explicit mission team still governs — that is the caller stating who works the job.
+  const explicit = aggregateMission([{ inputs: small }, { inputs: large }], { teamSize: 10 });
+  assert.equal(explicit.teamSize, 10);
+  assert.equal(explicit.manning, 'mission-team');
+  assert.equal(explicit.totalManHours, m.totalManHours, 'the work is the same either way');
+
+  // The general property, on exact arithmetic so display rounding cannot mask it: whatever teams
+  // the items name, the rollup clock is never shorter than working the items on their own teams.
+  for (const a of [1, 4, 10, 50]) {
+    for (const b of [1, 4, 10, 50]) {
+      const ia = defaultInputs({ positionType: 'two_man', count: 3, teamSize: a });
+      const ib = defaultInputs({ positionType: 'mg_crew', count: 2, teamSize: b });
+      const roll = aggregateMission([{ inputs: ia }, { inputs: ib }]);
+      const ca = compute(ia);
+      const cb = compute(ib);
+      const work = ca.labor.manHoursTotal + cb.labor.manHoursTotal;
+      const perItem = ca.labor.manHoursTotal / a + cb.labor.manHoursTotal / b;
+      assert.equal(roll.teamSize, Math.min(a, b), 'teams ' + a + '/' + b);
+      assert.ok(work / roll.teamSize >= perItem - 1e-9, 'teams ' + a + '/' + b + ': rollup clock beats the items');
+    }
+  }
+});
+
+test('aggregateMission: an empty job is a team of one, not a division by nothing', () => {
+  const m = aggregateMission([]);
+  assert.equal(m.teamSize, 1);
+  assert.equal(m.totalPositions, 0);
+  assert.equal(m.totalManHours, 0);
+  assert.equal(m.elapsedHours, 0);
 });
 
 test('aggregateMission: lines are sorted by sortKey', () => {

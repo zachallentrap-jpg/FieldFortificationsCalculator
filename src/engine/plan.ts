@@ -63,7 +63,20 @@ function tieKey(o: PlanOption): string {
   // charged) — and ranking the request ahead of its honest twin put "overhead cover: yes" at the
   // top of the plan for every threat that forces an engineered roof.
   const cover = o.deliversCover ? '0' : o.overheadCover ? '2' : '1';
-  return String(4 - STANDARD_RANK[o.standard]) + cover + o.revetment;
+  return String(4 - STANDARD_RANK[o.standard]) + cover;
+}
+
+// Every revetment that builds a face charges the same labor adder and scores the same +1, so the
+// four of them tie on validity, protection AND man-hours — the last tie-break alone decides which
+// one the operator is shown at #0. Comparing the raw id made that decision alphabetical, which is
+// not a reason to recommend anything (and it moved silently, from pickets_wire to
+// corrugated_metal, the moment the sweep was widened from a hand-written list to the doctrine
+// table). Rank by the doctrine table's own order instead: the plan then leads with the same
+// facing the revetment select offers first, and a rename cannot reshuffle the recommendation.
+// A test pins the resulting #0 so a doctrine REORDER cannot move it unnoticed either.
+function revetRank(id: string): number {
+  const i = REVETS.indexOf(id);
+  return i < 0 ? REVETS.length : i;
 }
 
 export function planForTime(req: PlanRequest): PlanResult {
@@ -114,7 +127,8 @@ export function planForTime(req: PlanRequest): PlanResult {
     Number(a.hasErrors) - Number(b.hasErrors) ||
     b.protectionScore - a.protectionScore ||
     a.manHoursTotal - b.manHoursTotal ||
-    (tieKey(a) < tieKey(b) ? -1 : tieKey(a) > tieKey(b) ? 1 : 0);
+    (tieKey(a) < tieKey(b) ? -1 : tieKey(a) > tieKey(b) ? 1 : 0) ||
+    revetRank(a.revetment) - revetRank(b.revetment);
 
   const feasible = options.filter((o) => o.feasible).sort(rank);
   const infeasible = options.filter((o) => !o.feasible).sort(rank);
