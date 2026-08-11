@@ -6,7 +6,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import '../src/doctrine/index';
 import { exportDoctrine, importDoctrine, getFillState, resetFillState } from '../src/doctrine/io';
-import { counts, all } from '../src/doctrine/registry';
+import { counts, all, getByPath } from '../src/doctrine/registry';
+import { spanSizes, stringerSizeForSpan } from '../src/doctrine/protection';
 import { compute } from '../src/engine/compute';
 import type { GeometryModel } from '../src/engine/geometry';
 import { MemoryAdapter } from '../src/state/persistence';
@@ -166,6 +167,66 @@ test('the "setback" dimension stays flagged when depthOfCut — not standoff —
   const setback = geo.dims.find((d) => d.key === 'setback');
   assert.ok(setback, 'setback dim present');
   assert.equal(setback!.placeholder, true, 'must still be flagged — depthOfCut (the binding term here) is still a placeholder');
+  restore();
+});
+
+// ── Whole-table invariants: what a per-entry check cannot see ────────────────────
+
+const fixture = (entries: { path: string; value: number }[]): unknown => ({
+  ...exportDoctrine(),
+  entries: entries.map((e) => ({ ...e, status: 'DOCTRINE', source: 'FM 5-103 (test fixture)' })),
+});
+
+test('a fill that scrambles the stringer span table is refused WHOLE', () => {
+  // stringerSizeForSpan is first-fit: with the limits descending, the widest opening matches the
+  // FIRST row and gets billed the SMALLEST timber. Every value here passes the per-entry checks
+  // (right type, in range), so only a whole-table check catches it.
+  const paths = spanSizes.map((_, i) => 'protection.spanSizes[' + i + '].maxSpan');
+  const before = paths.map((p) => getByPath(p)!.value as number);
+  const widest = before[before.length - 1]!;
+
+  const rep = importDoctrine(fixture(paths.map((path, i) => ({ path, value: before[before.length - 1 - i]! }))));
+
+  assert.ok(!rep.ok, 'descending span limits are refused');
+  assert.equal(rep.applied, 0);
+  assert.ok(rep.rejected.some((r) => /ascend/.test(r.reason)), 'says which invariant broke');
+  assert.deepEqual(paths.map((p) => getByPath(p)!.value), before, 'registry unchanged — all or nothing');
+  // The behaviour that was at stake: the widest tabulated span still resolves to the LARGEST
+  // stringer, not the first row it happens to fit under.
+  assert.equal(stringerSizeForSpan(widest), spanSizes[spanSizes.length - 1]!.sizeLabel);
+});
+
+test('a fill whose excavation stage shares do not sum to 1 is refused WHOLE', () => {
+  const paths = ['security', 'hasty', 'deliberate', 'parapet'].map((k) => 'stages.excavationSplit.' + k);
+  const before = paths.map((p) => getByPath(p)!.value as number);
+  const target = 'stages.excavationSplit.hasty';
+
+  const rep = importDoctrine(fixture([{ path: target, value: (getByPath(target)!.value as number) + 0.2 }]));
+
+  assert.ok(!rep.ok, 'a partition that does not sum to 1 is refused');
+  assert.equal(rep.applied, 0);
+  assert.ok(rep.rejected.some((r) => /sum to 1/.test(r.reason)), 'says which invariant broke');
+  assert.deepEqual(paths.map((p) => getByPath(p)!.value), before, 'registry unchanged — all or nothing');
+  const sum = paths.reduce((acc, p) => acc + (getByPath(p)!.value as number), 0);
+  assert.ok(Math.abs(sum - 1) < 1e-9, 'the stage partition still divides exactly one total');
+});
+
+test('a non-monotone shielding fill is APPLIED but reported', () => {
+  // Plausibility, not correctness: the engine stays correct either way and a real table may
+  // legitimately step sideways, so this is surfaced for the filler to judge — never a refusal.
+  assert.deepEqual(importDoctrine(fullFill(), { dryRun: true }).warnings, [], 'the shipped table is not flagged');
+
+  const path = 'protection.shielding.ind-mtr-120.soil';
+  const smaller = 'protection.shielding.ind-mtr-81.soil';
+  const thin = (getByPath(smaller)!.value as number) / 2;
+
+  const rep = importDoctrine(fixture([{ path, value: thin }]));
+
+  assert.ok(rep.ok, 'an odd fill still applies — the importer refuses what breaks the engine, not what surprises it');
+  assert.equal(rep.applied, 1);
+  assert.equal(getByPath(path)!.value, thin, 'the value really landed');
+  assert.ok(rep.warnings.some((w) => w.path === path), 'the bigger round needing less cover is reported');
+  assert.ok((getByPath(smaller)!.value as number) > (getByPath(path)!.value as number), '…and it genuinely is backwards');
   restore();
 });
 

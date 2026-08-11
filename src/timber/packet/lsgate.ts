@@ -62,6 +62,9 @@ export const LS_CONSUMERS: Readonly<Record<string, LsConsumer>> = {
   'SPAN.ceilingJoist': { roles: ['joist'] , label: 'Ceiling-joist span limit' },
   'SPAN.rafter': { roles: ['rafter', 'jackRafter', 'hipRafter'] , label: 'Rafter span limit' },
   'SPAN.header': { roles: ['header'] , label: 'Header span limit' },
+  // How much of a rafter its bird's mouth may take. It governs wherever a rafter is seated on a
+  // plate, which is every rafter role the toolkit cuts a seat into.
+  'NOTCH.rafterSeatMaxDepthFrac': { roles: ['rafter', 'jackRafter', 'hipRafter'] , label: 'Bird’s-mouth seat depth limit' },
 
   // Fall protection. Every one of these is a height or a spacing somebody trusts with a fall.
   'RAIL.topHeightIn': { roles: ['railTop'] , label: 'Top rail height' },

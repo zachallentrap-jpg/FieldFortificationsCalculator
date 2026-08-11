@@ -59,8 +59,8 @@
     {
       "name": "spacing-24",
       "note": "24 in OC studs/joists/rafters — the other legal spacing on every grid.",
-      "members": 241,
-      "sha256": "239280ca3e1d2a028f9839cde6599e37579d0999e25a64dabb5c18c4ab877127"
+      "members": 242,
+      "sha256": "ead564dba3b4de14048ff9c708b140afee1793d8d46263b1c006648949040a3e"
     },
     {
       "name": "steep-12-12",

@@ -15,10 +15,12 @@ import {
   allDoctrineEntries, lifeSafetyRegister, citeOf,
 } from '../src/timber/doctrine';
 import { FULL_FIXTURES, MATRIX_FIXTURES } from './fixtures/frameFixtures';
-import { DRESSED } from '../src/timber/types';
+import { DRESSED, type Member } from '../src/timber/types';
 import { BF_PER_LF, classifyNominal, bomSummary } from '../src/timber/bom';
 import { generateFrame, specFromBuildingInput, type BuildingInput } from '../src/timber/frame';
 import { generateStructure } from '../src/timber/families/index';
+import { FAMILY_TABLE } from '../src/timber/catalog';
+import type { RoofSpec, StructureSpec } from '../src/timber/spec';
 
 test('every doctrine constant carries a citation, and unverified ones are visibly (PH)', () => {
   const entries = allDoctrineEntries();
@@ -185,35 +187,107 @@ test('SIDING/ROOFING/FOUNDATION tables are populated (the coverings phase reads 
 // The mirror the NAILING table exists to be. Both directions matter: an unmirrored schedule is
 // a value with no cited home (the thing the requirement is about), and a dead mirror is a
 // citation for something no crew is ever told to do, which is worse than none.
+//
+// IT HAS TO WALK WHAT SHIPS. This walked `generateFrame` alone — the frozen compat path, which
+// the app reaches only through this suite — and reported the guarantee as though it covered the
+// tool. The app generates through `generateStructure` over the family table, and against that
+// the register was short 59 schedules on ~1,800 member instances: every shutter, door, screen
+// band, tower bolt, crib spike and roll of roofing in the catalog. A test scoped to the wrong
+// generator is worse than no test, because the gap it leaves reads as a guarantee.
+//
+// The corpus below is the CARD PLUS ITS PANEL: each family's preset, then the same preset at
+// every roof kind and every covering option that family's own panel offers, because those are
+// buildings a user can produce by clicking. The legacy fixtures stay in the walk — the frozen
+// branch is still shipped code and its schedules still need homes.
 
-/** Every distinct `nailing` string the frozen generators emit, mapped to the roles carrying it. */
-function emittedNailing(): Map<string, Set<string>> {
-  const out = new Map<string, Set<string>>();
-  for (const fx of [...FULL_FIXTURES, ...MATRIX_FIXTURES]) {
-    for (const m of generateFrame(fx.input).members) {
-      const n = (m as { nailing?: string }).nailing;
-      if (!n) continue;
-      if (!out.has(n)) out.set(n, new Set());
-      out.get(n)!.add(m.role);
+/** Every spec the shipped app can generate from a catalog card by using that card's own panel. */
+function shippedSpecs(): { id: string; spec: StructureSpec }[] {
+  const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+  const out: { id: string; spec: StructureSpec }[] = [];
+  for (const fam of FAMILY_TABLE) {
+    out.push({ id: fam.id, spec: clone(fam.preset) });
+    for (const kind of fam.roofs) {
+      const s = clone(fam.preset) as StructureSpec & { roof?: RoofSpec };
+      if (!s.roof || s.roof.kind === kind) continue;
+      s.roof =
+        kind === 'shed' ? { kind, risePer12: 3, overhangFt: 1, highSide: 'N' }
+        : kind === 'flat' ? { kind, overhangFt: 1 }
+        : kind === 'none' ? { kind }
+        : { kind, risePer12: 4, overhangFt: 1 };
+      out.push({ id: `${fam.id} roof=${kind}`, spec: s });
+    }
+    for (const [key, options] of Object.entries(fam.coverings)) {
+      for (const option of options as string[]) {
+        const s = clone(fam.preset) as StructureSpec & { coverings?: Record<string, string> };
+        if (!s.coverings) continue;
+        s.coverings[key] = option;
+        out.push({ id: `${fam.id} ${key}=${option}`, spec: s });
+      }
     }
   }
   return out;
 }
 
-test('doctrine mirrors every nailing schedule the FROZEN generators emit', () => {
+/** Every distinct `nailing` string the toolkit emits, mapped to the roles and the build carrying it. */
+function emittedNailing(): Map<string, { roles: Set<string>; where: string }> {
+  const out = new Map<string, { roles: Set<string>; where: string }>();
+  const record = (members: readonly Member[], where: string): void => {
+    for (const m of members) {
+      const n = (m as { nailing?: string }).nailing;
+      if (!n) continue;
+      if (!out.has(n)) out.set(n, { roles: new Set(), where });
+      out.get(n)!.roles.add(m.role);
+    }
+  };
+  for (const fx of [...FULL_FIXTURES, ...MATRIX_FIXTURES]) record(generateFrame(fx.input).members, `legacy ${fx.name}`);
+  for (const { id, spec } of shippedSpecs()) record(generateStructure(spec).members, id);
+  return out;
+}
+
+test('doctrine mirrors every nailing schedule the SHIPPED generators emit', () => {
   const emitted = emittedNailing();
-  assert.ok(emitted.size > 20, `expected the real schedule set, got ${emitted.size}`);
+  // The corpus is the guarantee's reach, so it is asserted rather than assumed: a refactor that
+  // quietly narrowed the walk back to one generator would otherwise leave this test green.
+  assert.ok(emitted.size > 70, `expected the real schedule set across both paths, got ${emitted.size}`);
 
   const mirrored = new Map(Object.entries(NAILING).map(([k, d]) => [d.value as string, k]));
-  for (const [spec, roles] of emitted) {
-    assert.ok(
-      mirrored.has(spec),
-      `emitted nailing has no cited home in NAILING: ${JSON.stringify(spec)} (roles: ${[...roles].sort().join(', ')})`,
-    );
-  }
+  const homeless = [...emitted.entries()]
+    .filter(([spec]) => !mirrored.has(spec))
+    .map(([spec, { roles, where }]) => `${JSON.stringify(spec)} (roles: ${[...roles].sort().join(', ')}; e.g. ${where})`);
+  assert.deepEqual(homeless, [], `emitted nailing schedules with no cited home in NAILING:\n  ${homeless.join('\n  ')}`);
+
   for (const [key, d] of Object.entries(NAILING)) {
     assert.ok(emitted.has(d.value as string), `NAILING.${key} mirrors nothing any generator emits`);
   }
+});
+
+test('the family path really is walked — the frozen fixtures alone cannot carry this test', () => {
+  // The guarantee above is only worth what its corpus reaches. If the family walk were dropped,
+  // `emitted.size` would fall back to the frozen branch's couple of dozen; this names the
+  // schedules that exist ONLY on the shipped side, so the loss is a failure and not a shrug.
+  const legacy = new Set<string>();
+  for (const fx of [...FULL_FIXTURES, ...MATRIX_FIXTURES]) {
+    for (const m of generateFrame(fx.input).members) if (m.nailing) legacy.add(m.nailing);
+  }
+  const all = emittedNailing();
+  const familyOnly = [...all.keys()].filter((s) => !legacy.has(s));
+  assert.ok(familyOnly.length > 40, `only ${familyOnly.length} schedules come from the family path`);
+});
+
+test('no two schedules are the same joint written two ways', () => {
+  // WHAT THE GAP WAS MADE OF. A third of the missing schedules were not missing at all: the
+  // frozen branch says "3-16d toenail ea bearing" and the sibling floor said "3-16d toenail each
+  // bearing" — one joint, two strings, and the second had no cited home purely because of the
+  // word. Collapsed at the source (the generators read the value from NAILING), and pinned here
+  // so the next retyped string is a red test rather than a silent second entry.
+  const flatten = (s: string): string => s.toLowerCase().replace(/\beach\b/g, 'ea').replace(/\s+/g, ' ').trim();
+  const byJoint = new Map<string, string[]>();
+  for (const [key, d] of Object.entries(NAILING)) {
+    const k = flatten(d.value as string);
+    byJoint.set(k, [...(byJoint.get(k) ?? []), key]);
+  }
+  const twins = [...byJoint.entries()].filter(([, keys]) => keys.length > 1).map(([k, keys]) => `${keys.join(' / ')}: ${k}`);
+  assert.deepEqual(twins, [], `one joint, two entries:\n  ${twins.join('\n  ')}`);
 });
 
 test('the (PH) a crew reads and the ph the register reports cannot disagree', () => {

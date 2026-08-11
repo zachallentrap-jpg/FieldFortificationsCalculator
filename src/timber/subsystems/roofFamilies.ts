@@ -23,7 +23,7 @@ import type { Member, WallId } from '../types';
 import { DRESSED } from '../types';
 import type { BuildingSpec, RoofSpec } from '../spec';
 import { makeEmitter } from '../emit';
-import { LUMBER, LAYOUT, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
+import { LUMBER, LAYOUT, NAILING, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
 import { surfaceYaw, type WallsContract } from './wallSystem';
 import { rafterSeatLiftFt } from '../birdsMouth';
 
@@ -487,7 +487,7 @@ export function generateShed(input: ShedInput): Member[] {
         rotation: [0, surfaceYaw(highSurface) + Math.PI / 2, Math.PI / 2],
         stage: stageRoofFrame,
         wall: highSide,
-        nailing: 'toenail 2-8d each end (PH)',
+        nailing: NAILING.rakeInfillStud.value,
         doctrineRef: `${citeOf(LUMBER.studNominal)} — shed pony wall carrying the high plate`,
       });
     }
@@ -530,7 +530,7 @@ export function generateShed(input: ShedInput): Member[] {
         rotation: [0, 0, Math.PI / 2],
         stage: stageRoofFrame,
         wall,
-        nailing: 'toenail 2-8d each end (PH)',
+        nailing: NAILING.rakeInfillStud.value,
         doctrineRef: `${citeOf(LUMBER.studNominal)} — rake infill under the shed slope`,
       });
     }

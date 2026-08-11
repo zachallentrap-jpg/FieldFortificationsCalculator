@@ -5,10 +5,20 @@
 // applied. A dry run validates without mutating so the UI can preview. Every applied fill
 // carries a manifest (content hash + optional author/date) so a DOCTRINE stamp is attributable
 // evidence, printed on the job sheet. Never trusts a file blindly.
+//
+// Validation is per-entry AND whole-table: a couple of tables are read by their ORDER or their
+// SUM rather than value by value, so those invariants are checked against the table as it would
+// stand after the file lands — before anything commits, so a violation still refuses the whole
+// file. Fills that are merely doctrinally odd (a bigger round wanting less cover) are reported
+// as warnings and applied; the importer refuses what would break the engine, not what disagrees
+// with expectation.
 
 import { DOCTRINE_VERSION } from '../version';
 import { all, getByPath, counts } from './registry';
+import { shielding, shieldMaterials, spanSizes, threats } from './protection';
+import { excavationSplit } from './stages';
 import type { Counts } from './registry';
+import type { Provenance } from './types';
 
 export interface DoctrineEntryDTO {
   path: string;
@@ -33,11 +43,17 @@ export interface DoctrineExport {
   entries: DoctrineEntryDTO[];
 }
 
+export interface DoctrineFinding {
+  path: string;
+  reason: string;
+}
+
 export interface DoctrineImportReport {
   ok: boolean;
   applied: number; // entries that were (or in a dry run, would be) applied
   dryRun: boolean;
-  rejected: { path: string; reason: string }[];
+  rejected: DoctrineFinding[];
+  warnings: DoctrineFinding[]; // applied, but the filler should look at them (see plausibility below)
   message?: string;
   manifest?: DoctrineManifest; // echoed from the file (with a freshly computed contentHash)
   counts: Counts;
@@ -111,6 +127,7 @@ const fail = (message: string): DoctrineImportReport => ({
   applied: 0,
   dryRun: false,
   rejected: [],
+  warnings: [],
   message,
   counts: counts(),
 });
@@ -144,6 +161,110 @@ function previewCounts(staged: Staged[]): Counts {
   return { total: all().length, doctrine, placeholder, safetyCritical, safetyCriticalRemaining };
 }
 
+// Sum tolerance for the stage partition — float noise on four decimals is ~1e-16, so this is
+// several orders of magnitude of headroom and still far tighter than any share a filler could
+// mistype.
+const SUM_TOLERANCE = 1e-9;
+
+// A view of the doctrine as it WOULD stand after this file lands: the staged value where the
+// file supplies one, the live value everywhere else. The whole-table checks below have to run
+// against that view — a file that scrambles one row is only detectable against the rows it
+// does not touch — and they run BEFORE anything is mutated, so a violation can still refuse
+// the whole file.
+interface Prospective {
+  valueOf: (leaf: Provenance<number>) => number;
+  pathOf: (leaf: Provenance<number>) => string;
+}
+
+function prospective(staged: Staged[]): Prospective {
+  const byLeaf = new Map<Provenance<unknown>, unknown>();
+  for (const s of staged) {
+    const leaf = getByPath(s.path);
+    if (leaf) byLeaf.set(leaf, s.value);
+  }
+  const paths = new Map<Provenance<unknown>, string>();
+  for (const e of all()) {
+    const leaf = getByPath(e.path);
+    if (leaf) paths.set(leaf, e.path);
+  }
+  return {
+    valueOf: (leaf) => {
+      const v = byLeaf.get(leaf as Provenance<unknown>);
+      return typeof v === 'number' ? v : leaf.value;
+    },
+    pathOf: (leaf) => paths.get(leaf as Provenance<unknown>) ?? '(unregistered leaf)',
+  };
+}
+
+// ENGINE-CORRECTNESS invariants — not doctrinal judgments. Two tables are read by their ORDER
+// or their SUM, not just by their values, and a fill that breaks either passes every per-entry
+// check while silently corrupting the answer:
+//   · stringerSizeForSpan is a FIRST-FIT walk over spanSizes. With the limits out of order, a
+//     row that covers a short span sits behind a longer one and is never reached — an 8-ft
+//     opening gets billed a 4×4. That is an undersized member on the safety-critical span path.
+//   · the stage clock PARTITIONS one man-hour total by excavationSplit. Anything but 1.0
+//     invents or loses labor in the per-stage breakdown with no other symptom.
+// Both refuse the whole file, like every other rejection here.
+function invariantViolations(p: Prospective): DoctrineFinding[] {
+  const out: DoctrineFinding[] = [];
+
+  for (let i = 1; i < spanSizes.length; i++) {
+    const prev = spanSizes[i - 1]!.maxSpan;
+    const cur = spanSizes[i]!.maxSpan;
+    if (p.valueOf(cur) <= p.valueOf(prev)) {
+      out.push({
+        path: p.pathOf(cur),
+        reason: 'stringer span limits must ascend (' + p.valueOf(prev) + ' ft then ' + p.valueOf(cur) + ' ft) — the size lookup is first-fit',
+      });
+    }
+  }
+
+  const sum = Object.values(excavationSplit).reduce((acc, share) => acc + p.valueOf(share), 0);
+  if (Math.abs(sum - 1) > SUM_TOLERANCE) {
+    out.push({
+      path: 'stages.excavationSplit',
+      reason: 'excavation stage shares must sum to 1 (they sum to ' + sum + ') — the stage clock partitions one total',
+    });
+  }
+
+  return out;
+}
+
+// PLAUSIBILITY, not correctness — reported, never enforced. A bigger round needing LESS cover
+// than a smaller one of the same kind is almost always a transposed fill, but the engine stays
+// correct either way and a real table may legitimately step sideways between threat classes,
+// so this must not block the import. Compared only within a class, in catalog severity order,
+// and only across threats that actually yield a thickness (engineered munitions never do).
+function plausibilityWarnings(p: Prospective): DoctrineFinding[] {
+  const byClass = new Map<string, string[]>();
+  for (const [id, t] of Object.entries(threats)) {
+    if (t.roof !== 'earth_on_stringers') continue;
+    const ids = byClass.get(t.class) ?? [];
+    ids.push(id);
+    byClass.set(t.class, ids);
+  }
+
+  const out: DoctrineFinding[] = [];
+  for (const ids of byClass.values()) {
+    for (const mat of shieldMaterials) {
+      for (let i = 1; i < ids.length; i++) {
+        const prev = shielding[ids[i - 1]!]?.[mat];
+        const cur = shielding[ids[i]!]?.[mat];
+        if (!prev || !cur) continue;
+        if (p.valueOf(cur) < p.valueOf(prev)) {
+          out.push({
+            path: p.pathOf(cur),
+            reason:
+              threats[ids[i]!]!.label + ' needs less ' + mat + ' cover (' + p.valueOf(cur) + ' ft) than ' +
+              threats[ids[i - 1]!]!.label + ' (' + p.valueOf(prev) + ' ft) — applied; confirm this is what the pub says',
+          });
+        }
+      }
+    }
+  }
+  return out;
+}
+
 export function importDoctrine(raw: unknown, opts?: { maxEntries?: number; dryRun?: boolean }): DoctrineImportReport {
   const dryRun = opts?.dryRun === true;
   if (typeof raw !== 'object' || raw === null) return fail('Not a doctrine object.');
@@ -162,7 +283,7 @@ export function importDoctrine(raw: unknown, opts?: { maxEntries?: number; dryRu
   const max = opts?.maxEntries ?? 5000;
   if (entries.length > max) return fail('Too many entries (' + entries.length + ' > ' + max + ').');
 
-  const rejected: { path: string; reason: string }[] = [];
+  const rejected: DoctrineFinding[] = [];
   const staged: Staged[] = [];
 
   for (const item of entries) {
@@ -206,11 +327,18 @@ export function importDoctrine(raw: unknown, opts?: { maxEntries?: number; dryRu
     staged.push({ path, value, status, source, note });
   }
 
+  // Whole-table checks: everything above validates one entry at a time and cannot see an order
+  // or a sum. Run against the prospective table, still before any mutation.
+  const view = prospective(staged);
+  rejected.push(...invariantViolations(view));
+
   // All-or-nothing: any rejection refuses the ENTIRE file (safety-critical data must never
   // land half-applied). Nothing has been mutated yet.
   if (rejected.length > 0) {
-    return { ok: false, applied: 0, dryRun, rejected, message: 'Rejected — ' + rejected.length + ' entr(y/ies) failed validation; nothing was applied.', counts: counts() };
+    return { ok: false, applied: 0, dryRun, rejected, warnings: [], message: 'Rejected — ' + rejected.length + ' entr(y/ies) failed validation; nothing was applied.', counts: counts() };
   }
+
+  const warnings = plausibilityWarnings(view);
 
   const manifest: DoctrineManifest = { contentHash: contentHash(entries as DoctrineEntryDTO[]) };
   const rawManifest = obj['manifest'];
@@ -221,7 +349,7 @@ export function importDoctrine(raw: unknown, opts?: { maxEntries?: number; dryRu
   }
 
   if (dryRun) {
-    return { ok: true, applied: staged.length, dryRun: true, rejected: [], manifest, counts: previewCounts(staged) };
+    return { ok: true, applied: staged.length, dryRun: true, rejected: [], warnings, manifest, counts: previewCounts(staged) };
   }
 
   // Commit: mutate live leaves in place (value/status/source/note only — unit and
@@ -235,5 +363,5 @@ export function importDoctrine(raw: unknown, opts?: { maxEntries?: number; dryRu
   }
   appliedFill = manifest;
 
-  return { ok: true, applied: staged.length, dryRun: false, rejected: [], manifest, counts: counts() };
+  return { ok: true, applied: staged.length, dryRun: false, rejected: [], warnings, manifest, counts: counts() };
 }

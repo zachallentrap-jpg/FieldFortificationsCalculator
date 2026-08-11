@@ -15,7 +15,7 @@ import type { Member } from '../types';
 import { DRESSED } from '../types';
 import type { BuildingSpec, PartitionSpec } from '../spec';
 import { makeEmitter } from '../emit';
-import { LUMBER, OPENING, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
+import { LUMBER, NAILING, OPENING, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
 import { headerForSpan } from '../normalize';
 import { layoutCenters } from '../floor';
 
@@ -114,7 +114,7 @@ export function generatePartitions(input: PartitionInput): Member[] {
         position: [c[0], studBottom + studLen / 2, c[1]],
         rotation: upright,
         stage,
-        nailing: 'toenail 3-8d each plate (PH)',
+        nailing: NAILING.toenailedAtPlate.value,
         doctrineRef: citeOf(LUMBER.studNominal),
       });
     }
@@ -148,7 +148,7 @@ export function generatePartitions(input: PartitionInput): Member[] {
         position: [j[0], studBottom + doorH / 2, j[1]],
         rotation: upright,
         stage,
-        nailing: '16d @ 12" to the king (PH)',
+        nailing: NAILING.jackToKingStud.value,
         doctrineRef: `${citeOf(LUMBER.studNominal)} — carries the doorway header`,
       });
     }

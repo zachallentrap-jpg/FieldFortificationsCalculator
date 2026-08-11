@@ -29,6 +29,7 @@
 // and the waste between them is the notch.
 
 import type { Member } from './types';
+import { NOTCH, citeOf } from './doctrine';
 
 const IN_PER_FT = 12;
 
@@ -208,6 +209,75 @@ export function seatProfile(m: Member, seat: SeatCut | readonly SeatCut[]): [num
  * ALL of them, not the deepest. A shed rafter runs from the low wall up to the pony wall and
  * bears on a plate at each end; keeping only one left it running through the other.
  */
+export interface SeatDepthWarning {
+  memberId: string;
+  role: Member['role'];
+  nominal: string;
+  depthIn: number;
+  faceIn: number;
+  frac: number;
+  allowedFrac: number;
+  message: string;
+  cite: string;
+}
+
+/**
+ * Every rafter whose bird's mouth cuts deeper than a bearing notch may (`NOTCH`).
+ *
+ * THE MODULE ARGUED THE RULE AND NEVER ENFORCED IT. `heightAbovePlateFt` above justifies the
+ * whole HAP datum by "the third of the depth a bending member can lose at its bearing", and the
+ * only implemented guard — in `seatCutFor` — rejects a notch through the entire board. Between a
+ * third and the whole thing there was nothing: on a 2x6 rafter over a 2x4 plate, inside the pitch
+ * bound the tool itself allows, the seat takes 35% at 8/12 and 45% at 12/12 with no word said.
+ *
+ * Mandate #2, the same as the span tables: this WARNS. Nothing here resizes a rafter, raises a
+ * plate or flattens a roof — the drawing the crew is holding stays the drawing the tool drew, and
+ * the message says so.
+ */
+export function seatDepthWarnings(members: readonly Member[]): SeatDepthWarning[] {
+  const allowedFrac = NOTCH.rafterSeatMaxDepthFrac.value as number;
+  const cite = citeOf(NOTCH.rafterSeatMaxDepthFrac);
+  const byId = new Map(members.map((m) => [m.id, m]));
+  const out: SeatDepthWarning[] = [];
+  for (const [id, cuts] of seatCutsFor(members)) {
+    const m = byId.get(id);
+    if (!m) continue;
+    const faceIn = m.actual.d;
+    // The DEEPEST seat on the member: a shed rafter has one at each end, and it is the worse of
+    // the two that decides whether enough board is left.
+    const depthIn = Math.max(...cuts.map((c) => c.depthFt * IN_PER_FT));
+    const frac = depthIn / faceIn;
+    if (!(frac > allowedFrac + 1e-9)) continue;
+    out.push({
+      memberId: m.id,
+      role: m.role,
+      nominal: m.nominal,
+      depthIn,
+      faceIn,
+      frac,
+      allowedFrac,
+      message:
+        `${m.nominal} rafter: the bird’s mouth cuts ${(frac * 100).toFixed(0)}% of its ${faceIn} in depth `
+        + `(${depthIn.toFixed(2)} in); a bearing notch may take ${(allowedFrac * 100).toFixed(0)}%. `
+        + 'Flatten the pitch, deepen the rafter, or seat it on a narrower plate — the tool has NOT changed it.',
+      cite,
+    });
+  }
+  return out;
+}
+
+/** One line per distinct problem with a count, for the same reason `spans.ts` does it. */
+export function summarizeSeatDepthWarnings(warnings: readonly SeatDepthWarning[]): string[] {
+  const by = new Map<string, { w: SeatDepthWarning; n: number }>();
+  for (const w of warnings) {
+    const key = `${w.nominal}|${w.frac.toFixed(3)}`;
+    const row = by.get(key);
+    if (row) row.n += 1;
+    else by.set(key, { w, n: 1 });
+  }
+  return [...by.values()].map(({ w, n }) => `${n > 1 ? `${n}× ` : ''}${w.message} (${w.cite})`);
+}
+
 export function seatCutsFor(members: readonly Member[]): Map<string, SeatCut[]> {
   const out = new Map<string, SeatCut[]>();
   const plates = members.filter((m) => m.role === 'capPlate');

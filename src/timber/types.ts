@@ -74,6 +74,16 @@ export interface Member {
 // w = thickness, d = face width. TIMBER-2 §3.6 adds the sizes the new families cut from;
 // every nominal any generator emits must resolve HERE — the `{1.5, 3.5}` fallback in the
 // emitters is unreachable in generated output, and a test asserts it (I-14).
+//
+// TWO DEDUCTIONS, NOT ONE, AND THE SIZE DECIDES WHICH. Softwood dresses by nominal − 1/2 in up
+// to a 6-in face and nominal − 3/4 in at 8 in and over — but that second, larger deduction is a
+// DIMENSION-LUMBER rule. A TIMBER (nominal 5 in and thicker in its least dimension) is surfaced
+// green and dresses by 1/2 in on every face, so an 8-in timber face is 7 1/2 in where an 8-in
+// dimension-lumber face is 7 1/4. The two timber rows here carried the dimension-lumber figure
+// and modelled 1/4 in shallow apiece — on the bunker cribbing, the bunker cap, the overhead
+// stringers and the tower mudsill, which are the LS-tagged members in the table. Board feet are
+// billed off the NOMINAL section (`BF_PER_LF`), so the bill does not move; the wood does.
+// `test/timber2-dressed.test.ts` asserts the rule across every row rather than these two.
 export const DRESSED: Record<string, { w: number; d: number }> = {
   '1x2': { w: 0.75, d: 1.5 },
   '1x3': { w: 0.75, d: 2.5 },
@@ -90,6 +100,6 @@ export const DRESSED: Record<string, { w: number; d: number }> = {
   '4x4': { w: 3.5, d: 3.5 },
   '4x6': { w: 3.5, d: 5.5 },
   '6x6': { w: 5.5, d: 5.5 },
-  '6x8': { w: 5.5, d: 7.25 },
-  '8x8': { w: 7.25, d: 7.25 },
+  '6x8': { w: 5.5, d: 7.5 },
+  '8x8': { w: 7.5, d: 7.5 },
 };

@@ -10,7 +10,8 @@ import { spanWarnings, summarizeSpanWarnings } from '../src/timber/spans';
 import { generateStructure } from '../src/timber/families/index';
 import { familyById, shippedFamilies } from '../src/timber/catalog';
 import { headerForSpan } from '../src/timber/normalize';
-import { LUMBER } from '../src/timber/doctrine';
+import { LUMBER, SPAN } from '../src/timber/doctrine';
+import { DRESSED } from '../src/timber/types';
 
 const preset = (id: string) => JSON.parse(JSON.stringify(familyById(id as never)!.preset));
 
@@ -104,4 +105,65 @@ test('an opening that names its own header keeps it', () => {
   spec.stories[0].openings.S[0].headerNominal = '2x12';
   const model = generateStructure(spec);
   assert.ok(model.members.some((m) => m.role === 'header' && m.nominal === '2x12'));
+});
+
+// ── Header span: the sizer and the checker have to mean the same word ────────
+//
+// A header is CHOSEN by `headerForSpan(openingWidth)` — a clear span between bearings — and then
+// CUT to that width plus a jack stud at each end. The checker read the cut length against the
+// same table, so an opening landing exactly on a table row was condemned by three inches of its
+// own bearing: the tool picked a 2x6 for a 5-ft opening and then reported "2x6 header spans
+// 5.3 ft; the table allows 5 ft ... LIFE-SAFETY, review required" against its own choice. That
+// is the cry-wolf failure the module header says it exists to prevent, aimed at the module.
+
+/** The header warnings a gp-frame with one door of this width produces. */
+function headerWarningsFor(widthFt: number): { warnings: string[]; nominal: string | undefined } {
+  const spec = preset('gp-frame');
+  spec.stories[0].openings.S = [
+    { kind: 'door', offsetFt: 4, widthFt, heightFt: 6, sillHeightFt: 0, fill: 'rough' },
+  ];
+  const model = generateStructure(spec);
+  return {
+    warnings: model.issues.filter((i) => i.kind === 'span' && i.message.includes('header')).map((i) => i.message),
+    nominal: model.members.find((m) => m.role === 'header')?.nominal,
+  };
+}
+
+test('an opening sized exactly to a table row does not condemn the header the tool just chose', () => {
+  // Every row boundary in SPAN.header, which is where the off-by-two-bearings error lands.
+  for (const widthFt of Object.values(SPAN.header.value as Record<string, number>)) {
+    const { warnings, nominal } = headerWarningsFor(widthFt);
+    assert.deepEqual(warnings, [], `a ${widthFt} ft opening got a ${nominal} and was then warned about it`);
+  }
+});
+
+test('a header genuinely past its table still warns, on the CLEAR span', () => {
+  // The other half of the fix: the checker must not have gone quiet. `headerForSpan` stops at the
+  // deepest row rather than extrapolating, so an opening past it gets a 2x12 that really is over.
+  const { warnings, nominal } = headerWarningsFor(12);
+  assert.equal(nominal, '2x12', 'past the table the sizer hands back the deepest row');
+  assert.equal(warnings.length, 1);
+  // 12.0, not the 12.25 ft the header is cut to: the number reported is the span being checked.
+  assert.match(warnings[0]!, /spans 12\.0 ft/, warnings[0]);
+  assert.match(warnings[0]!, /has NOT changed it/);
+});
+
+test('the checker measures clear span — the same bearing the generator cuts', () => {
+  // Non-circular: the cut length comes off the emitted member, the reported span off the warning,
+  // and the difference has to be the two jack studs the header bears on. Nothing here restates a
+  // table value against itself.
+  const spec = preset('gp-frame');
+  spec.stories[0].openings.S = [
+    { kind: 'door', offsetFt: 4, widthFt: 12, heightFt: 6, sillHeightFt: 0, fill: 'rough' },
+  ];
+  const model = generateStructure(spec);
+  const header = model.members.find((m) => m.role === 'header')!;
+  const reported = Number(/spans ([\d.]+) ft/.exec(
+    model.issues.find((i) => i.kind === 'span' && i.message.includes('header'))!.message,
+  )![1]);
+  const bearingIn = DRESSED[LUMBER.studNominal.value as string]!.w;
+  assert.ok(
+    Math.abs((header.cutLength - 2 * bearingIn) / 12 - reported) < 0.05,
+    `cut ${header.cutLength} in, reported ${reported} ft — the two bearings are unaccounted for`,
+  );
 });

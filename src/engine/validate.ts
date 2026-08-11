@@ -6,12 +6,18 @@ import { retainingWall, threats } from '../doctrine/protection';
 import { backblast } from '../doctrine/positions';
 import { sandbag } from '../doctrine/materials';
 import { CODES, issue } from './codes';
+import { coverDataMissing } from './protection';
 import { round1 } from './round';
 import type { ValidationIssue } from './types';
 import type { Calc } from './compute';
 
 const HEAVY_SOILS = new Set(['rock', 'frozen', 'clay']);
 const WET_SOILS = new Set(['silt', 'clay']);
+
+// Float-drift guard for the cover-thickness comparison — nothing more. Sized at the noise
+// floor of the multiply that produces the delivered thickness, NOT at anything a soldier
+// could measure: a real shortfall must never fit inside it.
+const COVER_EPS = 1e-9;
 
 export function runValidation(calc: Calc): ValidationIssue[] {
   const errors: ValidationIssue[] = [];
@@ -36,6 +42,12 @@ export function runValidation(calc: Calc): ValidationIssue[] {
     warnings.push(issue(CODES.ROOF_ENGINEERED));
     if (calc.coverReason === 'span') {
       warnings.push(issue(CODES.ROOF_SPAN_EXCEEDED, '(clear span ' + round1(calc.stringerSpan) + ' ft)'));
+    }
+    // The third way to land here: the shielding table has no row to size the cover from. Say
+    // which unknown it was — "get a designer" alone leaves the operator hunting a threat rule
+    // when what is actually missing is a doctrine value they can fill in.
+    if (coverDataMissing(calc.threat)) {
+      warnings.push(issue(CODES.ROOF_NO_SHIELDING_DATA, '(' + (threats[calc.threat]?.label ?? calc.threat) + ')'));
     }
     if (calc.inputs.standard === 'hasty') warnings.push(issue(CODES.ROOF_ENGINEERED_HASTY));
   }
@@ -82,12 +94,16 @@ export function runValidation(calc: Calc): ValidationIssue[] {
   // the standard's coverMul, so a HASTY roof (0.75×) renders THINNER than that requirement.
   // Surface the tradeoff with both numbers. Deliberate (1.0×) meets it and reinforced (1.4×)
   // exceeds it, so this stays silent there; it never fires without a real earth cover
-  // (engineered/none leave coverT at 0 and coverLeaf undefined). Compared on the ROUNDED
-  // values the panel actually shows, so the warning agrees with the numbers on screen and
-  // never fires a sub-tenth-of-a-foot phantom shortfall.
-  if (calc.coverLeaf && calc.coverT > 0 && round1(calc.coverT) < round1(calc.coverLeaf.value)) {
+  // (engineered/none leave coverT at 0 and coverLeaf undefined). Compared on the RAW values,
+  // not the rounded ones: round1 is nearest-half-up, so rounding both sides could lift the
+  // delivered thickness AND drop the requirement onto the same tenth at once, swallowing a
+  // real shortfall of nearly 0.1 ft — the unsafe direction on the one check that says "this
+  // roof does not stop the round you picked". The epsilon exists only to keep float drift on
+  // an exactly-met roof from firing a phantom shortfall; the message still prints the rounded
+  // numbers so it agrees with the panel.
+  if (calc.coverLeaf && calc.coverT > 0 && calc.coverT < calc.coverLeaf.value - COVER_EPS) {
     const label = threats[calc.threat]?.label ?? 'this threat';
-    advisories.push(
+    warnings.push(
       issue(
         CODES.COVER_UNDER_THREAT,
         '(roof ~' + round1(calc.coverT) + ' ft as drawn; ~' + round1(calc.coverLeaf.value) + ' ft fully stops ' + label + ')',

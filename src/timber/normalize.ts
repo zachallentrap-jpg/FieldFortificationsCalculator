@@ -27,9 +27,10 @@ import { hutDims } from './families/hut';
 
 export interface SpecIssue {
   path: string; // dotted spec path
-  // 'span': a member is past its span table. Distinct from 'clamped' on purpose — nothing
-  // was changed, which is the whole point of mandate #2.
-  kind: 'clamped' | 'dropped' | 'forced' | 'ls-note' | 'span';
+  // 'span': a member is past its span table. 'notch': a member's bearing notch cuts deeper than
+  // a bending member may lose there. Both distinct from 'clamped' on purpose — nothing was
+  // changed, which is the whole point of mandate #2.
+  kind: 'clamped' | 'dropped' | 'forced' | 'ls-note' | 'notch' | 'span';
   message: string; // plain language — this is shown to the user, not logged
   severity?: 'info' | 'warn' | 'error';
 }

@@ -38,6 +38,11 @@ export const CODES = {
     'warning',
     'The roof opening is wider than the stringer table covers — the roof must be engineered (no stringer size or cover thickness is estimated).',
   ),
+  ROOF_NO_SHIELDING_DATA: def(
+    'ROOF_NO_SHIELDING_DATA',
+    'warning',
+    'The loaded doctrine has no shielding thickness for this threat against its cover material — the roof must be engineered (no cover thickness is estimated).',
+  ),
   CUT_DEPTH_SHORING: def(
     'CUT_DEPTH_SHORING',
     'warning',
@@ -73,9 +78,12 @@ export const CODES = {
     'advisory',
     'A mortar fires up and out through the top of the pit — a sealed roof overhead blocks its own fire. Overhead cover here is drawn as requested, not doctrine.',
   ),
+  // A WARNING, not an advisory: "the roof you are about to build does not stop the round you
+  // selected" outranks every planning-realism note in this catalog. It sat a tier below
+  // "hand-digging this is unrealistic" until the protection audit.
   COVER_UNDER_THREAT: def(
     'COVER_UNDER_THREAT',
-    'advisory',
+    'warning',
     'The overhead cover as drawn is thinner than full protection for this threat — a hasty roof trades protection for speed; thicken it when time allows.',
   ),
   SANDBAG_BASIC_LOAD_EXCEEDED: def(

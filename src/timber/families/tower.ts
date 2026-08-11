@@ -19,7 +19,7 @@ import type { Member } from '../types';
 import { DRESSED } from '../types';
 import type { TowerSpec } from '../spec';
 import { makeEmitter } from '../emit';
-import { TOWER, RAIL, PANEL, HUT, LUMBER, STAIR, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
+import { TOWER, RAIL, PANEL, HUT, LUMBER, NAILING, STAIR, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
 import { stagePlan, requireOrdinal, type StagePlanEntry } from '../stagePlan';
 import { generateRailing, railRequired, type RailEdge } from '../subsystems/railings';
 import { generateLadder, generateStair } from '../subsystems/access';
@@ -857,7 +857,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
         position: [cx - deckHalf + (deckHalf * 2 * i) / bays, eaveY + rise, cx],
         rotation: [0, -Math.PI / 2, Math.atan2(fall, half * 2)],
         stage: sRoof,
-        nailing: 'toenail 3-8d ea plate (PH)',
+        nailing: NAILING.toenailedAtPlate.value,
         doctrineRef: citeOf(TOWER.cabRisePer12),
       });
     }

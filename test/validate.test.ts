@@ -2,11 +2,45 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { compute } from '../src/engine/compute';
 import { allCodes } from '../src/engine/codes';
+import { importDoctrine } from '../src/doctrine/io';
+import { getByPath } from '../src/doctrine/registry';
+import { coverMaterialDefault } from '../src/doctrine/protection';
+import type { ShieldMaterial } from '../src/doctrine/protection';
+import { DOCTRINE_VERSION } from '../src/version';
 import { defaultInputs } from './helpers';
 import type { Inputs } from '../src/engine/types';
 
 const codesFor = (over: Partial<Inputs>): Set<string> =>
   new Set(compute(defaultInputs(over)).validation.map((v) => v.code));
+
+// Run `body` against a doctrine table filled with the given leaf values, then put the original
+// values back — through the sanctioned importer both ways, so the fixture is a fill a qualified
+// user could actually have made.
+function withDoctrine(values: Record<string, number>, body: () => void): void {
+  const fileOf = (v: Record<string, number>): unknown => ({
+    doctrineVersion: DOCTRINE_VERSION,
+    entries: Object.entries(v).map(([path, value]) => ({ path, value, status: 'PLACEHOLDER', source: getByPath(path)!.source })),
+  });
+  const before = Object.fromEntries(Object.keys(values).map((p) => [p, getByPath(p)!.value as number]));
+  assert.ok(importDoctrine(fileOf(values)).ok, 'fixture fill applies');
+  try {
+    body();
+  } finally {
+    assert.ok(importDoctrine(fileOf(before)).ok, 'doctrine restored');
+  }
+}
+
+// The only way to reach the missing-shielding-data fail-safe: name a cover material the
+// shielding table does not carry, so there is no leaf to size a roof from.
+function withNoShieldingData(threat: string, body: () => void): void {
+  const original = coverMaterialDefault[threat]!;
+  coverMaterialDefault[threat] = 'no_such_material' as ShieldMaterial;
+  try {
+    body();
+  } finally {
+    coverMaterialDefault[threat] = original;
+  }
+}
 
 test('each validation code is reachable', () => {
   const fired = new Set<string>();
@@ -35,6 +69,12 @@ test('each validation code is reachable', () => {
   ];
   for (const s of scenarios) for (const c of codesFor(s)) fired.add(c);
 
+  // ROOF_NO_SHIELDING_DATA has no reachable input combination — it is the fail-safe for doctrine
+  // that is MISSING, so reaching it means taking the shielding row away.
+  withNoShieldingData('ind-mtr-81', () => {
+    for (const c of codesFor({ threat: 'ind-mtr-81', overheadCover: true })) fired.add(c);
+  });
+
   for (const def of allCodes()) {
     assert.ok(fired.has(def.code), 'code never fired: ' + def.code);
   }
@@ -50,6 +90,32 @@ test('COVER_UNDER_THREAT fires for a hasty roof and clears at deliberate/reinfor
   assert.ok(!cov('reinforced').has('COVER_UNDER_THREAT'), 'reinforced exceeds it');
   // No cover requested ⇒ nothing to be short.
   assert.ok(!codesFor({ threat: 'sa-556', overheadCover: false, standard: 'hasty' }).has('COVER_UNDER_THREAT'), 'no roof, no shortfall');
+});
+
+test('COVER_UNDER_THREAT fires on a shortfall too small to survive display rounding', () => {
+  // The panel rounds to a tenth of a foot, and the check used to round BOTH sides before
+  // comparing. Fill the doctrine so a real shortfall lands inside one rounding step: 1.44 ft
+  // required, 1.3536 ft delivered — both print as ~1.4 ft, and the roof is still an inch short
+  // of stopping the round. Rounding first hides it; that is the unsafe direction.
+  withDoctrine({ 'protection.shielding.sa-556.soil': 1.44, 'standards.hasty.coverMul': 0.94 }, () => {
+    const r = compute(defaultInputs({ threat: 'sa-556', overheadCover: true, standard: 'hasty' }));
+    assert.equal(r.cover.roofPath, 'earth_on_stringers', 'a real earth roof, not an engineered one');
+    assert.ok(r.cover.thickness < 1.44, 'the roof really is thinner than the requirement');
+    const shortfall = r.validation.find((v) => v.code === 'COVER_UNDER_THREAT');
+    assert.ok(shortfall, 'a genuine shortfall must not be rounded away');
+    // …while the message still prints the rounded numbers the panel shows.
+    assert.match(shortfall!.message, /1\.4 ft as drawn/);
+  });
+});
+
+test('COVER_UNDER_THREAT outranks the planning-realism notes it used to sit below', () => {
+  const v = compute(defaultInputs({ threat: 'sa-556', overheadCover: true, standard: 'hasty' })).validation;
+  const cover = v.find((i) => i.code === 'COVER_UNDER_THREAT');
+  assert.ok(cover, 'fires on a hasty roof');
+  assert.equal(cover!.severity, 'warning', '"this roof does not stop the round you picked" is not an advisory');
+  const at = v.findIndex((i) => i.code === 'COVER_UNDER_THREAT');
+  const firstAdvisory = v.findIndex((i) => i.severity === 'advisory');
+  assert.ok(firstAdvisory === -1 || at < firstAdvisory, 'ranked with the warnings, not trailing the advisories');
 });
 
 test('REVET_REQUIRED_SOIL is an error and clears when a revetment is chosen', () => {

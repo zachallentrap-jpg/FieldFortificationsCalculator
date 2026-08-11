@@ -4634,7 +4634,7 @@
    },
    "cutLength": 64,
    "position": [
-    6.125,
+    4.125,
     9.922118432373972,
     8
    ],
@@ -4646,10 +4646,34 @@
    "stage": 8,
    "grade": "No. 2 common",
    "nailing": "3-10d face nail ea end (IRC R802.3.1)",
-   "doctrineRef": "FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)"
+   "doctrineRef": "FM 5-426 collar ties, closed up to every 2nd rafter so the run stays within 4 ft at 24 in o.c. (IRC R802.3.1)"
   },
   {
    "id": "RF-collarTie-02",
+   "role": "collarTie",
+   "nominal": "2x4",
+   "actual": {
+    "w": 1.5,
+    "d": 3.5
+   },
+   "cutLength": 64,
+   "position": [
+    8.125,
+    9.922118432373972,
+    8
+   ],
+   "rotation": [
+    0,
+    -1.5707963267948966,
+    0
+   ],
+   "stage": 8,
+   "grade": "No. 2 common",
+   "nailing": "3-10d face nail ea end (IRC R802.3.1)",
+   "doctrineRef": "FM 5-426 collar ties, closed up to every 2nd rafter so the run stays within 4 ft at 24 in o.c. (IRC R802.3.1)"
+  },
+  {
+   "id": "RF-collarTie-03",
    "role": "collarTie",
    "nominal": "2x4",
    "actual": {
@@ -4670,10 +4694,10 @@
    "stage": 8,
    "grade": "No. 2 common",
    "nailing": "3-10d face nail ea end (IRC R802.3.1)",
-   "doctrineRef": "FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)"
+   "doctrineRef": "FM 5-426 collar ties, closed up to every 2nd rafter so the run stays within 4 ft at 24 in o.c. (IRC R802.3.1)"
   },
   {
-   "id": "RF-collarTie-03",
+   "id": "RF-collarTie-04",
    "role": "collarTie",
    "nominal": "2x4",
    "actual": {
@@ -4682,7 +4706,7 @@
    },
    "cutLength": 64,
    "position": [
-    18.125,
+    16.125,
     9.922118432373972,
     8
    ],
@@ -4694,7 +4718,7 @@
    "stage": 8,
    "grade": "No. 2 common",
    "nailing": "3-10d face nail ea end (IRC R802.3.1)",
-   "doctrineRef": "FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)"
+   "doctrineRef": "FM 5-426 collar ties, closed up to every 2nd rafter so the run stays within 4 ft at 24 in o.c. (IRC R802.3.1)"
   },
   {
    "id": "RF-stud-01",

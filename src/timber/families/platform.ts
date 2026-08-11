@@ -19,7 +19,7 @@ import { DRESSED } from '../types';
 import type { PlatformSpec, TentFrameSpec } from '../spec';
 import type { WallId } from '../types';
 import { makeEmitter } from '../emit';
-import { TENT, LUMBER, OPENING, PANEL, RAMP, PLATFORM, RAIL, IN_PER_FT, citeOf } from '../doctrine';
+import { TENT, LUMBER, NAILING, OPENING, PANEL, RAMP, PLATFORM, RAIL, IN_PER_FT, citeOf } from '../doctrine';
 import { stagePlan, requireOrdinal, type StagePlanEntry } from '../stagePlan';
 import { generateRailing, railRequired, type RailEdge } from '../subsystems/railings';
 import { generateStair } from '../subsystems/access';
@@ -196,7 +196,7 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
         rotation: [-Math.PI / 2, 0, 0],
         stage: sDeck,
         actual: { w: DRESSED[nominal]!.w, d: cut * IN_PER_FT },
-        nailing: '2-16d ea joist (PH)',
+        nailing: NAILING.deckPlankToJoist.value,
         doctrineRef: citeOf(TENT.deckNominal),
       });
     }
@@ -498,7 +498,7 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
 
       stage: sDeck,
       actual: { w: DRESSED[deckNominal]!.w, d: cut * IN_PER_FT },
-      nailing: '2-16d ea joist (PH)',
+      nailing: NAILING.deckPlankToJoist.value,
       doctrineRef: citeOf(TENT.deckNominal),
     });
   }

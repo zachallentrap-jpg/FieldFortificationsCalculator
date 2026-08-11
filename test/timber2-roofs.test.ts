@@ -12,6 +12,7 @@ import { roofPlanes, slopeOf, generateShed } from '../src/timber/subsystems/roof
 import { wallContract } from '../src/timber/subsystems/wallSystem';
 import type { BuildingSpec, RoofSpec } from '../src/timber/spec';
 import { DRESSED } from '../src/timber/types';
+import { LAYOUT } from '../src/timber/doctrine';
 import type { WallId } from '../src/timber/types';
 
 function bldg(roof: RoofSpec, over: Partial<BuildingSpec> = {}): BuildingSpec {
@@ -229,4 +230,60 @@ test('roof: "none" frames no roof at all, and nothing downstream trips over it',
   assert.equal(roofPlanes(model.spec as BuildingSpec, 8).length, 0);
   assert.equal(model.members.filter((m) => m.role === 'rafter').length, 0);
   assert.ok(model.members.length > 100, 'the floor and walls still built');
+});
+
+// ── Collar ties: a distance, not a rafter count ──────────────────────────────
+//
+// "Every 3rd rafter" is the 4-ft interval written for the 16-in layout it was written on. Stepped
+// by 3 at 24 in o.c. the ties came out 6 ft apart — past the 4 ft the tie's own nailing schedule
+// cites (IRC R802.3.1) and past the ≤5 ft the member's own doctrineRef claimed — on the roof of
+// every card laid out at 24 in, with the member card printing the rule it was breaking.
+
+/** Ridge-line collar ties, sorted along the ridge, for a long gable at this rafter spacing. */
+function collarTieRun(rafterSpacingIn: 16 | 24): number[] {
+  const spec = bldg({ kind: 'gable', risePer12: 4, overhangFt: 1 }, {
+    dims: { lengthFt: 40, widthFt: 16 },
+    spacing: { studSpacingIn: 16, joistSpacingIn: 16, rafterSpacingIn },
+  });
+  return generateStructure(spec).members
+    .filter((m) => m.role === 'collarTie')
+    .map((m) => m.position[0])
+    .sort((a, b) => a - b);
+}
+
+test('collar ties hold their cited interval at BOTH legal rafter spacings', () => {
+  const limit = LAYOUT.collarTieMaxSpacingFt.value as number;
+  for (const spacing of [16, 24] as const) {
+    const xs = collarTieRun(spacing);
+    assert.ok(xs.length >= 3, `${spacing} in o.c.: only ${xs.length} ties on a 40-ft ridge`);
+    const worst = Math.max(...xs.slice(1).map((x, i) => x - xs[i]!));
+    assert.ok(
+      worst <= limit + 1e-9,
+      `${spacing} in o.c.: ties are ${worst.toFixed(2)} ft apart; the cited limit is ${limit} ft`,
+    );
+  }
+});
+
+test('closing the spacing up does not thin the ties out — the 16-in layout is unchanged', () => {
+  // The fix keys on spacing, so the wider layout gets MORE ties, not the same count spread further.
+  // 16 in already satisfied the limit and must come out byte-identical (the compat goldens agree).
+  assert.equal(collarTieRun(24).length, collarTieRun(16).length);
+  const xs = collarTieRun(16);
+  assert.deepEqual(
+    [...new Set(xs.slice(1).map((x, i) => +(x - xs[i]!).toFixed(6)))],
+    [4],
+    'a 16-in layout still puts a tie on every 3rd rafter',
+  );
+});
+
+test('a collar tie does not print a rule it is not following', () => {
+  // The member card is what a crew reads. At 24 in the ties are on every SECOND rafter, and the
+  // ref said "every 3rd rafter / ≤5 ft" while they stood 6 ft apart.
+  const spec = bldg({ kind: 'gable', risePer12: 4, overhangFt: 1 }, {
+    dims: { lengthFt: 40, widthFt: 16 },
+    spacing: { studSpacingIn: 16, joistSpacingIn: 16, rafterSpacingIn: 24 },
+  });
+  const tie = generateStructure(spec).members.find((m) => m.role === 'collarTie')!;
+  assert.doesNotMatch(tie.doctrineRef, /every 3rd rafter/, tie.doctrineRef);
+  assert.match(tie.doctrineRef, /2nd rafter/, tie.doctrineRef);
 });

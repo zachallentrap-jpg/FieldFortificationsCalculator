@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import '../src/doctrine/index'; // triggers registration
 import { all, getByPath, counts } from '../src/doctrine/registry';
+import { spanSizes } from '../src/doctrine/protection';
+import { excavationSplit } from '../src/doctrine/stages';
 
 test('doctrine registered non-empty', () => {
   const entries = all();
@@ -43,6 +45,22 @@ test('numeric ranges are sane (finite, non-negative, bounded)', () => {
       assert.ok(p.value < 1000, 'bounded: ' + e.path);
     }
   }
+});
+
+// The two tables the engine reads by ORDER and by SUM rather than value by value. The importer
+// re-checks both on every fill (doctrine/io); these hold the shipped table to the same contract.
+test('stringer span limits ascend — the size lookup is first-fit', () => {
+  for (let i = 1; i < spanSizes.length; i++) {
+    assert.ok(
+      spanSizes[i]!.maxSpan.value > spanSizes[i - 1]!.maxSpan.value,
+      'out of order at ' + spanSizes[i]!.sizeLabel + ' — a wide span would match an undersized row first',
+    );
+  }
+});
+
+test('excavation stage shares sum to 1 — the stage clock partitions one total', () => {
+  const sum = Object.values(excavationSplit).reduce((acc, s) => acc + s.value, 0);
+  assert.ok(Math.abs(sum - 1) < 1e-9, 'shares sum to ' + sum);
 });
 
 test('counts() is internally consistent with all placeholders remaining', () => {

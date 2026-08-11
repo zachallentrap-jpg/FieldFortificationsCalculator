@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import { generateStructure } from '../src/timber/families/index';
 import { FAMILY_TABLE } from '../src/timber/catalog';
 import { seatCutsFor, seatCutFor, seatProfile, runAxisOf } from '../src/timber/birdsMouth';
+import { NOTCH, lifeSafetyRegister } from '../src/timber/doctrine';
 import { roofPlanes } from '../src/timber/subsystems/roofFamilies';
 import type { Member } from '../src/timber/types';
 
@@ -158,13 +159,19 @@ test('the notch never eats more than a third of the rafter, per the doctrine lim
   // A seat cut deeper than a third of the depth is a broken rafter, not a joint — the reason the
   // heel height is what sizes a rafter in the first place. If a generator ever pitches a roof so
   // steeply that the notch would exceed it, this is where it is caught.
+  //
+  // The limit is READ from the doctrine entry rather than retyped as 1/3, which is what the
+  // title has always claimed. This covers the shipped presets, which all sit at 20%; a spec
+  // that goes past the limit is the engine's business, and it now warns — see the seat-depth
+  // block at the foot of this file.
+  const limit = NOTCH.rafterSeatMaxDepthFrac.value as number;
   for (const fam of FAMILY_TABLE) {
     const model = generateStructure(fam.preset);
     const seats = seatCutsFor(model.members);
     for (const m of rafters(model.members)) {
       for (const seat of seats.get(m.id) ?? []) {
       const frac = seat.depthFt / (m.actual.d / 12);
-      assert.ok(frac > 0 && frac <= 1 / 3 + 1e-9, `${fam.id} ${m.id}: notch is ${(frac * 100).toFixed(0)}% of the face`);
+      assert.ok(frac > 0 && frac <= limit + 1e-9, `${fam.id} ${m.id}: notch is ${(frac * 100).toFixed(0)}% of the face`);
       }
     }
   }
@@ -313,4 +320,70 @@ test('a shed rafter sits ON its roof plane, so the deck lands on the rafters', (
       assert.ok(Math.abs(d) < 1e-9, `${highSide} ${m.id}: centre is ${(d * 12).toFixed(4)} in off its own roof plane`);
     }
   }
+});
+
+// ── The seat-depth limit ─────────────────────────────────────────────────────
+//
+// This module argued the 1/3 rule as the whole justification for the HAP datum and then enforced
+// nothing: `seatCutFor` rejects a notch through the WHOLE board and nothing between. Measured on
+// gp-frame — a 2x6 rafter over a 2x4 plate, every pitch inside the bound the tool allows — the
+// seat took 20% of the depth at 4/12, 35% at 8/12 and 45% at 12/12, with no word said anywhere.
+
+test('a seat past a third of the rafter WARNS, and says nothing was changed', () => {
+  const spec = withRoof({ kind: 'gable', risePer12: 12, overhangFt: 1 });
+  const model = generateStructure(spec);
+  const notch = model.issues.filter((i) => i.kind === 'notch');
+  assert.equal(notch.length, 1, 'one line for the whole roof, not one per rafter');
+  assert.match(notch[0]!.message, /45%/, `the message must state what it measured: ${notch[0]!.message}`);
+  assert.match(notch[0]!.message, /has NOT changed it/, 'mandate #2: the tool warns, it never resizes');
+  // And the model really is untouched — no rafter was deepened and no pitch was flattened to make
+  // the check pass, which is the failure mode the mandate exists to forbid.
+  assert.ok(model.members.some((m) => m.role === 'rafter' && m.nominal === '2x6'), 'the rafter was silently upsized');
+  assert.equal((model.spec as { roof: { risePer12: number } }).roof.risePer12, 12, 'the pitch was silently flattened');
+});
+
+test('the same rafter at a shallow pitch says nothing — the limit is a limit, not a mood', () => {
+  for (const risePer12 of [2, 4, 6]) {
+    const model = generateStructure(withRoof({ kind: 'gable', risePer12, overhangFt: 1 }));
+    assert.deepEqual(
+      model.issues.filter((i) => i.kind === 'notch'),
+      [],
+      `${risePer12}/12 on a 2x6 over a 2x4 plate is inside the limit and must be silent`,
+    );
+  }
+});
+
+test('the limit is the doctrine entry, measured on the notch the viewer actually cuts', () => {
+  // Non-circular on purpose: the fraction is computed from the SeatCut geometry the renderer
+  // extrudes, not read back out of the table the warning quotes. Walking the pitch up, the
+  // verdict has to turn over exactly where the doctrine value says it does.
+  const limit = NOTCH.rafterSeatMaxDepthFrac.value as number;
+  const worstFrac = (risePer12: number): number => {
+    const model = generateStructure(withRoof({ kind: 'gable', risePer12, overhangFt: 1 }));
+    const byId = new Map(model.members.map((m) => [m.id, m]));
+    let worst = 0;
+    for (const [id, cuts] of seatCutsFor(model.members)) {
+      const m = byId.get(id)!;
+      for (const c of cuts) worst = Math.max(worst, (c.depthFt * 12) / m.actual.d);
+    }
+    return worst;
+  };
+  for (const risePer12 of [2, 4, 6, 8, 10, 12]) {
+    const model = generateStructure(withRoof({ kind: 'gable', risePer12, overhangFt: 1 }));
+    const warned = model.issues.some((i) => i.kind === 'notch');
+    assert.equal(
+      warned,
+      worstFrac(risePer12) > limit,
+      `${risePer12}/12 cuts ${(worstFrac(risePer12) * 100).toFixed(1)}% and the limit is ${(limit * 100).toFixed(1)}%`,
+    );
+  }
+});
+
+test('the seat-depth limit is life-safety tagged and declares its consumer', () => {
+  // A notch at the bearing is a shear failure at the one point that carries the roof, which is
+  // the LS-GATE's own definition. The gate obligates a consumer for every id it carries.
+  assert.ok(
+    lifeSafetyRegister().some((e) => e.id === 'NOTCH.rafterSeatMaxDepthFrac'),
+    'the seat-depth limit must be in the life-safety register',
+  );
 });

@@ -14,7 +14,7 @@
 import type { Member } from '../types';
 import { DRESSED } from '../types';
 import { makeEmitter } from '../emit';
-import { LUMBER, LAYOUT, PANEL, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
+import { LUMBER, LAYOUT, NAILING, PANEL, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
 import { crossBridgingRise } from '../bridgingRise';
 import type { BearingLine } from './wallSystem';
 
@@ -75,7 +75,11 @@ export function generateFloorOnBearings(input: FloorSystemInput): Member[] {
       position: [x, joistY, W / 2],
       rotation: [0, -Math.PI / 2, 0],
       stage: stageFloor,
-      nailing: '3-16d toenail each bearing (PH)',
+      // THE SAME JOINT AS THE FROZEN BRANCH'S, so it is the same string. This branch had
+      // "each bearing" against the register's "ea bearing" — one joint, two schedules, and the
+      // second had no cited home purely because of the word. Read from the register instead of
+      // retyped, the drift cannot come back.
+      nailing: NAILING.joistToBearing.value,
       doctrineRef: joistCite,
     });
   }
@@ -85,7 +89,7 @@ export function generateFloorOnBearings(input: FloorSystemInput): Member[] {
       position: [L / 2, joistY, z],
       rotation: [0, 0, 0],
       stage: stageFloor,
-      nailing: '3-16d each joist end (PH)',
+      nailing: NAILING.rimJoist.value,
       doctrineRef: citeOf(LUMBER.joistNominal),
     });
   }
@@ -116,7 +120,7 @@ export function generateFloorOnBearings(input: FloorSystemInput): Member[] {
             position: [(centers[k]! + centers[k + 1]!) / 2, joistY, zMid + s * TOLERANCE.bridgingSplayFt],
             rotation: [0, 0, s * ang],
             stage: stageFloor,
-            nailing: '2-8d each end; bottom ends after the deck (PH)',
+            nailing: NAILING.crossBridging.value,
             doctrineRef: citeOf(LAYOUT.bridgingRowMaxFt),
           });
         }
@@ -171,7 +175,7 @@ export function generateFloorOnBearings(input: FloorSystemInput): Member[] {
         position: [L / 2, deckTopY - deckThickFt / 2, (i + 0.5) * cell],
         rotation: [-Math.PI / 2, 0, 0],
         stage: stageDeck,
-        nailing: '2-16d each joist (PH)',
+        nailing: NAILING.deckPlankToJoist.value,
         doctrineRef: citeOf(LUMBER.deckPlankNominal),
       });
     }

@@ -11,7 +11,18 @@
 // because the next person treats it as a clearance.
 
 import type { Member } from './types';
-import { SPAN, IN_PER_FT, citeOf } from './doctrine';
+import { DRESSED } from './types';
+import { SPAN, LUMBER, IN_PER_FT, citeOf } from './doctrine';
+
+/**
+ * How much of a header's CUT LENGTH is bearing rather than span, at each end.
+ *
+ * A header is cut to the rough opening plus a jack stud at each side — `walls.ts` cuts
+ * `widthFt + 2t` and every other doorway in the toolkit does the same — and the wood sitting on
+ * the jack is not spanning anything. The table row is a CLEAR span between bearings, so the two
+ * numbers differ by exactly this, twice.
+ */
+const headerBearingIn = (): number => DRESSED[LUMBER.studNominal.value as string]!.w;
 
 export interface SpanWarning {
   memberId: string;
@@ -116,7 +127,14 @@ export function spanWarnings(
         });
       }
     } else if (m.role === 'header') {
-      const spanFt = m.cutLength / IN_PER_FT;
+      // THE SIZER AND THE CHECKER HAVE TO MEAN THE SAME WORD. The header over an opening is
+      // CHOSEN by `headerForSpan(openingWidth)` — a clear span — and then CUT to that width plus
+      // a jack at each end. Checking the cut length against the same table therefore condemned
+      // the member the tool had just picked, on every opening landing exactly on a table row: a
+      // 5-ft opening got the 2x6 the 5-ft row allows and was then reported as a 5.3-ft span past
+      // a 5-ft limit, tagged LIFE-SAFETY. That is the cry-wolf failure the header of this file
+      // says the module exists to prevent, fired by the module against itself.
+      const spanFt = Math.max(0, (m.cutLength - 2 * headerBearingIn()) / IN_PER_FT);
       const allowed = headerTable[m.nominal];
       if (allowed !== undefined && spanFt > allowed + 1e-6) {
         out.push({

@@ -187,8 +187,17 @@ export function generateRoof(input: RoofInput): Member[] {
     nailing: 'rafters 3-16d ea (PH)',
     doctrineRef: 'FM 5-426: ridge one size deeper than rafters, tops flush (PH page)',
   });
-  // Collar ties on every third interior rafter pair (≤5 ft apart per manual), at 1/3 down
-  // from the ridge, nailed beside their rafters (the gable ends need none).
+  // Collar ties on the interior rafter pairs, at 1/3 down from the ridge, nailed beside their
+  // rafters (the gable ends need none).
+  //
+  // EVERY THIRD RAFTER IS NOT THE RULE — IT IS THE RULE WRITTEN FOR A 16-IN LAYOUT. What doctrine
+  // states is a DISTANCE between ties, and it is the distance the tie's own nailing schedule
+  // cites: 4 ft o.c. (IRC R802.3.1). Three bays of 16 in is exactly that, which is why the two
+  // read as the same rule and why the count was hard-coded. At 24 in o.c. they part company —
+  // three bays is 6 ft, past the cited 4 ft AND past the ≤5 ft this member's own doctrineRef
+  // claimed, on every card laid out at 24 in. Keyed on the spacing, the interval holds at either.
+  const TIE_MAX_FT = 4; // mirrored as LAYOUT.collarTieMaxSpacingFt, cited to IRC R802.3.1
+  const tieStep = Math.max(1, Math.floor(TIE_MAX_FT / oc + 1e-9));
   // Measured down from the ridge against the RAFTER LINE — which starts at `eaveDatum`, not at
   // the plate. `tieHalf` below is derived from that same line, so using the plate top here
   // would put the tie two thirds of the way to where its own ends are.
@@ -199,10 +208,16 @@ export function generateRoof(input: RoofInput): Member[] {
   // it directly avoids a 0/0 at a flat (risePer12=0) roof, which the cancelled-out form
   // divided by literally. Audit fix, kept through the FM 5-426 merge.
   const tieHalf = halfSpan / 3;
-  for (let i = 3; i < gridXs.length - 1; i += 3) {
+  for (let i = tieStep; i < gridXs.length - 1; i += tieStep) {
     emit('collarTie', '2x4', 2 * tieHalf, [gridXs[i]! + t, tieY, W / 2], [0, -Math.PI / 2, 0], 8, {
       nailing: '3-10d face nail ea end (IRC R802.3.1)',
-      doctrineRef: 'FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)',
+      // The ref states what was actually done, the way the sheathing and let-in brace refs below
+      // and in walls.ts do — "every 3rd rafter" is only the description when it is also the tie
+      // interval the cited limit allows.
+      doctrineRef: tieStep === 3
+        ? 'FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)'
+        : `FM 5-426 collar ties, closed up to every ${tieStep === 2 ? '2nd' : `${tieStep}th`} rafter `
+          + `so the run stays within ${TIE_MAX_FT} ft at ${input.rafterSpacingIn} in o.c. (IRC R802.3.1)`,
     });
   }
   // Gable-end studs: verticals from the cap plate up to whatever is over them, standing on the
