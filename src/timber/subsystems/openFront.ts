@@ -19,7 +19,7 @@ import type { Member, WallId } from '../types';
 import { DRESSED } from '../types';
 import type { BuildingSpec } from '../spec';
 import { makeEmitter } from '../emit';
-import { LUMBER, LAYOUT, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
+import { LUMBER, LAYOUT, NAILING, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
 import { headerForSpan } from '../normalize';
 import type { WallsContract } from './wallSystem';
 
@@ -92,7 +92,7 @@ export function generateOpenFront(input: OpenFrontInput): Member[] {
       rotation: [0, yaw, Math.PI / 2],
       stage: stageWalls,
       wall,
-      nailing: 'framing anchor top and bottom (PH)',
+      nailing: NAILING.openFrontPost.value,
       doctrineRef: `${citeOf(LUMBER.postNominal)} — open front: ${bays} bay(s) at ${bayFt.toFixed(2)} ft`,
     });
   }
@@ -119,7 +119,12 @@ export function generateOpenFront(input: OpenFrontInput): Member[] {
       rotation: [0, yaw, 0],
       stage: stageWalls,
       wall,
-      nailing: '16d @ 16" both plies; framing anchor to each post (PH)',
+      // WHAT THIS BEAM IS CUT TO IS NOT WHAT A DOORWAY HEADER IS CUT TO, so it says what it bears
+      // on rather than letting the span check assume a doorway's jack studs. A splice lands on a
+      // post's CENTRELINE and gets half of it; the two ends of the run reach the plan line and get
+      // a whole post, which is why the figure is a total for both ends and not one per end.
+      bearingTotalIn: ((i === 0 ? postD : postD / 2) + (i === bays - 1 ? postD : postD / 2)) * IN_PER_FT,
+      nailing: NAILING.openFrontBeam.value,
       doctrineRef: `${citeOf(LUMBER.headerNominal)} — beam over a ${bayFt.toFixed(2)} ft open bay`,
     });
   }

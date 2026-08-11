@@ -44,7 +44,7 @@ export interface DoctrineExport {
 }
 
 export interface DoctrineFinding {
-  path: string;
+  path: string; // a registry path — except in rejectedTables, where it names a whole table
   reason: string;
 }
 
@@ -52,7 +52,11 @@ export interface DoctrineImportReport {
   ok: boolean;
   applied: number; // entries that were (or in a dry run, would be) applied
   dryRun: boolean;
-  rejected: DoctrineFinding[];
+  rejected: DoctrineFinding[]; // per-ENTRY findings — each `path` addresses a row of the fill table
+  // Whole-TABLE findings: an invariant that several leaves hold together, so no single row is
+  // the culprit and `path` names the table. Kept apart from `rejected` so a reader is never
+  // pointed at a row identifier that matches nothing they can edit.
+  rejectedTables: DoctrineFinding[];
   warnings: DoctrineFinding[]; // applied, but the filler should look at them (see plausibility below)
   message?: string;
   manifest?: DoctrineManifest; // echoed from the file (with a freshly computed contentHash)
@@ -127,6 +131,7 @@ const fail = (message: string): DoctrineImportReport => ({
   applied: 0,
   dryRun: false,
   rejected: [],
+  rejectedTables: [],
   warnings: [],
   message,
   counts: counts(),
@@ -204,8 +209,10 @@ function prospective(staged: Staged[]): Prospective {
 //     opening gets billed a 4×4. That is an undersized member on the safety-critical span path.
 //   · the stage clock PARTITIONS one man-hour total by excavationSplit. Anything but 1.0
 //     invents or loses labor in the per-stage breakdown with no other symptom.
-// Both refuse the whole file, like every other rejection here.
-function invariantViolations(p: Prospective): DoctrineFinding[] {
+// Both refuse the whole file, like every other rejection here. They differ in what a reader can
+// be pointed at: a span limit out of order is one row's value, while the partition is a property
+// of four shares TOGETHER — no single share is wrong, so that one is reported against the table.
+function entryInvariantViolations(p: Prospective): DoctrineFinding[] {
   const out: DoctrineFinding[] = [];
 
   for (let i = 1; i < spanSizes.length; i++) {
@@ -219,48 +226,127 @@ function invariantViolations(p: Prospective): DoctrineFinding[] {
     }
   }
 
-  const sum = Object.values(excavationSplit).reduce((acc, share) => acc + p.valueOf(share), 0);
+  return out;
+}
+
+function tableInvariantViolations(p: Prospective): DoctrineFinding[] {
+  const out: DoctrineFinding[] = [];
+
+  const shares = Object.entries(excavationSplit);
+  const sum = shares.reduce((acc, [, share]) => acc + p.valueOf(share), 0);
   if (Math.abs(sum - 1) > SUM_TOLERANCE) {
     out.push({
       path: 'stages.excavationSplit',
-      reason: 'excavation stage shares must sum to 1 (they sum to ' + sum + ') — the stage clock partitions one total',
+      reason:
+        'the stage clock partitions ONE excavation total, so these ' + shares.length + ' shares (' +
+        shares.map(([k]) => k).join(', ') + ') must sum to 1 — this file leaves them at ' + sum +
+        '. Send all ' + shares.length + ' in the same file, adjusted to sum to 1.',
     });
   }
 
   return out;
 }
 
-// PLAUSIBILITY, not correctness — reported, never enforced. A bigger round needing LESS cover
-// than a smaller one of the same kind is almost always a transposed fill, but the engine stays
-// correct either way and a real table may legitimately step sideways between threat classes,
-// so this must not block the import. Compared only within a class, in catalog severity order,
-// and only across threats that actually yield a thickness (engineered munitions never do).
-function plausibilityWarnings(p: Prospective): DoctrineFinding[] {
+// PLAUSIBILITY, not correctness — reported, never enforced. The engine stays correct either way
+// and a real table may legitimately step sideways between threat classes, so none of this blocks
+// the import; it exists so a transposed or half-finished fill of the two protection ladders
+// (shielding thickness and munition standoff) is visible to the person who made it.
+//
+// Threats are laddered WITHIN a class by the catalog's `base` severity seed — structure a file
+// cannot move — so only the values being compared come from the file.
+function severityLadders(): string[][] {
   const byClass = new Map<string, string[]>();
   for (const [id, t] of Object.entries(threats)) {
-    if (t.roof !== 'earth_on_stringers') continue;
     const ids = byClass.get(t.class) ?? [];
     ids.push(id);
     byClass.set(t.class, ids);
   }
+  for (const ids of byClass.values()) ids.sort((a, b) => threats[a]!.base - threats[b]!.base);
+  return [...byClass.values()];
+}
 
+// A protection magnitude of zero or less is not "none needed" — nothing stops a round and no
+// munition is safe at no standoff, so such a value reads as ABSENT (engine/protection.ts fails
+// the roof safe on exactly that reading). This has to be checked leaf by leaf: a ladder walk
+// cannot see it, because zeroing the smallest threat of a class decreases against nothing and
+// zeroing a whole class leaves every step equal rather than descending.
+function nonPositiveWarnings(p: Prospective): DoctrineFinding[] {
   const out: DoctrineFinding[] = [];
-  for (const ids of byClass.values()) {
+  for (const [id, row] of Object.entries(shielding)) {
     for (const mat of shieldMaterials) {
-      for (let i = 1; i < ids.length; i++) {
-        const prev = shielding[ids[i - 1]!]?.[mat];
-        const cur = shielding[ids[i]!]?.[mat];
-        if (!prev || !cur) continue;
-        if (p.valueOf(cur) < p.valueOf(prev)) {
-          out.push({
-            path: p.pathOf(cur),
-            reason:
-              threats[ids[i]!]!.label + ' needs less ' + mat + ' cover (' + p.valueOf(cur) + ' ft) than ' +
-              threats[ids[i - 1]!]!.label + ' (' + p.valueOf(prev) + ' ft) — applied; confirm this is what the pub says',
-          });
-        }
-      }
+      const leaf = row[mat];
+      const v = p.valueOf(leaf);
+      if (v > 0) continue;
+      out.push({
+        path: p.pathOf(leaf),
+        reason:
+          threats[id]!.label + ' would be fully stopped by ' + v + ' ft of ' + mat +
+          ' — a protective thickness of zero or less reads as a MISSING value, and a roof sized' +
+          ' from it falls to an engineered design; applied, confirm against the pub',
+      });
     }
+  }
+  for (const [id, t] of Object.entries(threats)) {
+    const v = p.valueOf(t.standoffMin);
+    if (v > 0) continue;
+    out.push({
+      path: p.pathOf(t.standoffMin),
+      reason:
+        t.label + ' would be safe at ' + v + ' ft of standoff — a standoff of zero or less reads' +
+        ' as a MISSING value, and standoff drives the roof setback; applied, confirm against the pub',
+    });
+  }
+  return out;
+}
+
+// Each rung is compared against the LARGEST value below it in the class, not merely the rung
+// immediately below: a gap anywhere in the ladder (a leaf the table does not carry) must not
+// break the chain and let a reversal through unseen.
+function ladderWarnings(
+  p: Prospective,
+  ids: string[],
+  leafOf: (id: string) => Provenance<number> | undefined,
+  reason: (bigger: string, biggerFt: number, smaller: string, smallerFt: number) => string,
+): DoctrineFinding[] {
+  const out: DoctrineFinding[] = [];
+  let peakId: string | undefined;
+  let peak = 0;
+  for (const id of ids) {
+    const leaf = leafOf(id);
+    if (!leaf) continue;
+    const v = p.valueOf(leaf);
+    if (peakId !== undefined && v < peak) {
+      out.push({ path: p.pathOf(leaf), reason: reason(id, v, peakId, peak) });
+      continue;
+    }
+    peakId = id;
+    peak = v;
+  }
+  return out;
+}
+
+function plausibilityWarnings(p: Prospective): DoctrineFinding[] {
+  const out: DoctrineFinding[] = [...nonPositiveWarnings(p)];
+
+  for (const ladder of severityLadders()) {
+    // Shielding: only across threats that actually yield a thickness — an engineered munition
+    // never gets one, so its row is not part of any cover ladder.
+    const covered = ladder.filter((id) => threats[id]!.roof === 'earth_on_stringers');
+    for (const mat of shieldMaterials) {
+      out.push(
+        ...ladderWarnings(p, covered, (id) => shielding[id]?.[mat], (bigger, bft, smaller, sft) =>
+          threats[bigger]!.label + ' needs less ' + mat + ' cover (' + bft + ' ft) than the smaller ' +
+          threats[smaller]!.label + ' (' + sft + ' ft) — applied; confirm this is what the pub says'),
+      );
+    }
+    // Standoff: every munition in the class, engineered roof or not — the setback is built
+    // either way.
+    out.push(
+      ...ladderWarnings(p, ladder, (id) => threats[id]!.standoffMin, (bigger, bft, smaller, sft) =>
+        threats[bigger]!.label + ' wants less standoff (' + bft + ' ft) than the smaller ' +
+        threats[smaller]!.label + ' (' + sft + ' ft) — applied; standoff sets the roof setback,' +
+        ' so confirm this is what the pub says'),
+    );
   }
   return out;
 }
@@ -330,12 +416,26 @@ export function importDoctrine(raw: unknown, opts?: { maxEntries?: number; dryRu
   // Whole-table checks: everything above validates one entry at a time and cannot see an order
   // or a sum. Run against the prospective table, still before any mutation.
   const view = prospective(staged);
-  rejected.push(...invariantViolations(view));
+  rejected.push(...entryInvariantViolations(view));
+  const rejectedTables = tableInvariantViolations(view);
 
   // All-or-nothing: any rejection refuses the ENTIRE file (safety-critical data must never
-  // land half-applied). Nothing has been mutated yet.
-  if (rejected.length > 0) {
-    return { ok: false, applied: 0, dryRun, rejected, warnings: [], message: 'Rejected — ' + rejected.length + ' entr(y/ies) failed validation; nothing was applied.', counts: counts() };
+  // land half-applied). Nothing has been mutated yet. The two kinds are counted separately so
+  // the summary never calls a broken table an "entry".
+  if (rejected.length > 0 || rejectedTables.length > 0) {
+    const parts: string[] = [];
+    if (rejected.length > 0) parts.push(rejected.length + ' entr(y/ies) failed validation');
+    if (rejectedTables.length > 0) parts.push(rejectedTables.length + ' table invariant(s) broke');
+    return {
+      ok: false,
+      applied: 0,
+      dryRun,
+      rejected,
+      rejectedTables,
+      warnings: [],
+      message: 'Rejected — ' + parts.join(' and ') + '; nothing was applied.',
+      counts: counts(),
+    };
   }
 
   const warnings = plausibilityWarnings(view);
@@ -349,7 +449,7 @@ export function importDoctrine(raw: unknown, opts?: { maxEntries?: number; dryRu
   }
 
   if (dryRun) {
-    return { ok: true, applied: staged.length, dryRun: true, rejected: [], warnings, manifest, counts: previewCounts(staged) };
+    return { ok: true, applied: staged.length, dryRun: true, rejected: [], rejectedTables: [], warnings, manifest, counts: previewCounts(staged) };
   }
 
   // Commit: mutate live leaves in place (value/status/source/note only — unit and
@@ -363,5 +463,5 @@ export function importDoctrine(raw: unknown, opts?: { maxEntries?: number; dryRu
   }
   appliedFill = manifest;
 
-  return { ok: true, applied: staged.length, dryRun: false, rejected: [], warnings, manifest, counts: counts() };
+  return { ok: true, applied: staged.length, dryRun: false, rejected: [], rejectedTables: [], warnings, manifest, counts: counts() };
 }

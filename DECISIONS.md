@@ -1135,3 +1135,65 @@ the mirror drifted. Making the values genuinely editable means the frozen module
 being the source of truth, which is a C-10 decision and a compat-lock event on every fixture, not
 an afternoon's plumbing. That is the shape of the remaining work, written down so the next person
 does not start with the import and discover this halfway.
+
+## 2026-08-11 — Two goldens moved for two different reasons (a compat-lock event)
+
+Both regenerations belong to the same rules pass and have nothing else in common, so they are
+recorded separately. Neither is a rubber stamp: in both sets the diff was read line by line, and
+what moved is exactly what the rule change says should move.
+
+**1. Collar ties at 24 in o.c. — `test/goldens/frame/spacing-24.json` and
+`test/goldens/frame-compat/spacing-24.json` (221 → 222 members, 241 → 242).** The generator
+placed a tie on *every third rafter*, which is a 4-ft interval only on the layout it was written
+for. At 24 in the same step is 6 ft — past the 4 ft the tie's own nailing schedule cites
+(IRC R802.3.1) and past the ≤ 5 ft the member's own `doctrineRef` claimed while standing 6 ft
+apart. The step is now derived from the rafter spacing and that limit, so the 24-in fixture gains
+one tie (3 → 4 on that ridge, the run closing from 6 ft to 4 ft) and its ties carry a reference
+that states the interval they are actually holding. **Nothing else in either file moved**: the
+16-in fixtures are byte-identical, because three 16-in bays already were 4 ft. The value is
+mirrored as `LAYOUT.collarTieMaxSpacingFt` — `roof.ts` is the frozen branch and keeps its own
+literal — and `test/timber2-roofs.test.ts` now holds the two in lockstep in BOTH directions:
+lowering the doctrine figure fails on the emitted geometry, and raising it fails on the number the
+member card prints.
+
+**2. Four thumbnails, sub-pixel — `crib-bunker{,.solid}.svg`, `tower{,.solid}.svg`.** A TIMBER
+dresses 1/2 in on every face; only DIMENSION lumber takes the 3/4-in deduction at an 8-in face.
+`DRESSED` had the dimension-lumber figure on its two timber rows, so 6x8 and 8x8 were modelled
+1/4 in shallow — the bunker's crib logs, its cap beams, the overhead stringers and the tower's
+mudsill, which are the LS-tagged members in that table. Correcting them moves every drawn edge of
+those two cards by a fraction of a pixel (76.3 → 76.2 and the like) and moves no other card,
+because no other family cuts from those sizes.
+
+**And the bill moved with it, which the first write-up got backwards.** Board feet are rate ×
+length. The RATE is nominal — a stick of 8x8 is bought as 8x8 however it surfaces — but the
+LENGTHS are not: anything cut to fit *between* two members is cut to their dressed faces. Each
+block of the crib bunker's overhead blocking now comes out 1.213 ft between 7 1/2-in stringers
+instead of 1.236 ft between 7 1/4-in ones — 14.556 ft on that cut-list line instead of 14.833 —
+and the bunker's board-foot total goes **2546.167 → 2543.944 BF**. A dressed size is a
+geometry number that reaches the BOM through the cut list, and `test/timber2-dressed.test.ts` pins
+that blocking cut to the deduction rule rather than to a literal, so the coupling cannot be
+quietly broken in either direction.
+
+## 2026-08-11 — A hip's bird's mouth is not measured, and the packet no longer says it is
+
+The seat-depth limit (`NOTCH.rafterSeatMaxDepthFrac`, life-safety) is checked on every member
+`birdsMouth.ts` actually seats. That is commons **and jacks**: a jack rafter runs square to the
+same cap plate at the same pitch and takes the identical `plateWidth · tan θ` notch, differing
+only in length — a hip roof at 12/12 puts 56 of them alongside its 44 commons, and a role filter
+was leaving every one unnotched in the viewer and unmeasured by the check.
+
+**A HIP IS A DIFFERENT CUT AND IS STILL NOT MEASURED.** It crosses the corner at 45° on its own
+shallower pitch, and its seat is a double cheek over two plates at once — geometry this module
+does not derive, which `runAxisOf` reports honestly by returning null rather than inventing a
+notch. So `LS_CONSUMERS` no longer lists `hipRafter` for that limit. The consequence is deliberate
+and worth stating plainly: **a tower cab's packet no longer prints "Bird's-mouth seat depth limit
+— REVIEW REQUIRED"**, because the cab has four hip rafters and nothing else, and that row was an
+assurance nobody had produced — a life-safety line naming members the check never examined. Losing
+a row that meant nothing is not the same as losing coverage, but it is not coverage either.
+
+**The open item, so the next person does not have to rediscover the geometry.** Measured by hand
+on gp-frame at 12/12, the hip's seat takes about 28% of a 2x6 where the commons take 45%, so
+nothing shipped is over the limit today — the case is not urgent, it is unwatched. Deriving it
+means solving the same two cuts in the hip's own vertical plane with the traverse taken across the
+corner (a plate width of W is crossed over W√2 along the diagonal), and it would put a notch on the
+hips in the 3D viewer as well. When it is derived, `hipRafter` goes back on that register line.

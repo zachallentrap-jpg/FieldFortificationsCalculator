@@ -487,7 +487,10 @@ export function generateShed(input: ShedInput): Member[] {
         rotation: [0, surfaceYaw(highSurface) + Math.PI / 2, Math.PI / 2],
         stage: stageRoofFrame,
         wall: highSide,
-        nailing: NAILING.rakeInfillStud.value,
+        // The pony-wall stud CARRIES the high plate the rafters are seated on; the rake stud
+        // below it fills a triangle. Same fastening, different member, so the schedule that
+        // prints on the card is the one whose citation is about a bearing stud.
+        nailing: NAILING.ponyWallStud.value,
         doctrineRef: `${citeOf(LUMBER.studNominal)} — shed pony wall carrying the high plate`,
       });
     }

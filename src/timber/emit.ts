@@ -30,6 +30,8 @@ export interface EmitOptions {
   wall?: Member['wall'];
   grade?: string;
   angles?: Member['angles'];
+  /** Bearing at both ends together, inches — see `Member.bearingTotalIn`. Only the emitter knows it. */
+  bearingTotalIn?: number;
 }
 
 export interface Emitter {
@@ -63,6 +65,9 @@ export function makeEmitter(prefix: string, sink?: Member[]): Emitter {
       doctrineRef: opts.doctrineRef,
       ...(opts.wall ? { wall: opts.wall } : {}),
       ...(opts.angles ? { angles: opts.angles } : {}),
+      // Absent unless the emitter said so: a member that does not carry the field reads as the
+      // doorway shape in `spans.ts`, and nothing already emitted grows a key it did not have.
+      ...(opts.bearingTotalIn !== undefined ? { bearingTotalIn: opts.bearingTotalIn } : {}),
     };
     members.push(member);
     return member;

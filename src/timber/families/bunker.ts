@@ -476,6 +476,10 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
     cutLengthFt: doorWidth + 2 * jambT,
     position: [postInset, wallTopY + DRESSED[headerNominal]!.d / IN_PER_FT / 2, outerW / 2],
     rotation: [0, Math.PI / 2, 0],
+    // A JAMB IS NOT A JACK STUD. This piece lands on the bunker's own jamb timbers at each side,
+    // which are heavier than the stud a doorway header bears on, so the clear span it is checked
+    // over is shorter — by the wood that is actually under it.
+    bearingTotalIn: 2 * jambT * IN_PER_FT,
     // And WITH THE CAPS, for the same reason: this piece is that course, and the two cap beams
     // on either side of the doorway stop dead at the jambs waiting for it.
     stage: sCap,

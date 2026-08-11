@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import '../src/doctrine/index';
 import { exportDoctrine, importDoctrine, getFillState, resetFillState } from '../src/doctrine/io';
 import { counts, all, getByPath } from '../src/doctrine/registry';
-import { spanSizes, stringerSizeForSpan } from '../src/doctrine/protection';
+import { shieldMaterials, spanSizes, stringerSizeForSpan } from '../src/doctrine/protection';
 import { compute } from '../src/engine/compute';
 import type { GeometryModel } from '../src/engine/geometry';
 import { MemoryAdapter } from '../src/state/persistence';
@@ -196,7 +196,7 @@ test('a fill that scrambles the stringer span table is refused WHOLE', () => {
   assert.equal(stringerSizeForSpan(widest), spanSizes[spanSizes.length - 1]!.sizeLabel);
 });
 
-test('a fill whose excavation stage shares do not sum to 1 is refused WHOLE', () => {
+test('a fill whose excavation stage shares do not sum to 1 is refused WHOLE, against the TABLE', () => {
   const paths = ['security', 'hasty', 'deliberate', 'parapet'].map((k) => 'stages.excavationSplit.' + k);
   const before = paths.map((p) => getByPath(p)!.value as number);
   const target = 'stages.excavationSplit.hasty';
@@ -205,10 +205,21 @@ test('a fill whose excavation stage shares do not sum to 1 is refused WHOLE', ()
 
   assert.ok(!rep.ok, 'a partition that does not sum to 1 is refused');
   assert.equal(rep.applied, 0);
-  assert.ok(rep.rejected.some((r) => /sum to 1/.test(r.reason)), 'says which invariant broke');
   assert.deepEqual(paths.map((p) => getByPath(p)!.value), before, 'registry unchanged — all or nothing');
   const sum = paths.reduce((acc, p) => acc + (getByPath(p)!.value as number), 0);
   assert.ok(Math.abs(sum - 1) < 1e-9, 'the stage partition still divides exactly one total');
+
+  // No single share is the wrong one, so the finding belongs to the table, not to a row: it is
+  // reported apart from the per-entry rejections and never counted as an entry, because the
+  // reader would otherwise be sent hunting for a fill-table row that does not exist.
+  const table = rep.rejectedTables.find((r) => /sum to 1/.test(r.reason));
+  assert.ok(table, 'says which invariant broke, as a table finding');
+  assert.equal(getByPath(table!.path), undefined, 'a table identifier, not a registry path');
+  assert.deepEqual(rep.rejected, [], 'the one entry in the file is not itself invalid');
+  assert.ok(!/entr\(y\/ies\) failed validation/.test(rep.message ?? ''), 'the summary does not call a table an entry: ' + rep.message);
+  // …and the message tells the filler what to do about it: all four shares travel together.
+  for (const p of paths) assert.ok(table!.reason.includes(p.split('.').pop()!), 'names ' + p + ': ' + table!.reason);
+  assert.match(table!.reason, /same file/, 'and says they fill together');
 });
 
 test('a non-monotone shielding fill is APPLIED but reported', () => {
@@ -228,6 +239,61 @@ test('a non-monotone shielding fill is APPLIED but reported', () => {
   assert.ok(rep.warnings.some((w) => w.path === path), 'the bigger round needing less cover is reported');
   assert.ok((getByPath(smaller)!.value as number) > (getByPath(path)!.value as number), '…and it genuinely is backwards');
   restore();
+});
+
+test('a shielding table zeroed WHOLESALE is reported — the failure a ladder walk cannot see', () => {
+  // The import bound accepts 0, and zeroing a whole class leaves every step of the severity
+  // ladder equal rather than descending, so a monotonicity walk sees nothing wrong with it —
+  // while the engine now reads every one of those leaves as a missing value and refuses to
+  // size a roof from any of them. This is the fill that must not pass quietly.
+  const smallArms = ['sa-556', 'sa-762', 'sa-127', 'sa-145'];
+  const paths = smallArms.flatMap((id) => shieldMaterials.map((m) => 'protection.shielding.' + id + '.' + m));
+
+  const rep = importDoctrine(fixture(paths.map((path) => ({ path, value: 0 }))), { dryRun: true });
+
+  assert.ok(rep.ok, 'plausibility never blocks — it reports');
+  const warned = new Set(rep.warnings.map((w) => w.path));
+  for (const p of paths) assert.ok(warned.has(p), 'no warning for ' + p);
+  assert.ok(rep.warnings.every((w) => /MISSING/.test(w.reason)), 'each says a zero reads as an absent value');
+});
+
+test('zeroing the SMALLEST threat of a class is reported — it decreases against nothing', () => {
+  // 5.56mm is the first rung of the small-arms ladder, so no predecessor exists to fall below.
+  const path = 'protection.shielding.sa-556.soil';
+  const rep = importDoctrine(fixture([{ path, value: 0 }]), { dryRun: true });
+  assert.ok(rep.ok);
+  assert.ok(rep.warnings.some((w) => w.path === path), 'the first rung is checked on its own merits');
+});
+
+test('a reversed standoff ladder is reported — standoff is half of what C13 named', () => {
+  // The biggest round given the smallest standoff, across the whole indirect class. Every value
+  // is in range and rightly typed, so only a table-shaped check sees it — and standoff drives
+  // the setback geometry, so it is exactly as safety-critical as the shielding half.
+  const ids = ['ind-mtr-60', 'ind-mtr-81', 'ind-mtr-120', 'ind-art-105', 'ind-art-122', 'ind-art-152', 'ind-art-155'];
+  const paths = ids.map((id) => 'protection.threats.' + id + '.standoffMin');
+  const before = paths.map((p) => getByPath(p)!.value as number);
+  const reversed = [...before].reverse();
+
+  const rep = importDoctrine(fixture(paths.map((path, i) => ({ path, value: reversed[i]! }))), { dryRun: true });
+
+  assert.ok(rep.ok, 'plausibility never blocks');
+  assert.ok(rep.warnings.length > 0, 'a reversed standoff ladder is not silent');
+  assert.ok(rep.warnings.every((w) => paths.includes(w.path)), 'warns on the standoff leaves themselves');
+  assert.ok(rep.warnings.some((w) => /less standoff/.test(w.reason)), 'says a bigger round wants less standoff');
+  // The biggest round in the class is the one that ends up worst off, so it must be named.
+  assert.ok(rep.warnings.some((w) => w.path === 'protection.threats.ind-art-155.standoffMin'), '155mm is reported');
+  assert.deepEqual(paths.map((p) => getByPath(p)!.value), before, 'dry run mutated nothing');
+});
+
+test('a standoff filled to zero is reported even where no ladder step descends', () => {
+  // The 60mm mortar is the smallest round of the indirect class, so zeroing its standoff falls
+  // below no other rung — the ladder sees nothing, and only a value-in-its-own-right check does.
+  const path = 'protection.threats.ind-mtr-60.standoffMin';
+  const rep = importDoctrine(fixture([{ path, value: 0 }]), { dryRun: true });
+  assert.ok(rep.ok);
+  const w = rep.warnings.find((x) => x.path === path);
+  assert.ok(w, 'no munition is safe at no standoff');
+  assert.match(w!.reason, /MISSING value/, 'reported as an absent value, not as a ladder step: ' + w!.reason);
 });
 
 test('a stored fill that no longer matches the registry is refused, not trusted', async () => {

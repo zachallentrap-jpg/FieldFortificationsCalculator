@@ -148,22 +148,55 @@ test('a header genuinely past its table still warns, on the CLEAR span', () => {
   assert.match(warnings[0]!, /has NOT changed it/);
 });
 
-test('the checker measures clear span — the same bearing the generator cuts', () => {
-  // Non-circular: the cut length comes off the emitted member, the reported span off the warning,
-  // and the difference has to be the two jack studs the header bears on. Nothing here restates a
-  // table value against itself.
+// ── One role, several joints: the bearing is the emitter's to declare ────────
+//
+// "Header" is worn by four different members. A doorway header is cut to the rough opening plus a
+// JACK STUD each side. A beam over an open front runs post CENTRELINE to post centreline, so each
+// end has half a post under it and none of the wood is spare. A bunker's entrance header lands on
+// jamb timbers. Subtracting one fixed bearing from all of them reports the wrong clear span for
+// three of the four — under-reporting a beam's span is the direction that goes quiet on a real
+// overload — so the member says what it was cut to bear on and the checker reads it.
+
+test('a beam over an open bay is checked on the span between its POSTS, not a doorway’s bearing', () => {
+  // The expectation comes from the emitted POSTS — centre spacing less one post face, which is
+  // what the beam actually clears — so nothing here restates the checker's own arithmetic. The
+  // beam is re-labelled to a nominal the table condemns, because the open front's own bay rule
+  // keeps every shipped beam inside its row (that is the design working, not the check).
+  const spec = preset('storage-shed');
+  spec.openFront = 'S';
+  const model = generateStructure(spec);
+  const beams = model.members.filter((m) => m.role === 'header' && m.wall === 'S');
+  const posts = model.members.filter((m) => m.role === 'post' && m.wall === 'S').sort((a, b) => a.position[0] - b.position[0]);
+  assert.ok(beams.length > 0 && posts.length >= 2, 'the open front framed no beam on posts');
+
+  const beam = beams.find((b) => Math.abs(b.position[0] - (posts[0]!.position[0] + posts[1]!.position[0]) / 2) < 0.5)!;
+  assert.ok(beam, 'no beam spanning the first bay');
+  const clearFt = posts[1]!.position[0] - posts[0]!.position[0] - posts[0]!.actual.d / 12;
+
+  const undersized = { ...beam, nominal: '2x6', actual: DRESSED['2x6']! };
+  const warnings = spanWarnings([undersized], { joistSpacingIn: 16, rafterSpacingIn: 16 });
+  assert.equal(warnings.length, 1, 'a 2x6 across a whole bay must be reported');
+  assert.ok(
+    Math.abs(warnings[0]!.spanFt - clearFt) < 0.02,
+    `posts leave ${clearFt.toFixed(3)} ft clear; the checker reported ${warnings[0]!.spanFt.toFixed(3)} ft`,
+  );
+  // And that is genuinely NOT the doorway shape: a jack stud each side would report a longer span
+  // than the beam has, which is the number that would have been printed on a life-safety line.
+  const doorwayShape = (beam.cutLength - 2 * DRESSED[LUMBER.studNominal.value as string]!.w) / 12;
+  assert.ok(Math.abs(doorwayShape - clearFt) > 0.02, 'the two shapes have become the same number — this proves nothing');
+});
+
+test('a doorway header keeps the doorway bearing when its emitter says nothing', () => {
+  // The FROZEN wall generator cannot be given a field to carry, so absence has to keep meaning
+  // "cut to the opening plus a jack each side". A 12-ft opening is a 12-ft clear span, stated by
+  // the spec rather than recomputed from the member.
   const spec = preset('gp-frame');
   spec.stories[0].openings.S = [
     { kind: 'door', offsetFt: 4, widthFt: 12, heightFt: 6, sillHeightFt: 0, fill: 'rough' },
   ];
   const model = generateStructure(spec);
   const header = model.members.find((m) => m.role === 'header')!;
-  const reported = Number(/spans ([\d.]+) ft/.exec(
-    model.issues.find((i) => i.kind === 'span' && i.message.includes('header'))!.message,
-  )![1]);
-  const bearingIn = DRESSED[LUMBER.studNominal.value as string]!.w;
-  assert.ok(
-    Math.abs((header.cutLength - 2 * bearingIn) / 12 - reported) < 0.05,
-    `cut ${header.cutLength} in, reported ${reported} ft — the two bearings are unaccounted for`,
-  );
+  assert.equal(header.bearingTotalIn, undefined, 'the frozen wall generator has started declaring a bearing');
+  const warning = spanWarnings([header], { joistSpacingIn: 16, rafterSpacingIn: 16 })[0]!;
+  assert.ok(Math.abs(warning.spanFt - 12) < 0.02, `a 12 ft opening reported as ${warning.spanFt.toFixed(2)} ft`);
 });

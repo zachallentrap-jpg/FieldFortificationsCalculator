@@ -69,10 +69,14 @@ test('each validation code is reachable', () => {
   ];
   for (const s of scenarios) for (const c of codesFor(s)) fired.add(c);
 
-  // ROOF_NO_SHIELDING_DATA has no reachable input combination — it is the fail-safe for doctrine
-  // that is MISSING, so reaching it means taking the shielding row away.
+  // ROOF_NO_SHIELDING_DATA and ROOF_NO_COVER_MULTIPLIER have no reachable input combination —
+  // they are the fail-safes for doctrine that is missing or unusable, so reaching them means
+  // taking the shielding row away, or filling a value that leaves no thickness to build to.
   withNoShieldingData('ind-mtr-81', () => {
     for (const c of codesFor({ threat: 'ind-mtr-81', overheadCover: true })) fired.add(c);
+  });
+  withDoctrine({ 'standards.deliberate.coverMul': 0 }, () => {
+    for (const c of codesFor({ threat: 'ind-mtr-81', overheadCover: true, standard: 'deliberate' })) fired.add(c);
   });
 
   for (const def of allCodes()) {
@@ -92,23 +96,44 @@ test('COVER_UNDER_THREAT fires for a hasty roof and clears at deliberate/reinfor
   assert.ok(!codesFor({ threat: 'sa-556', overheadCover: false, standard: 'hasty' }).has('COVER_UNDER_THREAT'), 'no roof, no shortfall');
 });
 
+// Pull the two thicknesses the warning prints as its evidence back out of the message.
+function coverEvidence(message: string): { drawn: number; required: number } {
+  const m = /roof ~([\d.]+) ft as drawn; ~([\d.]+) ft fully stops/.exec(message);
+  assert.ok(m, 'the warning prints both thicknesses: ' + message);
+  return { drawn: Number(m![1]), required: Number(m![2]) };
+}
+
 test('COVER_UNDER_THREAT fires on a shortfall too small to survive display rounding', () => {
-  // The panel rounds to a tenth of a foot, and the check used to round BOTH sides before
-  // comparing. Fill the doctrine so a real shortfall lands inside one rounding step: 1.44 ft
-  // required, 1.3536 ft delivered — both print as ~1.4 ft, and the roof is still an inch short
-  // of stopping the round. Rounding first hides it; that is the unsafe direction.
+  // The panel rounds to a tenth of a foot. Fill the doctrine so a real shortfall lands inside
+  // one rounding step: 1.44 ft required, 1.3536 ft delivered — a roof an inch short of stopping
+  // the round, on the one check that says so. Comparing rounded values hides it entirely, and
+  // reporting rounded values shows the operator two identical numbers as proof the roof is thin.
   withDoctrine({ 'protection.shielding.sa-556.soil': 1.44, 'standards.hasty.coverMul': 0.94 }, () => {
     const r = compute(defaultInputs({ threat: 'sa-556', overheadCover: true, standard: 'hasty' }));
     assert.equal(r.cover.roofPath, 'earth_on_stringers', 'a real earth roof, not an engineered one');
     assert.ok(r.cover.thickness < 1.44, 'the roof really is thinner than the requirement');
     const shortfall = r.validation.find((v) => v.code === 'COVER_UNDER_THREAT');
     assert.ok(shortfall, 'a genuine shortfall must not be rounded away');
-    // …while the message still prints the rounded numbers the panel shows.
-    assert.match(shortfall!.message, /1\.4 ft as drawn/);
+    // The evidence must SHOW the shortfall: two numbers that differ, in the direction claimed.
+    const { drawn, required } = coverEvidence(shortfall!.message);
+    assert.ok(drawn < required, 'the printed roof must read thinner than the printed requirement: ' + shortfall!.message);
+    assert.match(shortfall!.message, /ft short\)/, 'and the shortfall itself is named');
   });
 });
 
-test('COVER_UNDER_THREAT outranks the planning-realism notes it used to sit below', () => {
+test('COVER_UNDER_THREAT reports at the panel’s own tenth of a foot when that is enough', () => {
+  // Precision is added only where it is needed — a shortfall wider than a tenth of a foot is
+  // reported in the same tenths the panel and the drawings show.
+  const r = compute(defaultInputs({ threat: 'ind-art-155', overheadCover: true, standard: 'hasty' }));
+  const shortfall = r.validation.find((v) => v.code === 'COVER_UNDER_THREAT');
+  assert.ok(shortfall, 'a hasty roof against 155mm is short');
+  const { drawn, required } = coverEvidence(shortfall!.message);
+  assert.ok(required - drawn > 0.1, 'this shortfall is bigger than one rounding step');
+  assert.equal(drawn, Math.round(r.cover.thickness * 10) / 10, 'drawn thickness at the panel’s precision');
+  assert.match(shortfall!.message, /roof ~\d+(\.\d)? ft as drawn/, 'no extra decimals where tenths already tell the story');
+});
+
+test('COVER_UNDER_THREAT ranks with the warnings, above every planning-realism note', () => {
   const v = compute(defaultInputs({ threat: 'sa-556', overheadCover: true, standard: 'hasty' })).validation;
   const cover = v.find((i) => i.code === 'COVER_UNDER_THREAT');
   assert.ok(cover, 'fires on a hasty roof');

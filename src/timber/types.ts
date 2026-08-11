@@ -68,6 +68,21 @@ export interface Member {
   nailing: string; // e.g. "2-16d toenail ea end"
   doctrineRef: string; // page cite, e.g. "FM 5-426 Table 6-2, p.6-17"
   count?: number; // for instanced identical members
+  /**
+   * How much of `cutLength` is BEARING rather than span — both ends together, in inches.
+   *
+   * A span table row is a clear span between bearings and a cut length is not: a doorway header is
+   * cut to the rough opening plus a jack stud at each side, a beam over an open bay runs post
+   * centreline to post centreline with half a post under each end (and a whole post at the ends of
+   * the run, which is why this is a TOTAL and not a per-end figure), and a bunker's entrance header
+   * lands on jamb timbers that are neither. The span checker cannot read that off the role — every
+   * one of them is a `header` — so the member that was cut says what it was cut to bear on.
+   *
+   * Absent means the doorway shape (a jack stud at each side), which is what the frozen wall
+   * generator cuts and what `spans.ts` falls back to. Omitted from the emitted member when the
+   * emitter does not set it, so nothing in the frozen branch's output moves.
+   */
+  bearingTotalIn?: number;
 }
 
 // Dressed sizes, inches (FM 5-426 Table 2-1 values for common dimension lumber).
@@ -79,11 +94,18 @@ export interface Member {
 // to a 6-in face and nominal − 3/4 in at 8 in and over — but that second, larger deduction is a
 // DIMENSION-LUMBER rule. A TIMBER (nominal 5 in and thicker in its least dimension) is surfaced
 // green and dresses by 1/2 in on every face, so an 8-in timber face is 7 1/2 in where an 8-in
-// dimension-lumber face is 7 1/4. The two timber rows here carried the dimension-lumber figure
-// and modelled 1/4 in shallow apiece — on the bunker cribbing, the bunker cap, the overhead
-// stringers and the tower mudsill, which are the LS-tagged members in the table. Board feet are
-// billed off the NOMINAL section (`BF_PER_LF`), so the bill does not move; the wood does.
-// `test/timber2-dressed.test.ts` asserts the rule across every row rather than these two.
+// dimension-lumber face is 7 1/4. The two timber rows here carry the timber deduction, which is
+// what the bunker cribbing, the bunker cap, the overhead stringers and the tower mudsill are cut
+// from — the LS-tagged members in the table.
+//
+// AND THE BILL FOLLOWS. Only the RATE is nominal: `BF_PER_LF` is a nominal section, so a stick of
+// 8x8 costs the same board feet per foot whatever it dresses to. The LENGTHS are not — a piece
+// cut to fit between two members is cut to their dressed faces, so the crib bunker's overhead
+// blocking is 14.556 ft between 7 1/2-in stringers where it would be 14.833 ft between 7 1/4-in
+// ones, and the bunker's board-foot total moves with it. A dressed size is a geometry number that
+// reaches the BOM through the cut list; treating it as decoration is how it gets edited casually.
+// `test/timber2-dressed.test.ts` asserts the deduction rule across every row rather than these
+// two, and pins the blocking's cut to the rule rather than to a literal.
 export const DRESSED: Record<string, { w: number; d: number }> = {
   '1x2': { w: 0.75, d: 1.5 },
   '1x3': { w: 0.75, d: 2.5 },

@@ -161,6 +161,9 @@ export function generatePartitions(input: PartitionInput): Member[] {
         position: [hMid[0] + normal[0] * lat, studBottom + doorH + headerD / 2, hMid[1] + normal[1] * lat],
         rotation: [0, yaw, 0],
         stage,
+        // A jack at each side, which is what the cut length above adds — said out loud so the
+        // span check reads this member's own bearing rather than a default that happens to match.
+        bearingTotalIn: 2 * studT * IN_PER_FT,
         nailing: '16d @ 16" each side (PH)',
         doctrineRef: `${citeOf(LUMBER.headerNominal)} — partition doorway`,
       });

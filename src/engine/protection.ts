@@ -10,10 +10,13 @@
 // bolted on around a still-fabricated thickness. `engineeredReason` tells validation which
 // message to show; it never weakens the thickness-zero rule.
 //
-// The same fail-safe covers the DATA axis: a threat whose cover material has no shielding row
-// in the loaded doctrine has no thickness to build from, so it resolves to
-// 'engineered_required' too. Every unknown in this module — threat, span, or missing data —
-// leaves by the same door.
+// The same fail-safe covers the DATA axis: a threat whose cover material has no USABLE
+// shielding thickness in the loaded doctrine has nothing to build a roof from, so it resolves
+// to 'engineered_required' too. "Usable" means strictly positive, on the resolved thickness
+// the roof would actually be built to: a required thickness of zero or less for a real
+// munition is not "no cover needed" — nothing stops a round — so it means the value is
+// absent, and a multiplier that scales a real requirement away to nothing means the same.
+// Every unknown in this module — threat, span, or unusable data — leaves by the same door.
 
 import { roofPathFor, coverMaterialDefault, shielding, shieldMaterials, stringerSizeForSpan } from '../doctrine/protection';
 import type { ShieldMaterial } from '../doctrine/protection';
@@ -37,11 +40,26 @@ function coverLeafFor(threat: string): Provenance<number> | undefined {
   return isShieldMaterial(material) ? shielding[threat]?.[material] : undefined;
 }
 
-// Is the loaded doctrine missing the shielding thickness this threat's cover would be sized
-// from? Exported because validation must say WHY the roof came back engineered, and asking the
-// same question through the same helper is the only way the two can never disagree.
-export function coverDataMissing(threat: string): boolean {
-  return coverLeafFor(threat) === undefined;
+// Which unknown, if any, leaves this threat's earth roof with no thickness to build to.
+export type CoverGap =
+  | 'shielding_data' // no shielding row, or one that resolves to zero/negative feet
+  | 'cover_multiplier'; // a real requirement scaled away to nothing by the standard
+
+// The single answer to "can a thickness be built here, and if not, which value is the reason".
+// resolveCover and validation both ask THROUGH this helper — asking the same question the same
+// way is the only way the roof the engine builds and the reason the operator reads can never
+// disagree.
+function usableCover(threat: string, coverMul: number): { leaf: Provenance<number> } | { gap: CoverGap } {
+  const leaf = coverLeafFor(threat);
+  if (!leaf || !(leaf.value > 0)) return { gap: 'shielding_data' };
+  if (!(leaf.value * coverMul > 0)) return { gap: 'cover_multiplier' };
+  return { leaf };
+}
+
+// Exported so validation can say WHY the roof came back engineered.
+export function coverThicknessGap(threat: string, coverMul: number): CoverGap | undefined {
+  const r = usableCover(threat, coverMul);
+  return 'gap' in r ? r.gap : undefined;
 }
 
 export function resolveCover(threat: string, coverOn: boolean, coverMul: number, clearSpanFt: number): CoverResolution {
@@ -60,15 +78,15 @@ export function resolveCover(threat: string, coverOn: boolean, coverMul: number,
     return { roofPath: 'engineered_required', thickness: 0, material: '', engineeredReason: 'span' };
   }
 
-  // Data fail-safe: no shielding row for this threat's cover material means there is no
-  // thickness to size the roof from. Treating the gap as zero built a roof, billed the
-  // stringers and delivered nothing — the one unknown in this module that failed OPEN. It
-  // resolves like every other unknown here: engineered, zero thickness. No `engineeredReason`
-  // is recorded — 'threat' and 'span' each name a doctrine rule that fired, and this is the
-  // absence of doctrine rather than a rule; validation asks coverDataMissing() directly.
-  const leaf = coverLeafFor(threat);
-  if (!leaf) return { roofPath: 'engineered_required', thickness: 0, material: '' };
+  // Data fail-safe: with no usable thickness there is nothing to size the roof from. Building
+  // it anyway drew a roof, billed the stringers and delivered zero protection — an earth roof
+  // of zero feet is not a roof. It resolves like every other unknown here: engineered, zero
+  // thickness. No `engineeredReason` is recorded — 'threat' and 'span' each name a doctrine
+  // rule that fired, and this is the absence of usable doctrine rather than a rule; validation
+  // asks coverThicknessGap() directly for which value is missing.
+  const cover = usableCover(threat, coverMul);
+  if ('gap' in cover) return { roofPath: 'engineered_required', thickness: 0, material: '' };
 
   const material = coverMaterialDefault[threat] ?? 'soil';
-  return { roofPath, thickness: leaf.value * coverMul, material, thicknessLeaf: leaf };
+  return { roofPath, thickness: cover.leaf.value * coverMul, material, thicknessLeaf: cover.leaf };
 }

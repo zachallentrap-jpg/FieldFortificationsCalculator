@@ -62,9 +62,17 @@ export const LS_CONSUMERS: Readonly<Record<string, LsConsumer>> = {
   'SPAN.ceilingJoist': { roles: ['joist'] , label: 'Ceiling-joist span limit' },
   'SPAN.rafter': { roles: ['rafter', 'jackRafter', 'hipRafter'] , label: 'Rafter span limit' },
   'SPAN.header': { roles: ['header'] , label: 'Header span limit' },
-  // How much of a rafter its bird's mouth may take. It governs wherever a rafter is seated on a
-  // plate, which is every rafter role the toolkit cuts a seat into.
-  'NOTCH.rafterSeatMaxDepthFrac': { roles: ['rafter', 'jackRafter', 'hipRafter'] , label: 'Bird’s-mouth seat depth limit' },
+  // How much of a rafter its bird's mouth may take.
+  //
+  // THE ROLES ARE THE ONES THAT GET MEASURED, NOT THE ONES THE RULE APPLIES TO IN THE ABSTRACT.
+  // `birdsMouth.ts` seats commons and jacks — same notch, same plate, same pitch — and derives no
+  // seat for a HIP, whose double-cheek cut over the corner it does not model. Listing `hipRafter`
+  // here printed "Bird's-mouth seat depth limit — REVIEW REQUIRED" on the packet of a tower cab
+  // that has four hip rafters and nothing else, i.e. a life-safety row for a check that examined
+  // none of its members. A row that names a member nothing measured is a false assurance, which
+  // is the failure this table's own header calls printing too many. The hip's seat is an open
+  // item in DECISIONS.md; when it is derived, it belongs back on this line.
+  'NOTCH.rafterSeatMaxDepthFrac': { roles: ['rafter', 'jackRafter'] , label: 'Bird’s-mouth seat depth limit' },
 
   // Fall protection. Every one of these is a height or a spacing somebody trusts with a fall.
   'RAIL.topHeightIn': { roles: ['railTop'] , label: 'Top rail height' },

@@ -78,11 +78,16 @@ export const LAYOUT = {
   bridgingRowMaxFt: doc(8, 'FM 5-426: bridging rows not more than 8 ft apart', { unit: 'ft' }),
   // The legacy floor generator starts a bridging row once a half-span reaches this.
   bridgingThresholdFt: doc(7.5, 'FM 5-426 bridging rows', { unit: 'ft' }),
-  // A DISTANCE, not a rafter count. This was `collarTieEveryNthRafter: 3` — "every 3rd rafter",
-  // which is the 4-ft interval written for the 16-in layout it was written on and becomes 6 ft
-  // the moment the rafters go to 24 in. The generator now derives its step from the spacing and
-  // this limit, so the two spacings cannot mean two different rules.
-  collarTieMaxSpacingFt: doc(4, 'IRC R802.3.1: collar ties spaced not more than 4 ft o.c.', { unit: 'ft', ph: false }),
+  // A DISTANCE, not a rafter count. "Every 3rd rafter" is the 4-ft interval written for a 16-in
+  // layout, and it becomes 6 ft the moment the rafters go to 24 in; keyed on the spacing, one
+  // rule serves both layouts. `roof.ts` mirrors this value (C-10: the frozen branch keeps its
+  // own literal) and `test/timber2-roofs.test.ts` holds the two in lockstep.
+  //
+  // PH BECAUSE NOBODY HERE HAS READ THE PAGE. The section is named and the figure is the
+  // recognized one, but naming a section is not checking it, and a sibling entry's flag is not
+  // a page check of this one — the flag has to mean the same thing everywhere or it means
+  // nothing.
+  collarTieMaxSpacingFt: doc(4, 'IRC R802.3.1: collar ties spaced not more than 4 ft o.c.', { unit: 'ft' }),
   purlinSpacingMaxIn: doc(24, 'FM 5-426 purlin spacing along the slope', { unit: 'in' }),
   // Below this width the floor is girderless — joists clear-span (plan §3.2.2). Stated once
   // so custom, guard-shack and latrine cannot disagree about where the rule starts.
@@ -134,19 +139,16 @@ export const NOTCH = {
   /**
    * The deepest a bird's mouth may cut into the rafter, as a fraction of the rafter's face depth.
    *
-   * `birdsMouth.ts` has argued from this number since the day it was written — the whole case for
-   * seating the rafter plane at a real HAP is that the old datum "eats 56% of the rafter — past
-   * the third of the depth a bending member can lose at its bearing" — and then implemented no
-   * limit at all: the only guard rejected a notch through the WHOLE board, so a 2x6 on a 2x4
-   * plate lost 45% of its depth at 12/12 and said nothing. A seat is cut at the bearing, which is
-   * where the shear is, and what is left of the board is what carries the roof.
+   * A seat is cut AT THE BEARING, which is where the shear is, and what is left of the board is
+   * what carries the roof. On a 2x6 over a 2x4 plate the seat takes 35% of the depth at 8/12 and
+   * 45% at 12/12 — both inside the pitch range the tool offers, both past this limit.
    *
    * A fraction rather than a distance because that is how the rule is stated and how it scales: a
    * plate-wide seat takes `plateWidth · tan θ` of plumb depth whatever the rafter is.
    */
   rafterSeatMaxDepthFrac: doc(
     1 / 3,
-    'standard carpentry practice: a bearing notch leaves at least two thirds of the member depth (PH — no page-checked section)',
+    'standard carpentry practice: a bearing notch leaves at least two thirds of the member depth (no published section to check)',
     { lifeSafety: true },
   ),
 } as const;
@@ -481,16 +483,20 @@ export const LABOR = {
 // ── Fastening schedules ──────────────────────────────────────────────────────
 // Every distinct `nailing` string the toolkit puts on a member card, given one cited home.
 //
-// IT USED TO COVER THE FROZEN BRANCH ONLY, AND THE FROZEN BRANCH IS NOT WHAT SHIPS. The 28
-// entries under the `floor.ts`/`walls.ts`/`roof.ts` headings were enumerated from what
-// `generateFrame` emits across the compat fixtures, and the bidirectional test walked the same
-// path — so the guarantee was true of a code path the app reaches only through the compat lock.
-// The app generates through `generateStructure` over the family table, and against THAT the
-// register was missing 59 schedules on ~1,800 member instances: every shutter, door, screen
-// band, tower bolt, crib spike and roll of roofing in the catalog carried a schedule with no
-// cited home. Part of the gap was not even a gap — the same joint written "each bearing" here
-// and "ea bearing" there. Those are collapsed at the SOURCE (the generators read the value from
-// this table rather than retyping it), so the drift cannot come back by retyping.
+// THE GUARANTEE IS ONLY AS WIDE AS THE CORPUS THAT PROVES IT. What ships is
+// `generateStructure` over the catalog, driven by a panel of controls, so `test/timber2-doctrine.
+// test.ts` walks the shipped cards AND every build reachable by moving one panel control on one
+// of them — a foundation set to slab, a front left open, a tower cab roofed as a shed, a bunker
+// walled as a crib. Those are one click away, and a schedule reachable in one click with no
+// cited home is exactly the value this table exists to stop. The frozen fixtures stay in the
+// walk: the compat branch is shipped code too.
+//
+// ONE JOINT, ONE ENTRY. Two members that make different joints do not share a line here even
+// when they would type the same words, because the entry's citation names the member — sharing
+// it hands a load-carrying stick the citation written for an infill one. The mechanical version
+// of the same fault (the same joint written "ea bearing" here and "each bearing" there) is
+// collapsed at the SOURCE: the sibling generators read the value from this table rather than
+// retyping it, so the drift cannot come back by retyping.
 //
 // The mirror discipline still holds for the three FROZEN modules: they keep their literals
 // (editing them is C-10 stop-the-line) and this table mirrors them. The sibling generators are
@@ -517,6 +523,15 @@ export const NAILING = {
   // which reads the entries below rather than retyping them).
   footing: doc('poured on undisturbed soil (PH)', 'FM 5-426 ch. 5 footings'),
   slabOverVaporBarrier: doc('poured against walls over vapor barrier (PH)', 'FM 5-426 ch. 5 slab on grade'),
+  // Concrete on the member card. A pour has no fastening schedule, and the line still has to say
+  // something — a blank reads as "not decided yet" where the honest answer is "nothing is nailed
+  // here". The slab-on-grade line carries the one fastening that IS made against it: the sole
+  // plate of the wall standing on it.
+  concreteNoFasteners: doc('no fasteners — concrete (PH)', 'FM 5-426 ch. 5 footings: poured, not fastened'),
+  slabOnGradeAnchor: doc(
+    'no fasteners — concrete; sole plates anchored to the slab (PH)',
+    'FM 5-426 ch. 5 slab on grade: the sole plate is anchored to the slab it stands on',
+  ),
   foundationWallAnchor: doc(
     '1/2" anchor bolts @ 6 ft max o.c. into sill, min 2 per plate, within 12" of each end (IRC R403.1.6)',
     'IRC R403.1.6',
@@ -558,15 +573,27 @@ export const NAILING = {
   rafterAtRidge: doc('3-16d at ridge, bird’s-mouth toenail 3-8d (PH)', 'FM 5-426 ch. 7 rafters'),
   ridgeToRafters: doc('rafters 3-16d ea (PH)', 'FM 5-426 ch. 7 ridge'),
   collarTie: doc('3-10d face nail ea end (IRC R802.3.1)', 'IRC R802.3.1', { ph: false }),
-  // Named for what carries it. The one emitter of this schedule in the frozen branch is the
-  // GABLE STUD, and the sibling generator's pony-wall and rake studs make the same joint — a
-  // short infill stud, toenailed top and bottom into the plate and the rafter over it. Filed as
-  // "roofBlocking" it read as a citation for a member the toolkit does not emit.
+  // Named for what carries it: the gable stud in the frozen branch and the rake stud in the
+  // sibling generator, which are the same joint — a short INFILL stud, carrying nothing but
+  // itself, toenailed top and bottom into the plate and the rafter over it.
+  //
+  // WHAT CARRIES LOAD DOES NOT SHARE THIS CITATION. A register keyed on the schedule string
+  // gives every member that types the same words one entry, and then the entry names the wrong
+  // member — which is the defect this table exists to prevent, not one it may commit. The shed
+  // pony-wall stud (`ponyWallStud` below) stands under the high plate of a roof; it is a bearing
+  // stud and it carries its own line.
   rakeInfillStud: doc('toenail 2-8d ea end (PH)', 'FM 5-426 ch. 7: gable studs and raked infill'),
 
   // ── Roof kinds the frozen branch cannot frame — subsystems/roofFamilies.ts
   shedRafterAtPlates: doc('bird’s-mouth toenail 3-8d each plate (PH)', 'FM 5-426 ch. 7 rafters: a shed rafter is seated at both walls'),
   shedPonyPlate: doc('16d @ 16" to the studs; rafters bird’s-mouth toenail 3-8d (PH)', 'FM 5-426 ch. 6 wall framing: the pony wall the high side of a shed carries'),
+  // The stud UNDER that plate. Same fastening as an infill stud and a different job: this one is
+  // in the load path from the rafter seat down to the wall below, so it is cited as wall framing
+  // and its schedule says which plates it is toenailed between.
+  ponyWallStud: doc(
+    'toenail 2-8d ea end, between the plate below and the pony plate (PH)',
+    'FM 5-426 ch. 6 wall framing: a bearing stud toenailed between its plates',
+  ),
   jackRafterAtHip: doc('bevel-cut to the hip, 3-16d; bird’s-mouth toenail 3-8d (PH)', 'FM 5-426 ch. 7 hip roofs: jacks bevel-cut to the hip rafter'),
   hipRafterAtRidge: doc('3-16d at the ridge; jacks bear on it both sides (PH)', 'FM 5-426 ch. 7 hip roofs'),
   ridgeAtHip: doc('commons and hips 3-16d ea (PH)', 'FM 5-426 ch. 7 ridge: shortened for the hips at each end'),
@@ -580,6 +607,19 @@ export const NAILING = {
   kingToJackStud: doc('16d @ 12" to the jack (PH)', 'FM 5-426 ch. 6 framed openings'),
   builtUpHeaderEachSide: doc('16d @ 16" each side (PH)', 'FM 5-426 ch. 6 framed openings: the two plies of a header'),
 
+  // ── The open front: a wall replaced by posts and a beam — subsystems/openFront.ts
+  // Both of these carry a roof. The post is the wall's whole load path over that bay, and the
+  // beam is a built-up member spliced over the posts it bears on, so each says what holds it at
+  // each end rather than borrowing a jamb's schedule.
+  openFrontPost: doc(
+    'framing anchor at the foot and under the beam (PH)',
+    'FM 5-426 post & footer spacing: a post carrying the beam over an open bay',
+  ),
+  openFrontBeam: doc(
+    '16d @ 16" both plies; framing anchor to each post (PH)',
+    'FM 5-426 ch. 6 built-up girders / TM 5-302 storage: a built-up beam spliced over its posts',
+  ),
+
   // ── Coverings — subsystems/coverings.ts
   // Siding and roofing carry no manual chapter here on purpose: `SIDING` and `ROOFING` above cite
   // FM 5-426 by topic for the same reason — the pages have not been read, and a chapter number
@@ -590,6 +630,9 @@ export const NAILING = {
   rollRoofingCap: doc('roofing nails @ 6" each side of the joint, lapped downhill (PH)', 'FM 5-426 ridge and hip cap'),
   corrugatedCourse: doc('lead-head nails at every 3rd corrugation (PH)', 'FM 5-426 corrugated metal roofing: lead-head nails on the crowns'),
   corrugatedCap: doc('lead-head nails at every 3rd corrugation, each side of the joint (PH)', 'FM 5-426 corrugated ridge and hip cap'),
+  // Underlayment is held down only until the roofing goes over it, which is why it is stapled
+  // rather than nailed and why the schedule is not the roofing's.
+  feltCourse: doc('staples or 1-in roofing nails @ 12" (PH)', 'FM 5-426 felt underlayment: laid from the eave up'),
   fasciaAtRafterTails: doc('2-8d into each rafter tail (PH)', 'FM 5-426 cornice: fascia over the rafter tails'),
   bargeBoardAtRake: doc('2-8d into the rake at every rafter; mitred at the ridge (PH)', 'FM 5-426 cornice at a rake: barge board closing a gable end'),
 
@@ -612,6 +655,9 @@ export const NAILING = {
   // EM 385-1-1 is the authority for the GEOMETRY of these (see STAIR/LADDER/RAIL above); it does
   // not publish nailing schedules, so these cite the carpentry lineage instead and say so.
   treadToStringer: doc('2-16d ea stringer (PH)', 'FM 5-426 ch. 6 stairs / TM 5-302 plank deck: nailed to every stringer'),
+  // A landing is a little deck, so its planks are nailed to the bearers under them the way a
+  // tread is nailed to its stringers — a different member from a tread, and the same rule.
+  landingPlankToBearer: doc('2-16d ea bearer (PH)', 'TM 5-302 plank deck: a stair landing nailed to every bearer it crosses'),
   stairStringerBolted: doc('bolted at head and foot (PH)', 'FM 5-426 ch. 6 stairs: the stringer is carried at head and foot'),
   rampStringerBolted: doc('bolted at the deck; bedded at grade (PH)', 'TM 5-302 ramp stringers'),
   ladderRungLetIn: doc('let in and 2-16d ea rail (PH)', 'TM 5-302 ladder detail: rungs let into the rails'),
@@ -624,10 +670,17 @@ export const NAILING = {
   deckPlankToJoist: doc('2-16d ea joist (PH)', 'TM 5-302 plank deck / TM 10-8340 tent floor decking'),
   skidDriftPinned: doc('drift-pinned; chamfer both ends for dragging (PH)', 'TM 5-302 skid runners: PT, chamfered, drift-pinned'),
   platformPostAtPad: doc('drift-pinned to the pad; capped by the sill (PH)', 'FM 5-426 post & footer spacing: the post is pinned to its pad'),
+  // The same post standing on a SKID instead of a pad. A pad is bedded and takes a drift pin; a
+  // skid is a stick of wood that gets dragged, so the post is toenailed and cleated to it and the
+  // cleats are what stop the frame racking off the runner.
+  platformPostAtSkid: doc('toenailed and cleated to the skid (PH)', 'TM 5-302 skid runners: the frame cleated to the runner it is dragged on'),
   // Near-identical to `sillAtPostCap` above, which is the FROZEN branch's wording for the same
   // joint. Not collapsed: that would rewrite a frozen string, and the two are not a mechanical
   // substitution of one word. Both have a cited home; a later pass may settle on one wording.
   platformSillAtPostCap: doc('anchored to each post cap (PH)', 'FM 5-426 ch. 5 pier caps'),
+  // The TENT-FRAME DOOR JAMB, and nothing else. A jamb stands in the bent's plane, carries the
+  // door head, and is anchored at both ends because the frame it stands in is light and racks.
+  // An open-front post carries a roof beam and is filed under `openFrontPost`, not here.
   framingAnchorBothEnds: doc('framing anchor top and bottom (PH)', 'TM 10-8340 tent frame: end-door jamb standing in the bent’s plane'),
   bentPostAtDeck: doc('toenail 4-8d to the deck; braced to the sill (PH)', 'TM 10-8340 tent frame'),
   bentRafter: doc('3-8d at the ridge, 3-8d at the post (PH)', 'TM 10-8340 tent frame'),
@@ -643,6 +696,10 @@ export const NAILING = {
   towerBrace: doc('bolted at both ends and where the diagonals cross (PH)', 'TM 5-302 tower X-bracing'),
   cabPostAtPlatform: doc('bolted to the platform frame (PH)', 'TM 5-302 tower cab'),
   cabHipRafter: doc('3-16d at the peak, toenail 3-8d at the plate (PH)', 'TM 5-302 tower cab roof'),
+  // A SHED cab roof, which the pyramid does not have: two short posts stand on the cab posts to
+  // lift the high side, and a plate across them is what the rafters are seated on.
+  cabShedPost: doc('bolted to the cab post below (PH)', 'TM 5-302 tower cab roof: the high side carried on the cab posts'),
+  cabShedPlate: doc('2-16d ea post; rafters bird’s-mouth toenail 3-8d (PH)', 'TM 5-302 tower cab roof: the plate the shed rafters bear on'),
 
   // ── Crib bunker — families/bunker.ts
   // §2.7 applies to this block as much as to `BUNKER` above: these say how the wood is joined and
@@ -654,6 +711,9 @@ export const NAILING = {
   cribEndPost: doc('set against the end of the wall run; capped (PH)', 'standard heavy-timber practice: the post that closes a wall run'),
   cribCapBeam: doc('drift-pinned to every post or crib course (PH)', 'standard heavy-timber practice: caps drift-pinned to what they bear on'),
   cribCapBeamAtSides: doc('drift-pinned to every post or crib course; butted to the side caps (PH)', 'standard heavy-timber practice: caps drift-pinned to what they bear on'),
+  // The other wall type the bunker card offers: courses laid at right angles to each other, with
+  // nothing spiked to a post because there is no post — the wall is the stack.
+  cribLogCourse: doc('drift-pinned to the course below at every crossing (PH)', 'standard heavy-timber practice: crib courses pinned where they cross'),
   laggingToPost: doc('spiked to each post (PH)', 'standard heavy-timber practice: lagging spiked to every post it crosses'),
   laggingToStringer: doc('spiked to every stringer (PH)', 'standard heavy-timber practice: lagging spiked to every stringer it crosses'),
   ohcStringerAtCaps: doc('bearing on the caps both ends; drift-pinned (PH)', 'standard heavy-timber practice: the stringer bears, the pin only locates it'),

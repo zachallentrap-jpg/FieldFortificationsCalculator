@@ -20,6 +20,8 @@ import { BF_PER_LF, classifyNominal, bomSummary } from '../src/timber/bom';
 import { generateFrame, specFromBuildingInput, type BuildingInput } from '../src/timber/frame';
 import { generateStructure } from '../src/timber/families/index';
 import { FAMILY_TABLE } from '../src/timber/catalog';
+import { configSchemaFor } from '../src/ui/woodframe/config';
+import { HUT } from '../src/timber/doctrine';
 import type { RoofSpec, StructureSpec } from '../src/timber/spec';
 
 test('every doctrine constant carries a citation, and unverified ones are visibly (PH)', () => {
@@ -188,21 +190,66 @@ test('SIDING/ROOFING/FOUNDATION tables are populated (the coverings phase reads 
 // a value with no cited home (the thing the requirement is about), and a dead mirror is a
 // citation for something no crew is ever told to do, which is worse than none.
 //
-// IT HAS TO WALK WHAT SHIPS. This walked `generateFrame` alone — the frozen compat path, which
-// the app reaches only through this suite — and reported the guarantee as though it covered the
-// tool. The app generates through `generateStructure` over the family table, and against that
-// the register was short 59 schedules on ~1,800 member instances: every shutter, door, screen
-// band, tower bolt, crib spike and roll of roofing in the catalog. A test scoped to the wrong
-// generator is worse than no test, because the gap it leaves reads as a guarantee.
+// IT HAS TO WALK WHAT SHIPS, AND WHAT SHIPS IS THE CARD PLUS ITS PANEL. The corpus is every
+// build reachable by opening a catalog card and MOVING ONE CONTROL on the panel that comes with
+// it: every option of every select, both states of every toggle, each number row at its own
+// clamp ends. One control at a time rather than the cross-product — a schedule that only appears
+// when two controls are moved together is not something this has ever claimed to reach, and one
+// click is enough to show a value with no cited home to a user.
 //
-// The corpus below is the CARD PLUS ITS PANEL: each family's preset, then the same preset at
-// every roof kind and every covering option that family's own panel offers, because those are
-// buildings a user can produce by clicking. The legacy fixtures stay in the walk — the frozen
-// branch is still shipped code and its schedules still need homes.
+// A corpus built from `FAMILY_TABLE` presets, roof kinds and coverings alone leaves out eight
+// schedules that are one click away: a slab foundation, a front left open, felt under the
+// roofing, a tower cab roofed as a shed or reached by stair, a platform on skids, a bunker walled
+// as a crib. The legacy fixtures stay in the walk — the frozen branch is shipped code too.
+//
+// The panel's write semantics are reproduced here (they live in the boot file, which cannot be
+// imported outside a browser): the union rows rebuild their branch, and three rows mean "clear
+// this" rather than "store this string".
 
-/** Every spec the shipped app can generate from a catalog card by using that card's own panel. */
-function shippedSpecs(): { id: string; spec: StructureSpec }[] {
-  const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+
+function setPath(spec: Record<string, unknown>, path: string, value: unknown): void {
+  const keys = path.split('.');
+  let node = spec;
+  for (const k of keys.slice(0, -1)) {
+    if (node[k] === undefined || node[k] === null) node[k] = {};
+    node = node[k] as Record<string, unknown>;
+  }
+  node[keys[keys.length - 1]!] = value;
+}
+
+/** What the panel writes when a row is set to `value` — the same branch rebuilds the UI does. */
+function applyPanelRow(spec: Record<string, unknown>, path: string, value: unknown): void {
+  if (path === 'openFront') { spec.openFront = value === 'none' ? undefined : value; return; }
+  if (path === 'site.soil') { spec.site = value === 'unknown' ? undefined : { soil: value }; return; }
+  if (path === 'screenBand') { spec.screenBand = value ? { sillFt: HUT.screenBandSillFt.value, heightFt: HUT.screenBandHeightFt.value } : null; return; }
+  if (path === 'roof.kind') {
+    const prev = (spec.roof ?? {}) as { kind?: string; risePer12?: number; overhangFt?: number };
+    const rise = prev.risePer12 ?? 4;
+    const oh = prev.kind === 'none' ? 1 : prev.overhangFt ?? 1;
+    const kind = value as RoofSpec['kind'];
+    spec.roof =
+      kind === 'shed' ? { kind, risePer12: rise || 3, overhangFt: oh, highSide: 'N' }
+      : kind === 'flat' ? { kind, overhangFt: oh, drainPer12: 1 }
+      : kind === 'none' ? { kind }
+      : { kind, risePer12: rise, overhangFt: oh };
+    return;
+  }
+  if (path === 'foundation.kind') {
+    const prev = (spec.foundation ?? {}) as { crawlFt?: number };
+    const kind = value as string;
+    spec.foundation =
+      kind === 'piers' || kind === 'wall' ? { kind, crawlFt: prev.crawlFt ?? 1.5 }
+      : kind === 'basement' ? { kind, depthFt: 7.5, stairs: true }
+      : kind === 'embedded' ? { kind, embedFt: 3 }
+      : { kind };
+    return;
+  }
+  setPath(spec, path, value);
+}
+
+/** The catalog cards themselves, and the roof/covering variants their card data offers. */
+function cardSpecs(): { id: string; spec: StructureSpec }[] {
   const out: { id: string; spec: StructureSpec }[] = [];
   for (const fam of FAMILY_TABLE) {
     out.push({ id: fam.id, spec: clone(fam.preset) });
@@ -228,8 +275,37 @@ function shippedSpecs(): { id: string; spec: StructureSpec }[] {
   return out;
 }
 
-/** Every distinct `nailing` string the toolkit emits, mapped to the roles and the build carrying it. */
-function emittedNailing(): Map<string, { roles: Set<string>; where: string }> {
+/** Each card with ONE panel control moved, over every value that control offers. */
+function panelSpecs(): { id: string; spec: StructureSpec }[] {
+  const out: { id: string; spec: StructureSpec }[] = [];
+  for (const fam of FAMILY_TABLE) {
+    for (const group of configSchemaFor(fam.id).groups) {
+      for (const row of group.rows) {
+        // The family row opens another card (already in the corpus) and the openings editor is a
+        // list, not a value — neither is a one-click change to THIS spec.
+        if (row.control === 'family' || row.control === 'openings-editor') continue;
+        const values: unknown[] =
+          row.control === 'toggle' ? [true, false]
+          : row.control === 'number' ? [row.min, row.max].filter((v) => v !== undefined)
+          : (row.options ?? []).map((o) => (row.numeric ? Number(o) : o));
+        for (const v of values) {
+          const spec = clone(fam.preset) as unknown as Record<string, unknown>;
+          applyPanelRow(spec, row.path, v);
+          out.push({ id: `${fam.id} ${row.path}=${String(v)}`, spec: spec as unknown as StructureSpec });
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/** Every spec the shipped app can generate from a catalog card by using that card's own panel. */
+function shippedSpecs(): { id: string; spec: StructureSpec }[] {
+  return [...cardSpecs(), ...panelSpecs()];
+}
+
+/** Every distinct `nailing` string a set of builds emits, mapped to the roles and one build. */
+function emittedNailingFrom(specs: { id: string; spec: StructureSpec }[]): Map<string, { roles: Set<string>; where: string }> {
   const out = new Map<string, { roles: Set<string>; where: string }>();
   const record = (members: readonly Member[], where: string): void => {
     for (const m of members) {
@@ -240,15 +316,17 @@ function emittedNailing(): Map<string, { roles: Set<string>; where: string }> {
     }
   };
   for (const fx of [...FULL_FIXTURES, ...MATRIX_FIXTURES]) record(generateFrame(fx.input).members, `legacy ${fx.name}`);
-  for (const { id, spec } of shippedSpecs()) record(generateStructure(spec).members, id);
+  for (const { id, spec } of specs) record(generateStructure(spec).members, id);
   return out;
 }
 
-test('doctrine mirrors every nailing schedule the SHIPPED generators emit', () => {
+const emittedNailing = (): Map<string, { roles: Set<string>; where: string }> => emittedNailingFrom(shippedSpecs());
+
+test('doctrine mirrors every nailing schedule a card and its panel can emit', () => {
   const emitted = emittedNailing();
   // The corpus is the guarantee's reach, so it is asserted rather than assumed: a refactor that
   // quietly narrowed the walk back to one generator would otherwise leave this test green.
-  assert.ok(emitted.size > 70, `expected the real schedule set across both paths, got ${emitted.size}`);
+  assert.ok(emitted.size > 90, `expected the real schedule set across both paths, got ${emitted.size}`);
 
   const mirrored = new Map(Object.entries(NAILING).map(([k, d]) => [d.value as string, k]));
   const homeless = [...emitted.entries()]
@@ -261,33 +339,42 @@ test('doctrine mirrors every nailing schedule the SHIPPED generators emit', () =
   }
 });
 
-test('the family path really is walked — the frozen fixtures alone cannot carry this test', () => {
-  // The guarantee above is only worth what its corpus reaches. If the family walk were dropped,
-  // `emitted.size` would fall back to the frozen branch's couple of dozen; this names the
-  // schedules that exist ONLY on the shipped side, so the loss is a failure and not a shrug.
-  const legacy = new Set<string>();
-  for (const fx of [...FULL_FIXTURES, ...MATRIX_FIXTURES]) {
-    for (const m of generateFrame(fx.input).members) if (m.nailing) legacy.add(m.nailing);
-  }
-  const all = emittedNailing();
-  const familyOnly = [...all.keys()].filter((s) => !legacy.has(s));
-  assert.ok(familyOnly.length > 40, `only ${familyOnly.length} schedules come from the family path`);
+test('the guarantee reaches the PANEL, not just the cards it ships', () => {
+  // What the test above is worth is exactly what its corpus reaches, and the difference between
+  // "the fourteen cards" and "the fourteen cards you can actually operate" is not rhetorical:
+  // these schedules exist only once a control is moved. Narrow the corpus back to the cards and
+  // this names, one by one, the joints that would go unwatched.
+  const cardOnly = new Set(emittedNailingFrom(cardSpecs()).keys());
+  const reachedByPanel = [...emittedNailingFrom(panelSpecs()).keys()].filter((s) => !cardOnly.has(s));
+  assert.ok(
+    reachedByPanel.length >= 7,
+    `only ${reachedByPanel.length} schedules need a panel control moved — has the sweep stopped sweeping?`,
+  );
+  // And each of them is genuinely mirrored, and genuinely inside the corpus the guarantee above
+  // walks — a sweep that exists but is not wired into that walk proves nothing.
+  const mirrored = new Set(Object.values(NAILING).map((d) => d.value as string));
+  assert.deepEqual(reachedByPanel.filter((s) => !mirrored.has(s)), []);
+  const corpus = new Set(emittedNailing().keys());
+  assert.deepEqual(reachedByPanel.filter((s) => !corpus.has(s)), [], 'the panel sweep is not in the walked corpus');
 });
 
-test('no two schedules are the same joint written two ways', () => {
-  // WHAT THE GAP WAS MADE OF. A third of the missing schedules were not missing at all: the
-  // frozen branch says "3-16d toenail ea bearing" and the sibling floor said "3-16d toenail each
-  // bearing" — one joint, two strings, and the second had no cited home purely because of the
-  // word. Collapsed at the source (the generators read the value from NAILING), and pinned here
-  // so the next retyped string is a red test rather than a silent second entry.
+test('no two EMITTED schedules are the same joint written two ways', () => {
+  // One joint, one string. The frozen branch says "3-16d toenail ea bearing"; a sibling generator
+  // that types "each bearing" has made a second joint out of one, and the register cannot see it
+  // because both halves get a cited home. So this compares what the GENERATORS emit rather than
+  // the table against itself: collapse the wording, and any two distinct emitted strings that
+  // land on the same joint are the drift.
   const flatten = (s: string): string => s.toLowerCase().replace(/\beach\b/g, 'ea').replace(/\s+/g, ' ').trim();
-  const byJoint = new Map<string, string[]>();
-  for (const [key, d] of Object.entries(NAILING)) {
-    const k = flatten(d.value as string);
-    byJoint.set(k, [...(byJoint.get(k) ?? []), key]);
+  const byJoint = new Map<string, Map<string, string>>();
+  for (const [spec, { where }] of emittedNailing()) {
+    const k = flatten(spec);
+    if (!byJoint.has(k)) byJoint.set(k, new Map());
+    byJoint.get(k)!.set(spec, where);
   }
-  const twins = [...byJoint.entries()].filter(([, keys]) => keys.length > 1).map(([k, keys]) => `${keys.join(' / ')}: ${k}`);
-  assert.deepEqual(twins, [], `one joint, two entries:\n  ${twins.join('\n  ')}`);
+  const twins = [...byJoint.values()]
+    .filter((variants) => variants.size > 1)
+    .map((variants) => [...variants.entries()].map(([s, where]) => `${JSON.stringify(s)} (${where})`).join('  vs  '));
+  assert.deepEqual(twins, [], `one joint, two strings on the member cards:\n  ${twins.join('\n  ')}`);
 });
 
 test('the (PH) a crew reads and the ph the register reports cannot disagree', () => {

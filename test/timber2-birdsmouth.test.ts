@@ -18,6 +18,7 @@ import { generateStructure } from '../src/timber/families/index';
 import { FAMILY_TABLE } from '../src/timber/catalog';
 import { seatCutsFor, seatCutFor, seatProfile, runAxisOf } from '../src/timber/birdsMouth';
 import { NOTCH, lifeSafetyRegister } from '../src/timber/doctrine';
+import { packetModel } from '../src/timber/packet/model';
 import { roofPlanes } from '../src/timber/subsystems/roofFamilies';
 import type { Member } from '../src/timber/types';
 
@@ -40,8 +41,8 @@ test("every rafter in every shipped family gets a bird's mouth", () => {
     const model = generateStructure(fam.preset);
     const rs = rafters(model.members);
     if (rs.length === 0 || plates(model.members).length === 0) continue;
-    // Only rafters that run on a cardinal axis bear on a wall plate; a hip's jacks run diagonally
-    // and land on a hip rafter instead, which is a different joint and not claimed here.
+    // Only members that run on a cardinal axis bear square on a wall plate. A HIP does not: it
+    // crosses the corner diagonally, and its seat is a different cut, not claimed here.
     const cardinal = rs.filter((m) => runAxisOf(m) !== null && Math.abs(Math.sin(m.rotation[2])) > 1e-9);
     if (cardinal.length === 0) continue;
     sawOne = true;
@@ -379,9 +380,67 @@ test('the limit is the doctrine entry, measured on the notch the viewer actually
   }
 });
 
-test('the seat-depth limit is life-safety tagged and declares its consumer', () => {
-  // A notch at the bearing is a shear failure at the one point that carries the roof, which is
-  // the LS-GATE's own definition. The gate obligates a consumer for every id it carries.
+// ── What the limit measures is what the packet may claim ────────────────────
+//
+// A hip roof at 12/12 puts 56 JACK rafters on the same cap plates as its 44 commons, at the same
+// pitch, with the same `plateWidth · tan θ` notch. Measuring the commons alone and then printing
+// a life-safety row that names jacks and hips is a check reporting coverage it does not have —
+// the failure mode is not a missing warning, it is a warning that reads as an all-clear.
+
+const HIP_12 = { kind: 'hip', risePer12: 12, overhangFt: 1 } as const;
+
+/** gp-frame with a roof, generated. */
+function gpWithRoof(roof: unknown): ReturnType<typeof generateStructure> {
+  const spec = JSON.parse(JSON.stringify(FAMILY_TABLE.find((f) => f.id === 'gp-frame')!.preset));
+  spec.roof = roof;
+  return generateStructure(spec as never);
+}
+
+test('the JACK rafters of a hip roof are measured too — same plate, same pitch, same notch', () => {
+  const model = gpWithRoof(HIP_12);
+  const jacks = model.members.filter((m) => m.role === 'jackRafter');
+  assert.ok(jacks.length > 20, `only ${jacks.length} jack rafters — this roof cannot make the point`);
+
+  const seats = seatCutsFor(model.members);
+  const unmeasured = jacks.filter((m) => runAxisOf(m) !== null && !seats.has(m.id));
+  assert.deepEqual(unmeasured.map((m) => m.id), [], 'jack rafters seated on the plate went unnotched');
+
+  // And it reaches the operator as its own line, counting the jacks rather than folding them into
+  // the commons: "44×" where 100 members are over is a warning that points at the wrong sticks.
+  const notch = model.issues.filter((i) => i.kind === 'notch');
+  const jackLine = notch.find((i) => i.message.includes('jack rafter'));
+  assert.ok(jackLine, `no jack-rafter seat warning at 12/12: ${notch.map((i) => i.message).join(' | ')}`);
+  assert.match(jackLine.message, new RegExp(`^${jacks.length}× `), jackLine.message);
+});
+
+test('the packet lists the seat-depth limit only where something measured it', () => {
+  // The LS table's own rule: print too many and it stops being read. A row that names members the
+  // check never examined is worse than that — it is an assurance nobody produced. The tower cab
+  // is the case: four hip rafters, no commons, and a hip's double-cheek seat over the corner is
+  // not geometry this module derives.
+  const packetFor = (model: ReturnType<typeof generateStructure>, title: string) =>
+    packetModel(model, { title, lineage: 'test' });
+  const hasSeatRow = (p: ReturnType<typeof packetModel>): boolean =>
+    p.ls.some((r) => r.key === 'NOTCH.rafterSeatMaxDepthFrac');
+
+  const hip = packetFor(gpWithRoof(HIP_12), 'hip roof');
+  assert.ok(hasSeatRow(hip), 'a roof of commons and jacks is measured, so the limit governs it');
+  assert.ok(
+    hip.issues.some((i) => i.kind === 'notch'),
+    'the packet claims the limit governs this build but carries nothing the check measured',
+  );
+
+  const tower = generateStructure(JSON.parse(JSON.stringify(FAMILY_TABLE.find((f) => f.id === 'tower')!.preset)));
+  const roles = new Set(tower.members.map((m) => m.role));
+  assert.ok(roles.has('hipRafter') && !roles.has('rafter'), 'the tower cab is no longer the hips-only case');
+  assert.equal(hasSeatRow(packetFor(tower, 'tower')), false, 'the packet claimed a check that examined nothing');
+});
+
+test('the seat-depth limit is carried by the life-safety register', () => {
+  // Membership only, which is all this proves: a notch at the bearing is a shear failure at the
+  // one point carrying the roof, so it belongs to the LS set by that set's own definition. What
+  // the register OBLIGATES — that something surfaces the value to a reader — is proved by the
+  // packet test above and by the gate in `test/timber2-packet.test.ts`, not here.
   assert.ok(
     lifeSafetyRegister().some((e) => e.id === 'NOTCH.rafterSeatMaxDepthFrac'),
     'the seat-depth limit must be in the life-safety register',

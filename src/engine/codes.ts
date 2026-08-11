@@ -43,6 +43,11 @@ export const CODES = {
     'warning',
     'The loaded doctrine has no shielding thickness for this threat against its cover material — the roof must be engineered (no cover thickness is estimated).',
   ),
+  ROOF_NO_COVER_MULTIPLIER: def(
+    'ROOF_NO_COVER_MULTIPLIER',
+    'warning',
+    'The loaded standard scales overhead cover to nothing for this threat — the roof must be engineered (no cover thickness is estimated).',
+  ),
   CUT_DEPTH_SHORING: def(
     'CUT_DEPTH_SHORING',
     'warning',
@@ -79,8 +84,7 @@ export const CODES = {
     'A mortar fires up and out through the top of the pit — a sealed roof overhead blocks its own fire. Overhead cover here is drawn as requested, not doctrine.',
   ),
   // A WARNING, not an advisory: "the roof you are about to build does not stop the round you
-  // selected" outranks every planning-realism note in this catalog. It sat a tier below
-  // "hand-digging this is unrealistic" until the protection audit.
+  // selected" outranks every planning-realism note in this catalog.
   COVER_UNDER_THREAT: def(
     'COVER_UNDER_THREAT',
     'warning',

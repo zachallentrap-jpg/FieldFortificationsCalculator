@@ -251,17 +251,69 @@ function collarTieRun(rafterSpacingIn: 16 | 24): number[] {
     .sort((a, b) => a - b);
 }
 
-test('collar ties hold their cited interval at BOTH legal rafter spacings', () => {
+test('collar ties hold their cited interval at BOTH legal rafter spacings, and hold it BOTH ways', () => {
+  // Two directions, because a one-way check is half a mirror. Under the limit is the safety
+  // requirement; NO FURTHER UNDER THAN THE LAYOUT FORCES is what makes the doctrine value the
+  // thing actually deciding the count — ties one bay closer than the limit calls for means the
+  // generator is following some other number, which is the state this pair exists to catch.
   const limit = LAYOUT.collarTieMaxSpacingFt.value as number;
   for (const spacing of [16, 24] as const) {
     const xs = collarTieRun(spacing);
     assert.ok(xs.length >= 3, `${spacing} in o.c.: only ${xs.length} ties on a 40-ft ridge`);
-    const worst = Math.max(...xs.slice(1).map((x, i) => x - xs[i]!));
+    const gaps = xs.slice(1).map((x, i) => x - xs[i]!);
+    const worst = Math.max(...gaps);
     assert.ok(
       worst <= limit + 1e-9,
       `${spacing} in o.c.: ties are ${worst.toFixed(2)} ft apart; the cited limit is ${limit} ft`,
     );
+    // One more rafter bay would break the limit — i.e. this is the widest legal interval.
+    const bayFt = spacing / 12;
+    assert.ok(
+      worst + bayFt > limit + 1e-9,
+      `${spacing} in o.c.: ties at ${worst.toFixed(2)} ft with a ${limit} ft limit — another `
+      + `${bayFt.toFixed(2)} ft bay would still be legal, so the limit is not what set them`,
+    );
   }
+});
+
+test('the register cannot report the tie limit as checked while the card prints it as pending', () => {
+  // `ph` is a claim about SOURCING, and the only other place that claim is visible is the member
+  // card the crew reads. A crew told "(PH page)" and a register reporting a verified figure are
+  // two answers to one question, and the register is the one people quote. Same pairing the
+  // NAILING table is held to; the flag has to mean the same thing wherever it appears.
+  const pendingOnACard = ([16, 24] as const).some((rafterSpacingIn) => {
+    const spec = bldg({ kind: 'gable', risePer12: 4, overhangFt: 1 }, {
+      dims: { lengthFt: 40, widthFt: 16 },
+      spacing: { studSpacingIn: 16, joistSpacingIn: 16, rafterSpacingIn },
+    });
+    return generateStructure(spec).members
+      .filter((m) => m.role === 'collarTie')
+      .some((m) => /\(PH\b/.test(m.doctrineRef));
+  });
+  if (!pendingOnACard) return; // every card claims the page was read — nothing to contradict
+  assert.equal(
+    LAYOUT.collarTieMaxSpacingFt.ph,
+    true,
+    'the collar-tie interval is reported as page-checked while a member card still prints it (PH)',
+  );
+});
+
+test('the tie’s own card prints the doctrine limit, not a number of its own', () => {
+  // The generator keeps its literal (C-10: `roof.ts` is frozen, so the value is mirrored rather
+  // than imported), which makes the printed ref the place the two can drift. A crew reading
+  // "stays within 4 ft" is reading a claim, and it has to be the claim the register holds.
+  const spec = bldg({ kind: 'gable', risePer12: 4, overhangFt: 1 }, {
+    dims: { lengthFt: 40, widthFt: 16 },
+    spacing: { studSpacingIn: 16, joistSpacingIn: 16, rafterSpacingIn: 24 },
+  });
+  const tie = generateStructure(spec).members.find((m) => m.role === 'collarTie')!;
+  const printed = /stays within ([\d.]+) ft/.exec(tie.doctrineRef);
+  assert.ok(printed, `the tie card no longer states the interval it is holding: ${tie.doctrineRef}`);
+  assert.equal(
+    Number(printed[1]),
+    LAYOUT.collarTieMaxSpacingFt.value,
+    `the card says ${printed[1]} ft and the register says ${LAYOUT.collarTieMaxSpacingFt.value} ft`,
+  );
 });
 
 test('closing the spacing up does not thin the ties out — the 16-in layout is unchanged', () => {

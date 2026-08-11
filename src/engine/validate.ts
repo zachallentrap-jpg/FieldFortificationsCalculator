@@ -6,7 +6,7 @@ import { retainingWall, threats } from '../doctrine/protection';
 import { backblast } from '../doctrine/positions';
 import { sandbag } from '../doctrine/materials';
 import { CODES, issue } from './codes';
-import { coverDataMissing } from './protection';
+import { coverThicknessGap } from './protection';
 import { round1 } from './round';
 import type { ValidationIssue } from './types';
 import type { Calc } from './compute';
@@ -18,6 +18,28 @@ const WET_SOILS = new Set(['silt', 'clay']);
 // floor of the multiply that produces the delivered thickness, NOT at anything a soldier
 // could measure: a real shortfall must never fit inside it.
 const COVER_EPS = 1e-9;
+
+// A shortfall smaller than one tenth of a foot is real (the comparison above is unrounded), but
+// printed at the panel's tenth of a foot it shows the SAME number twice — a warning whose own
+// evidence says the roof is thick enough. So the two numbers are printed at the coarsest
+// precision that still holds them apart, and the shortfall is named outright.
+const COVER_DP_MIN = 1; // the tenth of a foot the panel shows
+const COVER_DP_MAX = 3; // ~1/64 in — finer than anything a soldier lays out
+
+function coverDecimals(deliveredFt: number, requiredFt: number): number {
+  for (let dp = COVER_DP_MIN; dp < COVER_DP_MAX; dp++) {
+    if (deliveredFt.toFixed(dp) !== requiredFt.toFixed(dp)) return dp;
+  }
+  return COVER_DP_MAX;
+}
+// At the panel's own precision, print exactly what the panel prints.
+function coverFt(ft: number, dp: number): string {
+  return dp === COVER_DP_MIN ? String(round1(ft)) : ft.toFixed(dp);
+}
+function shortfallFt(ft: number, dp: number): string {
+  const shown = ft.toFixed(dp);
+  return Number(shown) > 0 ? shown : 'under ' + Number('1e-' + COVER_DP_MAX).toFixed(COVER_DP_MAX);
+}
 
 export function runValidation(calc: Calc): ValidationIssue[] {
   const errors: ValidationIssue[] = [];
@@ -43,11 +65,16 @@ export function runValidation(calc: Calc): ValidationIssue[] {
     if (calc.coverReason === 'span') {
       warnings.push(issue(CODES.ROOF_SPAN_EXCEEDED, '(clear span ' + round1(calc.stringerSpan) + ' ft)'));
     }
-    // The third way to land here: the shielding table has no row to size the cover from. Say
-    // which unknown it was — "get a designer" alone leaves the operator hunting a threat rule
-    // when what is actually missing is a doctrine value they can fill in.
-    if (coverDataMissing(calc.threat)) {
-      warnings.push(issue(CODES.ROOF_NO_SHIELDING_DATA, '(' + (threats[calc.threat]?.label ?? calc.threat) + ')'));
+    // The third way to land here: the doctrine holds no usable thickness to size the cover
+    // from. Say which value it was — "get a designer" alone leaves the operator hunting a
+    // threat rule when what is actually missing is a doctrine value they can fill in.
+    // Only when no doctrine RULE sent it here: a threat- or span-driven engineered roof is
+    // already explained, and naming a data gap there would blame the wrong value.
+    if (calc.coverReason === undefined) {
+      const gap = coverThicknessGap(calc.threat, calc.standard.coverMul.value);
+      const threatLabel = '(' + (threats[calc.threat]?.label ?? calc.threat) + ')';
+      if (gap === 'shielding_data') warnings.push(issue(CODES.ROOF_NO_SHIELDING_DATA, threatLabel));
+      if (gap === 'cover_multiplier') warnings.push(issue(CODES.ROOF_NO_COVER_MULTIPLIER, threatLabel));
     }
     if (calc.inputs.standard === 'hasty') warnings.push(issue(CODES.ROOF_ENGINEERED_HASTY));
   }
@@ -99,14 +126,15 @@ export function runValidation(calc: Calc): ValidationIssue[] {
   // delivered thickness AND drop the requirement onto the same tenth at once, swallowing a
   // real shortfall of nearly 0.1 ft — the unsafe direction on the one check that says "this
   // roof does not stop the round you picked". The epsilon exists only to keep float drift on
-  // an exactly-met roof from firing a phantom shortfall; the message still prints the rounded
-  // numbers so it agrees with the panel.
+  // an exactly-met roof from firing a phantom shortfall.
   if (calc.coverLeaf && calc.coverT > 0 && calc.coverT < calc.coverLeaf.value - COVER_EPS) {
     const label = threats[calc.threat]?.label ?? 'this threat';
+    const dp = coverDecimals(calc.coverT, calc.coverLeaf.value);
     warnings.push(
       issue(
         CODES.COVER_UNDER_THREAT,
-        '(roof ~' + round1(calc.coverT) + ' ft as drawn; ~' + round1(calc.coverLeaf.value) + ' ft fully stops ' + label + ')',
+        '(roof ~' + coverFt(calc.coverT, dp) + ' ft as drawn; ~' + coverFt(calc.coverLeaf.value, dp) +
+          ' ft fully stops ' + label + ' — about ' + shortfallFt(calc.coverLeaf.value - calc.coverT, dp) + ' ft short)',
       ),
     );
   }

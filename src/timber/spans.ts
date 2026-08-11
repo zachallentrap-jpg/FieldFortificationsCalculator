@@ -15,14 +15,20 @@ import { DRESSED } from './types';
 import { SPAN, LUMBER, IN_PER_FT, citeOf } from './doctrine';
 
 /**
- * How much of a header's CUT LENGTH is bearing rather than span, at each end.
+ * How much of THIS member's cut length is bearing rather than span, both ends together.
  *
- * A header is cut to the rough opening plus a jack stud at each side — `walls.ts` cuts
- * `widthFt + 2t` and every other doorway in the toolkit does the same — and the wood sitting on
- * the jack is not spanning anything. The table row is a CLEAR span between bearings, so the two
- * numbers differ by exactly this, twice.
+ * The table row is a CLEAR span between bearings and a cut length is not, so the two differ by
+ * whatever the emitter left to sit on — and that is not one number for every member wearing the
+ * `header` role. A doorway header is cut to the rough opening plus a jack stud at each side; a
+ * beam over an open bay is cut post centreline to post centreline and has half a post at each
+ * splice and a whole one at the ends of the run; a bunker's entrance header lands on jamb
+ * timbers. Only the emitter knows which, so it says so on the member (`Member.bearingTotalIn`).
+ *
+ * The fallback is the doorway shape, because that is what the FROZEN wall generator cuts
+ * (`walls.ts`: `widthFt + 2t`) and a frozen module cannot be given a new field to carry.
  */
-const headerBearingIn = (): number => DRESSED[LUMBER.studNominal.value as string]!.w;
+const bearingTotalIn = (m: Member): number =>
+  m.bearingTotalIn ?? 2 * DRESSED[LUMBER.studNominal.value as string]!.w;
 
 export interface SpanWarning {
   memberId: string;
@@ -127,14 +133,15 @@ export function spanWarnings(
         });
       }
     } else if (m.role === 'header') {
-      // THE SIZER AND THE CHECKER HAVE TO MEAN THE SAME WORD. The header over an opening is
-      // CHOSEN by `headerForSpan(openingWidth)` — a clear span — and then CUT to that width plus
-      // a jack at each end. Checking the cut length against the same table therefore condemned
-      // the member the tool had just picked, on every opening landing exactly on a table row: a
-      // 5-ft opening got the 2x6 the 5-ft row allows and was then reported as a 5.3-ft span past
-      // a 5-ft limit, tagged LIFE-SAFETY. That is the cry-wolf failure the header of this file
-      // says the module exists to prevent, fired by the module against itself.
-      const spanFt = Math.max(0, (m.cutLength - 2 * headerBearingIn()) / IN_PER_FT);
+      // THE SIZER AND THE CHECKER HAVE TO MEAN THE SAME WORD. A header over an opening is CHOSEN
+      // by `headerForSpan(openingWidth)` — a clear span — and then CUT to that width plus a jack
+      // at each end. Read against the same table, the cut length condemns the member the tool
+      // itself just picked on every opening landing on a table row: a 5-ft opening gets the 2x6
+      // the 5-ft row allows and is reported as a 5.3-ft span past a 5-ft limit, tagged
+      // LIFE-SAFETY. That is the cry-wolf failure the header of this file says the module exists
+      // to prevent, fired by the module against itself. The bearing subtracted is the one THIS
+      // member was cut with, not one shape assumed for every emitter of the role.
+      const spanFt = Math.max(0, (m.cutLength - bearingTotalIn(m)) / IN_PER_FT);
       const allowed = headerTable[m.nominal];
       if (allowed !== undefined && spanFt > allowed + 1e-6) {
         out.push({

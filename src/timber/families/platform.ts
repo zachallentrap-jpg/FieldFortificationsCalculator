@@ -637,6 +637,9 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
         position: [x, deckY + doorH + headD / 2, W / 2],
         rotation: [0, Math.PI / 2, 0],
         stage: sBent,
+        // A jamb at each side — the same shape a doorway header has, stated on the member so the
+        // span check does not have to assume it from the role.
+        bearingTotalIn: 2 * jambT * IN_PER_FT,
         nailing: '4-8d ea end (PH)',
         doctrineRef: `${citeOf(OPENING.doorHeightFt)} — end-door head, sized for its own span`,
       });

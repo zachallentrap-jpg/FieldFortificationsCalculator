@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import '../src/doctrine/index'; // triggers registration
 import { all, getByPath, counts } from '../src/doctrine/registry';
-import { spanSizes } from '../src/doctrine/protection';
+import { shielding, shieldMaterials, spanSizes, threats } from '../src/doctrine/protection';
 import { excavationSplit } from '../src/doctrine/stages';
 
 test('doctrine registered non-empty', () => {
@@ -61,6 +61,20 @@ test('stringer span limits ascend — the size lookup is first-fit', () => {
 test('excavation stage shares sum to 1 — the stage clock partitions one total', () => {
   const sum = Object.values(excavationSplit).reduce((acc, s) => acc + s.value, 0);
   assert.ok(Math.abs(sum - 1) < 1e-9, 'shares sum to ' + sum);
+});
+
+// The engine reads a protection magnitude of zero as ABSENT and fails the roof safe on it
+// (engine/protection.ts), so a zero anywhere in these two tables would quietly take overhead
+// cover away from a threat the shipped doctrine claims to size a roof for.
+test('every shielding thickness and munition standoff is strictly positive', () => {
+  for (const [id, row] of Object.entries(shielding)) {
+    for (const mat of shieldMaterials) {
+      assert.ok(row[mat].value > 0, 'shielding ' + id + '.' + mat + ' is ' + row[mat].value);
+    }
+  }
+  for (const [id, t] of Object.entries(threats)) {
+    assert.ok(t.standoffMin.value > 0, 'standoff ' + id + ' is ' + t.standoffMin.value);
+  }
 });
 
 test('counts() is internally consistent with all placeholders remaining', () => {

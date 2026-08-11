@@ -73,15 +73,45 @@ test('the bunker and tower members that carry the load are cut to the timber siz
   assert.deepEqual({ w: mudsill.actual.w, d: mudsill.actual.d }, dressedByRule(mudsillNominal));
 });
 
-test('board feet are billed off the NOMINAL section, so the correction does not move the bill', () => {
-  // The two rows changed by a quarter inch of DRESSED depth. Lumber is sold by the nominal board
-  // foot, so a timber that is modelled correctly must not cost more — if these ever coupled, a
-  // geometry fix would silently reprice a job.
+test('the board-foot RATE is nominal — lumber is sold by the size on the tally, not the size it dresses to', () => {
+  // Half of what a dressed size does to the bill. A stick of 8x8 is bought as 8x8 however it
+  // surfaces, so the per-foot rate must stay off the nominal section; coupling it to DRESSED
+  // would let a geometry correction reprice a job by itself.
   for (const nominal of ['6x8', '8x8', '6x6', '2x8']) {
     const [w, d] = nominal.split('x').map(Number) as [number, number];
     assert.ok(
       Math.abs(BF_PER_LF[nominal]! - (w * d) / IN_PER_FT) < 1e-12,
-      `${nominal}: board feet followed the dressed size instead of the nominal one`,
+      `${nominal}: the board-foot rate followed the dressed size instead of the nominal one`,
     );
   }
+});
+
+test('and the LENGTHS are not — a piece cut to fit is cut to the dressed face, so the bill moves', () => {
+  // The other half, and the one that is easy to state backwards. Board feet are rate × length,
+  // and the length of anything cut BETWEEN two members is set by how wide those members really
+  // are. The crib bunker's overhead blocking fits between 8x8 stringers: at the timber deduction
+  // the stringers are 7 1/2 in and each block is cut shorter than it would be at 7 1/4, and the
+  // bunker's board-foot total moves with it. Expected off the RULE rather than off `DRESSED`, so
+  // reverting the table makes the emitted cut and the expectation disagree.
+  const bunker = generateStructure(JSON.parse(JSON.stringify(familyById('crib-bunker' as never)!.preset)));
+  const stringers = bunker.members.filter((m) => m.role === 'ohcStringer').sort((a, b) => a.position[0] - b.position[0]);
+  const blocking = bunker.members.filter((m) => m.role === 'ohcBlocking');
+  assert.ok(stringers.length >= 2 && blocking.length > 0, 'the crib bunker no longer has an overhead deck to measure');
+
+  const nominal = stringers[0]!.nominal;
+  const rule = dressedByRule(nominal)!;
+  const centreSpacingFt = stringers[1]!.position[0] - stringers[0]!.position[0];
+  const clearGapFt = centreSpacingFt - rule.w / IN_PER_FT;
+  for (const b of blocking) {
+    assert.ok(
+      Math.abs(b.cutLength / IN_PER_FT - clearGapFt) < 1e-9,
+      `${b.id}: cut ${(b.cutLength / IN_PER_FT).toFixed(4)} ft between ${nominal} stringers `
+      + `${centreSpacingFt.toFixed(4)} ft apart; a ${rule.w} in face leaves ${clearGapFt.toFixed(4)} ft`,
+    );
+  }
+  // Stated as the money consequence, from the same rule: a quarter inch on each stringer face is
+  // this many board feet off the bunker's bill, which is why the cut list is not decoration.
+  const wrongGapFt = centreSpacingFt - (rule.w - 0.25) / IN_PER_FT;
+  const swing = blocking.length * (wrongGapFt - clearGapFt) * BF_PER_LF[nominal]!;
+  assert.ok(swing > 1, `a quarter inch across ${blocking.length} blocks moves only ${swing.toFixed(2)} BF`);
 });

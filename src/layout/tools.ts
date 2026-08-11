@@ -13,7 +13,7 @@ import type { PlanResult } from '../engine/plan';
 import type { Schedule } from '../engine/stages';
 import type { Scenario } from '../state/schema';
 import type { RegEntry } from '../doctrine/registry';
-import type { DoctrineImportReport, DoctrineManifest } from '../doctrine/io';
+import type { DoctrineFinding, DoctrineImportReport, DoctrineManifest } from '../doctrine/io';
 
 // Attribute-safe escaping: scenario names/ids are UNTRUSTED (they arrive via file import,
 // §14) and are interpolated into double-quoted attributes — quotes MUST be escaped or an
@@ -193,13 +193,27 @@ export function doctrineOverlay(
       (fill.author ? ' by ' + esc(fill.author) : '') + (fill.date ? ' on ' + esc(fill.date) : '') + '.</p>'
     : '';
 
+  // A finding list, capped so one bad file cannot bury the panel.
+  const findingList = (findings: DoctrineFinding[]): string =>
+    '<ul>' + findings.slice(0, 12).map((f) => '<li>' + esc(f.path) + ' — ' + esc(f.reason) + '</li>').join('') +
+    (findings.length > 12 ? '<li>…and ' + (findings.length - 12) + ' more</li>' : '') + '</ul>';
+
+  // A rejection and a warning mean opposite things about what is now in the doctrine — nothing
+  // applied vs. it DID apply — so they are never rendered as one list. Table findings are
+  // separated again because their identifier names a whole table, not a row of the fill table
+  // below, and a reader must not hunt for a row that does not exist.
   const reportBlock = report
     ? '<div class="import-report ' + (report.ok ? 'ok' : 'bad') + '">' +
       '<strong>' + (report.ok ? (report.dryRun ? 'Preview: ' : 'Applied: ') + report.applied + ' value(s)' : 'Import rejected') + '</strong>' +
       (report.message ? '<div>' + esc(report.message) + '</div>' : '') +
-      (report.rejected.length
-        ? '<ul>' + report.rejected.slice(0, 12).map((r) => '<li>' + esc(r.path) + ' — ' + esc(r.reason) + '</li>').join('') +
-          (report.rejected.length > 12 ? '<li>…and ' + (report.rejected.length - 12) + ' more</li>' : '') + '</ul>'
+      (report.rejected.length ? '<div>Values refused:</div>' + findingList(report.rejected) : '') +
+      (report.rejectedTables.length
+        ? '<div>Whole tables refused — these values are filled together, not one at a time:</div>' +
+          findingList(report.rejectedTables)
+        : '') +
+      (report.warnings.length
+        ? '<div class="import-warn"><strong>Applied, but check ' + report.warnings.length +
+          ' value(s) — nothing here was refused:</strong>' + findingList(report.warnings) + '</div>'
         : '') +
       (report.dryRun && report.ok ? '<button type="button" class="btn" data-action="doctrine-import-apply">Apply this import</button>' : '') +
       '</div>'

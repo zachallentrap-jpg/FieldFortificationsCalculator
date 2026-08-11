@@ -199,16 +199,11 @@ export function seatProfile(m: Member, seat: SeatCut | readonly SeatCut[]): [num
 }
 
 /**
- * Every notch on every rafter in a model, keyed by member id.
- *
- * A rafter is matched to the cap plates it actually crosses — those whose run its footprint
- * passes over, running SQUARE to it — and rafters that cross none simply get no entry, which is
- * the honest answer rather than a guessed notch. A tower's cab rafters bear on a beam, not a
- * wall plate.
- *
- * ALL of them, not the deepest. A shed rafter runs from the low wall up to the pony wall and
- * bears on a plate at each end; keeping only one left it running through the other.
+ * What to call a seated member in front of a crew. A warning that says "rafter" about the 56 jacks
+ * it measured is a warning the reader cannot act on: they go and look at the commons.
  */
+const roleWord = (role: Member['role']): string => (role === 'jackRafter' ? 'jack rafter' : 'rafter');
+
 export interface SeatDepthWarning {
   memberId: string;
   role: Member['role'];
@@ -222,13 +217,19 @@ export interface SeatDepthWarning {
 }
 
 /**
- * Every rafter whose bird's mouth cuts deeper than a bearing notch may (`NOTCH`).
+ * Every seated member whose bird's mouth cuts deeper than a bearing notch may (`NOTCH`).
  *
- * THE MODULE ARGUED THE RULE AND NEVER ENFORCED IT. `heightAbovePlateFt` above justifies the
- * whole HAP datum by "the third of the depth a bending member can lose at its bearing", and the
- * only implemented guard — in `seatCutFor` — rejects a notch through the entire board. Between a
- * third and the whole thing there was nothing: on a 2x6 rafter over a 2x4 plate, inside the pitch
- * bound the tool itself allows, the seat takes 35% at 8/12 and 45% at 12/12 with no word said.
+ * A seat is cut at the bearing, where the shear is, and `heightAbovePlateFt` above argues the HAP
+ * datum from exactly that: "the third of the depth a bending member can lose at its bearing". On
+ * a 2x6 over a 2x4 plate the seat takes 35% at 8/12 and 45% at 12/12 — both pitches the tool
+ * offers, both past the limit — so the number the module argues from is checked against what it
+ * actually cut.
+ *
+ * IT MEASURES WHAT IT CUT, WHICH IS WHAT THE PACKET IS ALLOWED TO CLAIM. Whatever `seatCutsFor`
+ * seats gets measured, common and jack alike — a jack rafter is the same notch on the same plate
+ * at the same pitch, differing only in length. A hip is NOT: it crosses the corner at 45° on its
+ * own shallower pitch and its seat is a double cheek this module does not derive, so no hip is
+ * measured here and `packet/lsgate.ts` does not list the limit as governing one.
  *
  * Mandate #2, the same as the span tables: this WARNS. Nothing here resizes a rafter, raises a
  * plate or flattens a roof — the drawing the crew is holding stays the drawing the tool drew, and
@@ -257,7 +258,7 @@ export function seatDepthWarnings(members: readonly Member[]): SeatDepthWarning[
       frac,
       allowedFrac,
       message:
-        `${m.nominal} rafter: the bird’s mouth cuts ${(frac * 100).toFixed(0)}% of its ${faceIn} in depth `
+        `${m.nominal} ${roleWord(m.role)}: the bird’s mouth cuts ${(frac * 100).toFixed(0)}% of its ${faceIn} in depth `
         + `(${depthIn.toFixed(2)} in); a bearing notch may take ${(allowedFrac * 100).toFixed(0)}%. `
         + 'Flatten the pitch, deepen the rafter, or seat it on a narrower plate — the tool has NOT changed it.',
       cite,
@@ -270,7 +271,9 @@ export function seatDepthWarnings(members: readonly Member[]): SeatDepthWarning[
 export function summarizeSeatDepthWarnings(warnings: readonly SeatDepthWarning[]): string[] {
   const by = new Map<string, { w: SeatDepthWarning; n: number }>();
   for (const w of warnings) {
-    const key = `${w.nominal}|${w.frac.toFixed(3)}`;
+    // Role is part of the key: the commons and the jacks off one hip roof are the same cut at the
+    // same fraction, and collapsing them would report the count against the wrong members.
+    const key = `${w.role}|${w.nominal}|${w.frac.toFixed(3)}`;
     const row = by.get(key);
     if (row) row.n += 1;
     else by.set(key, { w, n: 1 });
@@ -278,12 +281,33 @@ export function summarizeSeatDepthWarnings(warnings: readonly SeatDepthWarning[]
   return [...by.values()].map(({ w, n }) => `${n > 1 ? `${n}× ` : ''}${w.message} (${w.cite})`);
 }
 
+/**
+ * Every notch on every seated member in a model, keyed by member id.
+ *
+ * A rafter is matched to the cap plates it actually crosses — those whose run its footprint
+ * passes over, running SQUARE to it — and members that cross none simply get no entry, which is
+ * the honest answer rather than a guessed notch. A tower's cab rafters bear on a beam, not a
+ * wall plate.
+ *
+ * ALL of them, not the deepest. A shed rafter runs from the low wall up to the pony wall and
+ * bears on a plate at each end; keeping only one left it running through the other.
+ *
+ * A JACK IS A SHORT COMMON, AND IT IS SEATED THE SAME WAY. It runs square to the plate, at the
+ * roof's own pitch, and its bird's mouth is the identical `plateWidth · tan θ` notch — a hip roof
+ * at 12/12 puts 56 of them on the same plates as its 44 commons. Filtering on `role === 'rafter'`
+ * left every one of them unnotched in the viewer and unmeasured by the seat-depth check. The HIP
+ * itself is not here: it crosses the corner diagonally on its own shallower pitch, which is a
+ * double-cheek seat this module does not derive, and `runAxisOf` returns null for it rather than
+ * inventing one.
+ */
+const SEATED_ROLES: ReadonlySet<string> = new Set(['rafter', 'jackRafter']);
+
 export function seatCutsFor(members: readonly Member[]): Map<string, SeatCut[]> {
   const out = new Map<string, SeatCut[]>();
   const plates = members.filter((m) => m.role === 'capPlate');
   if (plates.length === 0) return out;
   for (const m of members) {
-    if (m.role !== 'rafter') continue;
+    if (!SEATED_ROLES.has(m.role)) continue;
     const run = runAxisOf(m);
     if (!run) continue;
     const halfLen = m.cutLength / IN_PER_FT / 2;

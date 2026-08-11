@@ -134,11 +134,16 @@ function renderPickerScreen(): void {
 
 function regenerate(): void {
   if (!current) return;
-  const { spec, issues } = normalizeSpec(current.spec);
+  const { spec } = normalizeSpec(current.spec);
   current.spec = spec;
   model = generateStructure(spec);
   studio?.setModel(model);
-  renderIssues(issues.map((i) => i.message));
+  // THE MODEL'S ISSUES, NOT THE NORMALIZER'S. `generateStructure` carries everything the
+  // normalizer said AND what the member checks found on the frame it went on to build — a joist
+  // past its span table, a bird's mouth eating half the rafter at a 12/12 pitch. Fed from
+  // `normalizeSpec` alone, those reached the printed packet and never the screen, so the operator
+  // choosing the pitch was the one person not told.
+  renderIssues(model.issues.map((i) => i.message));
   renderStrips();
   session = commitBuild(session, { ...current, updatedAt: Date.now() }).state;
   scheduleSave();
@@ -235,12 +240,13 @@ function finishWorkbench(build: StoredBuild, family: ReturnType<typeof familyByI
   model = generateStructure(build.spec);
 
   app.innerHTML = workbenchHtml(build, family, false);
-  // THE PANEL HAD NEVER SPOKEN ON LOAD. `regenerate` is what renders normalize's report, and it
-  // runs only after the operator changes a control — so a build that arrived already needing
-  // repair opened silently. Every warning was there and none of it was on screen: a forwarded
-  // link carrying a roof this engine cannot frame, an opening moved back inside its wall, a
-  // second story dropped. It is said here, when the build opens, which is when it matters.
-  renderIssues(normalizeSpec(build.spec).issues.map((i) => i.message));
+  // THE PANEL HAD NEVER SPOKEN ON LOAD. `regenerate` is what renders the report, and it runs only
+  // after the operator changes a control — so a build that arrived already needing repair opened
+  // silently. Every warning was there and none of it was on screen: a forwarded link carrying a
+  // roof this engine cannot frame, an opening moved back inside its wall, a second story dropped,
+  // a span or a seat cut the frame cannot carry. It is said here, when the build opens, which is
+  // when it matters, and off the same model the viewport is showing.
+  renderIssues(model.issues.map((i) => i.message));
 
   studio = createStudio(
     {
