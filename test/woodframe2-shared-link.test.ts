@@ -21,7 +21,11 @@ import assert from 'node:assert/strict';
 import { generateStructure } from '../src/woodframe/families/index';
 import { normalizeSpec } from '../src/woodframe/normalize';
 import { decodeSpec } from '../src/ui/woodframe/router';
-import { familyById, FAMILY_TABLE } from '../src/woodframe/catalog';
+import { familyById, familyTable } from '../src/woodframe/catalog';
+
+// The catalog is minted fresh per call now (live doctrine reads); these cases read the
+// shipped table once — none of them mutates the register.
+const FAMILY_TABLE = familyTable();
 import { WALL_ORDER } from '../src/woodframe/spec';
 import type { StructureSpec } from '../src/woodframe/spec';
 

@@ -9,7 +9,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { FAMILY_TABLE, shippedFamilies } from '../src/woodframe/catalog';
+import { familyTable, shippedFamilies } from '../src/woodframe/catalog';
+
+// The catalog is minted fresh per call now (live doctrine reads); these cases read the
+// shipped table once — none of them mutates the register.
+const FAMILY_TABLE = familyTable();
 import { thumbnailFor, thumbnailCached } from '../src/woodframe/thumbnails';
 import { portraitFor, portraitCached } from '../src/woodframe/portrait';
 

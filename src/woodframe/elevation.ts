@@ -3,13 +3,18 @@
 // members by construction (the §9 count-parity test locks that in).
 
 import type { Member, WallId } from './types';
+import { DRESSED } from './types';
+import { LUMBER } from './doctrine';
 
 const FT = 12;
-const D = 3.5 / FT; // dressed 2x4 face width (wall thickness), feet
 
 // Wall frames must match walls.ts placement exactly (start = left end viewed from OUTSIDE;
-// walls sit inside the floor edge, N/S run through, E/W butt between them).
+// walls sit inside the floor edge, N/S run through, E/W butt between them). The wall thickness
+// is the dressed face of the doctrine stud, read AT CALL TIME — a module-load `3.5 / 12` const
+// froze it, so an imported stud-nominal correction left every elevation projected at the old
+// thickness.
 function wallFrame(wall: WallId, lengthFt: number, widthFt: number): { start: [number, number]; dir: [number, number]; runFt: number } {
+  const D = DRESSED[LUMBER.studNominal.value as string]!.d / FT;
   switch (wall) {
     case 'S': return { start: [0, D / 2], dir: [1, 0], runFt: lengthFt };
     case 'N': return { start: [lengthFt, widthFt - D / 2], dir: [-1, 0], runFt: lengthFt };

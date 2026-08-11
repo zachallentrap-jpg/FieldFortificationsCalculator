@@ -14,7 +14,7 @@ import { renderPicker } from './woodframe/picker';
 import { createStudio, type StudioHandles } from './woodframe/studio';
 import { regenerateFrom } from './woodframe/regen';
 import { configSchemaFor, type PanelRow } from './woodframe/config';
-import { HUT } from '../woodframe/doctrine';
+import { FOUNDATION, HUT, OPENING, ROOF } from '../woodframe/doctrine';
 import { layoutStrip } from '../woodframe/elevation';
 import {
   loadSession, saveSession, commitBuild, buildFromFamily, findBuild, nextCustomId,
@@ -22,13 +22,20 @@ import {
 } from './woodframe/store';
 import { parseRoute, routeToHash, decodeSpec, encodeSpec } from './woodframe/router';
 import { FEATURES, APP_NAME, MODE } from './woodframe/mode';
-import { askPacketOptions, downloadMaterialsCsv, openCommandSheet, PACKET_DEFAULTS } from './woodframe/sheet';
+import { askPacketOptions, downloadMaterialsCsv, openCommandSheet, packetDefaults } from './woodframe/sheet';
 
 const esc = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-/** The screened band a hut gets when its toggle is switched on. */
-const HUT_BAND = { sillFt: HUT.screenBandSillFt.value as number, heightFt: HUT.screenBandHeightFt.value as number };
+/**
+ * The screened band a hut gets when its toggle is switched on — read from the register when
+ * the toggle is CLICKED, not when the page booted, so an imported band correction reaches the
+ * next toggle without a reload.
+ */
+const hutBand = (): { sillFt: number; heightFt: number } => ({
+  sillFt: HUT.screenBandSillFt.value as number,
+  heightFt: HUT.screenBandHeightFt.value as number,
+});
 
 const app = document.getElementById('app')!;
 const noticeBar = document.getElementById('notices')!;
@@ -271,7 +278,7 @@ function finishWorkbench(build: StoredBuild, family: ReturnType<typeof familyByI
   document.getElementById('sheetBtn')?.addEventListener('click', () => {
     // Ask for the three numbers the tool has no basis for before generating anything. A labor
     // table built on defaults nobody chose is a labor table the unit gets held to anyway.
-    void askPacketOptions(PACKET_DEFAULTS).then((opts) => {
+    void askPacketOptions(packetDefaults()).then((opts) => {
       if (!opts) return;
       // The packet carries a still of the view the operator set up, so the drawing on the page
       // is the one they were looking at when they decided it was right. `preserveDrawingBuffer`
@@ -335,11 +342,17 @@ function setPath(spec: StructureSpec, path: string, value: unknown): void {
   node[keys[keys.length - 1]!] = value;
 }
 
-/** Roof and foundation are unions — switching kind rebuilds the branch with sane defaults. */
+/**
+ * Roof and foundation are unions — switching kind rebuilds the branch with sane defaults.
+ * The defaults are LIVE doctrine reads (ROOF.risePer12/overhangFt, FOUNDATION.crawlFt/
+ * basementDepthFt — 4, 1, 1.5 and 7.5 as shipped): these fire on a CLICK, long after module
+ * load, so a literal here would hand the user the stale pre-import default.
+ */
 function setRoofKind(spec: BuildingSpec, kind: RoofSpec['kind']): void {
   const prev = spec.roof;
-  const rise = prev.kind === 'gable' || prev.kind === 'shed' || prev.kind === 'hip' || prev.kind === 'pyramid' ? prev.risePer12 : 4;
-  const oh = prev.kind === 'none' ? 1 : prev.overhangFt;
+  const rise = prev.kind === 'gable' || prev.kind === 'shed' || prev.kind === 'hip' || prev.kind === 'pyramid'
+    ? prev.risePer12 : ROOF.risePer12.value as number;
+  const oh = prev.kind === 'none' ? ROOF.overhangFt.value as number : prev.overhangFt;
   spec.roof =
     kind === 'gable' ? { kind, risePer12: rise, overhangFt: oh }
     : kind === 'shed' ? { kind, risePer12: rise || 3, overhangFt: oh, highSide: 'N' }
@@ -351,11 +364,11 @@ function setRoofKind(spec: BuildingSpec, kind: RoofSpec['kind']): void {
 
 function setFoundationKind(spec: BuildingSpec, kind: FoundationSpec['kind']): void {
   const prev = spec.foundation;
-  const crawl = prev.kind === 'piers' || prev.kind === 'wall' ? prev.crawlFt : 1.5;
+  const crawl = prev.kind === 'piers' || prev.kind === 'wall' ? prev.crawlFt : FOUNDATION.crawlFt.value as number;
   spec.foundation =
     kind === 'piers' ? { kind, crawlFt: crawl }
     : kind === 'wall' ? { kind, crawlFt: crawl }
-    : kind === 'basement' ? { kind, depthFt: 7.5, stairs: true }
+    : kind === 'basement' ? { kind, depthFt: FOUNDATION.basementDepthFt.value as number, stairs: true }
     : kind === 'slab' ? { kind }
     : kind === 'skids' ? { kind }
     : { kind: 'embedded', embedFt: 3 };
@@ -466,7 +479,7 @@ function renderConfigPanel(): void {
         // The toggle is "does this hut breathe"; the spec value is the band itself, or null.
         // Mapping it here keeps the doctrine numbers out of the control and out of the panel.
         (spec as unknown as Record<string, unknown>).screenBand = (el as HTMLInputElement).checked
-          ? { sillFt: HUT_BAND.sillFt, heightFt: HUT_BAND.heightFt }
+          ? hutBand()
           : null;
       } else if (path === 'roof.kind') {
         setRoofKind(spec, (el as HTMLSelectElement).value as RoofSpec['kind']);
@@ -517,13 +530,18 @@ function renderConfigPanel(): void {
 //     sill, so a door never shows one.
 //   · WHAT IS WRONG SAYS SO, on the row: off the end of the wall, or overlapping its neighbour.
 
-const OPENING_KINDS: { kind: OpeningKind; label: string; widthFt: number; heightFt: number; sillHeightFt: number; fill: OpeningFill }[] = [
-  // Sizes are the standard-design rough openings this tool already ships in its presets, so
-  // "+ Door" produces the same door the GP building's own drawing calls for.
-  { kind: 'door', label: 'Door', widthFt: 3, heightFt: 6.7, sillHeightFt: 0, fill: 'door-ledged' },
-  { kind: 'window', label: 'Window', widthFt: 3, heightFt: 3.5, sillHeightFt: 3.5, fill: 'window-shutter' },
-  { kind: 'vent', label: 'Vent', widthFt: 1.5, heightFt: 1, sillHeightFt: 6.5, fill: 'vent-screen' },
-];
+// Sizes are the standard-design rough openings from `doctrine.OPENING`, read when the buttons
+// render — so "+ Door" produces the same door the GP building's own drawing calls for, and an
+// imported RO correction reaches the next click. (The door literal here wrote 6.7 where the
+// register holds 6 ft 8 in — the same 0.4-in disagreement the catalog carried; see DECISIONS D46.)
+function openingKinds(): { kind: OpeningKind; label: string; widthFt: number; heightFt: number; sillHeightFt: number; fill: OpeningFill }[] {
+  const n = (d: { value: unknown }): number => d.value as number;
+  return [
+    { kind: 'door', label: 'Door', widthFt: n(OPENING.doorWidthFt), heightFt: n(OPENING.doorHeightFt), sillHeightFt: 0, fill: 'door-ledged' },
+    { kind: 'window', label: 'Window', widthFt: n(OPENING.windowWidthFt), heightFt: n(OPENING.windowHeightFt), sillHeightFt: n(OPENING.windowSillFt), fill: 'window-shutter' },
+    { kind: 'vent', label: 'Vent', widthFt: n(OPENING.ventWidthFt), heightFt: n(OPENING.ventHeightFt), sillHeightFt: n(OPENING.ventSillFt), fill: 'vent-screen' },
+  ];
+}
 
 /** Decimal feet as a carpenter reads them: 6.7 ft is 6'-8", not "6.7". */
 function ftIn(ft: number): string {
@@ -610,7 +628,7 @@ function renderOpeningsEditor(): void {
         .map((o, i) => {
           const id = `${w}-${i}`;
           const open = openOpening === id;
-          const kindLabel = OPENING_KINDS.find((k) => k.kind === o.kind)?.label ?? o.kind;
+          const kindLabel = openingKinds().find((k) => k.kind === o.kind)?.label ?? o.kind;
           const problem = openingProblem(o, i, list);
           const editor = open
             ? `<div class="op-edit">${fieldsFor(o)
@@ -639,7 +657,7 @@ function renderOpeningsEditor(): void {
       return `<section class="op-wall">
         <h4>${esc(label)}<span class="op-run">${ftIn(runFt)} wall</span></h4>
         ${rows || '<p class="op-none">No openings — a solid wall.</p>'}
-        <div class="op-add">${OPENING_KINDS.map((k) => `<button class="chip" data-add="${w}" data-kind="${k.kind}" type="button">+ ${esc(k.label)}</button>`).join('')}</div>
+        <div class="op-add">${openingKinds().map((k) => `<button class="chip" data-add="${w}" data-kind="${k.kind}" type="button">+ ${esc(k.label)}</button>`).join('')}</div>
       </section>`;
     })
     .join('');
@@ -647,7 +665,7 @@ function renderOpeningsEditor(): void {
   host.querySelectorAll<HTMLButtonElement>('[data-add]').forEach((el) => {
     el.addEventListener('click', () => {
       const w = el.dataset.add as 'S';
-      const preset = OPENING_KINDS.find((k) => k.kind === el.dataset.kind)!;
+      const preset = openingKinds().find((k) => k.kind === el.dataset.kind)!;
       // Re-read through `current` rather than the captured story: `regenerate()` swaps
       // `current.spec` for the normalized copy, so anything closed over here is one edit stale.
       const live = (current!.spec as BuildingSpec).stories[0]!;

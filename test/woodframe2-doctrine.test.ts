@@ -23,7 +23,11 @@ import { DRESSED, type Member } from '../src/woodframe/types';
 import { BF_PER_LF, classifyNominal, bomSummary } from '../src/woodframe/bom';
 import { generateFrame, specFromBuildingInput, type BuildingInput } from '../src/woodframe/frame';
 import { generateStructure, type StructureModel } from '../src/woodframe/families/index';
-import { FAMILY_TABLE } from '../src/woodframe/catalog';
+import { familyTable } from '../src/woodframe/catalog';
+
+// The catalog is minted fresh per call now (live doctrine reads); these cases read the
+// shipped table once — none of them mutates the register.
+const FAMILY_TABLE = familyTable();
 import { configSchemaFor, type PanelRow } from '../src/ui/woodframe/config';
 import { HUT } from '../src/woodframe/doctrine';
 import { spanWarnings, type SpanWarning } from '../src/woodframe/spans';

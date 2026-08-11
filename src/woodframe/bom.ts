@@ -5,6 +5,7 @@
 import type { Member } from './types';
 import { STAGES } from './types';
 import { fracIn } from './units';
+import { LABOR } from './doctrine';
 import type { StagePlanEntry } from './stagePlan';
 
 // Nominal section board-feet per lineal foot (nominal w×d ÷ 12). EXPORTED (plan §3.6) so the
@@ -134,19 +135,24 @@ export interface BomSummary {
 // Placeholder labor rates, man-hours per board-foot equivalent (FM 5-426 Table C-1 pending
 // verification — design doc §8 keeps these DOCTRINE-UNVERIFIED and visibly footnoted).
 //
-// EXPORTED (FD71) because a man-hour total is the exact number a unit gets held to, and a
-// labor block that prints the total without the rate that produced it is asking to be believed.
-// The packet prints `LABOR_RATES` inline on the block; keeping these module-private made that
-// impossible and was the reason the sibling's labor page could not be audited from the page.
-export const MH_PER_BF = 0.055; // (PH)
-export const MH_PER_PANEL = 0.5; // (PH)
-export const MH_PER_CONC_LF = 0.15; // (PH) concrete form/pour per lineal foot of wall/footing/slab run
+// THE RATES LIVE IN `doctrine.LABOR` and are read at call time — the exported `MH_PER_*`
+// consts these functions replace were module-load copies of the same three numbers, which
+// meant an offline import that corrected a rate repriced nothing until the page reloaded.
+const mhPerBf = (): number => LABOR.mhPerBoardFoot.value as number;
+const mhPerPanel = (): number => LABOR.mhPerPanel.value as number;
+const mhPerConcLf = (): number => LABOR.mhPerConcreteLf.value as number;
 
-/** The governing rates, in the form the labor block prints them. */
+/**
+ * The governing rates, in the form the labor block prints them. EXPORTED (FD71) because a
+ * man-hour total is the exact number a unit gets held to, and a labor block that prints the
+ * total without the rate that produced it is asking to be believed — the packet prints this
+ * inline on the block. The `value` fields are GETTERS so the printed rate is the rate that
+ * priced the job, read from the register at print time, not a string baked at module load.
+ */
 export const LABOR_RATES: readonly { label: string; value: string; note: string }[] = [
-  { label: 'Framing', value: `${MH_PER_BF} MH per board-foot`, note: '(PH) — unverified against FM 5-426 Table C-1 / TM 5-303' },
-  { label: 'Sheet goods', value: `${MH_PER_PANEL} MH per sheet`, note: '(PH) — unverified' },
-  { label: 'Concrete', value: `${MH_PER_CONC_LF} MH per lineal foot`, note: '(PH) — form, pour and strip, unverified' },
+  { label: 'Framing', get value() { return `${mhPerBf()} MH per board-foot`; }, note: '(PH) — unverified against FM 5-426 Table C-1 / TM 5-303' },
+  { label: 'Sheet goods', get value() { return `${mhPerPanel()} MH per sheet`; }, note: '(PH) — unverified' },
+  { label: 'Concrete', get value() { return `${mhPerConcLf()} MH per lineal foot`; }, note: '(PH) — form, pour and strip, unverified' },
 ];
 
 const eighth = (inches: number): number => Math.round(inches * 8) / 8;
@@ -257,7 +263,7 @@ export function bomSummary(members: Member[], plan?: StagePlanEntry[]): BomSumma
       boardFeet: bf,
       panels,
       memberCount: ofStage.length,
-      manHours: bf * MH_PER_BF + panels * MH_PER_PANEL + concLf * MH_PER_CONC_LF,
+      manHours: bf * mhPerBf() + panels * mhPerPanel() + concLf * mhPerConcLf(),
     });
   }
   return {

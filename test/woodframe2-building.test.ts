@@ -8,7 +8,11 @@ import { joistNominalFor, SMALL_PLAN_WIDTH_FT } from '../src/woodframe/subsystem
 import type { BuildingSpec, FoundationSpec } from '../src/woodframe/spec';
 import { shippedFamilies, familyById } from '../src/woodframe/catalog';
 import { maxOpeningTopFt } from '../src/woodframe/normalize';
-import { FAMILY_TABLE } from '../src/woodframe/catalog';
+import { familyTable } from '../src/woodframe/catalog';
+
+// The catalog is minted fresh per call now (live doctrine reads); these cases read the
+// shipped table once — none of them mutates the register.
+const FAMILY_TABLE = familyTable();
 import type { Member } from '../src/woodframe/types';
 
 function bldg(over: Partial<BuildingSpec> = {}): BuildingSpec {

@@ -22,6 +22,7 @@
 // non-linear fudge is not.
 
 import type { BomSummary } from '../bom';
+import { LABOR } from '../doctrine';
 
 /** Clamps. Operator inputs, not doctrine — arithmetic divisors with sane envelopes (R-T6). */
 export const CREW_MIN = 1;
@@ -29,17 +30,20 @@ export const CREW_MAX = 30;
 export const HOURS_MIN = 1;
 export const HOURS_MAX = 24;
 
-export const DEFAULT_PRODUCTIVE_HOURS = 6;
+// The two working figures live in `doctrine.LABOR` now (membersPerWorker, productiveHoursPerDay)
+// and `laborModel`/`maxUsefulCrew` read them AT CALL TIME — so an offline correction reaches the
+// next packet compile. The exported const below is the shipped default for callers that seed a
+// dialog with it; the model itself never reads it.
+export const DEFAULT_PRODUCTIVE_HOURS = LABOR.productiveHoursPerDay.value as number;
 
-/**
- * Members one worker can place before people start waiting on each other. A working figure,
- * not doctrine, and it is what sets the crew ceiling — so it is stated on the table rather
- * than hidden here.
- */
-export const MEMBERS_PER_WORKER = 12;
+/** Members one worker can place before people start waiting on each other — see the leaf. */
+const membersPerWorker = (): number => LABOR.membersPerWorker.value as number;
 
+// KNOWN RESIDUAL: this sentence interpolates the SHIPPED figure at module load (packet/html.ts,
+// outside this pass's reach, imports it as a plain string). The arithmetic beside it is live;
+// only this prose lags a mid-session import until reload.
 export const MEMBERS_PER_WORKER_NOTE =
-  `Crew ceiling is stage members ÷ ${MEMBERS_PER_WORKER} per worker — a working figure for how `
+  `Crew ceiling is stage members ÷ ${membersPerWorker()} per worker — a working figure for how `
   + 'many people can reach the work, not a doctrinal crew size. (PH)';
 
 export interface CrewRow {
@@ -73,7 +77,7 @@ export interface LaborModel {
 }
 
 export function maxUsefulCrew(members: number): number {
-  return Math.max(1, Math.ceil(members / MEMBERS_PER_WORKER));
+  return Math.max(1, Math.ceil(members / membersPerWorker()));
 }
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, Math.round(v)));
@@ -82,7 +86,7 @@ export function laborModel(
   bom: BomSummary,
   opts: { crewSizes?: readonly number[]; productiveHoursPerDay?: number } = {},
 ): LaborModel {
-  const hours = clamp(opts.productiveHoursPerDay ?? DEFAULT_PRODUCTIVE_HOURS, HOURS_MIN, HOURS_MAX);
+  const hours = clamp(opts.productiveHoursPerDay ?? (LABOR.productiveHoursPerDay.value as number), HOURS_MIN, HOURS_MAX);
   const stages: StageLabor[] = bom.stages.map((s) => ({
     ordinal: s.stage,
     name: s.name,

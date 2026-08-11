@@ -8,7 +8,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateStructure } from '../src/woodframe/families/index';
-import { familyById, FAMILY_TABLE } from '../src/woodframe/catalog';
+import { familyById, familyTable } from '../src/woodframe/catalog';
+
+// The catalog is minted fresh per call now (live doctrine reads); these cases read the
+// shipped table once — none of them mutates the register.
+const FAMILY_TABLE = familyTable();
 import { fastenerTakeoff } from '../src/woodframe/fasteners';
 import { OPENING, IN_PER_FT } from '../src/woodframe/doctrine';
 import { DRESSED } from '../src/woodframe/types';
@@ -124,9 +128,9 @@ test('the leaf fits its rough opening — inside it, not through it', () => {
   assert.ok(east.length > 0, 'the east door exists');
   const ys = east.flatMap((x) => box(x).y);
   const zs = east.flatMap((x) => box(x).z);
-  // Measured against the opening THIS CARD asks for, not against the doctrine figure: the
-  // gp-frame preset writes 6.7 ft where `OPENING.doorHeightFt` is 6 ft 8 in, and a test that
-  // silently prefers one would be asserting something the model was never asked to do.
+  // Measured against the opening THIS CARD asks for, not against the doctrine figure. (The two
+  // agree now — D46 wired the preset to `OPENING.doorHeightFt`, retiring the card's 6.7 — but
+  // the operator can still resize the opening, so the spec stays the thing being asserted.)
   const spec = openingsOf(m.spec);
   void spec;
   const ro = ((m.spec as unknown as { stories: { openings: { E?: { widthFt: number; heightFt: number }[] } }[] })

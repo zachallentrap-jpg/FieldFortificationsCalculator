@@ -12,6 +12,7 @@
 
 import type { WallId } from './types';
 import type { BridgingType } from './floor';
+import { FOUNDATION, LAYOUT, ROOF, limitRow } from './doctrine';
 
 export interface Dims {
   lengthFt: number; // X
@@ -246,14 +247,36 @@ export interface SpecPathDef {
  * catalog → families/hut → families/building → normalize is already a chain, and importing back
  * would close it into a cycle.
  */
-export const SPEC_SECTION_FALLBACK = {
-  dims: { lengthFt: 24, widthFt: 16 } as Dims,
-  spacing: { studSpacingIn: 16, joistSpacingIn: 16, rafterSpacingIn: 16 } as SpacingSpec,
-  coverings: { wallSheathing: 'none', siding: 'plywood', roofDeck: 'plywood', roofing: 'roll' } as CoveringSpec,
-  stories: [{ wallHeightFt: 8, openings: {} }] as StorySpec[],
-  roof: { kind: 'gable', risePer12: 4, overhangFt: 1 } as RoofSpec,
-  foundation: { kind: 'piers', crawlFt: 1.5 } as FoundationSpec,
-} as const;
+export const SPEC_SECTION_FALLBACK: {
+  readonly dims: Dims;
+  readonly spacing: SpacingSpec;
+  readonly coverings: CoveringSpec;
+  readonly stories: StorySpec[];
+  readonly roof: RoofSpec;
+  readonly foundation: FoundationSpec;
+} = {
+  dims: { lengthFt: 24, widthFt: 16 },
+  coverings: { wallSheathing: 'none', siding: 'plywood', roofDeck: 'plywood', roofing: 'roll' },
+  // GETTERS, so the doctrine leaves are read when a repair happens, not when this module loads.
+  // A module-load snapshot here would hand a share-link repair the SHIPPED spacing after an
+  // import corrected it — the exact staleness the live rule register exists to end.
+  get spacing(): SpacingSpec {
+    return {
+      studSpacingIn: LAYOUT.studSpacingIn.value as SpacingIn,
+      joistSpacingIn: LAYOUT.joistSpacingIn.value as SpacingIn,
+      rafterSpacingIn: LAYOUT.rafterSpacingIn.value as SpacingIn,
+    };
+  },
+  get stories(): StorySpec[] {
+    return [{ wallHeightFt: 8, openings: {} }];
+  },
+  get roof(): RoofSpec {
+    return { kind: 'gable', risePer12: ROOF.risePer12.value as number, overhangFt: ROOF.overhangFt.value as number };
+  },
+  get foundation(): FoundationSpec {
+    return { kind: 'piers', crawlFt: FOUNDATION.crawlFt.value as number };
+  },
+};
 
 /**
  * Which sections a spec must actually have, by family — and they are NOT the same set.
@@ -269,26 +292,46 @@ export const SPEC_SECTIONS_BUILDING = [...SPEC_SECTIONS_COMMON, 'stories', 'roof
 export const SPEC_SECTIONS = SPEC_SECTIONS_BUILDING;
 export type SpecSection = typeof SPEC_SECTIONS_BUILDING[number];
 
+/**
+ * A registry row whose min/max/step are LIVE READS of `doctrine.LIMITS` — the clamp table is
+ * doctrine data now, editable through the validated offline import, and a module-load copy here
+ * would clamp against the shipped bounds after an import corrected them. The label and the
+ * clamp-message cite stay HERE: they are UI copy about the row, not the rule itself (the LIMITS
+ * leaf carries its own register-grade citation). A row with no LIMITS leaf is refused at load —
+ * a knob nothing clamps must be impossible, not discovered.
+ */
+function row(path: string, label: string, cite?: string): SpecPathDef {
+  if (!limitRow(path)) throw new Error(`spec.ts: no doctrine.LIMITS row for '${path}' — every numeric knob must have one`);
+  return {
+    path,
+    label,
+    ...(cite !== undefined ? { cite } : {}),
+    get min(): number { return limitRow(path)!.min; },
+    get max(): number { return limitRow(path)!.max; },
+    get step(): number { return limitRow(path)!.step; },
+  };
+}
+
 export const SPEC_PATH_DEFS: readonly SpecPathDef[] = [
-  { path: 'dims.lengthFt', label: 'Length', min: 4, max: 60, step: 0.5, cite: '4–60 ft — what this generator will lay out' },
-  { path: 'dims.widthFt', label: 'Width', min: 4, max: 24, step: 0.5, cite: '4–24 ft — a wider span needs a second girder line, which is not built yet' },
-  { path: 'stories.0.wallHeightFt', label: 'Wall height', min: 6, max: 12, step: 0.5, cite: 'FM 5-426 ch. 6 (PH)' },
-  { path: 'stories.1.wallHeightFt', label: 'Second-story wall height', min: 6, max: 12, step: 0.5, cite: 'FM 5-426 ch. 6 (PH)' },
-  { path: 'roof.risePer12', label: 'Roof pitch', min: 0, max: 12, step: 1, cite: 'FM 5-426 framing-square method (PH)' },
-  { path: 'roof.overhangFt', label: 'Eave overhang', min: 0, max: 3, step: 0.5, cite: 'FM 5-426 cornice (PH)' },
-  { path: 'roof.drainPer12', label: 'Flat-roof drainage slope', min: 1, max: 2, step: 0.25, cite: 'FM 5-426 roll-roofing minimum slope (PH)' },
+  row('dims.lengthFt', 'Length', '4–60 ft — what this generator will lay out'),
+  row('dims.widthFt', 'Width', '4–24 ft — a wider span needs a second girder line, which is not built yet'),
+  row('stories.0.wallHeightFt', 'Wall height', 'FM 5-426 ch. 6 (PH)'),
+  row('stories.1.wallHeightFt', 'Second-story wall height', 'FM 5-426 ch. 6 (PH)'),
+  row('roof.risePer12', 'Roof pitch', 'FM 5-426 framing-square method (PH)'),
+  row('roof.overhangFt', 'Eave overhang', 'FM 5-426 cornice (PH)'),
+  row('roof.drainPer12', 'Flat-roof drainage slope', 'FM 5-426 roll-roofing minimum slope (PH)'),
   // Floored at 1 ft, not 0.5: the built-up girder hangs a full 9 1/4 in BELOW the sill, so a
   // shallower crawl puts the girder posts underground — the sweep caught it as a negative post
-  // length. The bound is geometry, not preference, and it is stated once here.
-  { path: 'foundation.crawlFt', label: 'Crawl height', min: 1, max: 4, step: 0.25, cite: 'FM 5-426 foundations (PH); floored by the girder depth below the sill' },
-  { path: 'foundation.depthFt', label: 'Basement depth', min: 6, max: 9, step: 0.5, cite: 'FM 5-426 basement (PH)' },
-  { path: 'foundation.embedFt', label: 'Post embedment', min: 2, max: 6, step: 0.5, cite: 'TM 5-302 (PH)' },
-  { path: 'platformHeightFt', label: 'Platform height', min: 10, max: 32, step: 1, cite: 'TM 5-302 tower (PH, LS)' },
-  { path: 'cabPlanFt', label: 'Cab plan', min: 6, max: 8, step: 2, cite: 'TM 5-302 tower (PH)' },
-  { path: 'interiorLengthFt', label: 'Interior length', min: 6, max: 16, step: 1, cite: 'bunker envelope (PH)' },
-  { path: 'interiorWidthFt', label: 'Interior width', min: 6, max: 12, step: 1, cite: 'bunker envelope (PH)' },
-  { path: 'clearHeightFt', label: 'Clear height', min: 4.5, max: 7, step: 0.5, cite: 'bunker envelope (PH)' },
-  { path: 'designCoverDepthFt', label: 'Stated cover depth', min: 0, max: 4, step: 0.5, cite: 'load-table row range (PH, LS, SME)' },
+  // length. The bound is geometry, not preference, and it is stated once, in LIMITS.
+  row('foundation.crawlFt', 'Crawl height', 'FM 5-426 foundations (PH); floored by the girder depth below the sill'),
+  row('foundation.depthFt', 'Basement depth', 'FM 5-426 basement (PH)'),
+  row('foundation.embedFt', 'Post embedment', 'TM 5-302 (PH)'),
+  row('platformHeightFt', 'Platform height', 'TM 5-302 tower (PH, LS)'),
+  row('cabPlanFt', 'Cab plan', 'TM 5-302 tower (PH)'),
+  row('interiorLengthFt', 'Interior length', 'bunker envelope (PH)'),
+  row('interiorWidthFt', 'Interior width', 'bunker envelope (PH)'),
+  row('clearHeightFt', 'Clear height', 'bunker envelope (PH)'),
+  row('designCoverDepthFt', 'Stated cover depth', 'load-table row range (PH, LS, SME)'),
   // Floored at 1.75 ft, not 0.5, for the same reason `foundation.crawlFt` is floored at 1: the
   // frame hangs UNDER the walking surface and there has to be room for it. `deckHeightFt` is the
   // surface you stand on, and below it the platform stacks a runner (5½ in, lying on grade), a
@@ -303,15 +346,15 @@ export const SPEC_PATH_DEFS: readonly SpecPathDef[] = [
   //
   // Rendered, a 0.5-ft platform is a slab of decking sunk into the ground with no legs at all.
   // `timber2-platform-low-deck` re-derives this figure from the lumber and fails if the stock
-  // changes under it. The bound is geometry, not preference, and it is stated once here.
-  { path: 'deckHeightFt', label: 'Deck height', min: 1.75, max: 5, step: 0.25, cite: 'TM 5-302 loading platform (PH); floored by the frame depth under the deck' },
-  { path: 'ramp.widthFt', label: 'Ramp width', min: 4, max: 12, step: 0.5, cite: 'TM 5-302 (PH)' },
-  { path: 'temperBays', label: 'TEMPER bays', min: 2, max: 8, step: 1, cite: 'TM 10-8340 (PH)' },
-  { path: 'latrine.depthFt', label: 'Pit depth', min: 4, max: 8, step: 0.5, cite: 'TM 5-302 latrine (PH — sheet pending)' },
-  { path: 'openings[].offsetFt', label: 'Opening offset', min: 0, max: 60, step: 0.25 },
-  { path: 'openings[].widthFt', label: 'Opening width', min: 0.5, max: 16, step: 0.25 },
-  { path: 'openings[].heightFt', label: 'Opening height', min: 0.5, max: 10, step: 0.25 },
-  { path: 'openings[].sillHeightFt', label: 'Sill height', min: 0, max: 9, step: 0.25 },
+  // changes under it. The bound is geometry, not preference, and it is stated once, in LIMITS.
+  row('deckHeightFt', 'Deck height', 'TM 5-302 loading platform (PH); floored by the frame depth under the deck'),
+  row('ramp.widthFt', 'Ramp width', 'TM 5-302 (PH)'),
+  row('temperBays', 'TEMPER bays', 'TM 10-8340 (PH)'),
+  row('latrine.depthFt', 'Pit depth', 'TM 5-302 latrine (PH — sheet pending)'),
+  row('openings[].offsetFt', 'Opening offset'),
+  row('openings[].widthFt', 'Opening width'),
+  row('openings[].heightFt', 'Opening height'),
+  row('openings[].sillHeightFt', 'Sill height'),
 ];
 
 export const SPEC_PATHS: readonly string[] = SPEC_PATH_DEFS.map((d) => d.path);

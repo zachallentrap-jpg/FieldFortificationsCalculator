@@ -24,7 +24,7 @@ import { csvFilename, packetCsv } from '../../woodframe/packet/csv';
 import { thumbnailFor } from '../../woodframe/thumbnails';
 import { plainName } from './labels';
 import { DEFAULT_STOCK_FT } from '../../woodframe/purchase';
-import { DEFAULT_PRODUCTIVE_HOURS } from '../../woodframe/packet/labor';
+import { LABOR } from '../../woodframe/doctrine';
 
 export interface SheetInput {
   model: StructureModel;
@@ -118,12 +118,18 @@ export interface PacketOptionsInput {
   stockLengthsFt: number[];
 }
 
-/** Starting points, not recommendations — every one is overwritten before anything prints. */
-export const PACKET_DEFAULTS: PacketOptionsInput = {
-  crewSizes: [2, 4, 6, 8, 12],
-  productiveHoursPerDay: DEFAULT_PRODUCTIVE_HOURS,
-  stockLengthsFt: [...DEFAULT_STOCK_FT],
-};
+/**
+ * Starting points, not recommendations — every one is overwritten before anything prints.
+ * A FUNCTION so the productive-hours seed is the register's figure at ask time, not a copy
+ * taken when the page booted.
+ */
+export function packetDefaults(): PacketOptionsInput {
+  return {
+    crewSizes: [2, 4, 6, 8, 12],
+    productiveHoursPerDay: LABOR.productiveHoursPerDay.value as number,
+    stockLengthsFt: [...DEFAULT_STOCK_FT],
+  };
+}
 
 const parseList = (raw: string, lo: number, hi: number): number[] => {
   const out = raw.split(/[,\s]+/).map((s) => Number(s)).filter((n) => Number.isFinite(n) && n > 0)

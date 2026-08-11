@@ -19,6 +19,7 @@
 
 import type { Member } from './types';
 import { classifyNominal } from './bom';
+import { FASTENER, LAYOUT } from './doctrine';
 
 /** One line of the hardware bill. */
 export interface FastenerLine {
@@ -47,15 +48,9 @@ export interface FastenerTakeoff {
 }
 
 // Pieces per pound, common-nail tables (PH — not page-checked against a supply publication).
-const PER_POUND: Record<string, number> = {
-  '6d': 180,
-  '8d': 106,
-  '10d': 69,
-  '12d': 63,
-  '16d': 49,
-  '20d': 31,
-  roofing: 250, // 1 1/4 in galvanised large-head
-};
+// The table LIVES in `doctrine.FASTENER.perPound` and is read at take-off time, so a corrected
+// supply table reaches the very next bill without touching this module.
+const perPound = (): Record<string, number> => FASTENER.perPound.value as Record<string, number>;
 
 const SPEC_LABEL: Record<string, string> = {
   '6d': '6d common',
@@ -72,8 +67,12 @@ const SPEC_LABEL: Record<string, string> = {
   spike: 'timber spike (crib wall, overhead cover)',
 };
 
-/** Supports under sheathing are on the framing grid; 16 in is this engine's standard. */
-const FIELD_SUPPORT_SPACING_IN = 16;
+/**
+ * Supports under sheathing are on the framing grid — the doctrine stud spacing, read at call
+ * time so an imported spacing correction moves the field-nail assumption WITH the framing it
+ * describes. A separate 16 literal here held the old grid after the layout leaf changed.
+ */
+const fieldSupportSpacingIn = (): number => LAYOUT.studSpacingIn.value as number;
 
 interface Tally {
   add(kind: string, count: number, usedFor: string): void;
@@ -102,7 +101,7 @@ export function fastenersForMember(m: Member, tally: Tally): boolean {
   // the bill for the same reason the tower's bolts did not: the honesty check walked one card.
   // Two spikes at each end is the modest reading, the same one the bare-schedule default takes.
   if (/\bspiked\b/i.test(s)) {
-    tally.add('spike', 4, use);
+    tally.add('spike', FASTENER.spikesPerBareMember.value as number, use);
     return true;
   }
 
@@ -124,7 +123,7 @@ export function fastenersForMember(m: Member, tally: Tally): boolean {
     const h = Math.max(1, m.actual.d);
     const perimeter = 2 * (w + h);
     // Intermediate supports = those the panel crosses, less the two its edges land on.
-    const supports = Math.max(0, Math.floor(w / FIELD_SUPPORT_SPACING_IN) - 1);
+    const supports = Math.max(0, Math.floor(w / fieldSupportSpacingIn()) - 1);
     const edgeNails = Math.ceil(perimeter / edgeIn);
     const fieldNails = supports * Math.ceil(h / fieldIn);
     tally.add(size, edgeNails + fieldNails, use);
@@ -150,8 +149,9 @@ export function fastenersForMember(m: Member, tally: Tally): boolean {
     return true;
   }
   if (/lead-head nails at every (\w+) corrugation/i.test(s)) {
-    // Corrugated sheet: one nail per third corrugation, at 2 1/6 in pitch, on each end lap.
-    tally.add('lead', 2 * Math.ceil(lenIn / (3 * (26 / 12))), use);
+    // Corrugated sheet: one nail per third corrugation, at the doctrine corrugation pitch
+    // (2 1/6 in as shipped), on each end lap.
+    tally.add('lead', 2 * Math.ceil(lenIn / (3 * (FASTENER.corrugationPitchIn.value as number))), use);
     return true;
   }
 
@@ -185,7 +185,7 @@ export function fastenersForMember(m: Member, tally: Tally): boolean {
     const tail = (g[3] ?? '').toLowerCase();
     let connections = 1;
     if (/ea stud crossing|at each stud crossing/.test(tail)) {
-      connections = Math.max(2, Math.round(lenIn / FIELD_SUPPORT_SPACING_IN) + 1);
+      connections = Math.max(2, Math.round(lenIn / fieldSupportSpacingIn()) + 1);
     } else if (/ea\b|each|at laps|toenail/.test(tail)) {
       connections = 2;
     }
@@ -204,7 +204,7 @@ export function fastenersForMember(m: Member, tally: Tally): boolean {
   // reading, and "both ends" or "each leg" says how many connections there are.
   if (!matched && /\bbolted\b/i.test(s)) {
     const ends = /both ends|each leg|ea leg|every bay|at every bay/i.test(s) ? 2 : 1;
-    tally.add('bolt', 2 * ends, use);
+    tally.add('bolt', (FASTENER.boltsPerConnection.value as number) * ends, use);
     matched = true;
   }
 
@@ -251,19 +251,22 @@ export function fastenerTakeoff(members: Member[]): FastenerTakeoff {
   const order = ['20d', '16d', '12d', '10d', '8d', '6d', 'roofing', 'lead', 'spike', 'drift', 'bolt', 'staple'];
   const lines: FastenerLine[] = [...counts.entries()]
     .sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]))
-    .map(([kind, count]) => ({
-      spec: SPEC_LABEL[kind] ?? kind,
-      count: Math.ceil(count),
-      poundsApprox: PER_POUND[kind] ? Math.round((count / PER_POUND[kind]) * 10) / 10 : 0,
-      usedFor: [...(uses.get(kind) ?? [])].sort(),
-    }));
+    .map(([kind, count]) => {
+      const ppl = perPound()[kind];
+      return {
+        spec: SPEC_LABEL[kind] ?? kind,
+        count: Math.ceil(count),
+        poundsApprox: ppl ? Math.round((count / ppl) * 10) / 10 : 0,
+        usedFor: [...(uses.get(kind) ?? [])].sort(),
+      };
+    });
 
   return {
     lines,
     unparsed: [...unparsed.entries()]
       .map(([schedule, n]) => ({ schedule, members: n }))
       .sort((a, b) => b.members - a.members),
-    fieldSupportSpacingIn: FIELD_SUPPORT_SPACING_IN,
+    fieldSupportSpacingIn: fieldSupportSpacingIn(),
   };
 }
 

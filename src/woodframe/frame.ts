@@ -10,6 +10,7 @@
 // deep-equals the goldens snapshotted before any of this existed.
 
 import type { Member } from './types';
+import { FOUNDATION } from './doctrine';
 import { stairPlan, type FloorLevels, type FoundationType, type BridgingType } from './floor';
 import type { Opening } from './walls';
 import type { BuildingSpec, WallOpenings } from './spec';
@@ -72,7 +73,9 @@ export function specFromBuildingInput(input: BuildingInput): BuildingSpec {
 
   const foundation: BuildingSpec['foundation'] =
     input.foundation === 'basement'
-      ? { kind: 'basement', depthFt: input.basementDepthFt ?? 7.5, stairs: input.stairs ?? true }
+      // The default depth is the register's, read at call time — the 7.5 literal here was a
+      // dead copy of FOUNDATION.basementDepthFt that an offline import could never reach.
+      ? { kind: 'basement', depthFt: input.basementDepthFt ?? (FOUNDATION.basementDepthFt.value as number), stairs: input.stairs ?? true }
       : input.foundation === 'wall'
         ? { kind: 'wall', crawlFt: input.crawlFt }
         : { kind: 'piers', crawlFt: input.crawlFt };

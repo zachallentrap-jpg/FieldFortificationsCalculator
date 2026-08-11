@@ -18,7 +18,11 @@ import { specToJson } from '../src/woodframe/normalize';
 import type { BuildingSpec, FoundationSpec, RoofSpec, WallOpenings } from '../src/woodframe/spec';
 import type { WallId } from '../src/woodframe/types';
 import type { Member } from '../src/woodframe/types';
-import { FAMILY_TABLE } from '../src/woodframe/catalog';
+import { familyTable } from '../src/woodframe/catalog';
+
+// The catalog is minted fresh per call now (live doctrine reads); these cases read the
+// shipped table once — none of them mutates the register.
+const FAMILY_TABLE = familyTable();
 
 /** mulberry32 — small, fast, and deterministic across runs and platforms. */
 function mulberry32(seed: number): () => number {

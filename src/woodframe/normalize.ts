@@ -21,7 +21,7 @@ import type {
 import { SPEC_PATH_DEFS, SPEC_SECTION_FALLBACK, SPEC_SECTIONS_BUILDING, SPEC_SECTIONS_COMMON, WALL_ORDER, specPath } from './spec';
 import type { WallId } from './types';
 import { DRESSED } from './types';
-import { SPAN, LUMBER, ROOFING, LADDER, IN_PER_FT } from './doctrine';
+import { SPAN, LUMBER, ROOF, ROOFING, LADDER, IN_PER_FT } from './doctrine';
 import { defaultOpenings } from './openings';
 import { hutDims } from './families/hut';
 
@@ -224,6 +224,13 @@ export function repairRoofShape(raw: unknown, issues: SpecIssue[]): RoofSpec {
   // the user is looking at a page that appears to be working. Everything below repairs and SAYS
   // SO, which is this file's whole contract.
   const ROOF_KINDS = new Set(['gable', 'shed', 'flat', 'hip', 'pyramid', 'none']);
+  // The standard gable, read from the register AT REPAIR TIME — a literal here was a second
+  // copy of the ROOF defaults that an offline import could never reach.
+  const stdGable = (): RoofSpec => ({
+    kind: 'gable',
+    risePer12: ROOF.risePer12.value as number,
+    overhangFt: ROOF.overhangFt.value as number,
+  });
   let roof = raw as RoofSpec;
   if (!roof || typeof roof !== 'object' || typeof (roof as { kind?: unknown }).kind !== 'string') {
     issues.push({
@@ -232,7 +239,7 @@ export function repairRoofShape(raw: unknown, issues: SpecIssue[]): RoofSpec {
       message: 'This build arrived with no roof at all — framed as the standard gable so there is something to look at.',
       severity: 'warn',
     });
-    roof = { kind: 'gable', risePer12: 4, overhangFt: 1 };
+    roof = stdGable();
   } else if (!ROOF_KINDS.has(roof.kind)) {
     issues.push({
       path: 'roof.kind',
@@ -240,7 +247,7 @@ export function repairRoofShape(raw: unknown, issues: SpecIssue[]): RoofSpec {
       message: `"${roof.kind}" is not a roof this tool frames — framed as the standard gable. The kinds it knows are gable, shed, hip, flat and none.`,
       severity: 'warn',
     });
-    roof = { kind: 'gable', risePer12: 4, overhangFt: 1 };
+    roof = stdGable();
   }
   // A BUILDING HAS NO PYRAMID. `pyramid` is the guard tower's cab roof and the tower generator
   // owns it; the building path frames gable, hip, shed and flat and silently framed NOTHING for

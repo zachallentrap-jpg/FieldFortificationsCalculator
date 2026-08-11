@@ -257,6 +257,19 @@ export const OPENING = {
    * unusable without something to stand on.
    */
   entryStepMinRiseFt: doc(1.5, 'FM 5-426 entry steps at a raised floor (PH)', { unit: 'ft', lifeSafety: true }),
+  /**
+   * The storage shed's wide door bay, as ONE rule: an 8-ft rough opening under the 2x10 its
+   * span demands, at the height that fits under that header in an 8-ft wall (see the catalog
+   * note on the shed card — 6'-9" is what 91½ in of wall carries under a 9¼-in header). One
+   * structured leaf because the three numbers only make sense together: change the width and
+   * the header and height move with it, which is exactly what an importer should be forced to
+   * state in one entry.
+   */
+  wideDoor: doc(
+    { widthFt: 8, heightFt: 6.75, headerNominal: '2x10' },
+    'preset operating point — the storage shed’s wide door bay; height is what fits under its own 2x10 header in an 8-ft wall',
+    { unit: 'ft' },
+  ),
 } as const;
 
 // ── Named structure dimensions (plan §2.2 — the "exhaustive hut family") ─────
@@ -326,6 +339,8 @@ export const TOWER = {
   ladderClearanceFt: doc(0.6, 'EM 385-1-1 ladder clearance from the structure it climbs', { unit: 'ft', lifeSafety: true }),
   /** The four platform heights this family's drawing covers. Shape-typed — see RAMP.slopes. */
   platformHeightsFt: doc<readonly number[]>([10, 16, 24, 32], 'TM 5-302 guard tower heights (PH)', { unit: 'ft' }),
+  /** The cab plans the drawing covers — the picker's options, live like the heights above. */
+  cabPlanSizesFt: doc<readonly number[]>([6, 8], 'TM 5-302 tower cab plan sizes (PH)', { unit: 'ft' }),
   cabWallHeightFt: doc(7, 'TM 5-302 tower cab (PH)', { unit: 'ft' }),
   cabHalfWallFt: doc(3.5, 'TM 5-302 tower cab half-wall (PH)', { unit: 'ft' }),
   cabRisePer12: doc(4, 'TM 5-302 tower cab roof (PH)', { unit: 'in/ft' }),
@@ -343,6 +358,16 @@ export const TENT = {
   bentSpacingFt: doc(4, 'TM 10-8340 tent-frame bent spacing (PH)', { unit: 'ft' }),
   bentNominal: doc('2x4', 'TM 10-8340 tent frame (PH)'),
   deckNominal: doc('2x6', 'TM 10-8340 tent floor decking (PH)'),
+} as const;
+
+// ── Roof geometry defaults ───────────────────────────────────────────────────
+// The pitch and eave every standard drawing here ships at. These are the numbers the catalog
+// presets, the spec-repair fallback and the panel's roof-kind switch all used to retype — one
+// each — so a corrected default reaches every card and every repaired share link from here.
+// PRESET OPERATING POINTS, not limits: the legal range stays in LIMITS below.
+export const ROOF = {
+  risePer12: doc(4, 'preset operating point — the standard drawings ship a 4-in-12 (1/6 pitch) roof; any pitch lays out per the FM 5-426 framing-square method (PH)', { unit: 'in/ft' }),
+  overhangFt: doc(1, 'preset operating point — the standard drawings ship a 1-ft eave; FM 5-426 cornice (PH)', { unit: 'ft' }),
 } as const;
 
 // ── Roofing & coverings ──────────────────────────────────────────────────────
@@ -481,6 +506,17 @@ export const LABOR = {
   mhPerBoardFoot: doc(0.055, 'FM 5-426 Table C-1 / TM 5-303 labor factors', { unit: 'MH/BF' }),
   mhPerPanel: doc(0.5, 'FM 5-426 Table C-1 / TM 5-303 labor factors', { unit: 'MH/panel' }),
   mhPerConcreteLf: doc(0.15, 'TM 5-303 concrete form/pour factors', { unit: 'MH/LF' }),
+  /**
+   * Members one worker can place before people start waiting on each other — what sets the
+   * packet's crew ceiling. A working figure, not doctrine, and the labor table says so on its
+   * face; here so a unit that knows its own tempo can correct it offline.
+   */
+  membersPerWorker: doc(12, 'working figure — members one worker can place before people start waiting on each other; not a doctrinal crew size', { unit: 'members/worker' }),
+  /**
+   * Building hours in a shift. Six, not eight: security, details, travel and tool contention
+   * are the other two, and the packet's shift arithmetic reads this figure live.
+   */
+  productiveHoursPerDay: doc(6, 'working figure — a shift is not eight hours of building; security, details, travel and tool contention take the rest', { unit: 'h/shift' }),
 } as const;
 
 // ── Fastening schedules ──────────────────────────────────────────────────────
@@ -736,6 +772,71 @@ export const NAILING = {
   soilGhostNotBuilt: doc('not built — massing only (PH)', 'not a fastened member — the soil ghost is the user-stated depth drawn as massing, not wood'),
 } as const;
 
+// ── Fastener supply arithmetic ───────────────────────────────────────────────
+// What turns a member's nailing schedule into a supply request: pieces-per-pound, the modest
+// readings the parser bills where a schedule states a joint but not a count, and the corrugation
+// pitch the lead-head rule counts crowns by. These sat as literals in `fasteners.ts`; the module
+// reads them live now, so a corrected table reaches the very next take-off.
+export const FASTENER = {
+  /** Pieces per pound by nail size, plus the 1¼-in galvanised large-head roofing nail. */
+  perPound: doc(
+    { '6d': 180, '8d': 106, '10d': 69, '12d': 63, '16d': 49, '20d': 31, roofing: 250 } as Record<string, number>,
+    'common published pieces-per-pound figures for common nails — not page-checked against a supply publication',
+    { unit: 'pieces/lb' },
+  ),
+  /** A member whose schedule says only "spiked": two spikes at each end is the modest reading. */
+  spikesPerBareMember: doc(4, 'standard heavy-timber practice — two spikes at each end is the modest reading for a schedule that says only that it is spiked', { unit: 'spikes/member' }),
+  /** A bolted joint with no count stated: two bolts per connection is the modest reading. */
+  boltsPerConnection: doc(2, 'standard practice — two bolts per connection is the modest reading for a bolted joint that states no count', { unit: 'bolts/connection' }),
+  /** The corrugation pitch the "every 3rd corrugation" rule counts crowns by: 2 1/6 in. */
+  corrugationPitchIn: doc(26 / 12, 'FM 5-426 corrugated metal — 2 1/6-in corrugation pitch (26-in sheet, 12 corrugations) (PH)', { unit: 'in' }),
+} as const;
+
+// ── The clamp table (spec.ts SPEC_PATH_DEFS) ─────────────────────────────────
+// Every numeric knob's min/max/step, one structured leaf per spec path, keyed by the path the
+// registry clamps. `spec.ts` reads these LIVE (labels and the clamp-message cites stay with the
+// row registry there); a corrected bound reaches the very next normalize. Three numbers are one
+// leaf because a bound is only coherent as a set — an importer states the row whole.
+export const LIMITS = {
+  'dims.lengthFt': doc({ min: 4, max: 60, step: 0.5 }, '4–60 ft — what this generator will lay out', { unit: 'ft' }),
+  'dims.widthFt': doc({ min: 4, max: 24, step: 0.5 }, '4–24 ft — a wider span needs a second girder line, which is not built yet', { unit: 'ft' }),
+  'stories.0.wallHeightFt': doc({ min: 6, max: 12, step: 0.5 }, 'FM 5-426 ch. 6 (PH)', { unit: 'ft' }),
+  'stories.1.wallHeightFt': doc({ min: 6, max: 12, step: 0.5 }, 'FM 5-426 ch. 6 (PH)', { unit: 'ft' }),
+  'roof.risePer12': doc({ min: 0, max: 12, step: 1 }, 'FM 5-426 framing-square method (PH)', { unit: 'in/ft' }),
+  'roof.overhangFt': doc({ min: 0, max: 3, step: 0.5 }, 'FM 5-426 cornice (PH)', { unit: 'ft' }),
+  'roof.drainPer12': doc({ min: 1, max: 2, step: 0.25 }, 'FM 5-426 roll-roofing minimum slope (PH)', { unit: 'in/ft' }),
+  'foundation.crawlFt': doc({ min: 1, max: 4, step: 0.25 }, 'FM 5-426 foundations (PH); floored by the girder depth below the sill', { unit: 'ft' }),
+  'foundation.depthFt': doc({ min: 6, max: 9, step: 0.5 }, 'FM 5-426 basement (PH)', { unit: 'ft' }),
+  'foundation.embedFt': doc({ min: 2, max: 6, step: 0.5 }, 'TM 5-302 embedded posts (PH)', { unit: 'ft' }),
+  'platformHeightFt': doc({ min: 10, max: 32, step: 1 }, 'TM 5-302 tower (PH, LS)', { unit: 'ft' }),
+  'cabPlanFt': doc({ min: 6, max: 8, step: 2 }, 'TM 5-302 tower (PH)', { unit: 'ft' }),
+  'interiorLengthFt': doc({ min: 6, max: 16, step: 1 }, 'bunker envelope — the interior plan this tool frames (PH)', { unit: 'ft' }),
+  'interiorWidthFt': doc({ min: 6, max: 12, step: 1 }, 'bunker envelope — the interior plan this tool frames (PH)', { unit: 'ft' }),
+  'clearHeightFt': doc({ min: 4.5, max: 7, step: 0.5 }, 'bunker envelope — the interior plan this tool frames (PH)', { unit: 'ft' }),
+  'designCoverDepthFt': doc({ min: 0, max: 4, step: 0.5 }, 'load-table row range (PH, LS, SME)', { unit: 'ft' }),
+  'deckHeightFt': doc({ min: 1.75, max: 5, step: 0.25 }, 'TM 5-302 loading platform (PH); floored by the frame depth under the deck', { unit: 'ft' }),
+  'ramp.widthFt': doc({ min: 4, max: 12, step: 0.5 }, 'TM 5-302 ramp detail (PH)', { unit: 'ft' }),
+  'temperBays': doc({ min: 2, max: 8, step: 1 }, 'TM 10-8340 TEMPER bays (PH)', { unit: 'bays' }),
+  'latrine.depthFt': doc({ min: 4, max: 8, step: 0.5 }, 'TM 5-302 latrine (PH — sheet pending)', { unit: 'ft' }),
+  'openings[].offsetFt': doc({ min: 0, max: 60, step: 0.25 }, 'editor bounds for a rough opening — geometry and sanity, not doctrine', { unit: 'ft' }),
+  'openings[].widthFt': doc({ min: 0.5, max: 16, step: 0.25 }, 'editor bounds for a rough opening — geometry and sanity, not doctrine', { unit: 'ft' }),
+  'openings[].heightFt': doc({ min: 0.5, max: 10, step: 0.25 }, 'editor bounds for a rough opening — geometry and sanity, not doctrine', { unit: 'ft' }),
+  'openings[].sillHeightFt': doc({ min: 0, max: 9, step: 0.25 }, 'editor bounds for a rough opening — geometry and sanity, not doctrine', { unit: 'ft' }),
+} as const;
+
+/** A LIMITS row's value shape — what `spec.ts` reads live for every numeric knob. */
+export interface LimitRow {
+  min: number;
+  max: number;
+  step: number;
+}
+
+/** The live LIMITS row for a spec path ('dims.lengthFt'), or undefined for unclamped paths. */
+export function limitRow(path: string): LimitRow | undefined {
+  const d = (LIMITS as Record<string, Doc<LimitRow> | undefined>)[path];
+  return d ? d.value : undefined;
+}
+
 // ── The register ─────────────────────────────────────────────────────────────
 
 export interface LsEntry {
@@ -748,8 +849,8 @@ export interface LsEntry {
 }
 
 const GROUPS: Record<string, Record<string, Doc<unknown>>> = {
-  LUMBER, PANEL, LAYOUT, NOTCH, FOUNDATION, STAIR, LADDER, RAIL, RAMP, ROOFING, SIDING, LABOR,
-  HUT, LATRINE, TOWER, TENT, OPENING, PLATFORM, SPAN, BUNKER, NAILING,
+  LUMBER, PANEL, LAYOUT, NOTCH, FOUNDATION, STAIR, LADDER, RAIL, RAMP, ROOF, ROOFING, SIDING, LABOR,
+  HUT, LATRINE, TOWER, TENT, OPENING, PLATFORM, SPAN, BUNKER, NAILING, FASTENER, LIMITS,
 } as unknown as Record<string, Record<string, Doc<unknown>>>;
 
 /** Every doctrine constant, flattened — the source for the doc-integrity tests. */

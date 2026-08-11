@@ -10,8 +10,11 @@
 // FROM it, and `test/woodframe2-catalog.test.ts` asserts they agree — so a doc that describes a
 // different tool than the code is impossible rather than merely discouraged.
 
-import type { StructureSpec, RoofSpec, CoveringSpec, StructureFamily } from './spec';
-import { HUT, LATRINE, TOWER, TENT, RAIL, RAMP, LADDER, BUNKER, COVER_DEPTH_NOTE, citeOf } from './doctrine';
+import type { StructureSpec, RoofSpec, CoveringSpec, StructureFamily, SpacingSpec, SpacingIn, OpeningSpec } from './spec';
+import {
+  HUT, LATRINE, TOWER, TENT, RAIL, RAMP, LADDER, BUNKER, COVER_DEPTH_NOTE, citeOf,
+  FOUNDATION, LAYOUT, OPENING, ROOF,
+} from './doctrine';
 import { hutDims } from './families/hut';
 
 export type FamilyId =
@@ -63,12 +66,56 @@ export interface FamilyDef {
   shipped: boolean;
 }
 
-const STD_SPACING = { studSpacingIn: 16, joistSpacingIn: 16, rafterSpacingIn: 16 } as const;
+// EVERY CARD IS MINTED FRESH (see `familyTable()` below), so these helpers are called per mint
+// and every doctrine read in them is a LIVE read. A module-scope `STD_SPACING` const was the
+// snapshot that froze the whole catalog at boot: an imported spacing correction left every card
+// minting the shipped building.
+const stdSpacing = (): SpacingSpec => ({
+  studSpacingIn: LAYOUT.studSpacingIn.value as SpacingIn,
+  joistSpacingIn: LAYOUT.joistSpacingIn.value as SpacingIn,
+  rafterSpacingIn: LAYOUT.rafterSpacingIn.value as SpacingIn,
+});
 const NO_COVERINGS: CoveringSpec = { wallSheathing: 'none', siding: 'none', roofDeck: 'plywood', roofing: 'none' };
+
+/** The standard gable at the doctrine operating point — what every card's drawing ships. */
+const stdGable = (): RoofSpec => ({
+  kind: 'gable',
+  risePer12: ROOF.risePer12.value as number,
+  overhangFt: ROOF.overhangFt.value as number,
+});
+
+/** Piers at the doctrine crawl — the standard foundation on every raised card. */
+const stdPiers = (): { kind: 'piers'; crawlFt: number } => ({
+  kind: 'piers',
+  crawlFt: FOUNDATION.crawlFt.value as number,
+});
+
+/**
+ * The standard-design door and window rows, from `doctrine.OPENING`. The gp-frame card used to
+ * write 6.7 where the register holds 6 ft 8 in (6.667) — the same four-tenths-of-an-inch
+ * disagreement the register's own comment records correcting; the card reads the leaf now
+ * (DECISIONS D46).
+ */
+const stdDoorRow = (offsetFt: number, fill?: OpeningSpec['fill']): OpeningSpec => ({
+  kind: 'door',
+  offsetFt,
+  widthFt: OPENING.doorWidthFt.value as number,
+  heightFt: OPENING.doorHeightFt.value as number,
+  sillHeightFt: 0,
+  ...(fill ? { fill } : {}),
+});
+const stdWindowRow = (offsetFt: number, fill?: OpeningSpec['fill']): OpeningSpec => ({
+  kind: 'window',
+  offsetFt,
+  widthFt: OPENING.windowWidthFt.value as number,
+  heightFt: OPENING.windowHeightFt.value as number,
+  sillHeightFt: OPENING.windowSillFt.value as number,
+  ...(fill ? { fill } : {}),
+});
 
 // ── The families ─────────────────────────────────────────────────────────────
 
-const GP_FRAME: FamilyDef = {
+const GP_FRAME = (): FamilyDef => ({
   id: 'gp-frame',
   group: 'buildings',
   name: 'GP framed building',
@@ -82,30 +129,20 @@ const GP_FRAME: FamilyDef = {
   preset: {
     family: 'building',
     dims: { lengthFt: 48, widthFt: 20 },
-    spacing: STD_SPACING,
+    spacing: stdSpacing(),
     coverings: { wallSheathing: 'none', siding: 'plywood', roofDeck: 'plywood', roofing: 'roll' },
     stories: [{
       wallHeightFt: 8,
       letInBracing: true,
       openings: {
-        E: [{ kind: 'door', offsetFt: 8, widthFt: 3, heightFt: 6.7, sillHeightFt: 0, fill: 'door-ledged' }],
-        W: [{ kind: 'door', offsetFt: 8, widthFt: 3, heightFt: 6.7, sillHeightFt: 0, fill: 'door-ledged' }],
-        S: [
-          { kind: 'window', offsetFt: 6, widthFt: 3, heightFt: 3.5, sillHeightFt: 3.5, fill: 'window-shutter' },
-          { kind: 'window', offsetFt: 18, widthFt: 3, heightFt: 3.5, sillHeightFt: 3.5, fill: 'window-shutter' },
-          { kind: 'window', offsetFt: 30, widthFt: 3, heightFt: 3.5, sillHeightFt: 3.5, fill: 'window-shutter' },
-          { kind: 'window', offsetFt: 42, widthFt: 3, heightFt: 3.5, sillHeightFt: 3.5, fill: 'window-shutter' },
-        ],
-        N: [
-          { kind: 'window', offsetFt: 6, widthFt: 3, heightFt: 3.5, sillHeightFt: 3.5, fill: 'window-shutter' },
-          { kind: 'window', offsetFt: 18, widthFt: 3, heightFt: 3.5, sillHeightFt: 3.5, fill: 'window-shutter' },
-          { kind: 'window', offsetFt: 30, widthFt: 3, heightFt: 3.5, sillHeightFt: 3.5, fill: 'window-shutter' },
-          { kind: 'window', offsetFt: 42, widthFt: 3, heightFt: 3.5, sillHeightFt: 3.5, fill: 'window-shutter' },
-        ],
+        E: [stdDoorRow(8, 'door-ledged')],
+        W: [stdDoorRow(8, 'door-ledged')],
+        S: [6, 18, 30, 42].map((at) => stdWindowRow(at, 'window-shutter')),
+        N: [6, 18, 30, 42].map((at) => stdWindowRow(at, 'window-shutter')),
       },
     }],
-    roof: { kind: 'gable', risePer12: 4, overhangFt: 1 },
-    foundation: { kind: 'piers', crawlFt: 1.5 },
+    roof: stdGable(),
+    foundation: stdPiers(),
     bridging: 'cross',
   },
   locks: [
@@ -120,9 +157,9 @@ const GP_FRAME: FamilyDef = {
     wallSheathing: ['none', 'plywood'],
   },
   cutaway: { axis: 'z', frac: 0.5, keep: -1, reason: 'Cut through the door bay — see the header, the jacks, and how the floor meets the wall.' },
-};
+});
 
-const STORAGE_SHED: FamilyDef = {
+const STORAGE_SHED = (): FamilyDef => ({
   id: 'storage-shed',
   group: 'buildings',
   name: 'Storage shed',
@@ -134,7 +171,7 @@ const STORAGE_SHED: FamilyDef = {
   preset: {
     family: 'building',
     dims: { lengthFt: 20, widthFt: 12 },
-    spacing: STD_SPACING,
+    spacing: stdSpacing(),
     coverings: { wallSheathing: 'none', siding: 'boardAndBatten', roofDeck: 'plywood', roofing: 'roll' },
     stories: [{
       wallHeightFt: 8,
@@ -149,9 +186,21 @@ const STORAGE_SHED: FamilyDef = {
       // The door was drawn 7 ft tall anyway, with its header running 1¾ in THROUGH the top
       // plate — two solid members in the same space on a shipped card. 6'-9" is what fits, and
       // `maxOpeningTopFt` now catches the general case for anything the operator types.
-      openings: { S: [{ kind: 'door', offsetFt: 6, widthFt: 8, heightFt: 6.75, sillHeightFt: 0, fill: 'rough', headerNominal: '2x10' }] },
+      // Width, height and header now travel together as `OPENING.wideDoor` — one rule, stated
+      // whole, because the three numbers only make sense as a set.
+      openings: {
+        S: [{
+          kind: 'door',
+          offsetFt: 6,
+          widthFt: (OPENING.wideDoor.value as { widthFt: number }).widthFt,
+          heightFt: (OPENING.wideDoor.value as { heightFt: number }).heightFt,
+          sillHeightFt: 0,
+          fill: 'rough',
+          headerNominal: (OPENING.wideDoor.value as { headerNominal: string }).headerNominal,
+        }],
+      },
     }],
-    roof: { kind: 'gable', risePer12: 4, overhangFt: 1 },
+    roof: stdGable(),
     foundation: { kind: 'skids' },
   },
   locks: [
@@ -165,9 +214,9 @@ const STORAGE_SHED: FamilyDef = {
     roofDeck: ['none', 'plywood', 'purlins'],
   },
   cutaway: { axis: 'z', frac: 0.5, keep: -1, reason: 'Cut through the big door — see how the header carries the studs that were cut out.' },
-};
+});
 
-const CUSTOM: FamilyDef = {
+const CUSTOM = (): FamilyDef => ({
   id: 'custom',
   group: 'custom',
   name: 'Custom — start from a clean sheet',
@@ -179,20 +228,20 @@ const CUSTOM: FamilyDef = {
   preset: {
     family: 'building',
     dims: { lengthFt: 20, widthFt: 16 },
-    spacing: STD_SPACING,
+    spacing: stdSpacing(),
     coverings: NO_COVERINGS,
     stories: [{
       wallHeightFt: 8,
+      // Rough openings (no `fill` — the clean sheet's openings are holes, not assemblies) at
+      // the register's own sizes. The sills wrote 3 where `OPENING.windowSillFt` holds 3.5 —
+      // corrected to the leaf with the door height (DECISIONS D46).
       openings: {
-        S: [
-          { kind: 'window', offsetFt: 4, widthFt: 3, heightFt: 3.5, sillHeightFt: 3 },
-          { kind: 'door', offsetFt: 13, widthFt: 3, heightFt: 6.7, sillHeightFt: 0 },
-        ],
-        N: [{ kind: 'window', offsetFt: 8.5, widthFt: 3, heightFt: 3.5, sillHeightFt: 3 }],
+        S: [stdWindowRow(4), stdDoorRow(13)],
+        N: [stdWindowRow(8.5)],
       },
     }],
-    roof: { kind: 'gable', risePer12: 4, overhangFt: 1 },
-    foundation: { kind: 'piers', crawlFt: 1.5 },
+    roof: stdGable(),
+    foundation: stdPiers(),
   },
   locks: [], // nothing locked — that is the point of the card
   roofs: ['gable', 'hip', 'shed', 'flat', 'none'],
@@ -203,7 +252,7 @@ const CUSTOM: FamilyDef = {
     roofing: ['none', 'roll', 'rollDouble', 'corrugated'],
   },
   cutaway: { axis: 'z', frac: 0.5, keep: -1, reason: 'Cut through the middle — see the whole section at once.' },
-};
+});
 
 // ── The hut family (T5) ──────────────────────────────────────────────────────
 // TD2 in its purest form: six cards, one engine, zero new geometry. Each is a `hut` spec whose
@@ -244,10 +293,10 @@ function hutCard(
       family: 'hut',
       variant,
       dims: { lengthFt: d.lengthFt, widthFt: d.widthFt },
-      spacing: STD_SPACING,
+      spacing: stdSpacing(),
       coverings: HUT_COVERINGS,
-      roof: { kind: 'gable', risePer12: 4, overhangFt: 1 },
-      foundation: { kind: 'piers', crawlFt: 1.5 },
+      roof: stdGable(),
+      foundation: stdPiers(),
       ...presetExtra,
     } as StructureSpec,
     locks: [
@@ -266,7 +315,7 @@ function hutCard(
   };
 }
 
-const SEA_HUT = hutCard(
+const SEA_HUT = (): FamilyDef => hutCard(
   'sea-hut', 'seaHut', 'SEA hut',
   'Tropical billeting: closed walls with a screened band under the eaves so it breathes.',
   'TM 5-302 SEA hut (PH — sheet pending); FM 5-426 ch. 6 framing',
@@ -280,7 +329,7 @@ const SEA_HUT = hutCard(
   },
 );
 
-const SWA_HUT = hutCard(
+const SWA_HUT = (): FamilyDef => hutCard(
   'swa-hut', 'swaHut', 'SWA hut',
   'The desert cousin: same frame, closed up, no screened band.',
   'TM 5-302 SWA hut (PH — sheet pending); FM 5-426 ch. 6 framing',
@@ -288,7 +337,7 @@ const SWA_HUT = hutCard(
   {}, { screenBand: null },
 );
 
-const B_HUT = hutCard(
+const B_HUT = (): FamilyDef => hutCard(
   'b-hut', 'bHut', 'B-hut',
   `Billeting split into ${HUT.bHutBays.value} bays — one hut, four rooms, a door at each end.`,
   'TM 5-302 B-hut (PH — sheet pending); FM 5-426 ch. 6 framing',
@@ -298,7 +347,7 @@ const B_HUT = hutCard(
   }, { screenBand: null },
 );
 
-const SQUAD_HUT = hutCard(
+const SQUAD_HUT = (): FamilyDef => hutCard(
   'squad-hut', 'squadHut', 'Squad hut',
   'One long open bay for a squad — no partitions, windows down both sides.',
   'TM 5-302 squad hut (PH — sheet pending); FM 5-426 ch. 6 framing',
@@ -306,7 +355,7 @@ const SQUAD_HUT = hutCard(
   {}, { screenBand: null },
 );
 
-const GUARD_SHACK = hutCard(
+const GUARD_SHACK = (): FamilyDef => hutCard(
   'guard-shack', 'guardShack', 'Guard shack',
   'A post you can see out of on three sides, small enough to skid into place.',
   'TM 5-302 guard shack (PH — sheet pending); FM 5-426 ch. 6 framing',
@@ -317,7 +366,7 @@ const GUARD_SHACK = hutCard(
   { screenBand: null, foundation: { kind: 'skids' } },
 );
 
-const LATRINE_CARD = hutCard(
+const LATRINE_CARD = (): FamilyDef => hutCard(
   'latrine', 'latrine', 'Field latrine',
   'Riser box over the pit, screened band above, door on the long side.',
   'TM 5-302 field latrine (PH — sheet pending); FM 5-426 ch. 6 framing',
@@ -342,7 +391,7 @@ const LATRINE_CARD = hutCard(
 // Its locks are the life-safety rows: they render with the LS mark and they are the same values
 // the printable register enumerates.
 
-const TOWER_CARD: FamilyDef = {
+const TOWER_CARD = (): FamilyDef => ({
   id: 'tower',
   group: 'towers',
   name: 'Guard tower',
@@ -358,7 +407,7 @@ const TOWER_CARD: FamilyDef = {
   preset: {
     family: 'tower',
     dims: { lengthFt: 12, widthFt: 12 },
-    spacing: STD_SPACING,
+    spacing: stdSpacing(),
     coverings: { wallSheathing: 'none', siding: 'plywood', roofDeck: 'plywood', roofing: 'corrugated' },
     platformHeightFt: 16,
     cabPlanFt: 8,
@@ -375,11 +424,11 @@ const TOWER_CARD: FamilyDef = {
   roofs: ['pyramid', 'shed'],
   coverings: { roofing: ['corrugated', 'roll'] },
   cutaway: { axis: 'z', frac: 0.5, keep: -1, reason: 'Cut through the middle — see the batter, every brace bay, and how the platform lands on the legs.' },
-};
+});
 
 // ── Platform, tent floor and strongback (T6a) ────────────────────────────────
 
-const PLATFORM_CARD: FamilyDef = {
+const PLATFORM_CARD = (): FamilyDef => ({
   id: 'platform',
   group: 'site',
   name: 'Loading platform',
@@ -395,7 +444,7 @@ const PLATFORM_CARD: FamilyDef = {
   preset: {
     family: 'platform',
     dims: { lengthFt: 20, widthFt: 12 },
-    spacing: STD_SPACING,
+    spacing: stdSpacing(),
     coverings: NO_COVERINGS,
     deckHeightFt: 4,
     base: 'piers',
@@ -411,9 +460,9 @@ const PLATFORM_CARD: FamilyDef = {
   roofs: ['none'],
   coverings: {},
   cutaway: { axis: 'z', frac: 0.5, keep: -1, reason: 'Cut across the deck — see the joists, what they bear on, and how the rail posts land.' },
-};
+});
 
-const TENT_FLOOR: FamilyDef = {
+const TENT_FLOOR = (): FamilyDef => ({
   id: 'tent-floor',
   group: 'tents-frames',
   name: 'Tent frame & floor',
@@ -428,7 +477,7 @@ const TENT_FLOOR: FamilyDef = {
   preset: {
     family: 'tentFrame',
     dims: { lengthFt: 29.5, widthFt: 17.5 },
-    spacing: STD_SPACING,
+    spacing: stdSpacing(),
     coverings: NO_COVERINGS,
     tent: 'gpSmall',
     endDoor: true,
@@ -440,9 +489,9 @@ const TENT_FLOOR: FamilyDef = {
   roofs: ['none'],
   coverings: {},
   cutaway: { axis: 'x', frac: 0.5, keep: -1, reason: 'Cut across a bent — see the pair of posts, the rafters, and the collar that stops them spreading.' },
-};
+});
 
-const STRONGBACK: FamilyDef = {
+const STRONGBACK = (): FamilyDef => ({
   id: 'strongback',
   group: 'tents-frames',
   name: 'Strongback (TEMPER)',
@@ -457,7 +506,7 @@ const STRONGBACK: FamilyDef = {
   preset: {
     family: 'tentFrame',
     dims: { lengthFt: 32, widthFt: 20 },
-    spacing: STD_SPACING,
+    spacing: stdSpacing(),
     coverings: NO_COVERINGS,
     tent: 'temper',
     temperBays: 4,
@@ -469,14 +518,14 @@ const STRONGBACK: FamilyDef = {
   roofs: ['none'],
   coverings: {},
   cutaway: { axis: 'z', frac: 0.5, keep: -1, reason: 'Cut down the length — see every bent and the ridge running over them.' },
-};
+});
 
 // ── The crib bunker (T7) ─────────────────────────────────────────────────────
 // The one card that sits on the §2.7 boundary. Its blurb carries the boundary sentence
 // verbatim (from doctrine.COVER_DEPTH_NOTE, never retyped), and the boundary gate allowlists
 // exactly that string so the wordlist can be tightened without re-approving the copy.
 
-const CRIB_BUNKER: FamilyDef = {
+const CRIB_BUNKER = (): FamilyDef => ({
   id: 'crib-bunker',
   group: 'bunkers',
   name: 'Crib bunker',
@@ -493,7 +542,7 @@ const CRIB_BUNKER: FamilyDef = {
   preset: {
     family: 'bunker',
     dims: { lengthFt: 16, widthFt: 10 },
-    spacing: STD_SPACING,
+    spacing: stdSpacing(),
     coverings: NO_COVERINGS,
     interiorLengthFt: 16,
     interiorWidthFt: 10,
@@ -514,20 +563,32 @@ const CRIB_BUNKER: FamilyDef = {
   roofs: ['none'],
   coverings: {},
   cutaway: { axis: 'z', frac: 0.5, keep: -1, reason: 'Cut through the entrance — see the wall section, the caps, and the stringers over the clear span.', ghost: 'soil' },
-};
+});
 
-/** The one table (TD3). Families land as their phases ship; `shipped` gates the picker. */
-export const FAMILY_TABLE: readonly FamilyDef[] = [
-  GP_FRAME, SEA_HUT, SWA_HUT, B_HUT, SQUAD_HUT, GUARD_SHACK, STORAGE_SHED,
-  TOWER_CARD, TENT_FLOOR, STRONGBACK, PLATFORM_CARD, CRIB_BUNKER, LATRINE_CARD, CUSTOM,
-];
+/**
+ * The one table (TD3), MINTED FRESH ON EVERY CALL. Families land as their phases ship;
+ * `shipped` gates the picker.
+ *
+ * A FUNCTION, not a module-scope const, and the difference is the whole live-rule contract:
+ * the cards interpolate doctrine values (hut plan sizes, the standard spacing, the door RO,
+ * the lock captions), and a const array froze every one of them at boot — so a validated
+ * import that corrected `HUT.bHut` still minted the shipped B-hut from the stale snapshot.
+ * Each call rebuilds the cards from the register as it stands, so `store.buildFromFamily`
+ * (via `shippedFamilies`) mints the corrected building on the very next click.
+ */
+export function familyTable(): readonly FamilyDef[] {
+  return [
+    GP_FRAME(), SEA_HUT(), SWA_HUT(), B_HUT(), SQUAD_HUT(), GUARD_SHACK(), STORAGE_SHED(),
+    TOWER_CARD(), TENT_FLOOR(), STRONGBACK(), PLATFORM_CARD(), CRIB_BUNKER(), LATRINE_CARD(), CUSTOM(),
+  ];
+}
 
 export function familyById(id: FamilyId): FamilyDef | undefined {
-  return FAMILY_TABLE.find((f) => f.id === id);
+  return familyTable().find((f) => f.id === id);
 }
 
 export function shippedFamilies(): FamilyDef[] {
-  return FAMILY_TABLE.filter((f) => f.shipped);
+  return familyTable().filter((f) => f.shipped);
 }
 
 export const GROUP_ORDER: readonly FamilyGroup[] = [

@@ -7,7 +7,11 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FAMILY_TABLE, familyById, pickerGroups, shippedFamilies, GROUP_ORDER } from '../src/woodframe/catalog';
+import { familyTable, familyById, pickerGroups, shippedFamilies, GROUP_ORDER } from '../src/woodframe/catalog';
+
+// The catalog is minted fresh per call now (live doctrine reads); these cases read the
+// shipped table once — none of them mutates the register.
+const FAMILY_TABLE = familyTable();
 import { generateStructure } from '../src/woodframe/families/index';
 import { normalizeSpec, specToJson } from '../src/woodframe/normalize';
 import { ROOFING } from '../src/woodframe/doctrine';

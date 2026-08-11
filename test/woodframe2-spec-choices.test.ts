@@ -18,7 +18,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateStructure } from '../src/woodframe/families/index';
-import { familyById, FAMILY_TABLE } from '../src/woodframe/catalog';
+import { familyById, familyTable } from '../src/woodframe/catalog';
+
+// The catalog is minted fresh per call now (live doctrine reads); these cases read the
+// shipped table once — none of them mutates the register.
+const FAMILY_TABLE = familyTable();
 import type { StructureSpec } from '../src/woodframe/spec';
 
 const CASES: { fam: string; path: string; ok: string[] }[] = [

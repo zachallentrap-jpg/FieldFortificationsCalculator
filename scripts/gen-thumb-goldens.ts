@@ -14,7 +14,11 @@
 import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FAMILY_TABLE } from '../src/woodframe/catalog';
+import { familyTable } from '../src/woodframe/catalog';
+
+// The catalog is minted fresh per call now (live doctrine reads); these cases read the
+// shipped table once — none of them mutates the register.
+const FAMILY_TABLE = familyTable();
 import { thumbnailFor } from '../src/woodframe/thumbnails';
 import { portraitFor } from '../src/woodframe/portrait';
 

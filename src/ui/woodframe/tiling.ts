@@ -20,9 +20,17 @@
 // snips went through.
 
 import type { Member } from '../../woodframe/types';
+import { ROOFING } from '../../woodframe/doctrine';
 
-/** The real width one tile of each roofing texture is drawn at, in inches. */
-export const ROOFING_TILE_IN = { corrugated: 26, roll: 36 } as const;
+/**
+ * The real width one tile of each roofing texture is drawn at, in inches — GETTERS over the
+ * doctrine sheet widths, so the tiling follows a corrected `ROOFING.corrugatedWidthIn` or
+ * `rollWidthIn` on the next render instead of holding the boot-time copy.
+ */
+export const ROOFING_TILE_IN = {
+  get corrugated(): number { return ROOFING.corrugatedWidthIn.value as number; },
+  get roll(): number { return ROOFING.rollWidthIn.value as number; },
+} as const;
 
 export interface RoofingTiling {
   kind: 'corrugated' | 'roll';

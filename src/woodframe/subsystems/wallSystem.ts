@@ -22,10 +22,14 @@ import type { WallId } from '../types';
 import { DRESSED } from '../types';
 import type { OpeningSpec, WallOpenings } from '../spec';
 import { WALL_ORDER } from '../spec';
+import { LUMBER } from '../doctrine';
 
 const FT = 12;
-const WALL_THICK_FT = DRESSED['2x4']!.d / FT; // 3.5 in — a 2x4 wall's real thickness
-const PLATE_THICK_FT = DRESSED['2x4']!.w / FT; // 1.5 in
+// Read AT CALL TIME from the doctrine stud/plate nominals — 3.5 in and 1.5 in as shipped. A
+// module-load `DRESSED['2x4']` const hard-wired the 2x4 wall: an imported nominal correction
+// changed the members but left this contract describing the old wall thickness.
+const wallThickFt = (): number => DRESSED[LUMBER.studNominal.value as string]!.d / FT;
+const plateThickFt = (): number => DRESSED[LUMBER.plateNominal.value as string]!.w / FT;
 
 /** A line something above can bear on. */
 export interface BearingLine {
@@ -78,7 +82,7 @@ export interface WallsContract {
 export function wallFrames(lengthFt: number, widthFt: number): {
   wall: WallId; origin: [number, number]; along: [number, number]; normal: [number, number]; runFt: number;
 }[] {
-  const d = WALL_THICK_FT;
+  const d = wallThickFt();
   return [
     { wall: 'S', origin: [0, d / 2], along: [1, 0], normal: [0, -1], runFt: lengthFt },
     { wall: 'N', origin: [lengthFt, widthFt - d / 2], along: [-1, 0], normal: [0, 1], runFt: lengthFt },
@@ -119,8 +123,8 @@ export function wallContract(
       // v is measured from the sole-plate BOTTOM; the legacy generator measures rough
       // openings from the sole-plate TOP, so add the plate thickness once, here, where the
       // convention is owned.
-      v0: PLATE_THICK_FT + o.sillHeightFt,
-      v1: PLATE_THICK_FT + o.sillHeightFt + o.heightFt,
+      v0: plateThickFt() + o.sillHeightFt,
+      v1: plateThickFt() + o.sillHeightFt + o.heightFt,
     }));
     for (const band of bands) {
       cutouts.push({
@@ -129,8 +133,8 @@ export function wallContract(
         openingIndex: -1 - cutouts.length,
         u0: 0,
         u1: f.runFt,
-        v0: PLATE_THICK_FT + band.v0,
-        v1: PLATE_THICK_FT + band.v1,
+        v0: plateThickFt() + band.v0,
+        v1: plateThickFt() + band.v1,
       });
     }
     surfaces.push({
@@ -140,7 +144,7 @@ export function wallContract(
       normal: f.normal as [number, number],
       origin: f.origin as [number, number],
       along: f.along as [number, number],
-      faceOffsetFt: WALL_THICK_FT / 2,
+      faceOffsetFt: wallThickFt() / 2,
       cutouts,
     });
     bearings.push({
@@ -154,8 +158,8 @@ export function wallContract(
   }
 
   return {
-    thicknessFt: WALL_THICK_FT,
-    plateThicknessFt: PLATE_THICK_FT,
+    thicknessFt: wallThickFt(),
+    plateThicknessFt: plateThickFt(),
     plateTopY,
     bearings,
     surfaces: WALL_ORDER.map((w) => surfaces.find((s) => s.wall === w)!),

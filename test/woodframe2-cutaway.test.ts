@@ -10,7 +10,11 @@ import {
   cutPlaneEq, passesCut, signedDistance, cutStation, planeForState,
   initialCutawayState, toggleAxis, setDepth, CUT_AXES, axisById, type Aabb,
 } from '../src/ui/woodframe/cutaway';
-import { FAMILY_TABLE } from '../src/woodframe/catalog';
+import { familyTable } from '../src/woodframe/catalog';
+
+// The catalog is minted fresh per call now (live doctrine reads); these cases read the
+// shipped table once — none of them mutates the register.
+const FAMILY_TABLE = familyTable();
 
 const box: Aabb = { min: [0, -2, 0], max: [20, 10, 16] };
 

@@ -6,7 +6,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateStructure } from '../src/woodframe/families/index';
-import { familyById, FAMILY_TABLE } from '../src/woodframe/catalog';
+import { familyById, familyTable } from '../src/woodframe/catalog';
+
+// The catalog is minted fresh per call now (live doctrine reads); these cases read the
+// shipped table once — none of them mutates the register.
+const FAMILY_TABLE = familyTable();
 import { stringerFor } from '../src/woodframe/families/bunker';
 import { generateCribWall, cribCourseCount } from '../src/woodframe/subsystems/cribwork';
 import { BUNKER } from '../src/woodframe/doctrine';

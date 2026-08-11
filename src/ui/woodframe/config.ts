@@ -20,7 +20,7 @@
 
 import type { FamilyDef, FamilyId } from '../../woodframe/catalog';
 import { familyById, shippedFamilies } from '../../woodframe/catalog';
-import { COVER_DEPTH_NOTE } from '../../woodframe/doctrine';
+import { COVER_DEPTH_NOTE, RAMP, TOWER } from '../../woodframe/doctrine';
 import { SPEC_PATH_DEFS, specPath } from '../../woodframe/spec';
 
 export type ControlKind = 'number' | 'select' | 'toggle' | 'openings-editor' | 'family';
@@ -194,12 +194,19 @@ export function configSchemaFor(familyId: FamilyId): PanelSchema {
         title: 'DIMENSIONS',
         rows: [
           {
+            // Options are LIVE reads of the doctrine leaves ('10 16 24 32' / '6 8' as shipped):
+            // `configSchemaFor` runs per render, so a corrected height table reaches the picker
+            // without a reload. A string literal here was the register's dead twin.
             path: 'platformHeightFt', label: 'Platform height', control: 'select', numeric: true,
-            options: ['10', '16', '24', '32'],
+            options: (TOWER.platformHeightsFt.value as readonly number[]).map(String),
             cite: 'TM 5-302 guard tower heights (PH)',
             help: 'Above 20 ft a fixed ladder is not an acceptable sole means of access (EM 385-1-1) — the tool switches to a stair and tells you.',
           },
-          { path: 'cabPlanFt', label: 'Cab plan', control: 'select', numeric: true, options: ['6', '8'], help: 'Square, in feet.' },
+          {
+            path: 'cabPlanFt', label: 'Cab plan', control: 'select', numeric: true,
+            options: (TOWER.cabPlanSizesFt.value as readonly number[]).map(String),
+            help: 'Square, in feet.',
+          },
         ],
       },
       { title: 'SITE', rows: SITE_ROWS },
@@ -299,7 +306,15 @@ export function configSchemaFor(familyId: FamilyId): PanelSchema {
         title: 'ACCESS & SAFETY',
         rows: [
           numberRow('ramp.widthFt', family, 'Wide enough for what has to go up it.'),
-          { path: 'ramp.slope', label: 'Ramp slope', control: 'select', numeric: true, options: ['4', '6', '8'], optionLabels: ['1 in 4 — steepest allowed', '1 in 6', '1 in 8 — gentlest'], cite: 'EM 385-1-1 / TM 5-302 ramp slopes (1:N)', help: 'Run per foot of rise.' },
+          {
+            // Live read of RAMP.slopes ([4, 6, 8] as shipped) — the labels are derived from the
+            // same list so option and caption can never disagree about which slopes are legal.
+            path: 'ramp.slope', label: 'Ramp slope', control: 'select', numeric: true,
+            options: (RAMP.slopes.value as readonly number[]).map(String),
+            optionLabels: (RAMP.slopes.value as readonly number[]).map((n, i, all) =>
+              i === 0 ? `1 in ${n} — steepest allowed` : i === all.length - 1 ? `1 in ${n} — gentlest` : `1 in ${n}`),
+            cite: 'EM 385-1-1 / TM 5-302 ramp slopes (1:N)', help: 'Run per foot of rise.',
+          },
           { path: 'steps', label: 'Steps at the end', control: 'toggle' },
         ],
       },

@@ -1756,3 +1756,66 @@ move × 999. Everything else in the default fixture is byte-identical, labor inc
   not rewritten. `test/goldens/frame-compat/index.json` carries `generatedFrom:
   src/woodframe/frame.ts` — a metadata path updated to where the generator now lives; the
   generator's output bytes are unchanged, which the compat suite verifies.
+
+- **D46 — A doctrine edit reaches everything: the module-load snapshots are dead, and the
+  two preset numbers that disagreed with the register are corrected TO the register.**
+  (2026-08-11.) The rule register became a live, editable database (io.ts) one commit ago,
+  but the closure inventory showed an applied import going nowhere in the places that matter
+  most: the entire preset catalog was built once at module scope (`FAMILY_TABLE`), the three
+  framing-spacing leaves were dead while literals in `catalog.ts`/`spec.ts` held the live
+  values, and the clamp table, roof defaults, fastener supply arithmetic and labor figures
+  existed only as literals. This pass makes the register the single live source for that set:
+  `FAMILY_TABLE` is now `familyTable()`, minted fresh per call (`buildFromFamily` therefore
+  mints from the register as it stands); `SPEC_PATH_DEFS` min/max/step are live reads of a new
+  `LIMITS` group (24 rows, one structured leaf per spec path, the old cites carried onto the
+  leaves — reworded only where the register's own citation gate demands a subject:
+  `foundation.embedFt`, `ramp.widthFt`, `temperBays`, the three bunker-envelope rows, and the
+  four `openings[]` rows that had no cite at all); new `ROOF` (risePer12 4, overhangFt 1) and
+  `FASTENER` (pieces-per-pound, spikes/bolts modest readings, 2 1/6-in corrugation pitch)
+  groups plus `OPENING.wideDoor`, `TOWER.cabPlanSizesFt`, `LABOR.membersPerWorker` and
+  `LABOR.productiveHoursPerDay` — all cited honestly as preset operating points, working
+  figures or common published values, none of them life-safety tagged (an LS tag without a
+  packet consumer breaks the LS-GATE, per the open NAILING note). Consumers rewired to read
+  leaves at call time: catalog presets and lock captions, `normalize` roof repair, the spec
+  section fallback, `frame.ts` basement default, `elevation.ts`/`wallSystem.ts` wall and plate
+  thickness, `fasteners.ts` whole-file, `bom.ts` rates (`MH_PER_*` consts deleted;
+  `LABOR_RATES.value` are getters so the packet prints the rate that priced it),
+  `packet/labor.ts` crew/hours figures, and the UI's tiling, tower/ramp selects, opening
+  presets, screen band and roof/foundation switch defaults. `test/woodframe-live-rules.test.ts`
+  is the propagation lock: six locks, each one proven by reverting its wiring and watching the
+  recorded failure (snapshot catalog mints 16-in/36-ft buildings after a 24-in/24-ft import;
+  load-time clamp copies clamp 48 to nothing; literal tiling tiles 96/26 after a 32-in import;
+  load-time labor copies leave 356.156 MH unmoved; literal repair gables frame rise 4 after a
+  rise-6 import).
+
+  **The one deliberate output change.** Wiring the presets to `OPENING` exposed the two places
+  a card contradicted the register — the exact 0.4-in disagreement the register's own comment
+  says was already corrected once: the gp-frame and custom cards wrote a **6.7-ft door**
+  where `OPENING.doorHeightFt` is 6 ft 8 in (6.6667), and the custom card wrote **3-ft window
+  sills** where `OPENING.windowSillFt` is 3.5. The cards now read the leaves, and the deltas
+  were measured member-by-member over every shipped card (before/after digests of preset +
+  id/role/nominal/cutLength/position/rotation):
+
+  - **12 of 14 cards byte-identical** — preset and members. Every other wire in this pass is
+    value-identical by construction, and this measurement is the proof.
+  - **gp-frame** (936 members, count unchanged): 38 members moved, all of them the E/W door
+    chain, all by the door correction and nothing else — 4 jack studs and 14 leaf boards
+    −0.4 in, 4 header plies and 4 ledges down 0.4 in, 4 cripples over the headers +0.4 in,
+    4 leaf braces −0.17 in at −0.003 rad (the leaf is 0.4 in shorter), and the 4 siding
+    pieces over the door heads re-cut to the new header line (centres drop 0.2 in).
+  - **custom** (310 members, count unchanged): 24 members moved — the S-door chain exactly as
+    above (2 jacks, 2 header plies, 2 cripples), plus the two windows' sill chain at
+    +6 in: 2 rough sills and 4 header plies up 0.5 ft, 4 jacks +6 in, 4 cripples below the
+    sill +6 in, 4 cripples over the header −6 in.
+  - **Goldens regenerated deliberately, this PR:** `test/goldens/thumbs/{gp-frame,custom}.svg`
+    and `.solid.svg` — the four tiles of the two corrected cards, nothing else under
+    `test/goldens/` moved (frame, frame-compat and train-vectors are untouched; the compat
+    fixtures carry their own literal 6.7 inputs by design and keep them).
+
+  Left alone on purpose: crew-size and productive-hours clamps and the stock-length list stay
+  arithmetic divisors under R-T6 (`CREW_MIN/MAX`, `HOURS_MIN/MAX`, `DEFAULT_STOCK_FT`);
+  `MEMBERS_PER_WORKER_NOTE` still interpolates the shipped figure at module load because
+  `packet/html.ts` (another agent's file) imports it as a plain string — the arithmetic beside
+  it is live, and the residual is marked at the definition. `subsystems/floorSystem.ts`'s
+  `SMALL_PLAN_WIDTH_FT` re-export and `families/tower.ts`'s `TOWER_HEIGHTS` are the sibling
+  pass's files and were not touched here.

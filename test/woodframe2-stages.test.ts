@@ -11,7 +11,11 @@ import { generateStructure } from '../src/woodframe/families/index';
 import { bomSummary, boardFeet } from '../src/woodframe/bom';
 import { STAGES } from '../src/woodframe/types';
 import { stagePlanForBuilding, stagePlanForLegacyBuilding, STAGE_KEYS, ordinalOf } from '../src/woodframe/stagePlan';
-import { FAMILY_TABLE } from '../src/woodframe/catalog';
+import { familyTable } from '../src/woodframe/catalog';
+
+// The catalog is minted fresh per call now (live doctrine reads); these cases read the
+// shipped table once — none of them mutates the register.
+const FAMILY_TABLE = familyTable();
 import { normalizeSpec } from '../src/woodframe/normalize';
 
 const demo: BuildingInput = {

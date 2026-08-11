@@ -17,7 +17,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateStructure } from '../src/woodframe/families/index';
-import { FAMILY_TABLE } from '../src/woodframe/catalog';
+import { familyTable } from '../src/woodframe/catalog';
+
+// The catalog is minted fresh per call now (live doctrine reads); these cases read the
+// shipped table once — none of them mutates the register.
+const FAMILY_TABLE = familyTable();
 import { HUT, IN_PER_FT } from '../src/woodframe/doctrine';
 import type { Member } from '../src/woodframe/types';
 
