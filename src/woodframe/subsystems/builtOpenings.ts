@@ -28,7 +28,7 @@ import type { Member, WallId } from '../types';
 import { DRESSED } from '../types';
 import type { OpeningFill, OpeningSpec, WallOpenings } from '../spec';
 import { makeEmitter } from '../emit';
-import { OPENING, HUT, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
+import { NAILING, OPENING, HUT, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
 import { wallTilePlacement, type WallSurface } from './coverings';
 import { generateStair } from './access';
 
@@ -144,7 +144,10 @@ export function generateBuiltOpenings(input: BuiltOpeningsInput): Member[] {
         stage,
         wall: s.wall,
         actual: { w: DRESSED[boardNominal]!.w, d: p.widthFt * IN_PER_FT },
-        nailing: `${2 * ledgeCount}-6d clenched through the ledges (PH)`,
+        // The register entry states the schedule for the shipped three-ledge door; the leading
+        // count is two nails per ledge, so it is re-derived for the door as built and the rest
+        // of the line — fastener, joint, (PH) — comes from the entry.
+        nailing: NAILING.doorBoardsClenched.value.replace(/^\d+/, String(2 * ledgeCount)),
         doctrineRef: citeOf(OPENING.doorBoardNominal),
       });
     }
@@ -164,7 +167,7 @@ export function generateBuiltOpenings(input: BuiltOpeningsInput): Member[] {
         stage,
         wall: s.wall,
         actual: { w: DRESSED[ledgeNominal]!.w, d: p.heightFt * IN_PER_FT },
-        nailing: 'boards are nailed through it and clenched over — counted on the boards (PH)',
+        nailing: NAILING.clenchedFromTheBoards.value,
         doctrineRef: citeOf(OPENING.doorLedges),
       });
     }
@@ -194,7 +197,7 @@ export function generateBuiltOpenings(input: BuiltOpeningsInput): Member[] {
         stage,
         wall: s.wall,
         actual: { w: DRESSED[ledgeNominal]!.w, d: DRESSED[ledgeNominal]!.d },
-        nailing: '2-6d ea end into the ledges (PH)',
+        nailing: NAILING.doorBraceAtLedges.value,
         doctrineRef: citeOf(OPENING.doorBraces),
       });
     }
@@ -213,7 +216,7 @@ export function generateBuiltOpenings(input: BuiltOpeningsInput): Member[] {
       stage,
       wall: s.wall,
       actual: { w: HUT.screenClothThickIn.value as number, d: p.heightFt * IN_PER_FT },
-      nailing: 'staples @ 4" + batten (PH)',
+      nailing: NAILING.screenPanel.value,
       doctrineRef: citeOf(HUT.screenClothThickIn),
     });
     void roW; void roH;
@@ -253,7 +256,7 @@ export function generateBuiltOpenings(input: BuiltOpeningsInput): Member[] {
           stage,
           wall: s.wall,
           actual: { w: DRESSED[boardNominal]!.w, d: p.widthFt * IN_PER_FT },
-          nailing: '2-6d ea batten, clenched (PH)',
+          nailing: NAILING.shutterBattens.value,
           doctrineRef: citeOf(OPENING.shutterLapIn),
         });
       }
@@ -269,7 +272,7 @@ export function generateBuiltOpenings(input: BuiltOpeningsInput): Member[] {
           stage,
           wall: s.wall,
           actual: { w: DRESSED[ledgeNominal]!.w, d: p.heightFt * IN_PER_FT },
-          nailing: 'boards are nailed through it and clenched over — counted on the boards (PH)',
+          nailing: NAILING.clenchedFromTheBoards.value,
           doctrineRef: citeOf(OPENING.shutterBattens),
         });
       }
@@ -327,7 +330,7 @@ export function generateBuiltOpenings(input: BuiltOpeningsInput): Member[] {
         stage,
         wall: s.wall,
         actual: { w: DRESSED[boardNominal]!.w, d: p.widthFt * IN_PER_FT },
-        nailing: '2-6d ea batten, clenched (PH)',
+        nailing: NAILING.shutterBattens.value,
         doctrineRef: citeOf(OPENING.shutterLapIn),
       });
     }
@@ -346,7 +349,7 @@ export function generateBuiltOpenings(input: BuiltOpeningsInput): Member[] {
         stage,
         wall: s.wall,
         actual: { w: DRESSED[ledgeNominal]!.w, d: p.heightFt * IN_PER_FT },
-        nailing: 'boards are nailed through it and clenched over — counted on the boards (PH)',
+        nailing: NAILING.clenchedFromTheBoards.value,
         doctrineRef: citeOf(OPENING.shutterLapIn),
       });
     }

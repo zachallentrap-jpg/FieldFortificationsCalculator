@@ -122,7 +122,7 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
           rotation: [-Math.PI / 2, 0, 0],
           stage: sBase,
           actual: { w: padDepth, d: padSide },
-          nailing: 'poured on undisturbed soil (PH)',
+          nailing: NAILING.footing.value,
           doctrineRef: 'FM 5-426 post footers (PH page)',
         });
       }
@@ -135,8 +135,8 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
           rotation: [0, 0, Math.PI / 2],
           stage: sBase,
           nailing: spec.base === 'skids'
-            ? 'toenailed and cleated to the skid (PH)'
-            : 'drift-pinned to the pad; capped by the sill (PH)',
+            ? NAILING.platformPostAtSkid.value
+            : NAILING.platformPostAtPad.value,
           doctrineRef: citeOf(LUMBER.postNominal),
         });
       }
@@ -151,7 +151,7 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
       position: [L / 2, sillY, z],
       rotation: [0, 0, 0],
       stage: sFrame,
-      nailing: 'anchored to each post cap (PH)',
+      nailing: NAILING.platformSillAtPostCap.value,
       doctrineRef: citeOf(LUMBER.sillNominal),
     });
   }
@@ -163,7 +163,7 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
       position: [(L * i) / (joists - 1), frameTopY - joistDepth / 2, W / 2],
       rotation: [0, Math.PI / 2, 0],
       stage: sFrame,
-      nailing: '3-16d toenail ea bearing (PH)',
+      nailing: NAILING.joistToBearing.value,
       doctrineRef: citeOf(LUMBER.joistNominal),
     });
   }
@@ -213,7 +213,7 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
           rotation: [-Math.PI / 2, 0, 0],
           stage: sDeck,
           actual: { w: PANEL.subfloorThickIn.value as number, d: cd * IN_PER_FT },
-          nailing: '8d @ 6" edges / 12" field (PH)',
+          nailing: NAILING.panelEdgeField.value,
           doctrineRef: citeOf(PANEL.subfloorThickIn),
         });
       }
@@ -318,7 +318,7 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
         position: seat(x, 0.5, deckThick + stringerDepth / 2),
         rotation: [0, Math.PI / 2, -pitch],
         stage: sRamp,
-        nailing: 'bolted at the deck; bedded at grade (PH)',
+        nailing: NAILING.rampStringerBolted.value,
         doctrineRef: citeOf(RAMP.stringerNominal),
       });
     }
@@ -336,7 +336,7 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
           position: seat(L / 2, (i + 0.5) / boards, deckThick / 2),
           rotation: [rx, 0, 0],
           stage: sRamp,
-          nailing: '2-16d ea stringer (PH)',
+          nailing: NAILING.treadToStringer.value,
           doctrineRef: citeOf(RAMP.slopes),
         });
       }
@@ -358,7 +358,7 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
             rotation: [rx, 0, 0],
             stage: sRamp,
             actual: { w: PANEL.subfloorThickIn.value as number, d: cu * IN_PER_FT },
-            nailing: '8d @ 6" edges / 12" field (PH)',
+            nailing: NAILING.panelEdgeField.value,
             doctrineRef: citeOf(PANEL.subfloorThickIn),
           });
         }
@@ -482,7 +482,7 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
       position: [rankAt(i, joists, joistT), skidTop + joistDepth / 2, W / 2],
       rotation: [0, Math.PI / 2, 0],
       stage: sFloor,
-      nailing: '3-16d toenail ea bearing (PH)',
+      nailing: NAILING.joistToBearing.value,
       doctrineRef: citeOf(LUMBER.joistNominal),
     });
   }
@@ -537,7 +537,7 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
         position: [x, deckY + d.eaveFt / 2, z],
         rotation: [0, 0, Math.PI / 2],
         stage: sBent,
-        nailing: 'toenail 4-8d to the deck; braced to the sill (PH)',
+        nailing: NAILING.bentPostAtDeck.value,
         doctrineRef: citeOf(TENT.bentNominal),
       });
       // A RAFTER BEARS ON THE RIDGE BOARD; it does not run to the ridge LINE. Carried to the
@@ -563,7 +563,7 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
         position: [x, eaveY + rise / 2, (z + head) / 2],
         rotation: [0, run > 0 ? -Math.PI / 2 : Math.PI / 2, pitch],
         stage: sBent,
-        nailing: '3-8d at the ridge, 3-8d at the post (PH)',
+        nailing: NAILING.bentRafter.value,
         doctrineRef: citeOf(TENT.bentNominal),
       });
     }
@@ -576,7 +576,7 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
       position: [x + (i === bents - 1 ? -lapFt : lapFt), eaveY, W / 2],
       rotation: [0, Math.PI / 2, 0],
       stage: sBent,
-      nailing: '4-8d ea end (PH)',
+      nailing: NAILING.bentCollarAndHead.value,
       doctrineRef: citeOf(TENT.bentNominal),
     });
   }
@@ -585,7 +585,7 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
     position: [L / 2, ridgeY, W / 2],
     rotation: [0, 0, 0],
     stage: sRidge,
-    nailing: '3-8d ea bent (PH)',
+    nailing: NAILING.bentRidge.value,
     doctrineRef: citeOf(TENT.bentSpacingFt),
   });
 
@@ -621,7 +621,7 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
           position: [x, deckY + doorH / 2, W / 2 + s * (doorW + jambT) / 2],
           rotation: [0, 0, Math.PI / 2],
           stage: sBent,
-          nailing: 'framing anchor top and bottom (PH)',
+          nailing: NAILING.framingAnchorBothEnds.value,
           doctrineRef: `${citeOf(OPENING.doorWidthFt)} — end-door jamb, in the end bent's plane`,
         });
       }
@@ -640,7 +640,7 @@ export function generateTentFrame(spec: TentFrameSpec): FamilyResult {
         // A jamb at each side — the same shape a doorway header has, stated on the member so the
         // span check does not have to assume it from the role.
         bearingTotalIn: 2 * jambT * IN_PER_FT,
-        nailing: '4-8d ea end (PH)',
+        nailing: NAILING.bentCollarAndHead.value,
         doctrineRef: `${citeOf(OPENING.doorHeightFt)} — end-door head, sized for its own span`,
       });
     }

@@ -16,7 +16,7 @@
 import type { Member } from '../types';
 import { DRESSED } from '../types';
 import { makeEmitter } from '../emit';
-import { BUNKER, IN_PER_FT, citeOf } from '../doctrine';
+import { BUNKER, NAILING, IN_PER_FT, citeOf } from '../doctrine';
 
 export interface CribWallInput {
   /** Wall centre line in plan, from → to. */
@@ -87,7 +87,7 @@ export function generateCribWall(input: CribWallInput): Member[] {
             ],
             rotation: [0, yaw, 0],
             stage: input.stage,
-            nailing: 'drift-pinned to the course below at every crossing (PH)',
+            nailing: NAILING.cribLogCourse.value,
             doctrineRef: citeOf(BUNKER.cribLogNominal),
           });
         }
@@ -108,7 +108,7 @@ export function generateCribWall(input: CribWallInput): Member[] {
           position: [input.from[0] + ux * d, y, input.from[1] + uz * d],
           rotation: [0, Math.atan2(-az, ax), 0],
           stage: input.stage,
-          nailing: 'drift-pinned to the course below at every crossing (PH)',
+          nailing: NAILING.cribLogCourse.value,
           doctrineRef: citeOf(BUNKER.cribLogNominal),
         });
       }

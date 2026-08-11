@@ -29,7 +29,7 @@ import type { Member } from '../types';
 import { DRESSED } from '../types';
 import type { BunkerSpec } from '../spec';
 import { makeEmitter } from '../emit';
-import { BUNKER, TOLERANCE, IN_PER_FT, citeOf, COVER_DEPTH_NOTE } from '../doctrine';
+import { BUNKER, NAILING, TOLERANCE, IN_PER_FT, citeOf, COVER_DEPTH_NOTE } from '../doctrine';
 import { stagePlan, requireOrdinal, type StagePlanEntry } from '../stagePlan';
 import { generateCribWall, cribWallTopFt } from '../subsystems/cribwork';
 import type { FloorLevels } from '../floor';
@@ -259,7 +259,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
           position: [px, H / 2, pz],
           rotation: [0, 0, Math.PI / 2],
           stage: sWall,
-          nailing: 'set against the cut face; capped and drift-pinned (PH)',
+          nailing: NAILING.cribPostAtCutFace.value,
           doctrineRef: citeOf(BUNKER.postNominal),
         });
       }
@@ -288,7 +288,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
             rotation: [0, Math.atan2(-uz, ux), 0],
             stage: sWall,
             actual: { w: DRESSED[lagNominal]!.w, d: cut * IN_PER_FT },
-            nailing: 'spiked to each post (PH)',
+            nailing: NAILING.laggingToPost.value,
             doctrineRef: citeOf(BUNKER.laggingNominal),
           });
         }
@@ -307,7 +307,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       position: [outerL / 2, capY, z],
       rotation: [0, 0, 0],
       stage: sCap,
-      nailing: 'drift-pinned to every post or crib course (PH)',
+      nailing: NAILING.cribCapBeam.value,
       doctrineRef: citeOf(BUNKER.capNominal),
     });
   }
@@ -344,7 +344,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
         position: [x, capY, (z0 + z1) / 2],
         rotation: [0, Math.PI / 2, 0],
         stage: sCap,
-        nailing: 'drift-pinned to every post or crib course; butted to the side caps (PH)',
+        nailing: NAILING.cribCapBeamAtSides.value,
         doctrineRef: citeOf(BUNKER.capNominal),
       });
     }
@@ -377,7 +377,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       position: [stringerW / 2 + (stringerRun * i) / stringerBays, stringerY, outerW / 2],
       rotation: [0, Math.PI / 2, 0],
       stage: sStringer,
-      nailing: 'bearing on the caps both ends; drift-pinned (PH)',
+      nailing: NAILING.ohcStringerAtCaps.value,
       doctrineRef: citeOf(BUNKER.stringerBySpan),
     });
   }
@@ -405,7 +405,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
         position: [(x0 + x1) / 2, stringerY, z],
         rotation: [0, 0, 0],
         stage: sStringer,
-        nailing: 'toenailed to the stringer each side; spiked to the cap (PH)',
+        nailing: NAILING.ohcBlocking.value,
         doctrineRef: `${citeOf(BUNKER.stringerBySpan)} — blocking, cut from the stringer stock`,
       });
     }
@@ -428,7 +428,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       rotation: [-Math.PI / 2, 0, 0],
       stage: sLag,
       actual: { w: DRESSED[lagNominal]!.w, d: cut * IN_PER_FT },
-      nailing: 'spiked to every stringer (PH)',
+      nailing: NAILING.laggingToStringer.value,
       doctrineRef: citeOf(BUNKER.laggingNominal),
     });
   }
@@ -457,7 +457,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       // stages after the caps it lines up with and two after that cover, so the scrubber ran the
       // stringers across the opening on nothing at all.
       stage: sWall,
-      nailing: 'set against the end of the wall run; capped (PH)',
+      nailing: NAILING.cribEndPost.value,
       doctrineRef: citeOf(BUNKER.postNominal),
     });
   }
@@ -483,7 +483,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
     // And WITH THE CAPS, for the same reason: this piece is that course, and the two cap beams
     // on either side of the doorway stop dead at the jambs waiting for it.
     stage: sCap,
-    nailing: 'drift-pinned to each jamb; carries the cover over the opening (PH)',
+    nailing: NAILING.entranceHeaderAtJambs.value,
     doctrineRef: citeOf(BUNKER.capNominal),
   });
 
@@ -512,7 +512,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
         position: [-offset, H / 2, baffleZ0 + (run * i) / (posts - 1)],
         rotation: [0, 0, Math.PI / 2],
         stage: sEntry,
-        nailing: 'free-standing: set in the ground and braced back to the entrance (PH)',
+        nailing: NAILING.baffleWallFreeStanding.value,
         doctrineRef: citeOf(BUNKER.baffleOffsetFt),
       });
     }
@@ -531,7 +531,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
         position: [-offset - (DRESSED[postNominal]!.w + DRESSED[lagNominal]!.w) / IN_PER_FT / 2, v + cut / 2, (baffleZ0 + baffleZ1) / 2],
         rotation: [0, Math.PI / 2, 0],
         stage: sEntry,
-        nailing: 'spiked to each post (PH)',
+        nailing: NAILING.laggingToPost.value,
         doctrineRef: citeOf(BUNKER.baffleOffsetFt),
       });
     }
@@ -553,7 +553,7 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
       // 10.92 deep: a monolith standing on edge on the bunker's roof, engulfing the structure,
       // on the first thing anyone sees of this family.
       actual: { w: outerW * IN_PER_FT, d: spec.designCoverDepthFt * IN_PER_FT },
-      nailing: 'not built — massing only (PH)',
+      nailing: NAILING.soilGhostNotBuilt.value,
       doctrineRef: COVER_DEPTH_NOTE,
     });
   }

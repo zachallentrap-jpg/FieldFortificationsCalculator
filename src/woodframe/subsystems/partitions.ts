@@ -88,7 +88,7 @@ export function generatePartitions(input: PartitionInput): Member[] {
         position: [mid[0], y, mid[1]],
         rotation: [-Math.PI / 2, yaw, 0], // FLAT — a plate lies on its face
         stage,
-        nailing: '16d @ 16" to the framing (PH)',
+        nailing: NAILING.partitionPlate.value,
         doctrineRef: `${citeOf(LUMBER.plateNominal)} — non-bearing partition, single top plate`,
       });
     };
@@ -139,7 +139,7 @@ export function generatePartitions(input: PartitionInput): Member[] {
         position: [k[0], studBottom + studLen / 2, k[1]],
         rotation: upright,
         stage,
-        nailing: '16d @ 12" to the jack (PH)',
+        nailing: NAILING.kingToJackStud.value,
         doctrineRef: citeOf(LUMBER.studNominal),
       });
       const j = at(edge + (side * studT) / 2);
@@ -164,7 +164,7 @@ export function generatePartitions(input: PartitionInput): Member[] {
         // A jack at each side, which is what the cut length above adds — said out loud so the
         // span check reads this member's own bearing rather than a default that happens to match.
         bearingTotalIn: 2 * studT * IN_PER_FT,
-        nailing: '16d @ 16" each side (PH)',
+        nailing: NAILING.builtUpHeaderEachSide.value,
         doctrineRef: `${citeOf(LUMBER.headerNominal)} — partition doorway`,
       });
     }
@@ -182,7 +182,7 @@ export function generatePartitions(input: PartitionInput): Member[] {
           position: [c[0], studBottom + doorH + headerD + crippleLen / 2, c[1]],
           rotation: upright,
           stage,
-          nailing: 'toenail 3-8d each end (PH)',
+          nailing: NAILING.crippleToenail.value,
           doctrineRef: `${citeOf(LUMBER.studNominal)} — cripple over the doorway header`,
         });
       }

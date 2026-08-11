@@ -17,7 +17,7 @@
 import type { Member } from '../types';
 import { DRESSED } from '../types';
 import { makeEmitter } from '../emit';
-import { LADDER, RAIL, STAIR, IN_PER_FT, citeOf } from '../doctrine';
+import { LADDER, NAILING, RAIL, STAIR, IN_PER_FT, citeOf } from '../doctrine';
 import { stringerDropFt } from '../stringerCuts';
 import { generateRailing, railRequired, type RailEdge } from './railings';
 
@@ -107,7 +107,7 @@ export function generateLadder(input: LadderInput): { members: Member[]; overCag
         ? [0, 0, Math.PI / 2]
         : [0, Math.atan2(-facing[1], facing[0]), Math.atan2(1, lean)],
       stage,
-      nailing: 'bolted to the frame at every bay (PH)',
+      nailing: NAILING.ladderRailBolted.value,
       doctrineRef: citeOf(LADDER.topExtensionIn),
     });
   }
@@ -120,7 +120,7 @@ export function generateLadder(input: LadderInput): { members: Member[]; overCag
       position: [base[0] + facing[0] * lean * climb * t, y, base[1] + facing[1] * lean * climb * t],
       rotation: [0, yaw, 0],
       stage,
-      nailing: 'let in and 2-16d ea rail (PH)',
+      nailing: NAILING.ladderRungLetIn.value,
       doctrineRef: citeOf(LADDER.rungSpacingIn),
     });
   }
@@ -354,7 +354,7 @@ export function generateStair(input: StairInput): StairResult {
           ],
         rotation: [0, yaw, pitch],
         stage,
-        nailing: 'bolted at head and foot (PH)',
+        nailing: NAILING.stairStringerBolted.value,
         doctrineRef: citeOf(STAIR.stringerNominal),
       });
     }
@@ -385,7 +385,7 @@ export function generateStair(input: StairInput): StairResult {
         position: [at[0] + dir[0] * d, y + (risePerFlight * i) / sol.risers - treadT / 2, at[1] + dir[1] * d],
         rotation: [-Math.PI / 2, treadYaw, 0],
         stage,
-        nailing: '2-16d ea stringer (PH)',
+        nailing: NAILING.treadToStringer.value,
         doctrineRef: citeOf(STAIR.minTreadIn),
       });
     }
@@ -434,7 +434,7 @@ export function generateStair(input: StairInput): StairResult {
             position: [qx(d), walkY(d) + (railTopH + proud) / 2, qz(d)],
             rotation: [0, 0, Math.PI / 2],
             stage,
-            nailing: 'bolted to the stringer (PH)',
+            nailing: NAILING.railPostToStringer.value,
             doctrineRef: citeOf(RAIL.postSpacingMaxFt),
           });
         }
@@ -453,7 +453,7 @@ export function generateStair(input: StairInput): StairResult {
             position: [px(mid), walkY(mid) + h, pz(mid)],
             rotation: [0, railYaw, pitch],
             stage,
-            nailing: '2-16d ea post (PH)',
+            nailing: NAILING.railMemberToPost.value,
             doctrineRef: cite,
           });
         }
@@ -513,7 +513,7 @@ export function generateStair(input: StairInput): StairResult {
           rotation: [-Math.PI / 2, yawL, 0], // flat, like the treads
           stage,
           actual: { w: DRESSED[plankNominal]!.w, d: cut * IN_PER_FT },
-          nailing: '2-16d ea bearer (PH)',
+          nailing: NAILING.landingPlankToBearer.value,
           doctrineRef: citeOf(STAIR.headroomIn),
         });
       }

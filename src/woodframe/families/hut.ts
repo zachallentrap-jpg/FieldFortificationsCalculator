@@ -29,7 +29,7 @@ import type { HutSpec, BuildingSpec, WallOpenings } from '../spec';
 import type { WallId } from '../types';
 import { WALL_ORDER } from '../spec';
 import { makeEmitter } from '../emit';
-import { HUT, LATRINE, LUMBER, OPENING, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
+import { HUT, LATRINE, LUMBER, NAILING, OPENING, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
 import { generateBuilding, type BuildingResult } from './building';
 import { defaultOpenings } from '../openings';
 import { surfaceYaw, type WallSurface, type WallsContract } from '../subsystems/wallSystem';
@@ -197,7 +197,7 @@ function generateGirts(
           rotation: [0, surfaceYaw(s), 0],
           stage,
           wall: s.wall,
-          nailing: '2-16d ea stud (PH)',
+          nailing: NAILING.girtToStud.value,
           doctrineRef: citeOf(HUT.girtSpacingFt),
         });
       }
@@ -332,7 +332,7 @@ function generateScreenBand(
           rotation: [0, surfaceYaw(s), 0],
           stage,
           wall: s.wall,
-          nailing: '2-16d ea end (PH)',
+          nailing: NAILING.plateGeneric.value,
           doctrineRef: citeOf(HUT.screenBandSillFt),
         });
       }
@@ -348,7 +348,7 @@ function generateScreenBand(
       stage,
       wall: s.wall,
       actual: { w: HUT.screenClothThickIn.value as number, d: band.heightFt * IN_PER_FT },
-      nailing: 'staples @ 4" + batten (PH)',
+      nailing: NAILING.screenPanel.value,
       doctrineRef: citeOf(HUT.screenBandHeightFt),
     });
   }
@@ -391,7 +391,7 @@ function generateRiserBox(
     rotation: [-Math.PI / 2, 0, 0],
     stage,
     actual: { w: DRESSED[nominal]!.w, d: depth * IN_PER_FT },
-    nailing: '3-8d ea stud (PH)',
+    nailing: NAILING.riserBoxToStud.value,
     doctrineRef: citeOf(LATRINE.riserBoxDepthFt),
   });
   // The front board, standing on edge under the lid's front edge and reaching the ground.
@@ -401,7 +401,7 @@ function generateRiserBox(
     rotation: [0, 0, 0],
     stage,
     actual: { w: DRESSED[nominal]!.w, d: (h - thick) * IN_PER_FT },
-    nailing: '3-8d ea stud (PH)',
+    nailing: NAILING.riserBoxToStud.value,
     doctrineRef: citeOf(LATRINE.riserBoxHeightFt),
   });
   // Ends and seat dividers, crossing front to back, full height under the lid — and landing on the
@@ -417,7 +417,7 @@ function generateRiserBox(
       rotation: [0, Math.PI / 2, 0],
       stage,
       actual: { w: DRESSED[nominal]!.w, d: (h - thick) * IN_PER_FT },
-      nailing: '3-8d ea end (PH)',
+      nailing: NAILING.riserBoxBoard.value,
       doctrineRef: citeOf(LATRINE.seatSpacingFt),
     });
   }

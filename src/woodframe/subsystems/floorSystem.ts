@@ -146,7 +146,7 @@ export function generateFloorOnBearings(input: FloorSystemInput): Member[] {
           rotation: [-Math.PI / 2, 0, 0],
           stage: stageDeck,
           actual: { w: PANEL.subfloorThickIn.value as number, d: rowW * IN_PER_FT },
-          nailing: '8d @ 6" edges / 12" field (PH)',
+          nailing: NAILING.panelEdgeField.value,
           doctrineRef: citeOf(PANEL.subfloorThickIn),
         });
         x = Math.min(stagger, L);
@@ -159,7 +159,7 @@ export function generateFloorOnBearings(input: FloorSystemInput): Member[] {
           rotation: [-Math.PI / 2, 0, 0],
           stage: stageDeck,
           actual: { w: PANEL.subfloorThickIn.value as number, d: rowW * IN_PER_FT },
-          nailing: '8d @ 6" edges / 12" field (PH)',
+          nailing: NAILING.panelEdgeField.value,
           doctrineRef: citeOf(PANEL.subfloorThickIn),
         });
       }

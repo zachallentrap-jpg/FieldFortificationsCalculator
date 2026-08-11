@@ -396,7 +396,7 @@ export function generateShed(input: ShedInput): Member[] {
   const alongZ = slopeAlongZ(highSide);
   const span = alongZ ? W : L;
   const ridgeRun = alongZ ? L : W; // the horizontal extent perpendicular to the slope
-  const t = DRESSED['2x4']!.w / IN_PER_FT;
+  const t = DRESSED[LUMBER.rafterNominal.value as string]!.w / IN_PER_FT;
   const rafterD = DRESSED[LUMBER.rafterNominal.value as string]!.d / IN_PER_FT;
   const oc = spec.spacing.rafterSpacingIn / IN_PER_FT;
   const up = highSide === 'N' || highSide === 'E' ? 1 : -1;
@@ -436,7 +436,7 @@ export function generateShed(input: ShedInput): Member[] {
       rotation: alongZ ? [0, -Math.PI / 2, up * pitchRad] : [0, 0, up * pitchRad],
       stage: stageRoofFrame,
       angles: { plumbCut: 90 - (pitchRad * 180) / Math.PI, seatCut: (pitchRad * 180) / Math.PI },
-      nailing: 'bird’s-mouth toenail 3-8d each plate (PH)',
+      nailing: NAILING.shedRafterAtPlates.value,
       doctrineRef: rafterCite,
     });
   }
@@ -462,12 +462,13 @@ export function generateShed(input: ShedInput): Member[] {
   if (ponyHeight > TOLERANCE.minSliverFt + ponyPlateThick) {
     const studLen = ponyHeight - ponyPlateThick;
     const studNominal = LUMBER.studNominal.value as string;
+    const studT = DRESSED[studNominal]!.w / IN_PER_FT;
     const highSurface = walls.surfaces.find((s) => s.wall === highSide)!;
     const ocStud = spec.spacing.studSpacingIn / IN_PER_FT;
     const runFt = highSurface.runFt;
-    const studCenters: number[] = [t / 2];
-    for (let s = ocStud; s < runFt - 1.5 * t; s += ocStud) studCenters.push(s);
-    studCenters.push(runFt - t / 2);
+    const studCenters: number[] = [studT / 2];
+    for (let s = ocStud; s < runFt - 1.5 * studT; s += ocStud) studCenters.push(s);
+    studCenters.push(runFt - studT / 2);
     for (const u of studCenters) {
       const x = highSurface.origin[0] + highSurface.along[0] * u;
       const z = highSurface.origin[1] + highSurface.along[1] * u;
@@ -506,7 +507,7 @@ export function generateShed(input: ShedInput): Member[] {
       rotation: alongZ ? [-Math.PI / 2, 0, 0] : [-Math.PI / 2, Math.PI / 2, 0],
       stage: stageRoofFrame,
       wall: highSide,
-      nailing: '16d @ 16" to the studs; rafters bird’s-mouth toenail 3-8d (PH)',
+      nailing: NAILING.shedPonyPlate.value,
       doctrineRef: `${citeOf(LUMBER.plateNominal)} — the pony wall's bearing plate for the rafters`,
     });
   }
@@ -694,7 +695,7 @@ export function generateHip(input: HipInput): Member[] {
       position: [x, plateTopY + cjD / 2, W / 2],
       rotation: [0, -Math.PI / 2, 0],
       stage: stageCeiling,
-      nailing: '3-16d toenail ea plate + 16d to rafter (PH)',
+      nailing: NAILING.ceilingJoistAtPlate.value,
       doctrineRef: citeOf(LUMBER.ceilingJoistNominal),
     });
   }
@@ -707,7 +708,7 @@ export function generateHip(input: HipInput): Member[] {
     position: [L / 2, ridgeY, W / 2],
     rotation: [0, 0, 0],
     stage,
-    nailing: 'commons and hips 3-16d ea (PH)',
+    nailing: NAILING.ridgeAtHip.value,
     doctrineRef: `${citeOf(LUMBER.ridgeNominal)} — hip ridge is shortened by half the span at each end`,
   });
 
@@ -736,7 +737,7 @@ export function generateHip(input: HipInput): Member[] {
         rotation: [0, side === -1 ? -Math.PI / 2 : Math.PI / 2, Math.atan(slope)],
         stage,
         angles: { plumbCut: 90 - (Math.atan(slope) * 180) / Math.PI, seatCut: (Math.atan(slope) * 180) / Math.PI },
-        nailing: '3-16d at ridge, bird’s-mouth toenail 3-8d (PH)',
+        nailing: NAILING.rafterAtRidge.value,
         doctrineRef: citeOf(LUMBER.rafterNominal),
       });
     }
@@ -762,7 +763,7 @@ export function generateHip(input: HipInput): Member[] {
       position: [(cx + rx) / 2, (roofY - oh * slope + ridgeY) / 2 - drop, (cz + W / 2) / 2],
       rotation: [0, Math.atan2(-(W / 2 - cz), rx - cx), Math.atan2(ridgeY - (roofY - oh * slope), run)],
       stage,
-      nailing: '3-16d at the ridge; jacks bear on it both sides (PH)',
+      nailing: NAILING.hipRafterAtRidge.value,
       doctrineRef: `${citeOf(LUMBER.rafterNominal)} — hip run is the diagonal: ${hipLenPerFtRun(slope).toFixed(3)} ft per ft of common run`
         + `; DROP the hip ${(drop * IN_PER_FT).toFixed(3)} in (or back it) so the sheathing lies flat`,
     });
@@ -793,7 +794,7 @@ export function generateHip(input: HipInput): Member[] {
         position: [cx + dirX * back, (yEave + yHip) / 2, cz + (dirZ * (back - oh)) / 2],
         rotation: [0, dirZ > 0 ? -Math.PI / 2 : Math.PI / 2, pitch],
         stage,
-        nailing: 'bevel-cut to the hip, 3-16d; bird’s-mouth toenail 3-8d (PH)',
+        nailing: NAILING.jackRafterAtHip.value,
         doctrineRef: `${citeOf(LUMBER.rafterNominal)} — jacks shorten ${jackDifference(slope, spacingFt).toFixed(3)} ft each at ${spec.spacing.rafterSpacingIn} in o.c.`,
       });
       // Jack on the SHORT wall: fixed z, running in x.
@@ -802,7 +803,7 @@ export function generateHip(input: HipInput): Member[] {
         position: [cx + (dirX * (back - oh)) / 2, (yEave + yHip) / 2, cz + dirZ * back],
         rotation: [0, dirX > 0 ? 0 : Math.PI, pitch],
         stage,
-        nailing: 'bevel-cut to the hip, 3-16d; bird’s-mouth toenail 3-8d (PH)',
+        nailing: NAILING.jackRafterAtHip.value,
         doctrineRef: `${citeOf(LUMBER.rafterNominal)} — jacks shorten ${jackDifference(slope, spacingFt).toFixed(3)} ft each at ${spec.spacing.rafterSpacingIn} in o.c.`,
       });
     }

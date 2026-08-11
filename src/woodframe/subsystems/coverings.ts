@@ -17,7 +17,7 @@
 import type { Member, WallId } from '../types';
 import { DRESSED } from '../types';
 import { makeEmitter } from '../emit';
-import { PANEL, ROOFING, SIDING, LUMBER, FOUNDATION, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
+import { PANEL, ROOFING, SIDING, LUMBER, FOUNDATION, NAILING, TOLERANCE, IN_PER_FT, citeOf } from '../doctrine';
 import { planeSpanAt, type RoofPlane } from './roofFamilies';
 import type { WallSurface } from './wallSystem';
 
@@ -259,7 +259,7 @@ export function generateInfillCovering(input: InfillCoveringInput): Member[] {
           stage,
           wall: s.wall,
           actual: { w: PANEL.sidingThickIn.value as number, d: heightFt * IN_PER_FT },
-          nailing: '8d @ 6" edges / 12" field (PH)',
+          nailing: NAILING.panelEdgeField.value,
           doctrineRef: `${citeOf(PANEL.sidingThickIn)} — cut to the rake above the plate`,
         });
       } else {
@@ -270,7 +270,7 @@ export function generateInfillCovering(input: InfillCoveringInput): Member[] {
           stage,
           wall: s.wall,
           actual: { w: DRESSED[boardNominal]!.w, d: widthFt * IN_PER_FT },
-          nailing: '8d @ 12" (PH)',
+          nailing: NAILING.sidingFieldNail.value,
           doctrineRef: `${citeOf(SIDING.boardNominal)} — cut to the rake above the plate`,
         });
       }
@@ -302,7 +302,7 @@ export function generateInfillCovering(input: InfillCoveringInput): Member[] {
           rotation: [0, Math.atan2(-s.along[1], s.along[0]), Math.PI / 2],
           stage,
           wall: s.wall,
-          nailing: '8d @ 12" into the joint (PH)',
+          nailing: NAILING.battenAtJoint.value,
           doctrineRef: `${citeOf(SIDING.battenNominal)} — carried up over the plate to the rake`,
         });
       }
@@ -451,7 +451,7 @@ export function generateWallCovering(input: WallCoveringInput): Member[] {
             stage,
             wall: s.wall,
             actual: { w: PANEL.sidingThickIn.value as number, d: p.heightFt * IN_PER_FT },
-            nailing: '8d @ 6" edges / 12" field (PH)',
+            nailing: NAILING.panelEdgeField.value,
             doctrineRef: `${citeOf(PANEL.sidingThickIn)} — joints on studs, cut around openings`,
           });
         }
@@ -482,7 +482,7 @@ export function generateWallCovering(input: WallCoveringInput): Member[] {
           wall: s.wall,
           // The board's covered width — its dressed face, or the ripped remainder at the end.
           actual: { w: DRESSED[boardNominal]!.w, d: p.widthFt * IN_PER_FT },
-          nailing: '8d @ 12" (PH)',
+          nailing: NAILING.sidingFieldNail.value,
           doctrineRef: citeOf(SIDING.boardNominal),
         });
       }
@@ -501,7 +501,7 @@ export function generateWallCovering(input: WallCoveringInput): Member[] {
             rotation: [0, p.rotation[1], Math.PI / 2],
             stage,
             wall: s.wall,
-            nailing: '8d @ 12" into the joint (PH)',
+            nailing: NAILING.battenAtJoint.value,
             doctrineRef: citeOf(SIDING.battenNominal),
           });
         }
@@ -642,7 +642,7 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
           rotation: [Math.PI / 2 - p.pitch, p.yaw, 0],
           stage: stageDeck,
           actual: { w: PANEL.roofDeckThickIn.value as number, d: (t.v1 - t.v0) * IN_PER_FT },
-          nailing: '8d @ 6" edges / 12" field (PH)',
+          nailing: NAILING.panelEdgeField.value,
           doctrineRef: citeOf(PANEL.roofDeckThickIn),
         });
       }
@@ -686,7 +686,7 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
           // Along the eave, standing on edge: the board's face is the vertical one you see.
           rotation: [0, Math.atan2(-plane.alongEave[2]!, plane.alongEave[0]!), 0],
           stage: stageDeck,
-          nailing: '2-8d into each rafter tail (PH)',
+          nailing: NAILING.fasciaAtRafterTails.value,
           doctrineRef: citeOf(LUMBER.fasciaNominal),
         });
       }
@@ -737,7 +737,7 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
           position: atUV(plane, edge + out * (wallSkinFt + bargeT / 2), runFt / 2),
           rotation: rot,
           stage: stageDeck,
-          nailing: '2-8d into the rake at every rafter; mitred at the ridge (PH)',
+          nailing: NAILING.bargeBoardAtRake.value,
           doctrineRef: citeOf(LUMBER.fasciaNominal),
         });
       }
@@ -787,7 +787,7 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
             rotation: [Math.PI / 2 - p.pitch, p.yaw, 0],
             stage: stageRoofing,
             actual: { w: ROOFING.feltThickIn.value as number, d: (vb1 - vb0) * IN_PER_FT },
-            nailing: 'staples or 1-in roofing nails @ 12" (PH)',
+            nailing: NAILING.feltCourse.value,
             doctrineRef: `${citeOf(ROOFING.feltWidthIn)} — ${ROOFING.feltLapIn.value}-in lap, laid from the eave up`,
           });
         }
@@ -901,7 +901,7 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
             rotation: [Math.PI / 2 - p.pitch, p.yaw, 0],
             stage: stageRoofing,
             actual: { w: ROOFING.coveringThickIn.value as number, d: (vb1 - vb0) * IN_PER_FT },
-            nailing: isRoll ? 'roofing nails @ 6" laps (PH)' : 'lead-head nails at every 3rd corrugation (PH)',
+            nailing: isRoll ? NAILING.rollRoofingCourse.value : NAILING.corrugatedCourse.value,
             doctrineRef: cite,
           });
         };
@@ -996,9 +996,7 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
       // courses under it. Both phrasings below are ones `fasteners.ts` already reads, and that
       // is not a coincidence to preserve by luck: its unparsed-schedule gate failed this file
       // the moment the caps shipped with prose nobody could count.
-      isRoll
-        ? 'roofing nails @ 6" each side of the joint, lapped downhill (PH)'
-        : 'lead-head nails at every 3rd corrugation, each side of the joint (PH)'));
+      isRoll ? NAILING.rollRoofingCap.value : NAILING.corrugatedCap.value));
   }
 
   return emit.members;
@@ -1173,7 +1171,7 @@ export function generateSlabOnGrade(lengthFt: number, widthFt: number, stageEdge
       rotation: [0, 0, 0],
       stage: stageEdge,
       actual: { w: FOUNDATION.stripFootingWidthIn.value as number, d: FOUNDATION.stripFootingDepthIn.value as number },
-      nailing: 'no fasteners — concrete (PH)',
+      nailing: NAILING.concreteNoFasteners.value,
       doctrineRef: edgeCite,
     });
   }
@@ -1184,7 +1182,7 @@ export function generateSlabOnGrade(lengthFt: number, widthFt: number, stageEdge
       rotation: [0, -Math.PI / 2, 0],
       stage: stageEdge,
       actual: { w: FOUNDATION.stripFootingWidthIn.value as number, d: FOUNDATION.stripFootingDepthIn.value as number },
-      nailing: 'no fasteners — concrete (PH)',
+      nailing: NAILING.concreteNoFasteners.value,
       doctrineRef: edgeCite,
     });
   }
@@ -1197,7 +1195,7 @@ export function generateSlabOnGrade(lengthFt: number, widthFt: number, stageEdge
     // basement slab is emitted with, so one reader serves both.
     actual: { w: widthFt * IN_PER_FT, d: FOUNDATION.slabThickIn.value as number },
     stage: stageSlab,
-    nailing: 'no fasteners — concrete; sole plates anchored to the slab (PH)',
+    nailing: NAILING.slabOnGradeAnchor.value,
     doctrineRef: citeOf(FOUNDATION.slabThickIn),
   });
   return emit.members;
@@ -1248,7 +1246,7 @@ export function generateSkids(
       position: [lengthFt / 2, gradeY + depth / 2, Math.min(Math.max(z, halfWide), widthFt - halfWide)],
       rotation: [0, 0, 0],
       stage,
-      nailing: 'drift-pinned; chamfer both ends for dragging (PH)',
+      nailing: NAILING.skidDriftPinned.value,
       doctrineRef: citeOf(LUMBER.skidNominal),
     });
   }

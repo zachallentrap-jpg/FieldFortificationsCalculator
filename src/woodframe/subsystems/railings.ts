@@ -11,7 +11,7 @@
 import type { Member } from '../types';
 import { DRESSED } from '../types';
 import { makeEmitter } from '../emit';
-import { RAIL, IN_PER_FT, citeOf } from '../doctrine';
+import { NAILING, RAIL, IN_PER_FT, citeOf } from '../doctrine';
 
 /**
  * Shorter than this and a rail run is a rounding artifact, not an edge — half an inch of deck
@@ -203,7 +203,7 @@ export function generateRailing(input: RailingInput): Member[] {
           position: [x + backAt(x, z)[0], deckY + (topH + proud) / 2, z + backAt(x, z)[1]],
           rotation: [0, 0, Math.PI / 2],
           stage,
-          nailing: 'bolted or 4-16d to the deck frame (PH)',
+          nailing: NAILING.railPostToFrame.value,
           doctrineRef: citeOf(RAIL.postSpacingMaxFt),
         });
       }
@@ -233,7 +233,7 @@ export function generateRailing(input: RailingInput): Member[] {
         position: [mx, deckY + h, mz],
         rotation: [0, yaw, 0],
         stage,
-        nailing: '2-16d ea post (PH)',
+        nailing: NAILING.railMemberToPost.value,
         doctrineRef: cite,
       });
       run(topH, 'railTop', citeOf(RAIL.topHeightIn));

@@ -243,7 +243,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
 
         stage: sLayout,
         actual: { w: TOWER.padDepthIn.value as number, d: TOWER.padSideIn.value as number },
-        nailing: 'poured on undisturbed soil (PH)',
+        nailing: NAILING.footing.value,
         doctrineRef: 'TM 5-302 tower footing (PH)',
       });
     }
@@ -257,7 +257,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
         position: [x, legBaseY / 2, z],
         rotation: [-Math.PI / 2, 0, 0],
         stage: sLayout,
-        nailing: 'bedded on tamped fill; leg drift-pinned (PH)',
+        nailing: NAILING.towerMudsill.value,
         doctrineRef: citeOf(TOWER.mudsillNominal),
       });
     }
@@ -312,7 +312,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
       position: [(x0 + x1) / 2, (legBaseY + legTopY) / 2, (z0 + z1) / 2],
       rotation: [rx, 0, rz],
       stage: sLegs,
-      nailing: 'drift-pinned at the sill; bolted at every girt (PH)',
+      nailing: NAILING.towerLeg.value,
       doctrineRef: citeOf(TOWER.legNominal),
     });
   }
@@ -367,7 +367,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
           ],
           rotation: [0, yaw, 0],
           stage: sBrace,
-          nailing: 'bolted to each leg (PH)',
+          nailing: NAILING.towerGirt.value,
           doctrineRef: citeOf(TOWER.girtNominal),
         });
       }
@@ -413,7 +413,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
           position: [(p[0] + q[0]) / 2 + n[0] * off, (yBot + yTop) / 2 + n[1] * off, (p[1] + q[1]) / 2 + n[2] * off],
           rotation: [Math.asin(-n[1]), Math.atan2(n[0], n[2]), Math.atan2(t[1], b3[1])],
           stage: sBrace,
-          nailing: 'bolted at both ends and where the diagonals cross (PH)',
+          nailing: NAILING.towerBrace.value,
           doctrineRef: citeOf(TOWER.braceNominal),
         });
       }
@@ -441,7 +441,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
       position: [cx, joistY, z],
       rotation: [0, 0, 0],
       stage: sPlatform,
-      nailing: '3-16d toenail ea bearing (PH)',
+      nailing: NAILING.joistToBearing.value,
       doctrineRef: citeOf(TOWER.platformJoistNominal),
     });
   }
@@ -463,7 +463,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
         rotation: [-Math.PI / 2, 0, 0],
         stage: sPlatform,
         actual: { w: deckThick, d: cd * IN_PER_FT },
-        nailing: '8d @ 6" edges / 12" field (PH)',
+        nailing: NAILING.panelEdgeField.value,
         doctrineRef: 'TM 5-302 tower platform decking (PH)',
       });
     }
@@ -587,7 +587,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
           rotation: [-Math.PI / 2, 0, 0],
           stage: sAccess,
           actual: { w: DRESSED[plankNominal]!.w, d: cut * IN_PER_FT },
-          nailing: '2-16d ea bearer (PH)',
+          nailing: NAILING.landingPlankToBearer.value,
           doctrineRef: citeOf(STAIR.treadNominal),
         });
       }
@@ -650,7 +650,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
     [cx - deckHalf, cx - deckHalf], [cx + deckHalf, cx - deckHalf],
     [cx + deckHalf, cx + deckHalf], [cx - deckHalf, cx + deckHalf],
   ];
-  const cabPostHalfFt = DRESSED['4x4']!.w / 2 / IN_PER_FT;
+  const cabPostHalfFt = DRESSED[CAB_POST_NOMINAL]!.w / 2 / IN_PER_FT;
   const cabPanel = (f: number, thickFt: number): {
     cutLengthFt: number; x: number; z: number; yaw: number;
     /** The u = 0 end of the emitted piece, and the unit direction it runs — for `topAt`. */
@@ -695,7 +695,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
         rotation: [0, w.yaw, 0],
         stage: sCab,
         actual: { w: PANEL.sidingThickIn.value as number, d: halfW * IN_PER_FT },
-        nailing: '8d @ 6" edges / 12" field (PH)',
+        nailing: NAILING.panelEdgeField.value,
         doctrineRef: citeOf(TOWER.cabHalfWallFt),
       });
       if (spec.cab.walls === 'half-wall-screen') {
@@ -706,7 +706,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
           rotation: [0, s.yaw, 0],
           stage: sCab,
           actual: { w: HUT.screenClothThickIn.value as number, d: screenH * IN_PER_FT },
-          nailing: 'staples @ 4" + batten (PH)',
+          nailing: NAILING.screenPanel.value,
           doctrineRef: citeOf(TOWER.cabWallHeightFt),
         });
       }
@@ -724,7 +724,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
       position: [x, (cabBaseY + postTopY) / 2, z],
       rotation: [0, 0, Math.PI / 2],
       stage: sCab,
-      nailing: 'bolted to the platform frame (PH)',
+      nailing: NAILING.cabPostAtPlatform.value,
       doctrineRef: citeOf(TOWER.cabWallHeightFt),
     });
   }
@@ -738,6 +738,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
   // roofing the operator selected reaches the cab at all. The hand-rolled version emitted four
   // full-width rectangles and no roofing whatsoever.
   const overhang = TOWER.cabOverhangFt.value as number;
+  const cabRafterNominal = LUMBER.rafterNominal.value as string;
   const rise = ((TOWER.cabRisePer12.value as number) / IN_PER_FT) * (spec.cabPlanFt / 2 + overhang);
   const eaveY = postTopY;
   let roofPlanes: RoofPlane[];
@@ -749,12 +750,12 @@ export function generateTower(spec: TowerSpec): TowerResult {
     ];
     for (const [x, z] of eaveCorners) {
       const run = Math.hypot(peak[0] - x, peak[2] - z);
-      emit('hipRafter', '2x6', {
+      emit('hipRafter', cabRafterNominal, {
         cutLengthFt: Math.hypot(run, rise),
         position: [(x + peak[0]) / 2, (eaveY + peak[1]) / 2, (z + peak[2]) / 2],
         rotation: [0, Math.atan2(-(peak[2] - z), peak[0] - x), Math.atan2(rise, Math.max(1e-6, run))],
         stage: sRoof,
-        nailing: '3-16d at the peak, toenail 3-8d at the plate (PH)',
+        nailing: NAILING.cabHipRafter.value,
         doctrineRef: citeOf(TOWER.cabRisePer12),
       });
     }
@@ -820,17 +821,17 @@ export function generateTower(spec: TowerSpec): TowerResult {
     const plateT = DRESSED[plateNom]!.w / IN_PER_FT; // its thickness, laid flat
     const slopeR = fall / (half * 2);
     const plateTopY = highY + (plateD / 2) * slopeR
-      - rafterSeatLiftFt(DRESSED['2x6']!.d, 0, slopeR);
+      - rafterSeatLiftFt(DRESSED[cabRafterNominal]!.d, 0, slopeR);
     const cabPostD = DRESSED[CAB_POST_NOMINAL]!.d / IN_PER_FT;
     for (const x of [cx - deckHalf, cx + deckHalf]) {
-      emit('post', '4x4', {
+      emit('post', CAB_POST_NOMINAL, {
         // Up to the UNDERSIDE of the plate, not to the top of the wall: a plate sits ON its
         // posts, and running them both to the same height buries it in them.
         cutLengthFt: plateTopY - plateT - eaveY,
         position: [x, (eaveY + plateTopY - plateT) / 2, cx + deckHalf],
         rotation: [0, 0, Math.PI / 2],
         stage: sRoof,
-        nailing: 'bolted to the cab post below (PH)',
+        nailing: NAILING.cabShedPost.value,
         doctrineRef: citeOf(TOWER.cabRisePer12),
       });
     }
@@ -839,7 +840,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
       position: [cx, plateTopY - plateT / 2, cx + deckHalf],
       rotation: [-Math.PI / 2, 0, 0],
       stage: sRoof,
-      nailing: '2-16d ea post; rafters bird’s-mouth toenail 3-8d (PH)',
+      nailing: NAILING.cabShedPlate.value,
       doctrineRef: citeOf(TOWER.cabRisePer12),
     });
     // Rafters span the slope, so they are spaced ACROSS it — along X — and run toward +Z going
@@ -852,7 +853,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
     const rafterOc = spec.spacing.rafterSpacingIn / IN_PER_FT;
     const bays = Math.max(1, Math.ceil((deckHalf * 2) / rafterOc));
     for (let i = 0; i <= bays; i++) {
-      emit('rafter', '2x6', {
+      emit('rafter', cabRafterNominal, {
         cutLengthFt: slopeLen,
         position: [cx - deckHalf + (deckHalf * 2 * i) / bays, eaveY + rise, cx],
         rotation: [0, -Math.PI / 2, Math.atan2(fall, half * 2)],
@@ -888,7 +889,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
     // the burial this pass has just taken out of the high plate.
     if (spec.cab.walls === 'half-wall-screen') {
       const screenT = (HUT.screenClothThickIn.value as number) / IN_PER_FT;
-      const seatDrop = DRESSED['2x6']!.d / IN_PER_FT / 2 / cs; // plumb half-depth of a rafter
+      const seatDrop = DRESSED[cabRafterNominal]!.d / IN_PER_FT / 2 / cs; // plumb half-depth of a rafter
       const wallTop = cabBaseY + (TOWER.cabWallHeightFt.value as number);
       for (let f = 0; f < 4; f++) {
         const w = cabPanel(f, screenT);
@@ -915,7 +916,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
             rotation: [0, w.yaw, 0],
             stage: sRoof,
             actual: { w: HUT.screenClothThickIn.value as number, d: h * IN_PER_FT },
-            nailing: 'staples @ 4" + batten (PH)',
+            nailing: NAILING.screenPanel.value,
             doctrineRef: `${citeOf(TOWER.cabWallHeightFt)} — cut to the shed roof above the cab wall`,
           });
         }
@@ -929,7 +930,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
     roofing: spec.coverings.roofing,
     stageDeck: sRoofing,
     stageRoofing: sRoofing,
-    rafterHalfFt: DRESSED['2x6']!.d / IN_PER_FT / 2,
+    rafterHalfFt: DRESSED[cabRafterNominal]!.d / IN_PER_FT / 2,
   }));
 
   return {
