@@ -213,7 +213,10 @@ export const PLATFORM = {
 } as const;
 
 export const RAMP = {
-  slopes: doc([4, 6, 8] as const, 'EM 385-1-1 / TM 5-302 ramp slopes (1:N)', { lifeSafety: true }),
+  // Typed `readonly number[]`, not the literal tuple the initializer spells: leaves are runtime-
+  // mutable through the validated offline import (io.ts), so a leaf's TYPE is the shape a value
+  // must keep — never a promise about which numbers are currently in it.
+  slopes: doc<readonly number[]>([4, 6, 8], 'EM 385-1-1 / TM 5-302 ramp slopes (1:N)', { lifeSafety: true }),
   stringerNominal: doc('2x12', 'TM 5-302 ramp stringers', { lifeSafety: true }),
 } as const;
 
@@ -321,8 +324,8 @@ export const TOWER = {
   // not be able to imply, and the boundary gate rejects it on sight. The concept here is simply
   // how far a ladder's foot stands out from what it is climbing.
   ladderClearanceFt: doc(0.6, 'EM 385-1-1 ladder clearance from the structure it climbs', { unit: 'ft', lifeSafety: true }),
-  /** The four platform heights this family's drawing covers. */
-  platformHeightsFt: doc([10, 16, 24, 32] as const, 'TM 5-302 guard tower heights (PH)', { unit: 'ft' }),
+  /** The four platform heights this family's drawing covers. Shape-typed — see RAMP.slopes. */
+  platformHeightsFt: doc<readonly number[]>([10, 16, 24, 32], 'TM 5-302 guard tower heights (PH)', { unit: 'ft' }),
   cabWallHeightFt: doc(7, 'TM 5-302 tower cab (PH)', { unit: 'ft' }),
   cabHalfWallFt: doc(3.5, 'TM 5-302 tower cab half-wall (PH)', { unit: 'ft' }),
   cabRisePer12: doc(4, 'TM 5-302 tower cab roof (PH)', { unit: 'in/ft' }),
@@ -785,4 +788,93 @@ export function citeOf(d: Doc<unknown>): string {
   const ph = d.ph ? ' (PH)' : '';
   const ls = d.lifeSafety && d.ph ? ' — LIFE-SAFETY, review required' : d.lifeSafety ? ' — LIFE-SAFETY' : '';
   return `${d.cite}${ph}${ls}`;
+}
+
+// ── The mutable-leaf register (the plug-and-play rule database's spine) ──────
+//
+// GROUPS is walked once at module load into a dotted-path index, and then the STRUCTURE is
+// frozen while the LEAVES stay writable — SAP-1's D8 discipline, ported. The split carries the
+// safety argument: the rule SET is the reviewed artifact, so no code path may add or remove a
+// rule at runtime (a rule that appears un-reviewed has no citation anyone vetted, and a rule
+// that vanishes takes its check with it), while a rule's VALUE is exactly what a user with the
+// cited pub in hand must be able to correct offline. Every consumer reads `.value` at use time,
+// so a validated import lands in the very next generate with no re-wiring.
+//
+// MUTATION GOES THROUGH io.ts AND NOWHERE ELSE. `getByPath` hands back the live leaf because
+// the io module needs the live leaf to write; that is a capability, not an invitation — a write
+// outside io.ts skips the validation (bounds, table invariants, life-safety immutability) that
+// makes a mutable safety table defensible at all.
+
+/** A doctrine leaf: the object that carries a value with its citation and (PH) status. */
+export function isDoc(v: unknown): v is Doc<unknown> {
+  return typeof v === 'object' && v !== null && 'value' in v && 'cite' in v && 'ph' in v;
+}
+
+const INDEX = new Map<string, Doc<unknown>>();
+
+/** The three importable fields as shipped — captured at first registration, before anything can have written a leaf. */
+interface ShippedLeaf {
+  value: unknown;
+  cite: string;
+  ph: boolean;
+}
+const SHIPPED = new Map<string, ShippedLeaf>();
+
+/** Leaf values are JSON-shaped by construction (numbers, strings, plain objects, arrays). */
+const cloneValue = <T>(v: T): T => (typeof v === 'object' && v !== null ? (JSON.parse(JSON.stringify(v)) as T) : v);
+
+// Walk the way SAP-1's registerTree walks: descend containers, stop at leaf objects that carry
+// value/cite — a leaf whose value is structured (a span table, a hut's dims) is ONE rule with
+// one citation, so it registers as one unit and the walk never descends into it.
+function indexTree(prefix: string, node: unknown): void {
+  if (isDoc(node)) {
+    INDEX.set(prefix, node);
+    SHIPPED.set(prefix, { value: cloneValue(node.value), cite: node.cite, ph: node.ph });
+    return;
+  }
+  if (Array.isArray(node)) {
+    node.forEach((v, i) => indexTree(`${prefix}[${i}]`, v));
+    return;
+  }
+  if (typeof node === 'object' && node !== null) {
+    for (const k of Object.keys(node)) {
+      indexTree(prefix === '' ? k : `${prefix}.${k}`, (node as Record<string, unknown>)[k]);
+    }
+  }
+}
+indexTree('', GROUPS);
+
+// Freeze containers, stop at leaves: keys can neither come nor go, values still can (io.ts only).
+function freezeStructure(node: unknown): void {
+  if (isDoc(node)) return; // the leaf stays writable — that is the whole point
+  if (Array.isArray(node)) {
+    for (const v of node) freezeStructure(v);
+    Object.freeze(node);
+    return;
+  }
+  if (typeof node === 'object' && node !== null) {
+    for (const v of Object.values(node)) freezeStructure(v);
+    Object.freeze(node);
+  }
+}
+freezeStructure(GROUPS);
+
+/** The live leaf at a dotted path ('SPAN.joist'), or undefined. Writing it is io.ts's job alone. */
+export function getByPath(path: string): Doc<unknown> | undefined {
+  return INDEX.get(path);
+}
+
+/** Every registered dotted path, sorted — the corpus the export must cover 100% of. */
+export function doctrinePaths(): string[] {
+  return [...INDEX.keys()].sort();
+}
+
+/**
+ * A fresh clone of a leaf's shipped {value, cite, ph} — the reset baseline io.ts restores so a
+ * test's import can never leak into the next test's doctrine. A clone each call, so nothing a
+ * caller does to the returned object can corrupt the baseline itself.
+ */
+export function shippedLeaf(path: string): ShippedLeaf | undefined {
+  const s = SHIPPED.get(path);
+  return s ? { value: cloneValue(s.value), cite: s.cite, ph: s.ph } : undefined;
 }
