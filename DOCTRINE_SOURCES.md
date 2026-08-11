@@ -15,9 +15,10 @@
 > S-6 / information-management shop before fielding. A qualified user fills real,
 > verified values **offline** via doctrine import
 > (`src/doctrine/io.ts` — `exportDoctrine()` / `importDoctrine()`), which flips a
-> leaf's `status` to `DOCTRINE` in place. The data-driven **NOT FOR FIELD USE**
-> banner clears only when **zero** placeholders remain (safety-critical leaves
-> tracked separately by the registry).
+> leaf's `status` to `DOCTRINE` in place. The app reports how many values are still
+> unfilled — under **Menu → Status** and in the per-table burn-down on **Menu →
+> Doctrine values** — and that count reaches zero only when every row below has
+> been filled. Safety-critical leaves are counted separately by the registry.
 
 ## How to read this checklist
 
@@ -35,11 +36,24 @@
 - **Verified by** — blank until a qualified user records who verified it against
   the current publication.
 
-**Safety-critical rows are flagged `[SC]`.** These are the leaves tagged
-`safetyCritical: true` in source (shielding thickness per threat, radiation
-halving thickness, standoff/setback, parapet/retaining thickness, stringer span
-limits). The registry tracks `safetyCriticalRemaining` separately — treat every
-`[SC]` row as must-verify before any use.
+### Safety-critical rows `[SC]`
+
+Rows flagged `[SC]` are the leaves tagged `safetyCritical: true` in source — the
+numbers that stop rounds, hold up roofs, and keep people out of a backblast. The
+registry tracks `safetyCriticalRemaining` separately; treat every `[SC]` row as
+must-verify before any use. They are:
+
+- `protection.shielding` — the thickness of each shield material that stops each threat.
+- `protection.threats` — every munition's minimum standoff, which drives the roof setback.
+- `protection.radiationHalving` — the thickness of each material that halves a fallout dose.
+- `protection.spanSizes` — the stringer span limits the roof member is sized from.
+- `protection.retainingWall` — the retaining-wall thickness and the height that demands one.
+- `protection.overhead.setbackMin` and `protection.overhead.setbackDepthFrac` — the roof
+  standoff used when no threat is named, and the share of the cut depth the setback is
+  taken from.
+- `protection.parapet.W` — the frontal cover of an earth parapet.
+- `protection.berm.W` — the frontal cover of a vehicle spoil berm.
+- `weapons.backblast.clearanceFt` — the rear danger area an ATGM crew keeps clear.
 
 ### Source-lineage note (guidance only — asserts no value)
 
@@ -219,13 +233,13 @@ authoritative — confirm against the current survivability ATP before any use.
 | `positions.mg_crew.hole.D` — depth | 4.0 ft (illustrative) | ATP 3-37.34 crew-served position geometry — confirm | No | |
 | `positions.mg_crew.firingPlatform.L` — platform length | 3.0 ft (illustrative) | ATP 3-37.34 crew-served position geometry — confirm | No | |
 | `positions.mg_crew.firingPlatform.W` — platform width | 2.0 ft (illustrative) | ATP 3-37.34 crew-served position geometry — confirm | No | |
-| `positions.mg_crew.firingPlatform.depthBelowHole` — platform below bay | 1.5 ft (illustrative) | ATP 3-37.34 crew-served position geometry — confirm | No | |
+| `positions.mg_crew.firingPlatform.riseAboveFloor` — bay floor below platform | 1.5 ft (illustrative) | ATP 3-37.34 crew-served position geometry — confirm | No | |
 | `positions.fifty_cal.hole.L` — frontage | 9.0 ft (illustrative) | ATP 3-37.34 crew-served position geometry — confirm | No | |
 | `positions.fifty_cal.hole.W` — width | 2.0 ft (illustrative) | ATP 3-37.34 crew-served position geometry — confirm | No | |
 | `positions.fifty_cal.hole.D` — depth | 4.0 ft (illustrative) | ATP 3-37.34 crew-served position geometry — confirm | No | |
 | `positions.fifty_cal.firingPlatform.L` — platform length | 4.0 ft (illustrative) | ATP 3-37.34 crew-served position geometry — confirm | No | |
-| `positions.fifty_cal.firingPlatform.W` — platform width | 3.0 ft (illustrative) | ATP 3-37.34 crew-served position geometry — confirm | No | |
-| `positions.fifty_cal.firingPlatform.depthBelowHole` — platform below bay | 1.0 ft (illustrative) | ATP 3-37.34 crew-served position geometry — confirm | No | |
+| `positions.fifty_cal.firingPlatform.W` — platform width | 2.0 ft (illustrative) | ATP 3-37.34 crew-served position geometry — confirm | No | |
+| `positions.fifty_cal.firingPlatform.riseAboveFloor` — bay floor below platform | 1.0 ft (illustrative) | ATP 3-37.34 crew-served position geometry — confirm | No | |
 | `positions.mortar_pit.hole.L` — pit diameter | 8.0 ft (illustrative) | ATP 3-37.34 mortar-position geometry — confirm | No | |
 | `positions.mortar_pit.hole.W` — pit diameter | 8.0 ft (illustrative) | ATP 3-37.34 mortar-position geometry — confirm | No | |
 | `positions.mortar_pit.hole.D` — pit depth | 4.5 ft (illustrative) | ATP 3-37.34 mortar-position geometry — confirm | No | |
@@ -346,13 +360,16 @@ weather — these are illustrative only.
    **verified** value from the **current** in-effect publication and sets that
    entry's `status` to `DOCTRINE`, recording the source and who verified it (fill
    the `Filled?` and `Verified by` columns here in the same pass).
-4. Reload the file with `importDoctrine()`. It validates strictly (rejects
-   prototype-pollution keys, rejects newer doctrine versions, rejects unknown
-   paths and type mismatches) and updates matching live leaves in place. The
-   registry's `counts()` recomputes.
-5. The **NOT FOR FIELD USE** banner clears **only** when zero placeholders
-   remain. `safetyCriticalRemaining` must reach zero before any safety-critical
-   output is trusted — the `[SC]` rows above are that set.
+4. Reload the file with `importDoctrine()`. It validates strictly — prototype-pollution
+   keys, newer doctrine versions, unknown paths, type mismatches, magnitudes outside
+   `0 ≤ v < 1000`, a `DOCTRINE` status still carrying a `TODO` source, a scrambled
+   stringer-span table and stage shares that miss 1.0 are all refused — and **any**
+   rejection refuses the whole file, leaving the live doctrine exactly as it was.
+   Nothing half-applies. Values that pass are written to the live leaves and the
+   registry's `counts()` recomputes at once.
+5. The remaining count falls only as rows are filled, and
+   `safetyCriticalRemaining` must reach zero before any safety-critical output is
+   trusted — the `[SC]` rows above are that set.
 
 **Do not** edit `status: 'DOCTRINE'` directly in source. The regime deliberately
 routes every fill through validated import so provenance is preserved, and the

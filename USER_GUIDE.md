@@ -4,7 +4,7 @@ SAP-1 turns a few dropdowns and toggles into dimensioned drawings, a real drag-t
 
 Every input carries a plain-language explanation, not just its name — the doctrinal term is always there too (in parentheses), but you never have to already know it to use the tool.
 
-The safety-critical values — shielding thickness, roof and stringer load and span, standoff, and parapet/retaining thickness — never get invented. For the heaviest threats they are not even estimated: the app hands the roof to an engineer instead (see "The engineered-roof case" below). Real values are filled in **offline** through a doctrine import file (export the current values, edit them against the current pub, import them back) — see **Doctrine values** in the menu.
+The safety-critical values — shielding thickness, munition standoff, radiation halving thickness, stringer span limits, retaining-wall thickness and height, roof setback, parapet and vehicle-berm frontal cover, and ATGM backblast clearance — never get invented. For the heaviest threats they are not even estimated: the app hands the roof to an engineer instead (see "The engineered-roof case" below). Real values are filled in **offline** through a doctrine import file (export the current values, edit them against the current pub, import them back) — see **Doctrine values** in the menu.
 
 ---
 
@@ -12,32 +12,37 @@ The safety-critical values — shielding thickness, roof and stringer load and s
 
 There are two ways to run SAP-1, both fully offline:
 
-- **Installed app (PWA).** Served over http(s) or localhost. It installs, caches itself, and runs offline after first load. Use this on a device you can serve the app to.
-- **Single file (`sap1.html`).** One self-contained file you open directly from disk (`file://`). This is the air-gap fallback — it needs no server. (Service workers don't run from `file://`, so the installed-app offline caching doesn't apply here; the single file simply *is* the whole app.)
+- **Installed app.** Served over http(s) or localhost, it installs as an app from its web manifest, and once it is open it makes no network calls at all. It does not keep a cached copy of itself, so it needs the server to be reachable when you open it. Use this on a device you can serve the app to.
+- **Single file (`sap1.html`).** One self-contained file you open directly from disk (`file://`). This is the air-gap fallback — it needs no server, ever: the single file simply *is* the whole app.
 
-Either way, no data leaves the device. The Diagnostics panel confirms it: **Network: offline by design.**
+Either way, no data leaves the device. The **Status** panel confirms it: **Network: offline by design.**
 
 ---
 
-## The three layouts and the Auto / override switch
+## Finding things: the menu and the bottom toolbar
 
-SAP-1 arranges itself for the screen you're on. There are three layouts, chosen automatically from width, pointer type, and orientation. A **Layout** dropdown at the right end of the top bar lets you force one.
+There are only two places to look for a control.
 
-**What you do:** nothing, normally — leave the layout picker on **Auto**. To lock a layout (e.g. force the desktop three-region view on a large tablet), pick **Mobile**, **Tablet**, or **Desktop** from that dropdown. A manual choice always wins over Auto until you set it back.
+- **Menu** — the hamburger button at the right of the top bar. Everything that isn't a constant action lives in it, in three groups: **Setups & planning** (Saved setups, Combine positions, Compare setups, Time planner, Build schedule, Doctrine values), **Save & print** (Print report, Download drawings, Export spreadsheet, Export settings file), and **App** (Help, Status). Click the menu again, click outside it, or press Esc to close it.
+- **Bottom toolbar** — fixed across the bottom of every screen, always one tap away: **Undo**, **Redo**, **Reset**, **Theme**, and on a phone **Edit** (which opens the inputs sheet).
 
-**What you see:**
+The inputs themselves are on the screen — in a sidebar, a column, or the phone's bottom sheet, depending on the layout.
 
-- **Desktop (3-region)** — inputs sidebar on the left, the three drawings (plan, section, 3D model) in the middle, and the specs / BOM / labor / checks rail on the right, all visible at once. Chosen automatically on a wide screen with a fine pointer (mouse). Undo/redo also respond to Ctrl+Z / Ctrl+Y (or Cmd) here.
+---
+
+## The three layouts
+
+SAP-1 arranges itself for the screen you're on. There are three layouts, chosen automatically from width, pointer type, and orientation; rotate the device or resize the window and the layout re-resolves live. There is no layout switch to set.
+
+- **Desktop (3-region)** — inputs sidebar on the left, the three drawings (plan, section, 3D model) in the middle, and the specs / BOM / labor / checks rail on the right, all visible at once. Chosen automatically on a wide screen with a fine pointer (mouse).
 - **Tablet (split)** — a controls column beside the canvas; plan and section sit side by side, the 3D model below them (large — this is the best view of it), and the panels below that. This is the likely primary field device; targets are glove-friendly. Chosen automatically on a mid-width touch screen.
-- **Mobile (bottom-sheet)** — a single scrolling column with a sticky summary bar across the top (Sandbags, Spoil, Man-hrs, Elapsed), the drawings stacked full-width, and the panels as cards. The inputs live in a bottom-sheet you open with the **Edit inputs** button at the bottom of the screen; tap it to slide the controls up, tap it again (or press Esc) to close. Chosen automatically on a narrow touch screen.
-
-If you rotate the device or resize the window while on Auto, the layout re-resolves live.
+- **Mobile (bottom-sheet)** — a single scrolling column with a sticky summary bar across the top (Sandbags, Spoil, Man-hrs, Elapsed), the drawings stacked full-width, and the panels as cards. The inputs live in a bottom-sheet you open with the **Edit** button in the bottom toolbar; tap it to slide the controls up, tap it again (or press Esc, or drag the sheet down by its handle) to close. Chosen automatically on a narrow touch screen.
 
 ---
 
 ## Day / Night themes
 
-**What you do:** press the theme button in the top bar. It's labeled with the theme you'll switch *to* — it reads **Night** while you're in Day, and **Day** while you're in Night.
+**What you do:** press **Theme** in the bottom toolbar. Its icon is the theme you'll switch *to* — a moon while you're in Day, a sun while you're in Night.
 
 **What you see:** Day is the default light theme. Night is a red/amber light-discipline palette for use under blackout conditions. Your choice is remembered on the device. On first run the app follows your system's light/dark setting.
 
@@ -100,7 +105,9 @@ You get three views — **Plan**, **Section A–A**, and **Isometric** — that 
 
 Every labeled feature is a numbered disc on the drawing; the same numbers are spelled out in the **LEGEND** strip at the bottom of each view. The numbers are stable across all three views — a "4" is the fighting bay everywhere. The legend lists only the callouts that view actually drew. The full catalog:
 
-1. Existing grade · 2. Spoil / parapet fill · 3. Parapet (frontal cover) · 4. Fighting bay · 5. Overhead cover · 6. Grenade sump · 7. Stringers · 8. Firing step / platform · 9. Roof setback · 10. Engineered roof — see engineer · 11. Sectors of fire · 12. Enemy direction.
+1. Ground level (existing grade) · 2. Dug-out dirt (spoil) · 3. Dirt wall up front (parapet) · 4. Where you stand and fight (the bay) · 5. Roof overhead (overhead cover) · 6. Grenade catch-pit (sump) · 7. Roof support beams (stringers) · 8. Step up to shoot (firing step) · 9. Safety gap under the roof (setback) · 10. Needs an engineer's design (no roof shown) · 11. Sectors of fire · 12. Enemy direction · 13. Dozed dirt mound up front (berm) · 14. Vehicle access ramp · 15. Elbow rest (aiming support) · 16. Backblast danger area — keep clear · 17. Ground left undug to stand/mount on (firing platform).
+
+Note that 8 and 17 are different things: the firing step is cut into the wall of the hole, while the firing platform is ground nobody dug — the stand the crew bays are cut down around.
 
 ### Plan view — ENEMY arrow, sectors, FRONT/REAR, the A–A cut
 
@@ -131,7 +138,7 @@ Where the plan and section are precise measured drawings, the third view is a re
 
 It carries **no dimensions** on purpose — the plan and section still govern measurement. If your device has no WebGL (rare), SAP-1 automatically falls back to a flat 2.5D schematic instead — nothing breaks, it just draws differently.
 
-**The materials you see are the materials in the bill of materials — nothing is decoration.** The parapet and any earthen roof are always shown as stacked sandbags, because that's what they actually are per doctrine. The dug-out walls show whatever you picked for Revetment: sandbag facing tiles the same way as the parapet, Pickets & wire shows visibly open posts and wire (not a solid wall), and Corrugated metal / Timber & plywood each get their own distinct texture. Pick **Revetment: None** and the wall goes back to bare, sloped earth — how steep the slope looks depends on the Soil you picked (sand and gravel slope hard and require a revetment; clay and rock barely slope at all).
+**The materials you see are the materials in the bill of materials — nothing is decoration.** Overhead cover is shown as stacked sandbags. The front protection depends on the position: a bunker / OP-CP is built as sandbag walls around the hole, a rifle or crew position gets a mounded earth parapet with a low sandbag firing rest at the aperture (the only concentrated sandbags on it), and a vehicle position's berm is dozed spoil. The dug-out walls show whatever you picked for Revetment: sandbag facing tiles the same way as a sandbag wall, Pickets & wire shows visibly open posts and wire (not a solid wall), and Corrugated metal / Timber & plywood each get their own distinct texture. Pick **Revetment: None** and the wall goes back to bare, sloped earth — how far the cut flares out depends on the Soil you picked: sand and gravel flare the widest and force a revetment on their own, rock and frozen ground stand vertical, and the loams, silt and clay sit between.
 
 Configure nothing and each view shows a prompt ("Configure a position to see the plan view.") rather than a blank box.
 
@@ -151,7 +158,7 @@ Close the panel by clicking outside it or pressing Esc.
 
 ## Scenarios — save, load, import, export
 
-Scenarios let you keep named configurations and move them between devices. Open the panel with **Scenarios** in the top bar.
+Scenarios let you keep named configurations and move them between devices. Open the panel with **Saved setups** in the menu.
 
 **What you do / what you see:**
 
@@ -166,7 +173,7 @@ Scenarios live **on this device only** (in the browser's IndexedDB), as the pane
 
 ## Mission BOM — roll up many positions, subtract on-hand, see the shortfall
 
-Mission BOM combines several positions into one materials list and tells you what you're short. Open it with **Mission** in the top bar.
+Mission BOM combines several positions into one materials list and tells you what you're short. Open it with **Combine positions** in the menu (the panel is headed "Group job list").
 
 **What you do:**
 
@@ -180,11 +187,12 @@ Mission BOM combines several positions into one materials list and tells you wha
 
 ## Compare — 2 to 3 configurations side by side
 
-Compare puts configurations next to each other so you can weigh protection against cost. Open it with **Compare** in the top bar.
+Compare puts configurations next to each other so you can weigh protection against cost. Open it with **Compare setups** in the menu.
 
 **What you do:**
 
 - **Add current** — adds the current configuration as a column (up to three). The button disables at three.
+- **Hasty vs deliberate vs reinforced** — replaces the comparison with the current position at each of the three standards, in one press.
 - **✕** on a column header removes that column; **Clear** empties the comparison.
 
 **What you see:** a table with one column per config and rows for Position, Standard, Threat, Depth, Overhead cover (a thickness, "engineered," or "none"), Setback, total Sandbags, total Man-hours, and Elapsed. It's the quick way to see what a heavier standard or a bigger threat actually costs you in dig and materials.
@@ -193,7 +201,7 @@ Compare puts configurations next to each other so you can weigh protection again
 
 ## Time-available planning — hours + team → the standard you can actually build
 
-This is the inverse question: given the time and crew you have, what's the most protection you can build for the current position and threat? Open it with **Plan** in the top bar.
+This is the inverse question: given the time and crew you have, what's the most protection you can build for the current position and threat? Open it with **Time planner** in the menu.
 
 **What you do:** enter **Hours available** and **Team size**, then press **Find achievable standard**.
 
@@ -201,13 +209,24 @@ This is the inverse question: given the time and crew you have, what's the most 
 
 ---
 
-## Exports — job sheet, CSV, JSON
+## Build schedule — priorities of work, and are we ready by stand-to?
 
-All three exports are produced locally; you click to download or print. Nothing is uploaded.
+Open it with **Build schedule** in the menu (the panel is headed "Priorities of work").
 
-- **Print** — opens a printable **job sheet** for the current position (the dimensioned drawings, specs, BOM, and labor in a print-friendly page) and sends it to your printer / PDF.
-- **CSV** — downloads the bill of materials as **`sap1-bom.csv`** (RFC-4180 CSV, safe to open in a spreadsheet).
-- **JSON** — downloads the current inputs as **`sap1-scenario.json`** — the portable configuration you can re-import later or on another device.
+**What you do:** enter **Team size**, **Hours to stand-to**, and **% on the tools** — how much of the team is digging while the rest pull security — then press **Build the timeline**.
+
+**What you see:** the stages in doctrinal order, each with its man-hours and the hour it is done by, and above them a plain verdict: ready with time to spare, or short by so many hours (cut the standard, add hands, or accept a hasty position). The per-stage man-hours partition the position's total exactly, and the job sheet prints the same stages in the same order as its priorities-of-work table.
+
+---
+
+## Exports — job sheet, drawings, CSV, JSON
+
+Every export is produced locally, from the **Save & print** group of the menu; you click to download or print. Nothing is uploaded.
+
+- **Print report** — opens a printable **job sheet** for the current position (the dimensioned drawings, specs, BOM, labor, and the priorities-of-work table in a print-friendly page) and sends it to your printer / PDF. If your browser blocks the pop-up, you get the same sheet as a **`sap1-job-sheet.html`** file instead, so you still walk away with the document.
+- **Download drawings** — the plan and the section as **`sap1-plan.svg`** and **`sap1-section.svg`**.
+- **Export spreadsheet** — the bill of materials as **`sap1-bom.csv`** (RFC-4180 CSV, safe to open in a spreadsheet).
+- **Export settings file** — the current inputs as **`sap1-scenario.json`** — the portable configuration you can re-import later or on another device.
 
 Exports carry the app / schema / doctrine version stamps.
 
@@ -215,20 +234,22 @@ Exports carry the app / schema / doctrine version stamps.
 
 ## Undo / redo / reset
 
-**What you do:** **Undo** and **Redo** in the top bar step through your input changes; **Reset** returns every input to the starting defaults. On desktop, Ctrl+Z / Ctrl+Y (or Cmd+Z / Cmd+Shift+Z) do undo/redo too.
+**What you do:** **Undo** and **Redo** in the bottom toolbar step through your input changes; **Reset** returns every input to the starting defaults. With a keyboard, Ctrl+Z / Ctrl+Y (or Cmd+Z / Cmd+Shift+Z) do undo/redo too. Undo and Redo grey out when there is nothing to step to.
 
-**What you see:** the inputs, drawings, and panels jump to the prior/next state. Undo/redo cover *input* changes; switching layout, theme, or opening a tool panel doesn't disturb your inputs or your history.
+**What you see:** the inputs, drawings, and panels jump to the prior/next state. Undo/redo cover *input* changes; switching theme or opening a panel from the menu doesn't disturb your inputs or your history.
 
 ---
 
-## Diagnostics + Help
+## Status + Help
 
-**Diagnostics** (the **Diag** button) opens an offline snapshot for troubleshooting or a bug report: the app / schema / doctrine versions, the placeholder counts (how many remain, and how many of those are safety-critical), the last error if any, and a flat statement that the app is **offline by design** — it makes no network calls, ever. If a view ever fails to draw, it degrades to an error card instead of crashing, and that error shows up here.
+**Status** (in the **App** group of the menu) opens an offline snapshot for troubleshooting or a bug report: the app / schema / doctrine versions, the practice-value counts (how many still need a real number, and how many of those are safety-critical), which doctrine fill is applied if any, the last error if any, and a flat statement that the app is **offline by design** — it makes no network calls, ever. If a view ever fails to draw, it degrades to an error card instead of crashing, and that error shows up here.
 
-**Help** (the **Help** button) opens a plain-language explainer of every input — Type, Standard, Soil, Threat, Revetment, the feature toggles, Positions / Team size, Units, and the tap-a-number trace — all offline.
+**Help** (also in the **App** group) opens a plain-language explainer of every input — Type, Standard, Soil, Threat, Revetment, the feature toggles, Positions / Team size, Units, and the tap-a-number trace — all offline.
+
+**Doctrine values** (in **Setups & planning**) is where a qualified user replaces the practice numbers with real ones, offline, against current pubs — export the file, fill it off-device, import it back, or edit inline and apply. An import is checked and applied all-or-nothing: one bad value refuses the whole file rather than leaving half a table filled. See [`PLACEHOLDER_POLICY.md`](PLACEHOLDER_POLICY.md) for the full procedure.
 
 ---
 
 ## The short version
 
-Pick a position, a standard, a soil, and a specific threat round. Read the drawings by their dimensions and legend, not their pixels. Tap any number to see how it was derived. Use Scenarios, Mission BOM, Compare, and Plan to work across many positions and constraints; export a job sheet, CSV, or JSON when you're done.
+Pick a position, a standard, a soil, and a specific threat round. Read the drawings by their dimensions and legend, not their pixels. Tap any number to see how it was derived. Use the menu — Saved setups, Combine positions, Compare setups, Time planner, Build schedule — to work across many positions and constraints; print the report or export the drawings, spreadsheet, or settings file when you're done.

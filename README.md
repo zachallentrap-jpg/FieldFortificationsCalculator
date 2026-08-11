@@ -9,9 +9,10 @@
 > **Why it was retired — the seed hazard, named plainly:** SAP-1 ships **295
 > plausible-looking illustrative placeholder values** (dimensions, shielding
 > thicknesses, standoffs, labor rates) adjacent to real publication citations. Every
-> one is flagged `PLACEHOLDER` and a NOT-FOR-FIELD-USE banner covers the app, but the
-> values *look* real, and a screenshot, a crop, or a stripped export can outlive the
-> banner. SAP-2 removes the hazard class entirely: it **ships empty** — no doctrinal
+> one is flagged `PLACEHOLDER`, and the app reports how many remain, but the flag lives
+> in a panel while the values *look* real on the drawing — and a screenshot, a crop, or a
+> stripped export carries the number without the count. SAP-2 removes the hazard class
+> entirely: it **ships empty** — no doctrinal
 > magnitude exists anywhere in its source or artifacts; values exist only in
 > owner-entered, cited, verified, commissioned fill files, and every output is
 > stamped with its data's provenance state.
@@ -37,7 +38,7 @@ Real values are filled in **offline** via doctrine import (`src/doctrine/io.ts`)
 
 ## The philosophy: deterministic / offline / private
 
-- **Deterministic.** The engine is pure. The same inputs always produce byte-identical drawings, BOM, labor, and job sheet — no randomness, no clock, no network. What you see is a repeatable function of what you entered, and every figure can show its own derivation (formula + operands, with placeholders flagged).
+- **Deterministic.** The engine is pure. The same inputs always produce byte-identical drawings, BOM, labor, and job sheet — no randomness, no clock, no network. What you see is a repeatable function of what you entered, and every figure can show its own derivation (formula + operands).
 - **Offline.** No runtime network requests, ever. The doctrine, engine, and state layers carry **zero runtime dependencies** (Vite and tsx are dev-only). A build gate (`scripts/check-offline.ts`) fails the build on any external URL in `dist/`, so the shipped artifact makes no outbound calls. The only allowlisted URLs are W3C SVG/XML namespace identifiers, which are never dereferenced over the network.
 - **Private.** No accounts, no analytics, no off-device logging. Your scenarios live in the browser (IndexedDB) and in files you explicitly export. Nothing leaves the machine unless you save it there yourself.
 
@@ -53,7 +54,7 @@ Threat is a **specific caliber, not a coarse bucket** — class → round: small
 
 ## Placeholder regime
 
-Every doctrinal constant is wrapped in `Provenance<T> = { value, unit?, status, source, safetyCritical?, note? }`. The helper `P(value, opts)` defaults `status` to `"PLACEHOLDER"` and `source` to `"TODO: confirm against current pub"`. A qualified user fills real values **offline** with `exportDoctrine` / `importDoctrine` (`src/doctrine/io.ts`): export serializes every provenance leaf, you edit it off-device, and import validates strictly (rejects prototype-pollution keys and file versions newer than the app), then flips matching leaves to `status: "DOCTRINE"` in place. The banner recomputes from those statuses. The test suite enforces the doctrine-integrity side of the regime today; the end-to-end banner-clear test lands with the doctrine-import UI (Phase 2 of `docs/EXECUTION_PLAN.md`).
+Every doctrinal constant is wrapped in `Provenance<T> = { value, unit?, status, source, safetyCritical?, note? }`. The helper `P(value, opts)` defaults `status` to `"PLACEHOLDER"` and `source` to `"TODO: confirm against current pub"`. A qualified user fills real values **offline** with `exportDoctrine` / `importDoctrine` (`src/doctrine/io.ts`): export serializes every provenance leaf, you edit it off-device, and import validates strictly — prototype-pollution keys, file versions newer than the app, unknown paths, type mismatches, out-of-range magnitudes and a `DOCTRINE` status still carrying a `TODO` source are all refused, and **any** rejection refuses the whole file so safety-critical data never lands half-applied. Values that pass are flipped to `status: "DOCTRINE"` in place, and the placeholder counts the app reports recompute from those statuses. Both halves are tested: `test/doctrine-integrity.test.ts` for the fresh-build regime, `test/doctrine-io.test.ts` for the end-to-end fill that drives the counts to zero through the doctrine-import UI (Phase 2 of `docs/EXECUTION_PLAN.md`, shipped).
 
 ## Run / develop
 
@@ -62,27 +63,27 @@ Requires **Node ≥ 20**.
 ```bash
 npm install
 npm run dev        # Vite dev server
-npm run verify     # typecheck + all tests + offline gate
+npm run verify     # typecheck + all tests + the offline and asset gates
 ```
 
-`npm run verify` runs `tsc --noEmit`, the full `node:test` suite, and the offline gate. The suites are green.
+`npm run verify` runs `tsc --noEmit`, the full `node:test` suite, `scripts/check-offline.ts`, and `scripts/check-assets.ts`.
 
 ## Build & deliver
 
 ```bash
-npm run build      # produces the installable PWA in dist/ AND dist/sap1.html, then runs the offline gate
+npm run build      # produces the installable build in dist/ AND dist/sap1.html, then runs the offline gate
 ```
 
 The build ships **two** ways to run SAP-1 offline; use whichever your environment allows.
 
-- **Installable PWA (`dist/`).** A static build with a web app manifest and a service worker. Served over **http(s) or localhost**, it installs as an app and runs fully offline after first load. This is the normal path — including the Replit static deployment (`.replit` sets `deploymentTarget = "static"`, `publicDir = "dist"`, and `build = npm ci && npm run build`).
-- **Single self-contained file (`dist/sap1.html`).** One HTML file with everything inlined — the **air-gap fallback**. It runs directly from `file://` with no server at all. Service workers do not run from `file://`, so this is the copy for a truly disconnected machine: put the one file on the box and open it in a browser.
+- **Installable app (`dist/`).** A static build with a web app manifest (`public/manifest.webmanifest`). Served over **http(s) or localhost**, it installs as an app, and once a page is open it makes no network requests of its own. This build ships **no service worker**, so it does not cache itself for a later cold start — a machine that will not have the server should take the single file below. This is the normal served path. On Replit, `.replit` sets `deploymentTarget = "autoscale"` and serves `dist/` through a zero-dependency Node static server (`scripts/serve.js`), because the app-publish flow wants a persistent run command; a leaner static deployment also works if you set `deploymentTarget = "static"` and `publicDir = "dist"` yourself.
+- **Single self-contained file (`dist/sap1.html`).** One HTML file with everything inlined — the **air-gap fallback**. It runs directly from `file://` with no server at all — the copy for a truly disconnected machine: put the one file on the box and open it in a browser.
 
 Both are produced by the same `npm run build`, and both pass the `check:offline` gate (no external URLs in `dist/`).
 
 ## More docs
 
-- [`PLACEHOLDER_POLICY.md`](PLACEHOLDER_POLICY.md) — the placeholder / provenance regime and how a doctrine fill clears it.
+- [`PLACEHOLDER_POLICY.md`](PLACEHOLDER_POLICY.md) — the placeholder / provenance regime, what the app discloses about it, and how a doctrine fill replaces it.
 - [`DOCTRINE_SOURCES.md`](DOCTRINE_SOURCES.md) — what a qualified user must confirm, and against which publications, before fielding.
 - [`USER_GUIDE.md`](USER_GUIDE.md) — how to use the planner: inputs, drawings, exports, scenarios, mission rollup, comparison, and time-available planning.
 - [`DECISIONS.md`](DECISIONS.md) — the design decisions behind the engine, the safety invariants, and the offline / private posture.
