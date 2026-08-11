@@ -276,44 +276,53 @@ test('collar ties hold their cited interval at BOTH legal rafter spacings, and h
   }
 });
 
-test('the register cannot report the tie limit as checked while the card prints it as pending', () => {
-  // `ph` is a claim about SOURCING, and the only other place that claim is visible is the member
-  // card the crew reads. A crew told "(PH page)" and a register reporting a verified figure are
-  // two answers to one question, and the register is the one people quote. Same pairing the
-  // NAILING table is held to; the flag has to mean the same thing wherever it appears.
-  const pendingOnACard = ([16, 24] as const).some((rafterSpacingIn) => {
+/** The collar-tie card a crew reads, at each rafter spacing the generator can be laid out at. */
+function tieCards(): { spacing: 16 | 24; ref: string }[] {
+  return ([16, 24] as const).map((rafterSpacingIn) => {
     const spec = bldg({ kind: 'gable', risePer12: 4, overhangFt: 1 }, {
       dims: { lengthFt: 40, widthFt: 16 },
       spacing: { studSpacingIn: 16, joistSpacingIn: 16, rafterSpacingIn },
     });
-    return generateStructure(spec).members
-      .filter((m) => m.role === 'collarTie')
-      .some((m) => /\(PH\b/.test(m.doctrineRef));
+    const ties = generateStructure(spec).members.filter((m) => m.role === 'collarTie');
+    assert.ok(ties.length > 0, `${rafterSpacingIn} in o.c. emitted no collar ties`);
+    const refs = [...new Set(ties.map((m) => m.doctrineRef))];
+    assert.equal(refs.length, 1, `${rafterSpacingIn} in o.c.: ties on one roof print ${refs.length} different refs`);
+    return { spacing: rafterSpacingIn, ref: refs[0]! };
   });
-  if (!pendingOnACard) return; // every card claims the page was read — nothing to contradict
-  assert.equal(
-    LAYOUT.collarTieMaxSpacingFt.ph,
-    true,
-    'the collar-tie interval is reported as page-checked while a member card still prints it (PH)',
-  );
+}
+
+test('the register and the tie card agree, both ways, about whether the page has been read', () => {
+  // `ph` is a claim about SOURCING, and the only other place that claim is visible is the member
+  // card the crew reads. A crew told "(PH page)" and a register reporting a verified figure are
+  // two answers to one question, and the register is the one people quote. Asserted as an
+  // equality on EVERY card rather than as a one-way check on some card: a card that quietly drops
+  // the marker and a register that quietly claims the page fail this from opposite directions,
+  // and neither can leave it with nothing to say.
+  const cards = tieCards();
+  assert.equal(cards.length, 2, 'both layouts have to be on the stand');
+  for (const { spacing, ref } of cards) {
+    assert.equal(
+      /\bPH\b/.test(ref),
+      LAYOUT.collarTieMaxSpacingFt.ph,
+      `${spacing} in o.c.: the card reads "${ref}" and the register reports ph=${LAYOUT.collarTieMaxSpacingFt.ph}`,
+    );
+  }
 });
 
-test('the tie’s own card prints the doctrine limit, not a number of its own', () => {
+test('the tie’s own card prints the doctrine limit at every layout, not a number of its own', () => {
   // The generator keeps its literal (C-10: `roof.ts` is frozen, so the value is mirrored rather
   // than imported), which makes the printed ref the place the two can drift. A crew reading
-  // "stays within 4 ft" is reading a claim, and it has to be the claim the register holds.
-  const spec = bldg({ kind: 'gable', risePer12: 4, overhangFt: 1 }, {
-    dims: { lengthFt: 40, widthFt: 16 },
-    spacing: { studSpacingIn: 16, joistSpacingIn: 16, rafterSpacingIn: 24 },
-  });
-  const tie = generateStructure(spec).members.find((m) => m.role === 'collarTie')!;
-  const printed = /stays within ([\d.]+) ft/.exec(tie.doctrineRef);
-  assert.ok(printed, `the tie card no longer states the interval it is holding: ${tie.doctrineRef}`);
-  assert.equal(
-    Number(printed[1]),
-    LAYOUT.collarTieMaxSpacingFt.value,
-    `the card says ${printed[1]} ft and the register says ${LAYOUT.collarTieMaxSpacingFt.value} ft`,
-  );
+  // "stays within 4 ft" is reading a claim, and it has to be the claim the register holds — on
+  // the 16-in default as much as on the 24-in layout, since the default is most of the catalog.
+  for (const { spacing, ref } of tieCards()) {
+    const printed = /stays within ([\d.]+) ft/.exec(ref);
+    assert.ok(printed, `${spacing} in o.c.: the tie card no longer states the interval it is holding: ${ref}`);
+    assert.equal(
+      Number(printed[1]),
+      LAYOUT.collarTieMaxSpacingFt.value,
+      `${spacing} in o.c.: the card says ${printed[1]} ft and the register says ${LAYOUT.collarTieMaxSpacingFt.value} ft`,
+    );
+  }
 });
 
 test('closing the spacing up does not thin the ties out — the 16-in layout is unchanged', () => {
@@ -328,14 +337,14 @@ test('closing the spacing up does not thin the ties out — the 16-in layout is 
   );
 });
 
-test('a collar tie does not print a rule it is not following', () => {
-  // The member card is what a crew reads. At 24 in the ties are on every SECOND rafter, and the
-  // ref said "every 3rd rafter / ≤5 ft" while they stood 6 ft apart.
-  const spec = bldg({ kind: 'gable', risePer12: 4, overhangFt: 1 }, {
-    dims: { lengthFt: 40, widthFt: 16 },
-    spacing: { studSpacingIn: 16, joistSpacingIn: 16, rafterSpacingIn: 24 },
-  });
-  const tie = generateStructure(spec).members.find((m) => m.role === 'collarTie')!;
-  assert.doesNotMatch(tie.doctrineRef, /every 3rd rafter/, tie.doctrineRef);
-  assert.match(tie.doctrineRef, /2nd rafter/, tie.doctrineRef);
+test('a collar tie names the rafter interval it is actually on, at either layout', () => {
+  // The member card is what a crew reads, and the interval it names is a consequence of the
+  // spacing, not a constant. At 24 in the ties are on every SECOND rafter; the card said "every
+  // 3rd rafter / ≤5 ft" while they stood 6 ft apart.
+  const expected: Record<number, RegExp> = { 16: /every 3rd rafter/, 24: /every 2nd rafter/ };
+  const wrong: Record<number, RegExp> = { 16: /every 2nd rafter/, 24: /every 3rd rafter/ };
+  for (const { spacing, ref } of tieCards()) {
+    assert.match(ref, expected[spacing]!, `${spacing} in o.c.: ${ref}`);
+    assert.doesNotMatch(ref, wrong[spacing]!, `${spacing} in o.c.: ${ref}`);
+  }
 });

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { resolveCover } from '../src/engine/protection';
 import { compute } from '../src/engine/compute';
 import '../src/doctrine/index';
-import { coverMaterialDefault, spanSizes } from '../src/doctrine/protection';
+import { coverMaterialDefault, shielding, spanSizes } from '../src/doctrine/protection';
 import type { ShieldMaterial } from '../src/doctrine/protection';
 import { importDoctrine } from '../src/doctrine/io';
 import { getByPath } from '../src/doctrine/registry';
@@ -76,8 +76,8 @@ test('resolveCover: a span past the stringer table fails safe, whatever else is 
 
 test('resolveCover: a threat with no shielding data fails SAFE, not open', () => {
   // The cover material named for this threat is not one the shielding table covers, so there is
-  // no thickness to size a roof from. Reading that gap as zero drew a roof, billed the stringers,
-  // delivered no protection, and said nothing downstream.
+  // no thickness to size a roof from. Reading that gap as zero draws a roof, bills the stringers,
+  // delivers no protection, and says nothing downstream.
   const threat = 'ind-mtr-81';
   const original = coverMaterialDefault[threat]!;
   coverMaterialDefault[threat] = 'no_such_material' as ShieldMaterial;
@@ -142,13 +142,33 @@ test('compute: a cover multiplier FILLED to zero fails safe the same way', () =>
   });
 });
 
-test('resolveCover: no non-positive multiplier ever yields an earth roof', () => {
-  for (const mul of [0, -1]) {
+// resolveCover is EXPORTED, so its guarantee has to hold for whatever a caller hands it — not
+// only for the doctrine leaves the importer has already bounded. A thickness must be a positive
+// real number of feet: Infinity ft of soil is as undiggable as zero, and NaN would flow into the
+// volume and the BOM without ever looking wrong.
+test('resolveCover: cover multipliers of 0, -1, ±Infinity and NaN all fail safe — only a positive real number sizes a roof', () => {
+  for (const mul of [0, -1, Infinity, -Infinity, NaN]) {
     const c = resolveCover('ind-mtr-81', true, mul, SHORT_SPAN);
     assert.equal(c.roofPath, 'engineered_required', 'coverMul ' + mul);
-    assert.equal(c.thickness, 0);
+    assert.equal(c.thickness, 0, 'coverMul ' + mul + ' produced a thickness');
     assert.equal(c.material, '');
     assert.equal(c.thicknessLeaf, undefined, 'no shielding leaf is claimed for a roof that was not sized');
+  }
+});
+
+test('resolveCover: a shielding leaf of ±Infinity or NaN fails safe the same way', () => {
+  const leaf = shielding['ind-mtr-81']!.sandbagged_soil;
+  const original = leaf.value;
+  for (const v of [Infinity, -Infinity, NaN]) {
+    leaf.value = v;
+    try {
+      const c = resolveCover('ind-mtr-81', true, 1.0, SHORT_SPAN);
+      assert.equal(c.roofPath, 'engineered_required', 'shielding leaf ' + v);
+      assert.equal(c.thickness, 0, 'shielding leaf ' + v + ' produced a thickness');
+      assert.equal(c.material, '');
+    } finally {
+      leaf.value = original;
+    }
   }
 });
 

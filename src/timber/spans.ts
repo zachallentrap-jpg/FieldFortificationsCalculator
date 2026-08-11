@@ -30,6 +30,23 @@ import { SPAN, LUMBER, IN_PER_FT, citeOf } from './doctrine';
 const bearingTotalIn = (m: Member): number =>
   m.bearingTotalIn ?? 2 * DRESSED[LUMBER.studNominal.value as string]!.w;
 
+/**
+ * The horizontal RUN of a pitched member — what the span tables are read on, since a table row is
+ * a plan dimension. Without it a steep roof condemns itself for being steep.
+ *
+ * THE PITCH COMES OFF THE MEMBER'S OWN ROTATION, not its `angles` block. `angles` is a cut-list
+ * annotation that some emitters state and some do not, and a missing one reads as zero pitch —
+ * i.e. the SLOPED length taken for the run, which over-reports every member that lacks it. The
+ * rotation is the geometry the viewer draws, so every pitched member carries it.
+ *
+ * It is also the only pitch a HIP has. A hip lies at 45° in plan under both slopes, so it climbs
+ * at `atan(slope/√2)` — shallower than the roof it carries — and its run is the DIAGONAL, longer
+ * than the common run by the same factor. On a 12/12 hip that is 18.4 ft of run under 22.5 ft of
+ * stick: reading the stick would cry wolf, and reading the common's run would miss it.
+ */
+const planRunFt = (m: Member): number =>
+  (m.cutLength / IN_PER_FT) * Math.abs(Math.cos(m.rotation[2] ?? 0));
+
 export interface SpanWarning {
   memberId: string;
   role: Member['role'];
@@ -50,8 +67,39 @@ function columnFor(table: Record<number, number>, spacingIn: number): { spacing:
 }
 
 /**
- * Every member that is past its span table. Pure, and scoped to the three roles the tables
- * actually cover — a role with no table produces no warning rather than a guess.
+ * Everything the rafter table is read against. A jack is a common cut back to the hip and sits at
+ * the same spacing on the same slope, so the row that rates one rates the other; the hip is the
+ * odd one and says so in its own message below.
+ */
+const RAFTER_ROLES: ReadonlySet<Member['role']> = new Set<Member['role']>(['rafter', 'jackRafter', 'hipRafter']);
+
+/**
+ * What to tell a crew about a rafter that is past its row, in the words of the member they have to
+ * go and look at.
+ *
+ * THE HIP IS NOT RATED BY THIS ROW AND THE MESSAGE MAY NOT PRETEND IT IS. The table is a
+ * repetitive-member table: one common at a spacing, carrying the strip of roof either side of it.
+ * A hip carries its own strip PLUS the end of every jack landing on it from both slopes, and there
+ * is no hip table here to size it from. What the row still supports is one direction of the
+ * inference, and it is the safe one: a hip carries more than a common of the same run, so a run
+ * the common row already refuses is a run the hip cannot make either. Said that way the warning
+ * claims a floor, not a rating, and the reader is told which.
+ */
+function rafterMessage(m: Member, spanFt: number, col: { spacing: number; allowed: number }): string {
+  if (m.role === 'hipRafter') {
+    return `${m.nominal} hip rafter runs ${spanFt.toFixed(1)} ft on the diagonal; the common-rafter table `
+      + `stops at ${col.allowed} ft at ${col.spacing} in o.c., and a hip carries the jacks off both slopes on top `
+      + 'of its own strip — so that figure is a floor it is already under, not a rating for it. Deepen it, post '
+      + 'the hip, or shorten the run — the tool has NOT changed it.';
+  }
+  const word = m.role === 'jackRafter' ? 'jack rafter' : 'rafter';
+  return `${m.nominal} ${word} runs ${spanFt.toFixed(1)} ft; the table allows ${col.allowed} ft at ${col.spacing} in o.c. `
+    + 'Deepen it, close the spacing, or add a purlin — the tool has NOT changed it.';
+}
+
+/**
+ * Every member that is past its span table. Pure, and scoped to the roles the tables actually
+ * cover — a role with no table produces no warning rather than a guess.
  */
 export function spanWarnings(
   members: Member[],
@@ -119,16 +167,19 @@ export function spanWarnings(
           cite: citeOf(SPAN.ceilingJoist),
         });
       }
-    } else if (m.role === 'rafter') {
-      // A rafter's span is its horizontal RUN, not its sloped length — the table is read on the
-      // plan projection. Without this a steep roof condemns itself for being steep.
-      const spanFt = (m.cutLength / IN_PER_FT) * Math.cos(m.angles?.seatCut ? (m.angles.seatCut * Math.PI) / 180 : 0);
+    } else if (RAFTER_ROLES.has(m.role)) {
+      // EVERY MEMBER THE RAFTER LINE OF THE LS REGISTER NAMES, not just the commons. A hip roof's
+      // commons are its SHORTEST sloping members: the jacks are commons cut back to the hip, and
+      // the hip itself runs the diagonal and is the longest stick on the roof. Measuring only
+      // `rafter` left the longest members of the one roof kind that has them unchecked, while the
+      // packet printed the rafter span limit as a life-safety value the build had been held to.
+      const spanFt = planRunFt(m);
       const row = rafterTable[m.nominal];
       const col = row && columnFor(row, spacing.rafterSpacingIn);
       if (col && spanFt > col.allowed + 1e-6) {
         out.push({
           memberId: m.id, role: m.role, nominal: m.nominal, spanFt, allowedFt: col.allowed, spacingIn: col.spacing,
-          message: `${m.nominal} rafter runs ${spanFt.toFixed(1)} ft; the table allows ${col.allowed} ft at ${col.spacing} in o.c. Deepen it, close the spacing, or add a purlin — the tool has NOT changed it.`,
+          message: rafterMessage(m, spanFt, col),
           cite: citeOf(SPAN.rafter),
         });
       }

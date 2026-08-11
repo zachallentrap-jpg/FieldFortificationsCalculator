@@ -17,6 +17,8 @@ import { DOCTRINE_VERSION } from '../version';
 import { all, getByPath, counts } from './registry';
 import { shielding, shieldMaterials, spanSizes, threats } from './protection';
 import { excavationSplit } from './stages';
+import { fmtLength } from './units';
+import type { UnitSystem } from './units';
 import type { Counts } from './registry';
 import type { Provenance } from './types';
 
@@ -148,9 +150,9 @@ interface Staged {
 }
 
 // A dry run must PREVIEW the counts an apply would actually produce, not just echo the
-// current (unmutated) state under the same field name — the two used to be silently
-// different (counts() called before vs. after the commit loop), which would have made a
-// dry-run preview lie the moment anything ever read report.counts.
+// current (unmutated) state under the same field name. counts() before the commit loop and
+// counts() after it are different numbers, and reporting the wrong one silently — same field,
+// same shape — would make a dry-run preview lie to whoever reads report.counts.
 function previewCounts(staged: Staged[]): Counts {
   const overrides = new Map(staged.map((s) => [s.path, s.status]));
   let doctrine = 0, placeholder = 0, safetyCritical = 0, safetyCriticalRemaining = 0;
@@ -270,31 +272,61 @@ function severityLadders(): string[][] {
 // the roof safe on exactly that reading). This has to be checked leaf by leaf: a ladder walk
 // cannot see it, because zeroing the smallest threat of a class decreases against nothing and
 // zeroing a whole class leaves every step equal rather than descending.
-function nonPositiveWarnings(p: Prospective): DoctrineFinding[] {
+//
+// A hair ABOVE zero is no better in the hand. The app prints a protective length through
+// fmtLength — feet-and-inches, or centimetres under the metric toggle — so a magnitude the
+// panel can only render as zero is one nobody can read off the screen, check against a pub, or
+// build to: the operator would be shown no cover at all while the drawing shows a roof and the
+// BOM bills the stringers under it. That is a data-entry error, not doctrine. The threshold is
+// asked of the SAME formatter the panel uses, so it follows the app's display precision — no
+// minimum thickness is invented here, and none exists to invent.
+const DISPLAY_UNITS: UnitSystem[] = ['imperial', 'metric'];
+function displayedAsZero(ft: number): string | undefined {
+  // Zero in the rendered string means no significant digit survived the rounding, whatever
+  // shape the formatter gives it (0'-0", 0 cm, 0 m).
+  return DISPLAY_UNITS.map((u) => fmtLength(ft, u)).find((shown) => !/[1-9]/.test(shown));
+}
+
+// At most ONE finding per leaf: a value that is absent is not separately reported as invisible.
+function unbuildableMagnitude(v: number, absent: () => string, invisible: (shown: string) => string): string | undefined {
+  if (!(v > 0)) return absent();
+  const shown = displayedAsZero(v);
+  return shown === undefined ? undefined : invisible(shown);
+}
+
+function unbuildableWarnings(p: Prospective): DoctrineFinding[] {
   const out: DoctrineFinding[] = [];
   for (const [id, row] of Object.entries(shielding)) {
     for (const mat of shieldMaterials) {
       const leaf = row[mat];
       const v = p.valueOf(leaf);
-      if (v > 0) continue;
-      out.push({
-        path: p.pathOf(leaf),
-        reason:
+      const reason = unbuildableMagnitude(
+        v,
+        () =>
           threats[id]!.label + ' would be fully stopped by ' + v + ' ft of ' + mat +
           ' — a protective thickness of zero or less reads as a MISSING value, and a roof sized' +
           ' from it falls to an engineered design; applied, confirm against the pub',
-      });
+        (shown) =>
+          threats[id]!.label + ' would be fully stopped by ' + v + ' ft of ' + mat +
+          ' — that rounds to zero as displayed (the panel can only show it as ' + shown + '), so' +
+          ' nobody can read or build the cover it asks for; applied, confirm against the pub',
+      );
+      if (reason !== undefined) out.push({ path: p.pathOf(leaf), reason });
     }
   }
-  for (const [id, t] of Object.entries(threats)) {
+  for (const t of Object.values(threats)) {
     const v = p.valueOf(t.standoffMin);
-    if (v > 0) continue;
-    out.push({
-      path: p.pathOf(t.standoffMin),
-      reason:
+    const reason = unbuildableMagnitude(
+      v,
+      () =>
         t.label + ' would be safe at ' + v + ' ft of standoff — a standoff of zero or less reads' +
         ' as a MISSING value, and standoff drives the roof setback; applied, confirm against the pub',
-    });
+      (shown) =>
+        t.label + ' would be safe at ' + v + ' ft of standoff — that rounds to zero as displayed' +
+        ' (the panel can only show it as ' + shown + '), and standoff drives the roof setback;' +
+        ' applied, confirm against the pub',
+    );
+    if (reason !== undefined) out.push({ path: p.pathOf(t.standoffMin), reason });
   }
   return out;
 }
@@ -326,7 +358,7 @@ function ladderWarnings(
 }
 
 function plausibilityWarnings(p: Prospective): DoctrineFinding[] {
-  const out: DoctrineFinding[] = [...nonPositiveWarnings(p)];
+  const out: DoctrineFinding[] = [...unbuildableWarnings(p)];
 
   for (const ladder of severityLadders()) {
     // Shielding: only across threats that actually yield a thickness — an engineered munition

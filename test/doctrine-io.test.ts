@@ -7,7 +7,8 @@ import assert from 'node:assert/strict';
 import '../src/doctrine/index';
 import { exportDoctrine, importDoctrine, getFillState, resetFillState } from '../src/doctrine/io';
 import { counts, all, getByPath } from '../src/doctrine/registry';
-import { shieldMaterials, spanSizes, stringerSizeForSpan } from '../src/doctrine/protection';
+import { shielding, shieldMaterials, spanSizes, stringerSizeForSpan } from '../src/doctrine/protection';
+import { fmtLength } from '../src/doctrine/units';
 import { compute } from '../src/engine/compute';
 import type { GeometryModel } from '../src/engine/geometry';
 import { MemoryAdapter } from '../src/state/persistence';
@@ -133,8 +134,8 @@ test('saveFill reports failure when storage actually fails — the caller must n
 test('sandbags_parapet BOM line stays flagged when the leaf it ACTUALLY depends on is still a placeholder', () => {
   // A doctrine fill can be done leaf-by-leaf (io.ts explicitly allows partial entries[]) — fill
   // everything EXCEPT sandbag.frontWallHeight, which is what actually feeds the earth-mode
-  // aperture-rest bag count (materials.ts used to check parapet.W/H instead, which don't feed
-  // this formula at all, and never checked frontWallHeight — a false "fully confirmed" negative).
+  // aperture-rest bag count. The placeholder flag has to follow THAT leaf: parapet.W/H do not
+  // enter this formula, so flagging on them instead reports a confirmed line built on a guess.
   const entries = all().map((e) => ({ path: e.path, value: e.value, status: 'DOCTRINE', source: 'FM 5-103 (test fixture)' }));
   const target = entries.find((e) => e.path.endsWith('frontWallHeight'));
   assert.ok(target, 'sandbag.frontWallHeight is a registered leaf');
@@ -151,9 +152,9 @@ test('sandbags_parapet BOM line stays flagged when the leaf it ACTUALLY depends 
 test('the "setback" dimension stays flagged when depthOfCut — not standoff — is still a placeholder', () => {
   // bunker_op_cp/deliberate/ind-mtr-81: depthOfCut-derived term (setbackDepthFrac × depth =
   // 1.625 ft) binds over the threat's own standoff (1.25 ft), so depthOfCut's placeholder-ness
-  // must flow into the setback dim — geometry.ts used to OR in only overhead.setbackMin (the
-  // threat==='none' fallback, not the leaf actually used once a real threat is picked) and
-  // setbackDepthFrac, never depthOfCut's own placeholder flag.
+  // must flow into the setback dim. OR-ing in only overhead.setbackMin (the threat==='none'
+  // fallback, not the leaf actually used once a real threat is picked) and setbackDepthFrac
+  // would leave the placeholder-ness of the term that actually binds out of the flag.
   const entries = all().map((e) => ({ path: e.path, value: e.value, status: 'DOCTRINE', source: 'FM 5-103 (test fixture)' }));
   const depthEntry = entries.find((e) => e.path.endsWith('bunker_op_cp.hole.D'));
   const depthMulEntry = entries.find((e) => e.path.endsWith('deliberate.depthMul'));
@@ -265,7 +266,7 @@ test('zeroing the SMALLEST threat of a class is reported — it decreases agains
   assert.ok(rep.warnings.some((w) => w.path === path), 'the first rung is checked on its own merits');
 });
 
-test('a reversed standoff ladder is reported — standoff is half of what C13 named', () => {
+test('a reversed standoff ladder is reported — a bigger round given less standoff than a smaller one', () => {
   // The biggest round given the smallest standoff, across the whole indirect class. Every value
   // is in range and rightly typed, so only a table-shaped check sees it — and standoff drives
   // the setback geometry, so it is exactly as safety-critical as the shielding half.
@@ -294,6 +295,45 @@ test('a standoff filled to zero is reported even where no ladder step descends',
   const w = rep.warnings.find((x) => x.path === path);
   assert.ok(w, 'no munition is safe at no standoff');
   assert.match(w!.reason, /MISSING value/, 'reported as an absent value, not as a ladder step: ' + w!.reason);
+});
+
+// A magnitude a hair above zero passes every per-entry check (it is in range, rightly typed and
+// strictly positive, so the engine's own fail-safe lets it through) while the app cannot print
+// it as anything but zero. Both tables are checked: standoff sets the roof setback, so it is as
+// safety-critical as the thickness half.
+test('a shielding thickness the panel can only show as zero is reported', () => {
+  const path = 'protection.shielding.sa-556.soil';
+  const tiny = 1e-9;
+  const rep = importDoctrine(fixture([{ path, value: tiny }]), { dryRun: true });
+
+  assert.ok(rep.ok, 'plausibility reports, never blocks');
+  const w = rep.warnings.find((x) => x.path === path);
+  assert.ok(w, 'a thickness of ' + tiny + ' ft is not doctrine anybody could build to');
+  assert.match(w!.reason, /rounds to zero as displayed/, 'the message says WHY it is unusable: ' + w!.reason);
+  // …and it really is invisible, through the same formatter the specs panel prints with.
+  assert.ok(!/[1-9]/.test(fmtLength(tiny, 'imperial')), 'the panel shows ' + fmtLength(tiny, 'imperial'));
+});
+
+test('a standoff the panel can only show as zero is reported', () => {
+  const path = 'protection.threats.ind-art-155.standoffMin';
+  const tiny = 1e-9;
+  const rep = importDoctrine(fixture([{ path, value: tiny }]), { dryRun: true });
+
+  assert.ok(rep.ok, 'plausibility reports, never blocks');
+  const w = rep.warnings.find((x) => x.path === path);
+  assert.ok(w, 'a setback of ' + tiny + ' ft is not a setback');
+  assert.match(w!.reason, /rounds to zero as displayed/, 'the message says WHY it is unusable: ' + w!.reason);
+  assert.ok(!/[1-9]/.test(fmtLength(tiny, 'imperial')), 'the panel shows ' + fmtLength(tiny, 'imperial'));
+});
+
+test('the smallest thickness the shipped shielding table carries is NOT called unbuildable', () => {
+  // The threshold is display precision, so it has to sit below everything the app itself ships:
+  // a check that fires on the pristine table would train the filler to ignore it.
+  const smallest = Object.values(shielding)
+    .flatMap((row) => shieldMaterials.map((m) => row[m].value))
+    .reduce((a, b) => Math.min(a, b), Infinity);
+  assert.ok(/[1-9]/.test(fmtLength(smallest, 'imperial')), smallest + ' ft shows as ' + fmtLength(smallest, 'imperial'));
+  assert.deepEqual(importDoctrine(fullFill(), { dryRun: true }).warnings, [], 'the shipped table is quiet');
 });
 
 test('a stored fill that no longer matches the registry is refused, not trusted', async () => {

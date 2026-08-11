@@ -12,10 +12,10 @@
 //
 // The same fail-safe covers the DATA axis: a threat whose cover material has no USABLE
 // shielding thickness in the loaded doctrine has nothing to build a roof from, so it resolves
-// to 'engineered_required' too. "Usable" means strictly positive, on the resolved thickness
-// the roof would actually be built to: a required thickness of zero or less for a real
-// munition is not "no cover needed" — nothing stops a round — so it means the value is
-// absent, and a multiplier that scales a real requirement away to nothing means the same.
+// to 'engineered_required' too. "Usable" means a positive, finite depth of feet, on the
+// resolved thickness the roof would actually be built to: a required thickness of zero or less
+// for a real munition is not "no cover needed" — nothing stops a round — so it means the value
+// is absent, and a multiplier that scales a real requirement away to nothing means the same.
 // Every unknown in this module — threat, span, or unusable data — leaves by the same door.
 
 import { roofPathFor, coverMaterialDefault, shielding, shieldMaterials, stringerSizeForSpan } from '../doctrine/protection';
@@ -42,17 +42,24 @@ function coverLeafFor(threat: string): Provenance<number> | undefined {
 
 // Which unknown, if any, leaves this threat's earth roof with no thickness to build to.
 export type CoverGap =
-  | 'shielding_data' // no shielding row, or one that resolves to zero/negative feet
+  | 'shielding_data' // no shielding row, or one that resolves to no buildable depth of feet
   | 'cover_multiplier'; // a real requirement scaled away to nothing by the standard
 
 // The single answer to "can a thickness be built here, and if not, which value is the reason".
 // resolveCover and validation both ask THROUGH this helper — asking the same question the same
 // way is the only way the roof the engine builds and the reason the operator reads can never
 // disagree.
+//
+// A thickness must be a positive REAL number of feet. Infinity ft of soil is no more diggable
+// than zero, and NaN would flow silently into the volume and the BOM; both are unknowns and
+// leave by the fail-safe door like every other unknown here. resolveCover is exported, so its
+// guarantee has to hold for any caller — not only for the one that reads from doctrine leaves
+// the importer has already bounded.
 function usableCover(threat: string, coverMul: number): { leaf: Provenance<number> } | { gap: CoverGap } {
   const leaf = coverLeafFor(threat);
-  if (!leaf || !(leaf.value > 0)) return { gap: 'shielding_data' };
-  if (!(leaf.value * coverMul > 0)) return { gap: 'cover_multiplier' };
+  if (!leaf || !(leaf.value > 0) || !Number.isFinite(leaf.value)) return { gap: 'shielding_data' };
+  const thickness = leaf.value * coverMul;
+  if (!(thickness > 0) || !Number.isFinite(thickness)) return { gap: 'cover_multiplier' };
   return { leaf };
 }
 
@@ -79,7 +86,7 @@ export function resolveCover(threat: string, coverOn: boolean, coverMul: number,
   }
 
   // Data fail-safe: with no usable thickness there is nothing to size the roof from. Building
-  // it anyway drew a roof, billed the stringers and delivered zero protection — an earth roof
+  // it anyway draws a roof, bills the stringers and delivers zero protection — an earth roof
   // of zero feet is not a roof. It resolves like every other unknown here: engineered, zero
   // thickness. No `engineeredReason` is recorded — 'threat' and 'span' each name a doctrine
   // rule that fired, and this is the absence of usable doctrine rather than a rule; validation

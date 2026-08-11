@@ -12,6 +12,7 @@ import { familyById, shippedFamilies } from '../src/timber/catalog';
 import { headerForSpan } from '../src/timber/normalize';
 import { LUMBER, SPAN } from '../src/timber/doctrine';
 import { DRESSED } from '../src/timber/types';
+import { LS_CONSUMERS } from '../src/timber/packet/lsgate';
 
 const preset = (id: string) => JSON.parse(JSON.stringify(familyById(id as never)!.preset));
 
@@ -199,4 +200,102 @@ test('a doorway header keeps the doorway bearing when its emitter says nothing',
   assert.equal(header.bearingTotalIn, undefined, 'the frozen wall generator has started declaring a bearing');
   const warning = spanWarnings([header], { joistSpacingIn: 16, rafterSpacingIn: 16 })[0]!;
   assert.ok(Math.abs(warning.spanFt - 12) < 0.02, `a 12 ft opening reported as ${warning.spanFt.toFixed(2)} ft`);
+});
+
+// ── A hip roof's longest members ─────────────────────────────────────────────
+//
+// The commons are the SHORTEST sloping members of a hip roof. The jacks are commons cut back to
+// the hip and sit on the same plates at the same spacing on the same slope; the hip runs the
+// corner diagonal and is the longest stick on the building. A check scoped to `rafter` measured
+// the short ones and the packet still printed the rafter span limit as a life-safety value the
+// build had been held to — a warning that reads as an all-clear.
+
+/** gp-frame at its own panel's widest, hipped at 12/12, laid out at 24 in o.c. */
+function hipBuild(): ReturnType<typeof generateStructure> {
+  const spec = preset('gp-frame');
+  spec.dims.widthFt = 24;
+  spec.spacing.rafterSpacingIn = 24;
+  spec.roof = { kind: 'hip', risePer12: 12, overhangFt: 1 };
+  return generateStructure(spec);
+}
+
+test('a hip roof is span-checked on its jacks and its hips, not only on its commons', () => {
+  const model = hipBuild();
+  const warnings = spanWarnings(model.members, model.spec.spacing, model.levels.subfloorTop);
+  const warned = new Set(warnings.map((w) => w.role));
+  for (const role of ['rafter', 'jackRafter', 'hipRafter'] as const) {
+    const present = model.members.filter((m) => m.role === role).length;
+    assert.ok(present > 0, `the fixture emits no ${role}`);
+    assert.ok(warned.has(role), `${present} ${role} members, none of them measured: warned on ${[...warned].join(', ')}`);
+  }
+  // Each set is reported against its own members rather than folded into the commons — "26×"
+  // over a roof of 98 sticks points a crew at the wrong ones.
+  const lines = summarizeSpanWarnings(warnings);
+  assert.ok(lines.some((l) => /\bjack rafter runs\b/.test(l)), lines.join(' | '));
+  assert.ok(lines.some((l) => /\bhip rafter runs\b/.test(l)), lines.join(' | '));
+});
+
+test('a hip is measured on its diagonal RUN — not on its stick, and not on the common’s run', () => {
+  // Equal pitches put the hip at 45° in plan, so its run is √2 × the common run and its own
+  // pitch is shallower than the roof's. Reading the stick cries wolf; reading the common's run
+  // misses the member entirely.
+  const model = hipBuild();
+  const warnings = spanWarnings(model.members, model.spec.spacing, model.levels.subfloorTop);
+  const hip = warnings.find((w) => w.role === 'hipRafter')!;
+  const commonRun = warnings.find((w) => w.role === 'rafter')!.spanFt;
+  const stickFt = model.members.find((m) => m.id === hip.memberId)!.cutLength / 12;
+  assert.ok(
+    Math.abs(hip.spanFt - commonRun * Math.SQRT2) < 0.01,
+    `hip run ${hip.spanFt.toFixed(3)} ft against a common run of ${commonRun.toFixed(3)} ft`,
+  );
+  assert.ok(hip.spanFt < stickFt - 3, `the ${stickFt.toFixed(2)} ft stick was read as the run`);
+});
+
+test('a jack inside its row stays quiet while the commons over theirs warn', () => {
+  // The other failure mode. At 16 in o.c. the same roof's jacks are a bay shorter than its
+  // commons and inside the table; a check that measured them by their SLOPED length — which is
+  // what a missing pitch reads as — would condemn every one of them.
+  const spec = preset('gp-frame');
+  spec.dims.widthFt = 24;
+  spec.roof = { kind: 'hip', risePer12: 12, overhangFt: 1 };
+  const model = generateStructure(spec);
+  const warnings = spanWarnings(model.members, model.spec.spacing, model.levels.subfloorTop);
+  assert.ok(model.members.some((m) => m.role === 'jackRafter'), 'the fixture emits no jack rafters');
+  assert.ok(warnings.some((w) => w.role === 'rafter'), 'the commons are supposed to be over here');
+  assert.deepEqual(
+    warnings.filter((w) => w.role === 'jackRafter').map((w) => w.spanFt),
+    [],
+    'jacks a bay shorter than the commons were condemned',
+  );
+});
+
+test('every member role SPAN.rafter declares as its consumer is a role the check measures', () => {
+  // The register's row says this value governed the build. A declared role the checker skips
+  // makes that a false assurance — the row prints, and nothing was examined. Proved per role by
+  // handing the check that role's own emitted member at four times its length: silence there
+  // means the branch never sees it, whatever the table says.
+  const model = hipBuild();
+  for (const role of LS_CONSUMERS['SPAN.rafter']!.roles) {
+    const member = model.members.find((m) => m.role === role);
+    assert.ok(member, `the register declares ${role} and the fixture emits none`);
+    const overlong = { ...member, cutLength: member.cutLength * 4 };
+    const warned = spanWarnings([overlong], model.spec.spacing);
+    assert.equal(
+      warned.length, 1,
+      `a ${role} at four times its length produced no warning, so the register's rafter-span row `
+      + 'is an assurance nothing measured',
+    );
+  }
+});
+
+test('a tower cab’s hips are examined even though they pass — the row is earned, not assumed', () => {
+  // The hips-only case. Nothing warns, and that has to be because the check LOOKED: a packet may
+  // print the rafter span limit for a build of four hip rafters only if those four were measured.
+  const tower = generateStructure(preset('tower'));
+  const hip = tower.members.find((m) => m.role === 'hipRafter')!;
+  assert.equal(tower.members.filter((m) => m.role === 'rafter').length, 0, 'the tower cab is no longer the hips-only case');
+  assert.deepEqual(spanWarnings([hip], tower.spec.spacing), [], 'a cab hip is inside its row');
+  const warned = spanWarnings([{ ...hip, cutLength: hip.cutLength * 4 }], tower.spec.spacing);
+  assert.equal(warned.length, 1, 'a cab hip four times as long went unmeasured');
+  assert.equal(warned[0]!.role, 'hipRafter');
 });

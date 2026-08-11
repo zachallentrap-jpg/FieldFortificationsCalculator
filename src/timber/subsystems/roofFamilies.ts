@@ -588,7 +588,7 @@ export function generatePurlins(planes: RoofPlane[], stage: number, rafterHalfFt
         position: [cx, cy, cz],
         rotation: [Math.PI / 2 - pitch, yaw, 0],
         stage,
-        nailing: '2-16d each rafter (PH)',
+        nailing: NAILING.purlinAtRafters.value,
         doctrineRef: citeOf(LAYOUT.purlinSpacingMaxIn),
       });
     }

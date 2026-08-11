@@ -597,6 +597,10 @@ export const NAILING = {
   jackRafterAtHip: doc('bevel-cut to the hip, 3-16d; bird’s-mouth toenail 3-8d (PH)', 'FM 5-426 ch. 7 hip roofs: jacks bevel-cut to the hip rafter'),
   hipRafterAtRidge: doc('3-16d at the ridge; jacks bear on it both sides (PH)', 'FM 5-426 ch. 7 hip roofs'),
   ridgeAtHip: doc('commons and hips 3-16d ea (PH)', 'FM 5-426 ch. 7 ridge: shortened for the hips at each end'),
+  // A purlin roof has no sheathing: the purlins ARE what the roofing is fastened through, so each
+  // one is nailed at every rafter it crosses rather than on a spacing of its own. Reachable from
+  // any card whose roof is not the frozen gable — that branch lays a solid deck instead.
+  purlinAtRafters: doc('2-16d ea rafter (PH)', 'FM 5-426 ch. 7 purlin roof: purlins laid across the rafters under the roofing'),
 
   // ── Interior partitions — subsystems/partitions.ts
   // A partition carries nothing, so it is TIED to the framing rather than bearing on it, and its

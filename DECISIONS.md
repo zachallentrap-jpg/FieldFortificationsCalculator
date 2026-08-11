@@ -1168,7 +1168,8 @@ because no other family cuts from those sizes.
 length. The RATE is nominal — a stick of 8x8 is bought as 8x8 however it surfaces — but the
 LENGTHS are not: anything cut to fit *between* two members is cut to their dressed faces. Each
 block of the crib bunker's overhead blocking now comes out 1.213 ft between 7 1/2-in stringers
-instead of 1.236 ft between 7 1/4-in ones — 14.556 ft on that cut-list line instead of 14.833 —
+instead of 1.236 ft between 7 1/4-in ones — **14.556 in** on that cut-list line instead of
+**14.833 in**, both of them inches, all 18 blocks —
 and the bunker's board-foot total goes **2546.167 → 2543.944 BF**. A dressed size is a
 geometry number that reaches the BOM through the cut list, and `test/timber2-dressed.test.ts` pins
 that blocking cut to the deduction rule rather than to a literal, so the coupling cannot be
@@ -1197,3 +1198,129 @@ nothing shipped is over the limit today — the case is not urgent, it is unwatc
 means solving the same two cuts in the hip's own vertical plane with the traverse taken across the
 corner (a plate width of W is crossed over W√2 along the diagonal), and it would put a notch on the
 hips in the 3D viewer as well. When it is derived, `hipRafter` goes back on that register line.
+
+## 2026-08-11 — A hip roof's longest members are now the ones that get measured
+
+`SPAN.rafter` is life-safety and its consumer line has always named three roles —
+`rafter`, `jackRafter`, `hipRafter`. `spans.ts` measured one of them. The other two fell through
+every branch of the checker and produced nothing, so the packet printed **"Rafter span limit"** as
+a governing value for a check that had examined a minority of the roof.
+
+**It is the wrong minority, which is what makes it a fail-open rather than a gap.** On a hip roof
+the commons are the SHORTEST sloping members: a jack is a common cut back to the hip, and the hip
+itself runs the corner diagonal. Measured on gp-frame at `dims.widthFt` 24 (that panel row's own
+maximum) with `roof {kind:'hip', risePer12:12}` and the default 16-in spacing — two clicks on
+controls the card advertises — the build emits 38 commons, 64 jacks and 4 hips, every one of them
+2x6. The 38 commons warned at 13.0 ft against a 12 ft row. The 4 hips run **18.385 ft** and said
+nothing.
+
+**The run comes off the member's rotation, not its `angles` block.** `angles` is a cut-list
+annotation: `roofFamilies.ts` states it on commons and omits it on jacks and hips, and the tower
+cab's shed rafters omit it too. A missing one read as zero pitch, i.e. the SLOPED length taken for
+the run — so widening the role filter alone would have reported a 12/12 hip at 22.517 ft instead
+of 18.385 and cried wolf on every hip roof in the catalog. Rotation is the geometry the viewer
+draws, every pitched member carries it, and on every emitter that states both they agree.
+
+**The hip is read against the common-rafter table, and its message says so.** There is no hip
+table here and inventing one would be a fabricated magnitude. What the common row does support is
+one direction of the inference, and it is the safe one: a hip carries its own strip of roof PLUS
+the end of every jack landing on it from both slopes, so a run the common row already refuses is a
+run the hip cannot make either. The hip's warning therefore says the table figure is *a floor it
+is already under, not a rating for it*, and names the diagonal. A jack gets the plain common
+wording, because a jack genuinely is a common on the same table at the same spacing.
+
+**Consequences, stated rather than discovered later.** Hip presets that were silent now warn: the
+shipped gp-frame at `roof.kind='hip'` (a card-advertised choice) reports its four hips at 15.56 ft
+against a 12 ft row. No shipped *preset* moved — `test/timber2-spans.test.ts`'s "no shipped
+standard design condemns itself" still passes — and no golden moved, because span findings are
+issues, not members. The tower cab's four hips are inside their row and stay quiet; the test proves
+they were nevertheless *examined*, by handing the checker that same emitted hip at four times its
+length and requiring a warning.
+
+**The NOTCH narrowing was re-checked against this and still holds.** The seat-depth limit is a
+different derivation: `runAxisOf` returns null for a hip because a hip is yawed 45° to both axes,
+and its seat is a double cheek over two plates at once. Giving the span check a pitch does not give
+the notch module a traverse. `LS_CONSUMERS['NOTCH.rafterSeatMaxDepthFrac']` therefore still lists
+commons and jacks only, and the open item recorded above is unchanged.
+
+## 2026-08-11 — The workbench issues strip went quiet on the edits that needed it
+
+Disclosing a regression introduced by the previous entry's own fix, and closing it.
+
+`regenerate()` had become `const { spec } = normalizeSpec(current.spec); current.spec = spec;
+model = generateStructure(spec)`. The normalizer is **idempotent**: it reports a repair on the pass
+that makes it and has nothing to say on the next. Repairing the spec first and handing the repaired
+copy on therefore left the build pass with nothing to report, and the strip was fed from that
+second, silent pass.
+
+Measured: open the standard gp-frame (clean, no messages), then take `dims.lengthFt` to 8 on the
+panel. All eight of that card's openings are now past the end of the wall they are on;
+`normalizeSpec` relocates every one and says so in eight messages ("Opening at 6 ft would run past
+the end of wall S; moved to 5 ft.", four on S and four on N). The strip showed none of them. The
+operator shortened the building, the tool moved four doors and four windows, and said nothing —
+the silent-correction failure mandate #2 exists to forbid. It appeared only on load, because the
+open path generated from the raw stored spec.
+
+The order is now a named step, `src/ui/woodframe/regen.ts`: build from the spec as the operator
+left it, then take the repaired spec back OUT of the model (`StructureModel.spec` is the normalized
+one). One normalize pass, one report, no double-reporting, and the boot file no longer runs the
+normalizer at all — which the test asserts, alongside the eight messages themselves and the fact
+that a second pass over the repaired spec is silent, since that idempotency is the whole reason the
+order matters.
+
+## 2026-08-11 — The nailing-schedule walk now moves two controls, because one was not enough
+
+`test/timber2-doctrine.test.ts` swept the catalog cards and their panels one control at a time.
+That corpus missed a member a user reaches in two clicks: the **purlin**. Every family whose deck
+offers purlins presets to a gable, and the frozen gable branch lays a solid deck (C-9) — so
+roof-kind variation and covering variation are each individually inert, and it takes
+`roof.kind=hip` AND `coverings.roofDeck=purlins` together, both options the card advertises and the
+panel's own help text points at ("Purlins come with the other roof shapes"), to put 26 purlins on a
+roof. Their schedule `'2-16d each rafter (PH)'` had no cited home while the test's title claimed
+every schedule did.
+
+The walk now includes every PAIR of panel rows, in both orders, with each row's `applies`
+predicate honoured against the spec as it stands when that row is reached — which is what makes
+the purlins option appear at all, and which is exactly what the panel would have shown. Numeric
+rows are taken at both clamp ends and the middle. Deduplicated by spec (most pairs land on a build
+some other pair already produced) it is 8,799 builds and about 9 s; the walk is computed once and
+read by four tests. It finds 100 distinct schedules, all of them cited.
+
+`NAILING.purlinAtRafters` is the new home — `'2-16d ea rafter (PH)'`, in the house's `ea` spelling
+rather than the emitted `each`, which the twins test could not see either because the string had no
+entry to be a twin of. A companion test asserts the purlin's schedule is reachable ONLY through a
+pair, so narrowing the corpus back to one control at a time is a red test rather than a silent
+regrowth of the same gap.
+
+The title now says what the corpus does: *"…a card and its panel can emit with one or two controls
+moved"*. Three controls is not claimed and is not walked.
+
+## 2026-08-11 — The collar-tie card, and a third golden regeneration (a compat-lock event)
+
+**What moved and why.** `roof.ts` printed two different `doctrineRef`s on the same member. The
+24-in branch stated the interval it was holding; the 16-in branch — the default layout of most of
+the catalog — still read `'FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)'`. The **≤5 ft**
+is a figure nothing in this engine enforces and nothing in the register holds:
+`LAYOUT.collarTieMaxSpacingFt` is 4 ft. "Every 3rd rafter" is likewise the 4-ft rule written for
+the 16-in layout it was written on, not the rule.
+
+Both branches now print one sentence built from the same two numbers — the interval the ties are
+actually on, and the distance that chose it: *"FM 5-426 collar ties, every 3rd rafter so the run
+stays within 4 ft at 16 in o.c. (IRC R802.3.1 — PH page)"*. `roof.ts` is the frozen branch and
+keeps its literal; the mirror is asserted at BOTH layouts now, not only at 24 in.
+
+**And the card now admits the page is owed.** `LAYOUT.collarTieMaxSpacingFt` is `ph: true`
+deliberately — the section is named and the figure is the recognized one, but naming a section is
+not reading it. The 24-in card printed `(IRC R802.3.1)` with no marker, which told a crew the
+sourcing was settled while the register said it was not. Both cards now carry `— PH page`, and the
+test asserts the marker and the flag as an EQUALITY on every layout: a card that drops the marker
+and a register that claims the page both fail it, from opposite directions. The previous version of
+that test carried an `if (!pendingOnACard) return;` escape and would have gone vacuous the moment
+this was fixed.
+
+**The goldens.** `scripts/gen-frame-goldens.ts` and `npm run gen:compat-goldens` were re-run in
+this change, per `test/frame-goldens.test.ts`'s stated obligation. **Every changed line in
+`test/goldens/frame/**` and `test/goldens/frame-compat/**` is a collar-tie `doctrineRef` string,
+plus the manifest/index hashes that cover them** — verified by diffing with those two patterns
+excluded, which leaves nothing. No member was added, removed or moved: member counts and every
+geometric field are byte-identical, because only the printed reference changed.

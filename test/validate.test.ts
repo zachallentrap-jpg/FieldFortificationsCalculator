@@ -30,8 +30,11 @@ function withDoctrine(values: Record<string, number>, body: () => void): void {
   }
 }
 
-// The only way to reach the missing-shielding-data fail-safe: name a cover material the
-// shielding table does not carry, so there is no leaf to size a roof from.
+// ONE of the two routes to the missing-shielding-data fail-safe: name a cover material the
+// shielding table does not carry, so there is no leaf at all to size a roof from. The other is
+// a leaf that IS there but holds no buildable thickness — a fill of zero or less, which arrives
+// through the sanctioned importer and lands on the same code (exercised end to end in
+// test/protection.test.ts). Neither route is reachable from inputs alone.
 function withNoShieldingData(threat: string, body: () => void): void {
   const original = coverMaterialDefault[threat]!;
   coverMaterialDefault[threat] = 'no_such_material' as ShieldMaterial;

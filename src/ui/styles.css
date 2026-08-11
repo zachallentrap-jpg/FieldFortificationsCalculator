@@ -300,6 +300,13 @@ table.bom td.n { text-align: right; font-variant-numeric: tabular-nums; }
 .import-report.ok { border-color: var(--focus); }
 .import-report.bad { border-color: var(--draw-engineered); }
 .import-report ul { margin: 4px 0 0; padding-left: 18px; }
+/* "Applied, but check this" — these values ARE in the doctrine now, so the block must never
+   wear the hazard red that means a refusal. It takes the same accent the warning severity uses
+   in the issues list, set off by its own rule so the distinction survives a glance. */
+.import-warn {
+  margin-top: 6px; padding: 4px 0 2px 8px;
+  border-left: 3px solid var(--dim); color: var(--dim-text);
+}
 .fill-scroll { max-height: 46vh; overflow: auto; border: 1px solid var(--border); border-radius: var(--r-sm); margin-top: 8px; }
 .fill-table { width: 100%; font-size: 11px; }
 .fill-table th { position: sticky; top: 0; background: var(--surface); z-index: 1; }

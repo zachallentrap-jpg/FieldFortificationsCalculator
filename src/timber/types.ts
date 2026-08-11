@@ -100,10 +100,11 @@ export interface Member {
 //
 // AND THE BILL FOLLOWS. Only the RATE is nominal: `BF_PER_LF` is a nominal section, so a stick of
 // 8x8 costs the same board feet per foot whatever it dresses to. The LENGTHS are not — a piece
-// cut to fit between two members is cut to their dressed faces, so the crib bunker's overhead
-// blocking is 14.556 ft between 7 1/2-in stringers where it would be 14.833 ft between 7 1/4-in
-// ones, and the bunker's board-foot total moves with it. A dressed size is a geometry number that
-// reaches the BOM through the cut list; treating it as decoration is how it gets edited casually.
+// cut to fit between two members is cut to their dressed faces, so each of the crib bunker's 18
+// overhead blocks is cut 14.556 IN between 7 1/2-in stringers where it would be 14.833 in between
+// 7 1/4-in ones, and the bunker's board-foot total moves with it. A dressed size is a geometry
+// number that reaches the BOM through the cut list; treating it as decoration is how it gets
+// edited casually.
 // `test/timber2-dressed.test.ts` asserts the deduction rule across every row rather than these
 // two, and pins the blocking's cut to the rule rather than to a literal.
 export const DRESSED: Record<string, { w: number; d: number }> = {

@@ -60,6 +60,10 @@ export const LS_CONSUMERS: Readonly<Record<string, LsConsumer>> = {
   'LUMBER.headerNominal': { roles: ['header'] , label: 'Header size' },
   'SPAN.joist': { roles: ['joist', 'tailJoist'] , label: 'Floor-joist span limit' },
   'SPAN.ceilingJoist': { roles: ['joist'] , label: 'Ceiling-joist span limit' },
+  // All three, because `spans.ts` reads the run of all three. A hip roof's commons are its
+  // SHORTEST sloping members — the jacks are commons cut back to the hip, and the hip runs the
+  // diagonal — so a check scoped to `rafter` would leave the longest sticks on the roof silent
+  // while this line told the signer they had been held to the table.
   'SPAN.rafter': { roles: ['rafter', 'jackRafter', 'hipRafter'] , label: 'Rafter span limit' },
   'SPAN.header': { roles: ['header'] , label: 'Header span limit' },
   // How much of a rafter its bird's mouth may take.

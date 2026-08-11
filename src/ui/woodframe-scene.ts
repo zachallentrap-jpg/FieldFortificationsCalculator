@@ -6,13 +6,13 @@
 // to the workbench, where the config panel edits a spec and the scene is regenerated from it —
 // the scene never edits itself, so the model on screen is always exactly what the spec says.
 
-import { generateStructure, type StructureModel } from '../timber/families/index';
+import type { StructureModel } from '../timber/families/index';
 import type { StructureSpec, BuildingSpec, RoofSpec, FoundationSpec, OpeningSpec, OpeningKind, OpeningFill } from '../timber/spec';
-import { normalizeSpec } from '../timber/normalize';
 import { familyById, type FamilyId } from '../timber/catalog';
 import { onPropAssetsReady } from './three-viewer';
 import { renderPicker } from './woodframe/picker';
 import { createStudio, type StudioHandles } from './woodframe/studio';
+import { regenerateFrom } from './woodframe/regen';
 import { configSchemaFor, type PanelRow } from './woodframe/config';
 import { HUT } from '../timber/doctrine';
 import { layoutStrip } from '../timber/elevation';
@@ -134,16 +134,20 @@ function renderPickerScreen(): void {
 
 function regenerate(): void {
   if (!current) return;
-  const { spec } = normalizeSpec(current.spec);
-  current.spec = spec;
-  model = generateStructure(spec);
+  // BUILD FROM THE SPEC THE OPERATOR LEFT, THEN ADOPT WHAT WAS BUILT. Repairing the spec here and
+  // handing the repaired copy on gives the build pass nothing left to report, and the strip goes
+  // quiet on exactly the edits that needed it — see `woodframe/regen.ts` for why the order is
+  // load-bearing.
+  const regen = regenerateFrom(current.spec);
+  current.spec = regen.spec;
+  model = regen.model;
   studio?.setModel(model);
   // THE MODEL'S ISSUES, NOT THE NORMALIZER'S. `generateStructure` carries everything the
   // normalizer said AND what the member checks found on the frame it went on to build — a joist
   // past its span table, a bird's mouth eating half the rafter at a 12/12 pitch. Fed from
   // `normalizeSpec` alone, those reached the printed packet and never the screen, so the operator
   // choosing the pitch was the one person not told.
-  renderIssues(model.issues.map((i) => i.message));
+  renderIssues(regen.messages);
   renderStrips();
   session = commitBuild(session, { ...current, updatedAt: Date.now() }).state;
   scheduleSave();
@@ -237,7 +241,8 @@ function renderWorkbench(build: StoredBuild): void {
 }
 
 function finishWorkbench(build: StoredBuild, family: ReturnType<typeof familyById>): void {
-  model = generateStructure(build.spec);
+  const regen = regenerateFrom(build.spec);
+  model = regen.model;
 
   app.innerHTML = workbenchHtml(build, family, false);
   // THE PANEL HAD NEVER SPOKEN ON LOAD. `regenerate` is what renders the report, and it runs only
@@ -246,7 +251,7 @@ function finishWorkbench(build: StoredBuild, family: ReturnType<typeof familyByI
   // roof this engine cannot frame, an opening moved back inside its wall, a second story dropped,
   // a span or a seat cut the frame cannot carry. It is said here, when the build opens, which is
   // when it matters, and off the same model the viewport is showing.
-  renderIssues(model.issues.map((i) => i.message));
+  renderIssues(regen.messages);
 
   studio = createStudio(
     {

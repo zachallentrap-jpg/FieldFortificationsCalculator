@@ -20,7 +20,7 @@ import { BF_PER_LF, classifyNominal, bomSummary } from '../src/timber/bom';
 import { generateFrame, specFromBuildingInput, type BuildingInput } from '../src/timber/frame';
 import { generateStructure } from '../src/timber/families/index';
 import { FAMILY_TABLE } from '../src/timber/catalog';
-import { configSchemaFor } from '../src/ui/woodframe/config';
+import { configSchemaFor, type PanelRow } from '../src/ui/woodframe/config';
 import { HUT } from '../src/timber/doctrine';
 import type { RoofSpec, StructureSpec } from '../src/timber/spec';
 
@@ -191,11 +191,18 @@ test('SIDING/ROOFING/FOUNDATION tables are populated (the coverings phase reads 
 // citation for something no crew is ever told to do, which is worse than none.
 //
 // IT HAS TO WALK WHAT SHIPS, AND WHAT SHIPS IS THE CARD PLUS ITS PANEL. The corpus is every
-// build reachable by opening a catalog card and MOVING ONE CONTROL on the panel that comes with
-// it: every option of every select, both states of every toggle, each number row at its own
-// clamp ends. One control at a time rather than the cross-product — a schedule that only appears
-// when two controls are moved together is not something this has ever claimed to reach, and one
-// click is enough to show a value with no cited home to a user.
+// build reachable by opening a catalog card and moving ONE OR TWO controls on the panel that
+// comes with it: every option of every select, both states of every toggle, each number row at
+// its clamp ends and its middle.
+//
+// TWO, BECAUSE ONE MISSED A MEMBER A USER CAN REACH IN TWO CLICKS. A one-control walk finds a
+// schedule only where a single choice reaches it, and some members exist only where two choices
+// AGREE. The purlin is the case: every family whose deck offers purlins presets to a gable, and
+// the frozen gable branch lays a solid deck (C-9), so roof-kind variation and covering variation
+// are each individually inert — it takes `roof.kind=hip` AND `coverings.roofDeck=purlins`
+// together, both of them options the card itself advertises, to put 26 purlins on a roof. Pairs
+// are walked in BOTH orders, and each row's `applies` predicate is honoured against the spec as
+// it stands when that row is reached, because that predicate is what the panel would have shown.
 //
 // A corpus built from `FAMILY_TABLE` presets, roof kinds and coverings alone leaves out eight
 // schedules that are one click away: a slab foundation, a front left open, felt under the
@@ -275,23 +282,66 @@ function cardSpecs(): { id: string; spec: StructureSpec }[] {
   return out;
 }
 
+/** The rows of a card's panel that are a value to move at all. */
+function panelRows(famId: string): PanelRow[] {
+  // The family row opens another card (already in the corpus) and the openings editor is a list,
+  // not a value — neither is a control set to one of a known set of values.
+  return configSchemaFor(famId as never).groups
+    .flatMap((g) => g.rows)
+    .filter((r) => r.control !== 'family' && r.control !== 'openings-editor');
+}
+
+/** Every value a row offers. Number rows at both clamp ends and the middle. */
+function rowValues(row: PanelRow): unknown[] {
+  if (row.control === 'toggle') return [true, false];
+  if (row.control === 'number') {
+    const { min, max } = row;
+    if (min === undefined || max === undefined) return [min, max].filter((v) => v !== undefined);
+    return [...new Set([min, (min + max) / 2, max])];
+  }
+  return (row.options ?? []).map((o) => (row.numeric ? Number(o) : o));
+}
+
 /** Each card with ONE panel control moved, over every value that control offers. */
 function panelSpecs(): { id: string; spec: StructureSpec }[] {
   const out: { id: string; spec: StructureSpec }[] = [];
   for (const fam of FAMILY_TABLE) {
-    for (const group of configSchemaFor(fam.id).groups) {
-      for (const row of group.rows) {
-        // The family row opens another card (already in the corpus) and the openings editor is a
-        // list, not a value — neither is a one-click change to THIS spec.
-        if (row.control === 'family' || row.control === 'openings-editor') continue;
-        const values: unknown[] =
-          row.control === 'toggle' ? [true, false]
-          : row.control === 'number' ? [row.min, row.max].filter((v) => v !== undefined)
-          : (row.options ?? []).map((o) => (row.numeric ? Number(o) : o));
-        for (const v of values) {
-          const spec = clone(fam.preset) as unknown as Record<string, unknown>;
-          applyPanelRow(spec, row.path, v);
-          out.push({ id: `${fam.id} ${row.path}=${String(v)}`, spec: spec as unknown as StructureSpec });
+    for (const row of panelRows(fam.id)) {
+      for (const v of rowValues(row)) {
+        const spec = clone(fam.preset) as unknown as Record<string, unknown>;
+        if (row.applies && !row.applies(spec)) continue; // the panel would not have shown this row
+        applyPanelRow(spec, row.path, v);
+        out.push({ id: `${fam.id} ${row.path}=${String(v)}`, spec: spec as unknown as StructureSpec });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Each card with TWO panel controls moved, in both orders. Order matters because a row's
+ * `applies` predicate reads the spec as it stands when that row is reached — which is exactly how
+ * the panel behaves, and how `roof.kind=hip` is what makes the purlins option appear at all.
+ */
+function pairSpecs(): { id: string; spec: StructureSpec }[] {
+  const out: { id: string; spec: StructureSpec }[] = [];
+  for (const fam of FAMILY_TABLE) {
+    const rows = panelRows(fam.id);
+    for (const a of rows) {
+      for (const b of rows) {
+        if (a === b) continue;
+        for (const va of rowValues(a)) {
+          for (const vb of rowValues(b)) {
+            const spec = clone(fam.preset) as unknown as Record<string, unknown>;
+            if (a.applies && !a.applies(spec)) continue;
+            applyPanelRow(spec, a.path, va);
+            if (b.applies && !b.applies(spec)) continue;
+            applyPanelRow(spec, b.path, vb);
+            out.push({
+              id: `${fam.id} ${a.path}=${String(va)} + ${b.path}=${String(vb)}`,
+              spec: spec as unknown as StructureSpec,
+            });
+          }
         }
       }
     }
@@ -299,9 +349,21 @@ function panelSpecs(): { id: string; spec: StructureSpec }[] {
   return out;
 }
 
-/** Every spec the shipped app can generate from a catalog card by using that card's own panel. */
+/**
+ * Every spec the shipped app can generate from a catalog card by moving one or two of that card's
+ * own panel controls. Deduplicated: most pairs land on a spec some other pair already produced
+ * (a row set to the value it already had), and building each one twice buys nothing.
+ */
 function shippedSpecs(): { id: string; spec: StructureSpec }[] {
-  return [...cardSpecs(), ...panelSpecs()];
+  const seen = new Set<string>();
+  const out: { id: string; spec: StructureSpec }[] = [];
+  for (const entry of [...cardSpecs(), ...panelSpecs(), ...pairSpecs()]) {
+    const key = JSON.stringify(entry.spec);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(entry);
+  }
+  return out;
 }
 
 /** Every distinct `nailing` string a set of builds emits, mapped to the roles and one build. */
@@ -320,9 +382,13 @@ function emittedNailingFrom(specs: { id: string; spec: StructureSpec }[]): Map<s
   return out;
 }
 
-const emittedNailing = (): Map<string, { roles: Set<string>; where: string }> => emittedNailingFrom(shippedSpecs());
+// The walk is thousands of builds; three tests read it, and building it three times would triple
+// the suite's runtime for an identical answer.
+let cachedEmitted: Map<string, { roles: Set<string>; where: string }> | null = null;
+const emittedNailing = (): Map<string, { roles: Set<string>; where: string }> =>
+  (cachedEmitted ??= emittedNailingFrom(shippedSpecs()));
 
-test('doctrine mirrors every nailing schedule a card and its panel can emit', () => {
+test('doctrine mirrors every nailing schedule a card and its panel can emit with one or two controls moved', () => {
   const emitted = emittedNailing();
   // The corpus is the guarantee's reach, so it is asserted rather than assumed: a refactor that
   // quietly narrowed the walk back to one generator would otherwise leave this test green.
@@ -356,6 +422,21 @@ test('the guarantee reaches the PANEL, not just the cards it ships', () => {
   assert.deepEqual(reachedByPanel.filter((s) => !mirrored.has(s)), []);
   const corpus = new Set(emittedNailing().keys());
   assert.deepEqual(reachedByPanel.filter((s) => !corpus.has(s)), [], 'the panel sweep is not in the walked corpus');
+});
+
+test('the guarantee reaches a member only a PAIR of card-advertised choices produces', () => {
+  // What the second control buys, named. Narrow the corpus back to one control at a time and the
+  // purlin's schedule leaves the walk entirely — not because it is unreachable, but because the
+  // two clicks that reach it are inert one at a time. That is the shape of gap this register is
+  // for, so the walk has to keep proving it still covers it.
+  const singles = new Set(emittedNailingFrom([...cardSpecs(), ...panelSpecs()]).keys());
+  const reachedOnlyByPairs = [...emittedNailing().keys()].filter((s) => !singles.has(s));
+  assert.ok(
+    reachedOnlyByPairs.includes(NAILING.purlinAtRafters.value as string),
+    `the purlin schedule is no longer pair-only — the walk found it at ${reachedOnlyByPairs.length} pair-only schedules`,
+  );
+  const mirrored = new Set(Object.values(NAILING).map((d) => d.value as string));
+  assert.deepEqual(reachedOnlyByPairs.filter((s) => !mirrored.has(s)), []);
 });
 
 test('no two EMITTED schedules are the same joint written two ways', () => {

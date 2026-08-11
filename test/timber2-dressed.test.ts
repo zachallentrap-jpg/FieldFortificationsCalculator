@@ -20,6 +20,10 @@ import { BF_PER_LF } from '../src/timber/bom';
 import { BUNKER, TOWER, IN_PER_FT } from '../src/timber/doctrine';
 import { generateStructure } from '../src/timber/families/index';
 import { familyById } from '../src/timber/catalog';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const TYPES = fileURLToPath(new URL('../src/timber/types.ts', import.meta.url));
 
 /** Nominal → dressed, by the standard softwood rule. `null` for a name this rule does not cover. */
 function dressedByRule(nominal: string): { w: number; d: number } | null {
@@ -114,4 +118,45 @@ test('and the LENGTHS are not — a piece cut to fit is cut to the dressed face,
   const wrongGapFt = centreSpacingFt - (rule.w - 0.25) / IN_PER_FT;
   const swing = blocking.length * (wrongGapFt - clearGapFt) * BF_PER_LF[nominal]!;
   assert.ok(swing > 1, `a quarter inch across ${blocking.length} blocks moves only ${swing.toFixed(2)} BF`);
+});
+
+test('the figures the DRESSED header argues from are the ones the bunker actually cuts', () => {
+  // The header makes its case for the timber deduction on one member — the crib bunker's overhead
+  // blocking — and states what that member is cut to at each of the two faces. A magnitude stated
+  // there is an argument, so it has to survive being checked: the blocks are cut in INCHES, and a
+  // figure a reader cannot reproduce is the same defect the header exists to correct.
+  const cribBunker = () => JSON.parse(JSON.stringify(familyById('crib-bunker' as never)!.preset));
+  const measure = (): { blocks: number; cutIn: number } => {
+    const blocking = generateStructure(cribBunker()).members.filter((m) => m.role === 'ohcBlocking');
+    const lengths = [...new Set(blocking.map((b) => +b.cutLength.toFixed(3)))];
+    assert.equal(lengths.length, 1, `the overhead blocking is no longer one repeated cut: ${lengths.join(', ')}`);
+    return { blocks: blocking.length, cutIn: lengths[0]! };
+  };
+
+  const asTimber = measure();
+  // The counterfactual the header names, measured rather than asserted: the same bunker with the
+  // 8x8 row standing back on the dimension-lumber deduction.
+  const saved = { ...DRESSED['8x8']! };
+  DRESSED['8x8'] = { w: 7.25, d: 7.25 };
+  let asDimensionLumber: { blocks: number; cutIn: number };
+  try {
+    asDimensionLumber = measure();
+  } finally {
+    DRESSED['8x8'] = saved;
+  }
+  assert.deepEqual(DRESSED['8x8'], saved, 'the table was left mutated');
+  assert.ok(asDimensionLumber.cutIn > asTimber.cutIn, 'a narrower stringer face has to leave a longer block');
+
+  const header = readFileSync(TYPES, 'utf8').split('export const DRESSED')[0]!.replace(/\n\s*\/\/\s?/g, ' ');
+  const stated = /(\d+)\s+overhead blocks is cut ([\d.]+) (in|ft) between 7 1\/2-in stringers where it would be ([\d.]+) (in|ft)/i
+    .exec(header);
+  assert.ok(stated, 'the header no longer states the blocking figures its argument rests on');
+  assert.equal(Number(stated[1]), asTimber.blocks, `the header counts ${stated[1]} blocks; the bunker cuts ${asTimber.blocks}`);
+  assert.equal(stated[3]!.toLowerCase(), 'in', `the header gives the cut in ${stated[3]}; it is inches`);
+  assert.equal(stated[5]!.toLowerCase(), 'in', `the header gives the counterfactual in ${stated[5]}; it is inches`);
+  assert.equal(Number(stated[2]), asTimber.cutIn, `the header says ${stated[2]} in; the bunker cuts ${asTimber.cutIn} in`);
+  assert.equal(
+    Number(stated[4]), asDimensionLumber.cutIn,
+    `the header says a 7 1/4-in stringer would leave ${stated[4]} in; it leaves ${asDimensionLumber.cutIn} in`,
+  );
 });

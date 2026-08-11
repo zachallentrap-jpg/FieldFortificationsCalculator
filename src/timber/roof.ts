@@ -208,16 +208,23 @@ export function generateRoof(input: RoofInput): Member[] {
   // it directly avoids a 0/0 at a flat (risePer12=0) roof, which the cancelled-out form
   // divided by literally. Audit fix, kept through the FM 5-426 merge.
   const tieHalf = halfSpan / 3;
+  // ONE SENTENCE FOR EVERY LAYOUT, AND THE NUMBER IN IT IS THE ONE THE REGISTER HOLDS. The rafter
+  // count is a consequence of the spacing, so the card states the count it used AND the distance
+  // that chose it; a card that names only the count is repeating the rule's 16-in special case as
+  // though it were the rule. The 16-in card said "≤5 ft" — a figure nothing here enforces and
+  // nothing in the register holds — on the default layout of most of the catalog.
+  //
+  // AND IT SAYS THE PAGE IS STILL OWED. The 4 ft is the recognized figure and the section is
+  // named, but naming a section is not reading it: `LAYOUT.collarTieMaxSpacingFt` is `ph: true`
+  // for exactly that reason, and a card that drops the marker tells a crew the sourcing is
+  // settled while the register says it is not.
+  const nth = tieStep === 1 ? '' : tieStep === 2 ? '2nd ' : tieStep === 3 ? '3rd ' : `${tieStep}th `;
+  const tieRef = `FM 5-426 collar ties, every ${nth}rafter so the run stays within ${TIE_MAX_FT} ft `
+    + `at ${input.rafterSpacingIn} in o.c. (IRC R802.3.1 — PH page)`;
   for (let i = tieStep; i < gridXs.length - 1; i += tieStep) {
     emit('collarTie', '2x4', 2 * tieHalf, [gridXs[i]! + t, tieY, W / 2], [0, -Math.PI / 2, 0], 8, {
       nailing: '3-10d face nail ea end (IRC R802.3.1)',
-      // The ref states what was actually done, the way the sheathing and let-in brace refs below
-      // and in walls.ts do — "every 3rd rafter" is only the description when it is also the tie
-      // interval the cited limit allows.
-      doctrineRef: tieStep === 3
-        ? 'FM 5-426: collar tie every 3rd rafter / ≤5 ft (PH page)'
-        : `FM 5-426 collar ties, closed up to every ${tieStep === 2 ? '2nd' : `${tieStep}th`} rafter `
-          + `so the run stays within ${TIE_MAX_FT} ft at ${input.rafterSpacingIn} in o.c. (IRC R802.3.1)`,
+      doctrineRef: tieRef,
     });
   }
   // Gable-end studs: verticals from the cap plate up to whatever is over them, standing on the
