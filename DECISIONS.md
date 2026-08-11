@@ -572,19 +572,31 @@ option, implement it, and log it here.
   **`unmeasured`** is a role the value governs in the abstract that the named check cannot reach,
   carrying the reason, and it exists because the previous fix for the hip's seat was to delete
   `hipRafter` from the list: true of `roles`, and silent in a way the next reader takes for
-  coverage. **The gate is four tests over the card-and-panel corpus** (`timber2-doctrine.test.ts`,
+  coverage. **The gate is five tests over the card-and-panel corpus** (`timber2-doctrine.test.ts`,
   the same walk the nailing register is proved against — 70 member roles, 208 distinct member
-  classes, 7 unaided check results, 2 seated roles, each floored just under its measured value and
-  the unaided results named individually as well, because a walk that stopped walking loses most of
-  a set and a floor at half the real figure would sit there green through it): every declared role
-  is one some shipped build emits; every role a LIMIT
+  classes, 7 unaided check results, 2 seated roles, each floored just under its measured value):
+  every declared role is one some shipped build emits; every role a LIMIT
   declares is one its named check is SEEN to measure — by the check's own warnings where a shipped
-  design breaks its row, and otherwise by handing the checker that build's own member at four
+  design breaks its row, and otherwise by handing the checker that build's own member at eight
   times its length, because a member inside its row and a member no branch reaches are the same
   silence from outside; no member CLASS a row claims falls through every branch, per class rather
   than per role, because a tail joist at ceiling level is the same declared role as one on the
-  deck and only one of the two was ever measured; and no `unmeasured` declaration that does not
-  hold up. **That fourth test is the one that had to be rewritten, because as first built the
+  deck and only one of the two was ever measured; every member a span table can be READ on is
+  claimed or disclaimed by SOME row, which is D43 below and is the one that starts from the
+  generators instead of from this table; and no `unmeasured` declaration that does not hold up.
+  **WHAT THE CORPUS FLOORS CAN AND CANNOT SEE — CORRECTED, BECAUSE THIS ENTRY FIRST GOT IT WRONG.**
+  It justified them by saying that what narrows a corpus is a walk that stopped walking or a
+  recorder that stopped recording, and that either takes most of a set rather than a member of it.
+  Measured false: make `recordLs` skip one role's members — `tailJoist` — and the classes go 208 to
+  205 while the roles, the unaided results and the seated roles do not move at all, so all four
+  floors sit green through it and a declaration bypass rides in behind. What the floors DO catch is
+  a wholesale narrowing: cutting the corpus back to the catalog cards takes 208 classes to 152 and
+  7 unaided results to 2, firing two of the four (the role count only falls 70 to 62 and the seated
+  count not at all, which is the same point again — an aggregate cannot see a role). So the
+  evidence the tests actually read is pinned BY NAME as well as by count: the kinds of unaided
+  result, and the member classes the refusals cite — the four roles a framed opening is built from,
+  on both decks, and the hips of a build with nothing else on its roof. **That fourth test is the
+  one that had to be rewritten, because as first built the
   escape hatch validated itself.** It asked "does the check fail to measure this role?" — which is
   trivially true exactly when somebody has broken or omitted the branch, i.e. in precisely the case
   it exists to refuse. Demonstrated, not theorised: revert the tail-joist branch in `spans.ts` and,
@@ -606,8 +618,9 @@ option, implement it, and log it here.
   that is not the same trap.** `seatCutsFor` runs over every member of every build and has never
   heard of the register, so a declaration cannot suppress its own refutation — which is exactly
   what the span side could do. The geometric analogue would be WORSE there: squash a hip roof to a
-  4 ft plan and its hips swing to within 17° of a wall line, `runAxisOf` snaps them onto that axis,
-  and `seatCutFor` duly returns a notch that is not the hip's joint at all. What decides that
+  4 ft plan and its hips swing to within 14.0° and 17.0° of a wall line on two builds the corpus
+  already ships, `runAxisOf` snaps all four of them onto that axis, and `seatCutFor` duly returns a
+  notch that is not the hip's joint at all. What decides that
   check's reach is whether the cut IS the member's joint, a modelling judgment the module states
   in the open and the viewer draws — so the subject list is the criterion, and the gate now refuses
   the reverse, a role the module seats that the row says nothing about. **The packet gained a NOT
@@ -628,7 +641,69 @@ option, implement it, and log it here.
   still a declaration, so a row that names no check is only held to "some build emits this role";
   the span criterion refuses a declaration but cannot invent the branch, so the fix is always
   someone's; and the hip's seat remains the one open item, unchanged — when the double-cheek
-  geometry is derived, `hipRafter` goes back on that register line and the caveat comes off.
+  geometry is derived, `hipRafter` goes back on that register line and the caveat comes off. **One
+  more residual was missing from that list and cost a whole defect: none of the four tests required
+  a role to be CLAIMED by anything.** They all start from what this table says, so a role in no
+  `roles` list and no `unmeasured` list is invisible to every one of them. See D43.
+
+- **D43 — Completeness is asked of the generators, not of the register: a member a span table can
+  be read on must be claimed by some row, or disclaimed by one.** D42's gate refuses a FALSE claim
+  in three directions and never once requires a claim to exist, and the same defect it was built
+  for walks back in through the gap. Demonstrated: take `tailJoist` out of `roles` on both joist
+  rows with no `unmeasured` entry and delete its branches in `spans.ts` — the register says nothing
+  at all about it — and every one of those four tests passes, because a member class with no
+  claimant is skipped, the "declares X" tests walk `roles`, and the escape-hatch test walks
+  `unmeasured`. **And there was a standing instance in the tree the day this was written, needing
+  no edit at all.** `LUMBER.joistNominal` sizes four joist roles — `joist`, `tailJoist`,
+  `headerJoist`, `trimmerJoist` — and the two span rows named the first two. A framed opening (a
+  stair well, an attic scuttle) turns the joists that would have crossed it into TAILS on a doubled
+  HEADER standing on a doubled TRIMMER each side, so the two members the opening's whole load runs
+  through were sized by doctrine, rated by nothing, and named by no span row: `building ·
+  trimmerJoist · 2x8 · on the deck` runs 23.8 ft and `building · headerJoist · 2x8 · on the deck`
+  runs 10.0 ft, both wearing a size that IS a row of the joist table, on the packet that printed
+  the joist span limit as a value the build had been held to. **The fix is the branches, not a
+  sentence** — `spans.ts` now reads all four joist roles on the floor and ceiling tables, a
+  trimmer on the worst bay it crosses like any joist, a header on its own length between the
+  trimmers because it runs the other way — and the warning for a doubled member says what the row
+  means for it, in the shape the hip's message already uses: the row is what ONE joist carrying its
+  own strip may span, a trimmer carries the header on top of that and a header carries the ends of
+  every tail, so the figure is a limit it is already past and not a rating for it.
+  **THE CRITERION IS THE EMITTERS' OWN VOCABULARY AND THE TABLE'S OWN SHAPE.** For every member
+  class the walk emitted: the doctrine key and the member role name the same kind of member (the
+  last word of `ceilingJoist` and of `trimmerJoist` is the same word), the table has a row for the
+  member's nominal, and — for the repetitive tables, which are indexed by nominal AND by o.c.
+  spacing — it has a COLUMN for the spacing that class actually stands at, measured off the
+  emitted geometry as the distance to the nearest parallel member of its own role. Then, and only
+  then, the register is asked whether any row in that member's scope speaks for it. Nothing in
+  `LS_CONSUMERS` can move any of those three facts. **The column is not a technicality.**
+  `columnFor` picks the nearest column at or above the member's spacing and falls back to the
+  WIDEST when the spacing is past all of them, which is right for a 12-in layout read at the 16-in
+  row and is not a reading at all for a member standing four feet from its neighbour: the allowance
+  shrinks as the spacing grows, so the fallback hands over a figure that belongs to a member
+  carrying a fraction of that strip — an overstatement, and overstatement is the direction that
+  goes quiet on a real overload. Measured on
+  the corpus, exactly two roles fall out of the obligation that way and nothing else does: a
+  `rimJoist`, whose only parallel neighbour of its own role is the band on the far side of the
+  building — the closest any build in the walk puts them is 46.5 in — and a tent frame's
+  `bentRafter`, whose bents stand 46.25 in apart. Neither is one of a repetitive set these columns
+  cover, and neither is quietly skipped: they are outside what the table can say, the same way a
+  6x8 cap beam is. **`spanTableOf` was fail-OPEN and is not any more.**
+  It returned any `SPAN.*` object as a table, and a table keyed on something other than
+  a nominal — clear-span feet, a load class — then matched no member, produced an empty evidence
+  list, and read as "nothing contradicts this declaration". Planted end to end — a `SPAN.trenchCap`
+  keyed `{4:2, 6:3, 8:4}`, life-safety, hosting a false `unmeasured` — and measured both ways: with
+  the precondition taken back out the whole file passes it, and with it in the plant is refused by
+  name. The shape of the table is now a precondition, and the refusal says so in its own sentence
+  rather than being interpolated into a per-class one where it read as a non-sequitur. **The probe
+  is at eight times
+  the member's length, not four**, because four was not enough for the shortest member the register
+  now claims: the factors the claimed classes actually need run 1 to 6, the binding one being the
+  attic scuttle's 2.5 ft doubled ceiling header against a 13.5 ft row. Raising it can only let the
+  probe see more, and every test reads "measured" as a reason to demand a branch or refuse a
+  declaration, never as a reason to excuse one. **Residual:** the obligation reaches a role only
+  where the corpus emits it, so a role that exists in no shipped build is still held by nothing;
+  and a class whose spacing cannot be measured at all is kept in the evidence deliberately, which
+  is the fail-closed direction but means the column test is a floor on the evidence, not a ceiling.
 
 ## 2026-08-02 — The catalog is complete, and the last three gaps closed the way they should have
 

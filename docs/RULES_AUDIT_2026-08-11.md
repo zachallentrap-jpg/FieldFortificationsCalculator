@@ -125,3 +125,71 @@ legacy generator; the strong cross-view geometry tests run on hand-picked fixtur
 while the broad sweeps assert only finiteness/token-validity; and no test reads
 `DOCTRINE_SOURCES.md` or `PLACEHOLDER_POLICY.md` at all — the registry is
 machine-readable and simply never diffed against its own checklist.
+
+---
+
+## 6. Phase 1 closure — fail-safe hardening (items 1 and 5)
+
+Closed over six rounds: one implementation pass and five adversarial passes, each
+reviewer required to construct inputs and observe outputs rather than reason from
+the code, and to verify every claimed test lock by reverting it. Suite went
+**941 → 1022 tests, all green**, typecheck clean.
+
+### What the adversarial passes caught that the implementation missed
+
+Each round closed the specific defect and the next round found the same *class*
+elsewhere. That progression is the useful record:
+
+1. **C10 declared closed, still open.** The missing-shielding-leaf branch was
+   guarded, but a leaf whose *value* is zero — which the importer explicitly
+   accepts — still produced an earth roof: stringers billed, zero protection,
+   zero warnings. Same bad state, second door.
+2. **Then a third door**, at `1e-9` ft: positive, so the guard passed, while the
+   roof rendered as `0'-0"`. Closed on a display-precision argument rather than
+   an invented doctrinal minimum.
+3. **Declared-role vs measured-role**, found three times in three different
+   register rows (bird's-mouth seat, rafter span, joist span). Fixing instances
+   was not converging, so the fix became a gate: every role a life-safety row
+   declares must be provably measured. On its first run the gate found a fourth
+   instance nobody had spotted — a crib bunker's 6x8 entrance header claimed by a
+   span table whose rows stop at 2x12, so nothing ever measured it while the
+   packet printed it as a value the doorway rested on.
+4. **The gate itself was bypassable three ways**, each demonstrated in a
+   disposable copy: by *declaration* (declare the role unmeasurable instead of
+   wiring the check — the validation was self-validating, since "the check does
+   not reach it" is trivially true when someone has broken the check); by
+   *silence* (claim the role nowhere at all); and by *narrowing* (shrink the
+   corpus so fewer members are observed). All three are now refused, the first by
+   an independent derivability criterion, the second by asking the generators
+   rather than the register which roles must be claimed, the third by named-class
+   floors that an aggregate count cannot slip past.
+
+Three findings also had to be corrected in the opposite direction: a claimed lock
+that survived a revert, a "no BOM impact" claim that was false, and — five rounds
+running — a wrong magnitude written into a comment added to correct a wrong
+magnitude (once off by 12x). Every numeric claim in the current comments was
+re-measured from a build.
+
+### Open residuals, and why this phase stopped here
+
+The recursion does not terminate on its own: each gate rests on a hand-maintained
+register, and a register nothing measures for completeness becomes the next place
+to hide. The final pass identified exactly where that stands, and these are
+carried as known, documented residuals rather than silently closed:
+
+- **`RENDERED_PROTECTION`** (`src/doctrine/io.ts`) is hand-written; dropping a
+  protective leaf from it is unobserved. Its exclusion notes are free text that
+  nothing measures, so a false reason reads as a real one.
+- **The span obligation's column prong** (`test/timber2-doctrine.test.ts`) drops a
+  class whose measured spacing exceeds the table's widest column — a silent lever
+  on the obligation set.
+- **Head-noun coupling** decides which limit governs which member by name, so a
+  pure rename decouples them.
+- **Sampled corpora presented as complete**: the dimensioned-magnitude map names
+  one depth of ten, one shielding row of twelve, one standoff of seventeen.
+
+None of these is a live wrong number today; each is a way a *future* change could
+reintroduce one without tripping a gate. They are worth one focused pass, but they
+rank below the phase-2 work: the rule↔rendering defects (C1, C2, C3, C7) are live
+disagreements between the rules and the drawings today, which is the failure the
+tool cannot afford.

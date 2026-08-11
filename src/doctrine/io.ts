@@ -15,8 +15,8 @@
 
 import { DOCTRINE_VERSION } from '../version';
 import { all, getByPath, counts } from './registry';
-import { berm, parapet, shielding, shieldMaterials, spanSizes, threats } from './protection';
-import { backblast } from './positions';
+import { berm, overhead, parapet, radiationHalving, shielding, shieldMaterials, spanSizes, threats } from './protection';
+import { backblast, positions } from './positions';
 import { standards } from './standards';
 import { excavationSplit } from './stages';
 import { fmtLength } from './units';
@@ -380,51 +380,118 @@ function coverMultiplierWarnings(p: Prospective, flagged: ReadonlySet<string>): 
 }
 
 // The two protection ladders are not the whole of what the operator is SHOWN as protection.
-// Three more safety-critical leaves are protective magnitudes in their own right and reach the
-// panel and the drawing through the SAME length formatter, so the reading above applies to them
-// leaf by leaf and unchanged:
-//   · parapet.W — the frontal cover of an earth parapet. The plan dimensions it and the job
-//     sheet prints it as the parapet's thickness.
-//   · berm.W — the same frontal cover for a vehicle hull-down, where the dozed spoil berm is the
+// Every leaf below is a protective magnitude in its own right that the app puts in front of the
+// operator as a length in feet — on the plan, on the job sheet, or as an operand of a tapped
+// derivation trace — so the reading above applies to it leaf by leaf and unchanged:
+//   · parapet.W / parapet.H — the frontal cover of an earth parapet and how much of it stands
+//     above grade. The plan dimensions both and the job sheet prints them on one line.
+//   · berm.W / berm.H — the same two for a vehicle hull-down, where the dozed spoil berm is the
 //     ONLY protection the position has.
 //   · backblast.clearanceFt — the rear danger area an ATGM crew must keep clear of people and
 //     hard surfaces. The plan draws the zone to scale and dimensions it.
+//   · overhead.setbackMin — the standoff of a position with NO named threat. An earlier round
+//     excluded it because it "never reaches the formatter alone": the setback DIMENSION is
+//     max(setbackMin, setbackDepthFrac × depthOfCut), so the other term usually binds. Measured,
+//     that is true of the dimension and false of the leaf — with threat 'none' the roof-setback
+//     trace prints THIS leaf as its own operand in feet (engine/explain.ts, 'munitionStandoff'),
+//     and filled to zero the trace reads it out as no standoff at all. It is the one standoff of
+//     the eighteen (every munition's, plus this fallback) that nothing checked, and the fallback
+//     is exactly the case where nobody chose a threat to be checked instead.
+//   · radiationHalving.* — the thickness of each material that halves a fallout dose. Also
+//     excluded before, as "consumed as a divisor and never printed as a length". Measured, it is
+//     printed: the specs panel carries a fallout-attenuation row, and its trace prints this leaf
+//     as an operand in feet through the panel's own number formatter, which shows a tiny fill as
+//     nothing. Worse, it is a DIVISOR — the attenuation is the roof thickness over it — so the
+//     unreadable band inflates the protective claim instead of deleting it, the dangerous
+//     direction, and a crew reads an earth roof as halving the dose a preposterous number of
+//     times. The old exclusion's second ground ("a non-positive one already reads as no
+//     attenuation") is true and covers only the non-positive case, which was never the problem.
 // Zero or less means ABSENT (no thickness of earth stops a round, and no crew is safe standing
-// at no backblast clearance); a hair above zero is a magnitude nobody can read off the screen,
-// check against a pub, or build to. Neither state is caught anywhere downstream: unlike the roof,
-// none of these has an engineered fail-safe behind it — the app dimensions a parapet of no
-// thickness while the BOM still bills the sandbag rest along its face, and a hull-down still
-// bills a berm fill of effectively nothing — so this report is the only place such a fill is
+// at no backblast clearance); a hair above zero is a magnitude nobody can read off the screen or
+// check against a pub. Unlike the roof, none of these has an engineered fail-safe behind it, and
+// no validation code downstream asks about any of them: the app dimensions a parapet of no
+// thickness while the BOM still bills the sandbag rest along its face, a hull-down still bills a
+// berm fill of effectively nothing, and a roof whose halving thickness reads as absent simply
+// drops the attenuation row without saying why. This report is the only place such a fill is
 // questioned.
 //
-// The REST of the safety-critical set is deliberately not here, because it is not a protective
-// length the app prints: overhead.setbackDepthFrac is a unitless RATIO and spanSizes[].maxSpan is
-// a span LIMIT, and the span limits already answer to a stricter whole-table check that REFUSES
-// the file. retainingWall.maxHeight is the threshold that trips the shoring warning rather than a
-// thickness anyone builds to, and retainingWall.thickness feeds no formula. radiationHalving is
-// consumed as a divisor for a layer count and never printed as a length — a non-positive one
-// already reads as no attenuation. overhead.setbackMin is only the fallback standoff for
-// threat 'none'/unknown and never reaches the formatter alone; what the panel prints is
-// max(setbackMin, setbackDepthFrac × depthOfCut).
-const RENDERED_PROTECTION: { leaf: Provenance<number>; subject: string; kind: string; consequence: string }[] = [
+// What is still NOT here, and why: overhead.setbackDepthFrac is a unitless RATIO with no length
+// display of its own, and it cannot empty the setback dimension by itself — that max() falls
+// back to the standoff term, and every standoff is now checked, the fallback above included.
+// spanSizes[].maxSpan is a span LIMIT rather than a length anyone builds to: its table's ORDER
+// answers to a whole-table check that REFUSES the file, and a limit driven to nothing fails SAFE —
+// the first-fit walk falls off the end of the table and the roof becomes engineered, so the app
+// asks for a designer instead of printing a size (measured: an earth roof turns engineered and the
+// span-exceeded warning fires). retainingWall.maxHeight is the threshold that trips the shoring
+// warning rather than a thickness anyone builds to, and driving it down makes that warning fire on
+// every cut — the loud direction (measured). retainingWall.thickness feeds no formula in src/ at all.
+interface RenderedProtection {
+  leaf: Provenance<number>;
+  subject: string;
+  kind: string;
+  // What the app does with the fill anyway. Split, because the two states do not always have the
+  // same consequence: a halving thickness of zero deletes the attenuation row, while one a hair
+  // above zero prints an attenuation nothing could deliver.
+  absent: string;
+  invisible: string;
+}
+
+const PARAPET_DRAWN = 'the plan still dimensions a parapet and the BOM still bills the sandbag rest along its face';
+const BERM_DRAWN = 'that berm is the only protection a hull-down position has, and the BOM still bills a fill for it';
+const BACKBLAST_DRAWN = 'the plan still draws the danger zone and the crew is still told to keep it clear before firing';
+
+const RENDERED_PROTECTION: RenderedProtection[] = [
   {
     leaf: parapet.W,
     subject: 'the frontal cover of an earth parapet',
     kind: 'thickness',
-    consequence: 'the plan still dimensions a parapet and the BOM still bills the sandbag rest along its face',
+    absent: PARAPET_DRAWN,
+    invisible: PARAPET_DRAWN,
+  },
+  {
+    leaf: parapet.H,
+    subject: 'the height an earth parapet stands above grade',
+    kind: 'height',
+    absent: 'the plan still dimensions a parapet height beside its thickness, on the same job-sheet line',
+    invisible: 'the plan still dimensions a parapet height beside its thickness, on the same job-sheet line',
   },
   {
     leaf: berm.W,
     subject: 'the frontal cover of a vehicle spoil berm',
     kind: 'thickness',
-    consequence: 'that berm is the only protection a hull-down position has, and the BOM still bills a fill for it',
+    absent: BERM_DRAWN,
+    invisible: BERM_DRAWN,
+  },
+  {
+    leaf: berm.H,
+    subject: 'the height a vehicle spoil berm stands above grade',
+    kind: 'height',
+    absent: 'the section still draws a berm and the BOM still bills the fill computed from that height',
+    invisible: 'the section still draws a berm and the BOM still bills the fill computed from that height',
   },
   {
     leaf: backblast.clearanceFt,
     subject: 'the rear backblast danger area of an ATGM position',
     kind: 'clearance',
-    consequence: 'the plan still draws the danger zone and the crew is still told to keep it clear before firing',
+    absent: BACKBLAST_DRAWN,
+    invisible: BACKBLAST_DRAWN,
   },
+  {
+    leaf: overhead.setbackMin,
+    subject: 'the standoff of a position with no named threat',
+    kind: 'standoff',
+    absent: 'the roof-setback trace still prints it, in feet, as the standoff the setback was taken from',
+    invisible: 'the roof-setback trace still prints it, in feet, as the standoff the setback was taken from',
+  },
+  ...shieldMaterials.map((mat) => ({
+    leaf: radiationHalving[mat],
+    subject: 'the thickness of ' + mat + ' that halves a fallout dose',
+    kind: 'halving thickness',
+    absent: 'the panel then prints no fallout attenuation at all for an earth roof of it',
+    invisible:
+      'the panel divides the roof thickness by it and prints the quotient as that roof\'s fallout' +
+      ' attenuation, so a halving thickness too small to read prints protection no roof delivers',
+  })),
 ];
 
 function protectiveMagnitudeWarnings(p: Prospective): DoctrineFinding[] {
@@ -435,13 +502,99 @@ function protectiveMagnitudeWarnings(p: Prospective): DoctrineFinding[] {
       v,
       () =>
         m.subject + ' would be ' + v + ' ft — a protective ' + m.kind + ' of zero or less reads as a' +
-        ' MISSING value, yet ' + m.consequence + '; applied, confirm against the pub',
+        ' MISSING value, yet ' + m.absent + '; applied, confirm against the pub',
       (shown) =>
         m.subject + ' would be ' + v + ' ft — that rounds to zero as displayed (the panel can only' +
-        ' show it as ' + shown + '), so nobody can read or build it, yet ' + m.consequence +
-        '; applied, confirm against the pub',
+        ' show it as ' + shown + '), so nobody can read it off the screen or check it against a pub,' +
+        ' yet ' + m.invisible + '; applied, confirm against the pub',
     );
     if (reason !== undefined) out.push({ path: p.pathOf(m.leaf), reason });
+  }
+  return out;
+}
+
+// Depth of cut is the protection a position gets from being IN the ground, and the plan
+// dimensions it — but it is a PRODUCT of two fillable leaves, exactly like the roof:
+// depthOfCut = the position's catalog hole depth × the build standard's depthMul. coverMul is
+// checked here because it scales a rendered protective magnitude to display-zero; depthMul is
+// its sibling in the same standards row and does the same to the depth of cut, which the drawing
+// dimensions and the excavation bills. Neither leaf is marked safetyCritical — neither is
+// coverMul — and nothing downstream objects: measured, a depth multiplier a hair above zero
+// leaves the plan dimensioning a position of no depth while the roof over it is still sized,
+// stringered and billed in full, and the only code the fill adds is a spoil shortfall — a
+// finding about the spoil, which says nothing about the hole not being there.
+//
+// So the same two-part shape as the roof: the depths leaf by leaf, the multiplier through the
+// product, and blame on whichever table is at fault — a depth that is unusable on its own is
+// reported against the position catalog and excluded from the product walk, so the filler is
+// never sent to the standards table to correct a position's depth.
+function depthOfCutWarnings(p: Prospective): DoctrineFinding[] {
+  const out: DoctrineFinding[] = [];
+  const flagged = new Set<string>();
+  const catalog = Object.values(positions);
+  for (const pos of catalog) {
+    const v = p.valueOf(pos.hole.D);
+    const reason = unbuildableMagnitude(
+      v,
+      () =>
+        'the ' + pos.label + ' would be dug ' + v + ' ft deep — a depth of cut of zero or less reads' +
+        ' as a MISSING value, yet the plan still dimensions the position and any roof over it is' +
+        ' still sized, stringered and billed unchanged; applied, confirm against the pub',
+      (shown) =>
+        'the ' + pos.label + ' would be dug ' + v + ' ft deep — that rounds to zero as displayed (the' +
+        ' plan can only dimension it as ' + shown + '), so the position offers no defilade anybody' +
+        ' can read, yet any roof over it is still sized, stringered and billed unchanged; applied,' +
+        ' confirm against the pub',
+    );
+    if (reason !== undefined) {
+      const path = p.pathOf(pos.hole.D);
+      flagged.add(path);
+      out.push({ path, reason });
+    }
+  }
+  for (const std of Object.values(standards)) {
+    const mul = p.valueOf(std.depthMul);
+    // Absent in its own right, like the cover multiplier: it takes every depth in the catalog
+    // away at once, so it needs no victim to prove it and is named even when every depth is
+    // already flagged on its own row.
+    if (!(mul > 0)) {
+      out.push({
+        path: p.pathOf(std.depthMul),
+        reason:
+          'a ' + std.label + ' position is dug to ' + mul + ' × the catalog depth — a multiplier of' +
+          ' zero or less reads as a MISSING value and leaves every position in the catalog with no' +
+          ' depth of cut at all, while any roof over it is still sized, stringered and billed' +
+          ' unchanged; applied, confirm against the build standard',
+      });
+      continue;
+    }
+    let worst: { label: string; ft: number } | undefined;
+    let affected = 0;
+    for (const pos of catalog) {
+      if (flagged.has(p.pathOf(pos.hole.D))) continue;
+      const d = p.valueOf(pos.hole.D);
+      if (!isUnbuildable(d * mul)) continue;
+      affected++;
+      if (worst === undefined || d > worst.ft) worst = { label: pos.label, ft: d };
+    }
+    // Same reading as the cover multiplier: with no legible depth left to convict it, a POSITIVE
+    // multiplier is left to the catalog rows that already carry their own finding.
+    if (worst === undefined) continue;
+    const w = worst;
+    const reason = unbuildableMagnitude(
+      w.ft * mul,
+      () =>
+        'a ' + std.label + ' position is dug to ' + mul + ' × the catalog depth, which scales a real' +
+        ' depth (' + w.label + ', ' + w.ft + ' ft) to zero or less — a depth of cut of zero or less' +
+        ' reads as a MISSING value; affects ' + affected + ' of the ' + catalog.length + ' positions' +
+        ' in the catalog; applied, confirm against the build standard',
+      (shown) =>
+        'the ' + w.label + ' under the ' + std.label + ' standard is dug to ' + w.ft + ' ft × ' + mul +
+        ', which the plan can only dimension as ' + shown + ' — the catalog depth reads fine on its' +
+        ' own, so it is this multiplier that takes the defilade away; affects ' + affected + ' of the ' +
+        catalog.length + ' positions in the catalog; applied, confirm against the build standard',
+    );
+    if (reason !== undefined) out.push({ path: p.pathOf(std.depthMul), reason });
   }
   return out;
 }
@@ -489,6 +642,7 @@ function unbuildableWarnings(p: Prospective): DoctrineFinding[] {
     if (reason !== undefined) out.push({ path: p.pathOf(t.standoffMin), reason });
   }
   out.push(...protectiveMagnitudeWarnings(p));
+  out.push(...depthOfCutWarnings(p));
   return out;
 }
 

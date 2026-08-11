@@ -105,10 +105,21 @@ export const LS_CONSUMERS: Readonly<Record<string, LsConsumer>> = {
   // say about a solid timber. Listed unscoped, they printed on a bunker packet as the values its
   // doorway rested on, and the span row was a limit no row of the table could be read against.
   'LUMBER.headerNominal': { roles: ['header'] , label: 'Header size', families: ['building', 'hut', 'tower', 'platform', 'tentFrame'] },
-  'SPAN.joist': { roles: ['joist', 'tailJoist'] , label: 'Floor-joist span limit', checkedBy: 'span' },
+  // ALL FOUR JOIST ROLES, WHICH IS EVERY ROLE `LUMBER.joistNominal` ABOVE ALREADY SIZED. A framed
+  // opening turns the joists that would have crossed it into TAILS on a doubled HEADER, and stands
+  // that header on a doubled TRIMMER each side. The size row named all four and the two span rows
+  // named two, so the trimmer and the header — the two members the opening's whole load runs
+  // through, the tails hanging on the header and the header landing on the trimmers — were sized
+  // by doctrine and rated by nothing, on a packet printing the joist span limit as a value the
+  // build had been held to. The trimmer runs the full width the joists beside it do, 23.8 ft on a
+  // 24-ft gp-frame, and wears the same 2x8 the table has a row for. Found
+  // by asking the GENERATORS what they emit rather than asking this table what to look for; the
+  // gate in `timber2-doctrine.test.ts` now asks that question on every build the app ships.
+  'SPAN.joist': { roles: ['joist', 'tailJoist', 'trimmerJoist', 'headerJoist'] , label: 'Floor-joist span limit', checkedBy: 'span' },
   // Tails as well as whole joists: an attic hatch frames its opening in the CEILING, so the two
-  // joists it cuts are ceiling joists hung on a header, and they are read on the ceiling's rows.
-  'SPAN.ceilingJoist': { roles: ['joist', 'tailJoist'] , label: 'Ceiling-joist span limit', checkedBy: 'span' },
+  // joists it cuts are ceiling joists hung on a header, and they are read on the ceiling's rows —
+  // as are the trimmers and headers of that same opening, which sit above the deck with them.
+  'SPAN.ceilingJoist': { roles: ['joist', 'tailJoist', 'trimmerJoist', 'headerJoist'] , label: 'Ceiling-joist span limit', checkedBy: 'span' },
   // All three, because `spans.ts` reads the run of all three. A hip roof's commons are its
   // SHORTEST sloping members — the jacks are commons cut back to the hip, and the hip runs the
   // diagonal — so a check scoped to `rafter` would leave the longest sticks on the roof silent

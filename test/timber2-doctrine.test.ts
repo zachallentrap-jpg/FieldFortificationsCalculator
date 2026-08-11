@@ -542,6 +542,18 @@ interface SpanClass {
   spacing: { joistSpacingIn: number; rafterSpacingIn: number };
   floorTopY: number;
   where: string;
+  /**
+   * How far the members of this class stand from the nearest PARALLEL member of their own role at
+   * their own level, in inches — the spacing a repetitive-member table's COLUMNS are indexed by,
+   * measured off the emitted geometry.
+   *
+   * `null` when no build in the corpus put a second parallel member of the role beside this one,
+   * and null is read below as "nothing measured says this is not a repetitive member", which keeps
+   * the class in the evidence. The SMALLEST distance any build produced is the one kept, for the
+   * same reason: this figure may only ever be a reason to drop a class from the evidence, so the
+   * measurement that keeps it there wins.
+   */
+  neighbourSpacingIn: number | null;
 }
 
 interface LsWalk {
@@ -604,14 +616,34 @@ function newLsWalk(): LsWalk {
 function recordLs(w: LsWalk, model: StructureModel, where: string): void {
   const family = model.spec.family;
   const floorTopY = model.levels.subfloorTop;
+  const byClass = new Map<string, Member[]>();
+  for (const m of model.members) {
+    const key = spanClassKey(family, m, floorTopY);
+    byClass.set(key, [...(byClass.get(key) ?? []), m]);
+  }
+  /** Nearest parallel member of the same role at the same level, in plan — see `neighbourSpacingIn`. */
+  const gapIn = (key: string, m: Member): number | null => {
+    let best: number | null = null;
+    for (const o of byClass.get(key)!) {
+      if (o === m) continue;
+      if (![0, 1, 2].every((i) => Math.abs((o.rotation[i] ?? 0) - (m.rotation[i] ?? 0)) < 1e-6)) continue;
+      const d = Math.hypot(o.position[0] - m.position[0], o.position[2] - m.position[2]) * IN_PER_FT;
+      if (d > 1e-6 && (best === null || d < best)) best = d;
+    }
+    return best;
+  };
   for (const m of model.members) {
     if (!w.rolesByFamily.has(m.role)) w.rolesByFamily.set(m.role, new Set());
     w.rolesByFamily.get(m.role)!.add(family);
     const key = spanClassKey(family, m, floorTopY);
     const prev = w.spanClasses.get(key);
-    if (!prev || m.cutLength > prev.member.cutLength) {
-      w.spanClasses.set(key, { member: m, family, spacing: model.spec.spacing, floorTopY, where });
-    }
+    const gap = gapIn(key, m);
+    const seen = [prev?.neighbourSpacingIn, gap].filter((v): v is number => typeof v === 'number');
+    const neighbourSpacingIn = seen.length > 0 ? Math.min(...seen) : null;
+    const base = !prev || m.cutLength > prev.member.cutLength
+      ? { member: m, family, spacing: model.spec.spacing, floorTopY, where }
+      : prev;
+    w.spanClasses.set(key, { ...base, neighbourSpacingIn });
   }
   for (const s of spanWarnings(model.members, model.spec.spacing, floorTopY)) w.observed.add(`span|${s.role}|${s.cite}`);
   for (const s of seatDepthWarnings(model.members)) w.observed.add(`seat|${s.role}|${s.cite}`);
@@ -634,10 +666,20 @@ function citeFor(id: string): string {
  * Whether the span check MEASURES a class — which is not whether it warns about one. A member
  * inside its row is silent and so is a member no branch ever reaches, and from outside the two
  * are the same silence. Pulling the one lever the check reads — the member's own length — tells
- * them apart: a class still silent at four times its length is a class nothing is looking at.
+ * them apart: a class still silent at EIGHT times its length is a class nothing is looking at.
+ *
+ * EIGHT BECAUSE FOUR WAS NOT ENOUGH FOR THE SHORTEST CLAIMED MEMBER, MEASURED. The factor has to
+ * clear the longest exemplar of every class the register claims over its own row, and the binding
+ * case is the attic scuttle's doubled ceiling header: 2.5 ft of 2x6 against a 13.5 ft row, which
+ * needs 6× before it says a word. Measured over the whole corpus, the factors the claimed classes
+ * actually need run 1 to 6 (the floor's 2x8 header joist needs 2, a 3.8 ft floor joist over its
+ * 9.5 ft row needs 3, most need 1), so eight clears the worst by a third and nothing here is
+ * tuned to a single build. Raising it can only make the probe see MORE: every test below reads
+ * "measured" as a reason to demand a branch or refuse a declaration, never as a reason to excuse
+ * one.
  */
 const spanProbe = (c: SpanClass): SpanWarning[] =>
-  spanWarnings([{ ...c.member, cutLength: c.member.cutLength * 4 }], c.spacing, c.floorTopY);
+  spanWarnings([{ ...c.member, cutLength: c.member.cutLength * 8 }], c.spacing, c.floorTopY);
 
 /**
  * The plan run a span row is read against, derived here from the member alone.
@@ -648,12 +690,73 @@ const spanProbe = (c: SpanClass): SpanWarning[] =>
  */
 const planRunOf = (m: Member): number => (m.cutLength / IN_PER_FT) * Math.abs(Math.cos(m.rotation[2] ?? 0));
 
-/** The doctrine table a span row IS. `SPAN.ceilingJoist` is read on `SPAN.ceilingJoist`. */
+/**
+ * The doctrine table a span row IS. `SPAN.ceilingJoist` is read on `SPAN.ceilingJoist`.
+ *
+ * AND IT HAS TO BE A TABLE OF NOMINALS, WHICH IS WHY THAT IS CHECKED HERE AND NOT ASSUMED. Every
+ * span row that ships is keyed on the member's size, and everything below reads it that way —
+ * `hasOwnProperty(table, nominal)`. A table keyed on anything else (clear-span feet, a load class)
+ * would still be FOUND by this function, match no member's nominal, and hand back an empty
+ * evidence list — which reads as "nothing contradicts the declaration" and lets it stand. That is
+ * fail-OPEN, in the one function whose whole job is to refuse a false declaration, so the shape of
+ * the table is a precondition rather than a hope: a table this section cannot read nominal by
+ * nominal is one it cannot hold a claim up with, and it says so instead of going quiet.
+ */
 function spanTableOf(id: string): Record<string, unknown> | undefined {
   const [group, key] = id.split('.');
   if (group !== 'SPAN' || !key) return undefined;
   const d = (SPAN as unknown as Record<string, { value: unknown } | undefined>)[key];
   return d && typeof d.value === 'object' && d.value !== null ? (d.value as Record<string, unknown>) : undefined;
+}
+
+/** Whether every row of a span table is a dimension-lumber nominal — see `spanTableOf`. */
+const isKeyedOnNominals = (table: Record<string, unknown>): boolean => {
+  const rows = Object.keys(table);
+  return rows.length > 0 && rows.every((r) => DRESSED[r] !== undefined);
+};
+
+/**
+ * Whether the table's rows are indexed by SPACING — the repetitive-member tables (a row per
+ * nominal, a column per o.c. spacing) as against a flat one like `SPAN.header`, which is a single
+ * allowable span per size and has no column to pick.
+ */
+const isSpacedTable = (table: Record<string, unknown>): boolean =>
+  Object.values(table).every((row) => typeof row === 'object' && row !== null);
+
+/**
+ * Whether this class stands at a spacing the table has a COLUMN for — the second half of "can
+ * this limit be read against this member", and the one the shipped code fudges.
+ *
+ * `columnFor` in `spans.ts` picks the nearest column at or above the member's spacing and falls
+ * back to the WIDEST column when the spacing is past all of them. That fallback is fine for a
+ * 12-in layout read at the 16-in row; it is not a reading for a member standing four feet from
+ * its neighbour, because the allowance shrinks as the spacing grows and the widest column's
+ * figure belongs to a member carrying a fraction of that strip. Handing it over would OVERSTATE what
+ * the member may span, which is the direction that goes quiet on a real overload. So a class
+ * whose measured neighbour spacing is past the table's widest column is one this table cannot
+ * rate, and it is left out of the evidence below rather than being read at a column that is not
+ * its own. A class with no measured spacing at all (`null`) stays in: silence is not evidence.
+ */
+function hasColumnFor(table: Record<string, unknown>, c: SpanClass): boolean {
+  if (!isSpacedTable(table) || c.neighbourSpacingIn === null) return true;
+  const columns = Object.values(table)
+    .flatMap((row) => Object.keys(row as Record<string, unknown>).map(Number))
+    .filter((n) => Number.isFinite(n));
+  return columns.length === 0 || c.neighbourSpacingIn <= Math.max(...columns) + 1e-6;
+}
+
+/**
+ * Why this row cannot be held to account at all, or `null` when it can — a fact about the doctrine
+ * table rather than about any member, so it is said once and in its own words.
+ */
+function spanTableObjection(id: string): string | null {
+  const table = spanTableOf(id);
+  if (!table) return `${id} names no span table of its own, so nothing here can hold that claim up`;
+  if (!isKeyedOnNominals(table)) {
+    return `${id} is keyed on ${Object.keys(table).slice(0, 3).join('/')}… rather than on nominals, so this `
+      + 'section cannot read it member by member and cannot hold that claim up';
+  }
+  return null;
 }
 
 /**
@@ -670,23 +773,27 @@ function spanTableOf(id: string): Record<string, unknown> | undefined {
  *   exists, and the clear span the check derives from it — a bay between bearing lines, a run less
  *   its bearings — is bounded by it. Nothing about a member makes those feet unobtainable.
  *
- *   A ROW TO READ THEM ON. The table is a list of nominals; a size that is not in it has no
- *   maximum here. THIS is the real limit of a span row's reach, and it is a doctrinal fact rather
- *   than a fact about the code: a bunker's 6x8 cap beam carried across a doorway cannot be rated
- *   by a table whose rows run 2x4 to 2x12, no matter what branch anyone writes.
+ *   A ROW TO READ THEM ON, AND A COLUMN TO READ IT AT. The table is a list of nominals; a size
+ *   that is not in it has no maximum here. THIS is the real limit of a span row's reach, and it is
+ *   a doctrinal fact rather than a fact about the code: a bunker's 6x8 cap beam carried across a
+ *   doorway cannot be rated by a table whose rows run 2x4 to 2x12, no matter what branch anyone
+ *   writes. The repetitive tables carry a second index, the o.c. spacing, and it is the same kind
+ *   of fact — see `hasColumnFor`.
  *
  * So: a role whose members are in this row's scope, carry a length, and wear a nominal the row's
- * own table lists is a role this limit must MEASURE. Declaring it unmeasurable is refused, and the
- * refusal names the class, because the fix is a branch or a narrower scope — never a sentence.
+ * own table lists at a spacing it has a column for is a role this limit must MEASURE. Declaring it
+ * unmeasurable is refused, and the refusal names the class, because the fix is a branch or a
+ * narrower scope — never a sentence.
  */
 function ratableSpanClasses(w: LsWalk, id: string, c: LsConsumer, role: string): string[] {
   const table = spanTableOf(id);
-  if (!table) return [`${id} names no span table of its own, so nothing here can hold the claim up`];
+  if (!table || spanTableObjection(id)) return [];
   const out: string[] = [];
   for (const [key, cls] of w.spanClasses) {
     if (cls.member.role !== role) continue;
     if (c.families && !(c.families as readonly string[]).includes(cls.family)) continue;
     if (!Object.prototype.hasOwnProperty.call(table, cls.member.nominal)) continue;
+    if (!hasColumnFor(table, cls)) continue;
     const run = planRunOf(cls.member);
     if (!(run > 0) || !Number.isFinite(run)) continue;
     out.push(`${key} runs ${run.toFixed(1)} ft and ${cls.member.nominal} is a row of this very table`);
@@ -700,13 +807,19 @@ function ratableSpanClasses(w: LsWalk, id: string, c: LsConsumer, role: string):
  * would otherwise leave the whole section green while proving nothing at all.
  */
 function assertCorpusIsReal(w: LsWalk): void {
-  // THE FLOORS SIT JUST UNDER WHAT THE WALK ACTUALLY PRODUCES — 70 roles, 208 member classes, 7
-  // unaided results, 2 seated roles. A floor at half the real figure is the shape of guard that
-  // watches the wrong failure: what narrows a corpus is a walk that stopped walking or a recorder
-  // that stopped recording, and either takes most of a set, not a member of it. `observed` was the
-  // thinnest of the four and it is the one that matters most, so it is also asserted by NAME
-  // below: it is the only place a check is seen measuring a role on a build the app really ships,
-  // and losing both joist rows would drop it from 7 to 5 — through a floor of 4 without a word.
+  // WHAT THE AGGREGATE FLOORS CAN SEE, AND WHAT THEY DEMONSTRABLY CANNOT. The walk produces 70
+  // member roles, 208 member classes, 7 unaided check results and 2 seated roles, and the four
+  // floors below sit just under those. They catch a walk that stopped walking — a corpus narrowed
+  // to the catalog presets drops the class count from 208 to 152 and fires three of them — and
+  // nothing finer than that. A NARROWING AIMED AT ONE ROLE GOES STRAIGHT THROUGH: making
+  // `recordLs` skip `tailJoist` members alone takes the classes from 208 to 205 and leaves the
+  // roles, the unaided results and the seated roles untouched, which is measured, not supposed. So
+  // the evidence these tests actually read is pinned BY NAME as well, in two registers: the kinds
+  // of unaided result, because that set is the only place a check is seen measuring a role on a
+  // build the app really ships; and the member classes the sections below cite as the reason a
+  // limit must be measured, because those are the exemplars a targeted narrowing would delete —
+  // the four roles a framed opening is built from, on both decks, and the hips of a build that has
+  // nothing else on its roof.
   assert.ok(w.rolesByFamily.size > 60, `the walk saw ${w.rolesByFamily.size} member roles across every card and panel`);
   assert.ok(w.spanClasses.size > 180, `the walk found ${w.spanClasses.size} distinct member classes`);
   assert.ok(w.observed.size > 5, `the corpus raised ${w.observed.size} kinds of check result unaided`);
@@ -714,6 +827,19 @@ function assertCorpusIsReal(w: LsWalk): void {
   const kinds = new Set([...w.observed].map((o) => o.split('|').slice(0, 2).join('|')));
   for (const kind of ['span|joist', 'span|rafter', 'span|jackRafter', 'span|hipRafter', 'seat|rafter', 'seat|jackRafter']) {
     assert.ok(kinds.has(kind), `no build the app ships raises ${kind} unaided any more — the corpus has lost its reach`);
+  }
+  for (const cls of [
+    'building · joist · 2x8 · on the deck',
+    'building · tailJoist · 2x8 · on the deck',
+    'building · trimmerJoist · 2x8 · on the deck',
+    'building · headerJoist · 2x8 · on the deck',
+    'building · joist · 2x6 · above the deck',
+    'building · tailJoist · 2x6 · above the deck',
+    'building · trimmerJoist · 2x6 · above the deck',
+    'building · headerJoist · 2x6 · above the deck',
+    'tower · hipRafter · 2x6 · above the deck',
+  ]) {
+    assert.ok(w.spanClasses.has(cls), `the corpus no longer contains "${cls}" — the evidence below has been narrowed away`);
   }
 }
 
@@ -795,6 +921,81 @@ test('no member a SPAN limit claims falls through every branch of the span check
   );
 });
 
+/**
+ * The member kind a name is about: the last word of a camelCase role or doctrine key. A
+ * `trimmerJoist` is a joist, a `jackRafter` is a rafter, and `SPAN.ceilingJoist` is a table of
+ * joists — the emitters and the doctrine table name the same member the same way, and that is the
+ * only thing the test below reads to decide which limit governs which member.
+ */
+const kindOf = (name: string): string =>
+  name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(' ').pop()!.toLowerCase();
+
+/**
+ * Which span limits could be read against this member class — asked of the GENERATORS and the
+ * doctrine tables, and of nothing anybody wrote in the register.
+ */
+function spanLimitsOver(cls: SpanClass): string[] {
+  const out: string[] = [];
+  for (const key of Object.keys(SPAN)) {
+    const id = `SPAN.${key}`;
+    const table = spanTableOf(id);
+    if (!table || !isKeyedOnNominals(table)) continue;
+    if (kindOf(key) !== kindOf(cls.member.role)) continue;
+    if (!Object.prototype.hasOwnProperty.call(table, cls.member.nominal)) continue;
+    if (!hasColumnFor(table, cls)) continue;
+    const run = planRunOf(cls.member);
+    if (!(run > 0) || !Number.isFinite(run)) continue;
+    out.push(id);
+  }
+  return out;
+}
+
+test('every member a SPAN table can be read on is claimed by some life-safety row, or disclaimed by one', () => {
+  // THE THIRD FORM OF THE SAME DEFECT, AND THE ONE THE OTHER THREE TESTS CANNOT SEE. They all
+  // start from what the register SAYS: a declared role that nothing measures, a claimed class that
+  // falls through, a disclaimed role the check reaches. None of them asks whether anything was
+  // said at all. So the same tail joist that took two rounds to catch goes straight back in by
+  // SILENCE — drop `tailJoist` from `roles` on both joist rows with no `unmeasured` entry, delete
+  // both branches in `spans.ts`, and every one of those three passes, because a class with no
+  // claimant is skipped and a role in no list is never looked up. It was not academic: with the
+  // register saying `joist, tailJoist` and `LUMBER.joistNominal` saying `joist, tailJoist,
+  // headerJoist, trimmerJoist`, the trimmer and the header of every framed opening in the tree —
+  // the doubled members the opening's whole load runs through — were sized by doctrine, rated by
+  // nothing, and named by no span row at all.
+  //
+  // SO THIS ONE STARTS FROM THE GENERATORS. Every class the walk emitted, every table that can be
+  // read on it — the doctrine key and the member role name the same kind, the table has a row for
+  // the nominal and a column for the spacing it stands at — and then, and only then, the register
+  // is asked whether ANY row in that member's scope speaks for it. A row may claim it (`roles`,
+  // and the three tests around this one then hold the claim to the check) or disclaim it
+  // (`unmeasured`, and the test below refuses the disclaimer if the limit can in fact be read).
+  // What it may not do is say nothing, which is the only state a reviewer cannot tell from an
+  // oversight — because that is what it is.
+  const w = lsWalk();
+  assertCorpusIsReal(w);
+  const rows = Object.entries(LS_CONSUMERS).filter(([, c]) => c.checkedBy === 'span');
+  const unspoken: string[] = [];
+  for (const [key, cls] of w.spanClasses) {
+    const limits = spanLimitsOver(cls);
+    if (limits.length === 0) continue;
+    const speaksFor = rows.filter(([, r]) =>
+      (!r.families || (r.families as readonly string[]).includes(cls.family))
+      && [...r.roles, ...Object.keys(r.unmeasured ?? {})].includes(cls.member.role));
+    if (speaksFor.length > 0) continue;
+    unspoken.push(
+      `${key} runs ${planRunOf(cls.member).toFixed(1)} ft and ${limits.join(' / ')} has a row for `
+      + `${cls.member.nominal} at the spacing it stands at, and no life-safety row claims it or disclaims it `
+      + `(e.g. ${cls.where})`,
+    );
+  }
+  assert.deepEqual(
+    unspoken,
+    [],
+    'members a life-safety span limit can be read against that no row names at all — claim them and '
+    + `measure them, or say in the row why the limit cannot reach them:\n  ${unspoken.join('\n  ')}`,
+  );
+});
+
 test('a role the register calls unmeasurable is one its check really CANNOT reach', () => {
   // The escape hatch, held shut against the thing it is easiest to use it for. Without this,
   // "declared unmeasurable" is a way to make the two tests above green by writing a sentence, and
@@ -828,6 +1029,14 @@ test('a role the register calls unmeasurable is one its check really CANNOT reac
         wrong.push(`${id}: the ${c.checkedBy} check DOES measure ${role} — it belongs in roles, not here`);
       }
       if (c.checkedBy === 'span') {
+        // The table-level objection is its OWN sentence. Folded into the per-class one it read as a
+        // non-sequitur — "role carries everything this limit is read on — this row has no table —
+        // so the limit CAN rate it" — and a refusal nobody can parse is a refusal that gets
+        // argued with rather than acted on.
+        const objection = spanTableObjection(id);
+        if (objection) {
+          wrong.push(`${id}: ${role} is called unmeasurable by a span check, but ${objection}`);
+        }
         for (const evidence of ratableSpanClasses(w, id, c, role)) {
           wrong.push(
             `${id}: ${role} carries everything this limit is read on — ${evidence} — so the limit CAN rate it and `

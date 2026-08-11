@@ -8,6 +8,7 @@ import '../src/doctrine/index';
 import { exportDoctrine, importDoctrine, getFillState, resetFillState } from '../src/doctrine/io';
 import { counts, all, getByPath } from '../src/doctrine/registry';
 import { shielding, shieldMaterials, spanSizes, stringerSizeForSpan } from '../src/doctrine/protection';
+import { positions } from '../src/doctrine/positions';
 import { standards } from '../src/doctrine/standards';
 import { fmtLength } from '../src/doctrine/units';
 import { compute } from '../src/engine/compute';
@@ -401,7 +402,7 @@ test('the smallest thickness the shipped shielding table carries is NOT called u
 // The roof is not the only protection the app prints. A parapet's frontal cover, a hull-down's
 // spoil berm and an ATGM's rear backblast area are each safety-critical, each drawn to scale and
 // dimensioned through the same length formatter, and none has an engineered fail-safe behind it.
-test('every protective magnitude the app dimensions is checked, not only the roof', () => {
+test('the protective magnitudes outside the two ladders are checked too, not only the roof', () => {
   const tiny = 1e-9;
   const paths = ['protection.parapet.W', 'protection.berm.W', 'weapons.backblast.clearanceFt'];
   const rep = importDoctrine(fixture(paths.map((path) => ({ path, value: tiny }))), { dryRun: true });
@@ -416,6 +417,67 @@ test('every protective magnitude the app dimensions is checked, not only the roo
   const zeroed = importDoctrine(fixture(paths.map((path) => ({ path, value: 0 }))), { dryRun: true });
   for (const path of paths) {
     assert.match(zeroed.warnings.find((x) => x.path === path)?.reason ?? '', /MISSING value/, path);
+  }
+});
+
+// The drawing's dimension list is exactly what an operator reads off the page, so it — not a
+// hand-picked trio — is the corpus this check answers to. Every dim key the app renders is
+// classified here: PROTECTIVE ones name the fillable leaves behind them and every one of those
+// leaves must draw a finding, and the rest carry a stated reason for not being protection. A new
+// dimension cannot be added without a decision, because the walk below asserts the two sets match.
+const DIMENSIONED: Record<string, { protectedBy: string[] } | { notProtection: string }> = {
+  depth: {
+    // depthOfCut = the position's catalog depth × the standard's depthMul — both fillable.
+    protectedBy: ['positions.two_man.hole.D', 'standards.deliberate.depthMul'],
+  },
+  parapet_w: { protectedBy: ['protection.parapet.W', 'protection.berm.W'] },
+  parapet_h: { protectedBy: ['protection.parapet.H', 'protection.berm.H'] },
+  setback: {
+    // max(munition standoff, setbackDepthFrac × depthOfCut). The ratio has no length display of
+    // its own and cannot empty the max alone — the standoff term does, so both standoffs are here:
+    // the munition's, and the fallback used when no threat is named.
+    protectedBy: ['protection.threats.ind-mtr-81.standoffMin', 'protection.overhead.setbackMin'],
+  },
+  cover_t: { protectedBy: ['protection.shielding.ind-mtr-81.sandbagged_soil', 'standards.deliberate.coverMul'] },
+  frontage: { notProtection: 'the position\'s SIZE — how much room the crew has, not what stops a round' },
+  front_back: { notProtection: 'the position\'s SIZE — how much room the crew has, not what stops a round' },
+  outer_l: { notProtection: 'frontage plus twice the parapet thickness — its protective factor is parapet.W/berm.W, checked above' },
+  outer_w: { notProtection: 'front-to-back plus twice the parapet thickness — same protective factor as outer_l' },
+  ramp_run: { notProtection: 'how much level ground the access ramp consumes behind the cut — access, not protection' },
+};
+
+test('every protective magnitude the app dimensions is checked, not only the roof', () => {
+  // The corpus: every dim key the app actually renders, over the whole position catalog, with and
+  // without a threat (cover_t and ramp_run only appear on some of them).
+  const rendered = new Set<string>();
+  for (const positionType of Object.keys(positions)) {
+    for (const threat of ['none', 'ind-mtr-81']) {
+      const geo = compute(defaultInputs({ positionType, threat, overheadCover: threat !== 'none' })).geometry as GeometryModel;
+      for (const d of geo.dims) rendered.add(d.key);
+    }
+  }
+  for (const key of rendered) {
+    assert.ok(DIMENSIONED[key], 'the drawing dimensions ' + key + ' and nothing here says whether it is protection');
+  }
+  for (const key of Object.keys(DIMENSIONED)) {
+    assert.ok(rendered.has(key), key + ' is classified here but the app no longer dimensions it');
+  }
+
+  // Every leaf behind a protective dimension draws a finding, at a hair above zero and at zero.
+  const protectivePaths = Object.values(DIMENSIONED).flatMap((v) => ('protectedBy' in v ? v.protectedBy : []));
+  assert.ok(protectivePaths.length > 0);
+  for (const path of protectivePaths) {
+    assert.ok(getByPath(path), path + ' is a registered leaf');
+    const tiny = importDoctrine(fixture([{ path, value: 1e-9 }]), { dryRun: true });
+    assert.ok(tiny.ok, 'plausibility reports, never blocks');
+    const onTiny = tiny.warnings.find((w) => w.path === path);
+    assert.ok(onTiny, 'no finding for ' + path + ' — a protective magnitude nobody can read is not doctrine');
+    assert.match(onTiny!.reason, /can only (show|dimension) (it )?as/, path + ': ' + onTiny!.reason);
+
+    const zero = importDoctrine(fixture([{ path, value: 0 }]), { dryRun: true });
+    const onZero = zero.warnings.find((w) => w.path === path);
+    assert.ok(onZero, 'no finding for ' + path + ' at exactly zero');
+    assert.match(onZero!.reason, /MISSING value/, path + ': ' + onZero!.reason);
   }
 });
 
@@ -448,22 +510,140 @@ test('a parapet filled to a thickness the panel shows as nothing still gets draw
 
 test('the display check stays off the safety-critical values that are not protective lengths', () => {
   // The threshold is DISPLAY precision of a length, so it has no meaning for a unitless ratio, a
-  // first-fit span limit, a warning threshold or a divisor — extending it to them would fire on
-  // fills that are merely small and train the filler to ignore the check. The span limits and the
-  // shoring threshold answer to their own rules instead, and a non-positive halving thickness
-  // already reads as no attenuation.
+  // first-fit span limit or a warning threshold — extending it to them would fire on fills that
+  // are merely small and train the filler to ignore the check. The span limits answer to the
+  // stricter whole-table rule that refuses the file; the shoring threshold driven down makes its
+  // warning fire on every cut, the loud direction; retainingWall.thickness feeds no formula in
+  // src/ at all; and the setback ratio has no length display of its own and cannot empty the
+  // setback by itself, because that max() falls back to a standoff and every standoff IS checked.
+  // (setbackMin and radiationHalving.* were on this list and are no longer: they are checked now,
+  // under the two tests below, which assert the opposite of what this one used to say about them.)
   const quiet = [
     { path: 'protection.overhead.setbackDepthFrac', value: 1e-9 },
-    { path: 'protection.overhead.setbackMin', value: 1e-9 },
     { path: 'protection.retainingWall.thickness', value: 1e-9 },
     { path: 'protection.retainingWall.maxHeight', value: 1e-9 },
-    { path: 'protection.radiationHalving.steel', value: 1e-9 },
     // ascending, so the whole-table first-fit invariant is satisfied and only display is at issue
     ...spanSizes.map((_, i) => ({ path: 'protection.spanSizes[' + i + '].maxSpan', value: (i + 1) * 1e-9 })),
   ];
   const rep = importDoctrine(fixture(quiet), { dryRun: true });
   assert.ok(rep.ok);
   assert.deepEqual(rep.warnings, [], 'none of these is a protective length the panel prints');
+});
+
+test('a fallout halving thickness too small to read is reported — the fill that INFLATES the protection', () => {
+  // The exclusion this replaces said radiationHalving is "consumed as a divisor and never printed
+  // as a length", and that a non-positive one already reads as no attenuation. The second half is
+  // true and covers the one value that was never the problem; the first half is false, and the
+  // band it waved through is the dangerous one — the leaf is a DIVISOR, so a thickness too small
+  // to read does not delete the protective claim, it multiplies it.
+  const path = 'protection.radiationHalving.sandbagged_soil';
+  const inputs = defaultInputs({ positionType: 'two_man', standard: 'deliberate', threat: 'ind-mtr-81' });
+  const layersBefore = compute(inputs).derivations.find((d) => d.key === 'radiationLayers')!.result;
+
+  const rep = importDoctrine(fixture([{ path, value: 1e-9 }]));
+  try {
+    assert.ok(rep.ok, 'plausibility reports, never blocks');
+    const w = rep.warnings.find((x) => x.path === path);
+    assert.ok(w, 'a halving thickness of 1e-9 ft is not doctrine anybody could confirm');
+    assert.match(w!.reason, /rounds to zero as displayed/, w?.reason);
+
+    // The state at stake, measured: the leaf IS printed to the operator — as an operand of the
+    // fallout trace, in feet, through the panel's own formatter — and it reads as nothing, while
+    // the attenuation it divides into is printed as a protective claim the roof cannot deliver.
+    const rad = compute(inputs).derivations.find((d) => d.key === 'radiationLayers');
+    assert.ok(rad, 'the panel still carries the fallout-attenuation row');
+    const operand = rad!.operands.find((o) => o.name === 'halvingThickness');
+    assert.ok(operand && operand.unit === 'ft', 'the trace prints the leaf as a length in feet');
+    assert.equal(Math.round(operand!.value * 100) / 100, 0, 'and the panel rounds it to nothing');
+    assert.ok(rad!.result > layersBefore * 1e6, 'the claim is inflated, not deleted: ' + layersBefore + ' → ' + rad!.result);
+  } finally {
+    restore();
+  }
+});
+
+test('the standoff nobody chose a threat for is checked like the seventeen that were', () => {
+  // The exclusion this replaces said setbackMin "never reaches the formatter alone", since the
+  // setback DIMENSION is max(setbackMin, setbackDepthFrac × depthOfCut) and the other term
+  // usually binds. True of the dimension, false of the leaf: with no threat named, the roof-setback
+  // trace prints THIS leaf as its own operand, in feet.
+  const path = 'protection.overhead.setbackMin';
+  const rep = importDoctrine(fixture([{ path, value: 0 }]));
+  try {
+    assert.ok(rep.ok, 'plausibility reports, never blocks');
+    const w = rep.warnings.find((x) => x.path === path);
+    assert.ok(w, 'the fallback standoff is a standoff — no munition is safe at none of it');
+    assert.match(w!.reason, /MISSING value/, w?.reason);
+
+    const setback = compute(defaultInputs({ positionType: 'two_man', threat: 'none', overheadCover: false }))
+      .derivations.find((d) => d.key === 'setback');
+    assert.ok(setback, 'the setback derivation is built whether or not a threat is named');
+    const operand = setback!.operands.find((o) => o.name === 'munitionStandoff');
+    assert.ok(operand && operand.unit === 'ft', 'the standoff is printed as a length in feet');
+    assert.equal(operand!.value, 0, 'and with no threat named it is this leaf that is read out');
+  } finally {
+    restore();
+  }
+});
+
+test('a depth multiplier that scales the cut to nothing is reported, against the multiplier', () => {
+  // coverMul is checked because it scales a rendered protective magnitude to display-zero.
+  // depthMul is its sibling in the same standards row and does the same to the depth of cut —
+  // which the drawing dimensions and the excavation bills — with no engineered fail-safe behind
+  // it and no validation code about the depth.
+  const path = 'standards.deliberate.depthMul';
+  const inputs = defaultInputs({ positionType: 'two_man', standard: 'deliberate', threat: 'ind-mtr-81' });
+  const before = compute(inputs);
+  const rep = importDoctrine(fixture([{ path, value: 1e-9 }]));
+  try {
+    assert.ok(rep.ok, 'plausibility reports, never blocks');
+    const w = rep.warnings.find((x) => x.path === path);
+    assert.ok(w, 'the multiplier that takes the defilade away is named');
+    assert.match(w!.reason, /can only dimension as/, w?.reason);
+    assert.ok(!rep.warnings.some((x) => x.path.startsWith('positions.')), 'the catalog depth reads fine — no wrong-table blame');
+
+    // The state at stake: the position is drawn, roofed and billed with no hole in the ground.
+    const after = compute(inputs);
+    const dim = (after.geometry as GeometryModel).dims.find((d) => d.key === 'depth');
+    assert.ok(dim && dim.valueFt > 0, 'strictly positive, so nothing downstream refuses it');
+    assert.ok(!/[1-9]/.test(fmtLength(dim!.valueFt, 'imperial')), 'the plan would dimension it ' + fmtLength(dim!.valueFt, 'imperial'));
+    assert.equal(after.cover.roofPath, 'earth_on_stringers', 'a roof is still drawn');
+    assert.equal(after.cover.thickness, before.cover.thickness, 'sized exactly as before');
+    for (const id of ['stringers', 'sandbags_cover']) {
+      assert.equal(
+        after.bom.find((b) => b.id === id)?.qtyTotal, before.bom.find((b) => b.id === id)?.qtyTotal,
+        id + ' is billed unchanged over a position with no depth',
+      );
+    }
+    assert.ok(!after.validation.some((v) => /depth/i.test(v.message)), 'and nothing downstream says a word about the depth');
+  } finally {
+    restore();
+  }
+});
+
+test('a catalog depth that is unusable on its own is blamed on the catalog, not on every standard', () => {
+  // The same wrong-table rule the cover check follows: a depth nobody can read is the position
+  // catalog's problem, and reporting it against all three depthMuls would send the filler to the
+  // standards table to correct a position. With no legible depth left, a POSITIVE multiplier has
+  // nothing to convict it and is left to the rows that already carry their own finding.
+  const depthPaths = Object.keys(positions).map((id) => 'positions.' + id + '.hole.D');
+  const rep = importDoctrine(
+    fixture([...depthPaths.map((path) => ({ path, value: 1e-9 })), { path: 'standards.hasty.depthMul', value: 1e-9 }]),
+    { dryRun: true },
+  );
+  assert.ok(rep.ok);
+  const warned = new Set(rep.warnings.map((w) => w.path));
+  for (const p of depthPaths) assert.ok(warned.has(p), 'no finding for ' + p + ' — the fill is not silent');
+  assert.ok(!rep.warnings.some((w) => w.path.startsWith('standards.')), 'no wrong-table blame');
+
+  // …but a multiplier of zero takes every depth in the catalog away in its own right, so it is
+  // named even then — the same reading the cover multiplier gets.
+  const zeroed = importDoctrine(
+    fixture([...depthPaths.map((path) => ({ path, value: 1e-9 })), { path: 'standards.hasty.depthMul', value: 0 }]),
+    { dryRun: true },
+  );
+  const on = zeroed.warnings.filter((w) => w.path === 'standards.hasty.depthMul');
+  assert.equal(on.length, 1, 'exactly one finding of its own');
+  assert.match(on[0]!.reason, /MISSING value/, on[0]?.reason);
 });
 
 test('a cover multiplier of zero is named even when every thickness it scales is unusable too', () => {

@@ -103,7 +103,60 @@ function rafterMessage(m: Member, spanFt: number, col: { spacing: number; allowe
  * beside the hatch sends them down the length of the building looking at the wrong sticks — the
  * same reason `birdsMouth.ts` says "jack rafter" rather than "rafter".
  */
-const joistWord = (role: Member['role']): string => (role === 'tailJoist' ? 'tail joist' : 'joist');
+const joistWord = (role: Member['role']): string =>
+  role === 'tailJoist' ? 'tail joist'
+  : role === 'trimmerJoist' ? 'trimmer joist'
+  : role === 'headerJoist' ? 'header joist'
+  : 'joist';
+
+/**
+ * EVERY JOIST AN OPENING IS FRAMED FROM, NOT JUST THE ONES THAT RUN PAST IT.
+ *
+ * `floor.ts` and `roof.ts` frame an opening — a stair well, an attic scuttle — the same way, and
+ * it takes four roles: the joists that would have crossed it are cut into TAILS hung on a doubled
+ * HEADER at each end, and those headers land on a doubled TRIMMER each side. All four are cut from
+ * the joist stock and all four are read on the joist rows. Measuring `joist` and `tailJoist` alone
+ * left the trimmer and the header — the two members the whole opening's load runs through, the
+ * tails hanging on the header and the header landing on the trimmers — measured by nothing, while
+ * the packet printed the joist span limit as a value the build had been held to. That is the same defect as the ceiling tail
+ * joist one role over, and it is now watched from the EMITTER side in `timber2-doctrine.test.ts`:
+ * a role the generators emit that a span table can be read on must be claimed by a register row.
+ *
+ * THE HEADER'S SPAN IS THE PIECE ITSELF, NOT A BAY. A joist, a tail and a trimmer all run ACROSS
+ * the lines the floor bears on, so the span that governs each of them is the worst bay between
+ * those lines. A header runs the other way: it is cut to the opening and hung between the two
+ * trimmers, so the wood between its bearings is its whole length and no bay logic applies to it.
+ */
+const BAY_JOIST_ROLES: ReadonlySet<Member['role']> = new Set<Member['role']>(['joist', 'tailJoist', 'trimmerJoist']);
+const isJoistRole = (role: Member['role']): boolean => BAY_JOIST_ROLES.has(role) || role === 'headerJoist';
+
+/**
+ * What to tell a crew about a joist that is past its row.
+ *
+ * A DOUBLED MEMBER AT AN OPENING GETS THE HIP'S SENTENCE, NOT THE COMMON'S. The joist table is a
+ * repetitive-member table: one joist at a spacing, carrying the strip of floor either side of it.
+ * A trimmer carries its own strip PLUS the end of the header beside it, and a header carries the
+ * end of every tail landing on it — both more than one joist of the same span, and neither has a
+ * table here to be sized from. What the row still supports is the safe direction of the inference:
+ * a member carrying more than a common joist cannot make a span the common row already refuses.
+ * Said that way the warning claims a limit, not a rating, and the reader is told which.
+ */
+function joistMessage(m: Member, spanFt: number, col: { spacing: number; allowed: number }, ceiling: boolean): string {
+  const word = `${ceiling ? 'ceiling ' : ''}${joistWord(m.role)}`;
+  const table = ceiling ? 'the ceiling table' : 'the table';
+  if (m.role === 'trimmerJoist' || m.role === 'headerJoist') {
+    const carries = m.role === 'trimmerJoist'
+      ? 'a doubled trimmer carries the opening’s header on top of its own strip'
+      : 'this header carries the end of every tail joist at the opening';
+    const where = m.role === 'headerJoist' ? ' between its trimmers' : '';
+    return `${m.nominal} ${word} spans ${spanFt.toFixed(1)} ft${where}; ${table} allows ${col.allowed} ft at `
+      + `${col.spacing} in o.c. for ONE joist carrying its own strip, and ${carries} — so that figure is a limit it `
+      + 'is already past, not a rating for it. Deepen it, narrow the opening, or post it — the tool has NOT changed it.';
+  }
+  return ceiling
+    ? `${m.nominal} ${word} spans ${spanFt.toFixed(1)} ft; the ceiling table allows ${col.allowed} ft at ${col.spacing} in o.c. Deepen it, close the spacing, or add a bearing partition — the tool has NOT changed it.`
+    : `${m.nominal} ${word} spans ${spanFt.toFixed(1)} ft; the table allows ${col.allowed} ft at ${col.spacing} in o.c. Deepen the joist, close the spacing, or add a bearing line — the tool has NOT changed it.`;
+}
 
 /**
  * Every member that is past its span table. Pure, and scoped to the roles the tables actually
@@ -151,19 +204,23 @@ export function spanWarnings(
   const ceilingTable = SPAN.ceilingJoist.value as Record<string, Record<number, number>>;
   const headerTable = SPAN.header.value as Record<string, number>;
 
+  /** The clear span this joist is read on: the worst bay it crosses, or a header's own length. */
+  const joistSpanFt = (m: Member): number =>
+    (m.role === 'headerJoist' ? m.cutLength / IN_PER_FT : worstBay(m.cutLength / IN_PER_FT / 2, m.position[2]));
+
   for (const m of members) {
-    if ((m.role === 'joist' || m.role === 'tailJoist') && m.position[1] <= floorTopY + 1e-6) {
-      const spanFt = worstBay(m.cutLength / IN_PER_FT / 2, m.position[2]);
+    if (isJoistRole(m.role) && m.position[1] <= floorTopY + 1e-6) {
+      const spanFt = joistSpanFt(m);
       const row = joistTable[m.nominal];
       const col = row && columnFor(row, spacing.joistSpacingIn);
       if (col && spanFt > col.allowed + 1e-6) {
         out.push({
           memberId: m.id, role: m.role, nominal: m.nominal, spanFt, allowedFt: col.allowed, spacingIn: col.spacing,
-          message: `${m.nominal} ${joistWord(m.role)} spans ${spanFt.toFixed(1)} ft; the table allows ${col.allowed} ft at ${col.spacing} in o.c. Deepen the joist, close the spacing, or add a bearing line — the tool has NOT changed it.`,
+          message: joistMessage(m, spanFt, col, false),
           cite: citeOf(SPAN.joist),
         });
       }
-    } else if ((m.role === 'joist' || m.role === 'tailJoist') && m.position[1] > floorTopY + 1e-6) {
+    } else if (isJoistRole(m.role) && m.position[1] > floorTopY + 1e-6) {
       // Above the deck: a CEILING joist, on its own table.
       //
       // A TAIL JOIST BELONGS TO WHICHEVER DECK IT IS IN. The role says a joist was cut short at a
@@ -171,14 +228,16 @@ export function spanWarnings(
       // opening in the CEILING, where the tails are ceiling joists carrying a ceiling. Matching
       // the role only on the floor branch left them measured by nothing: the floor table skipped
       // them for being above the deck and this branch skipped them for not being called `joist`,
-      // while the packet printed the joist-span limit as a value the build had been held to.
+      // while the packet printed the joist-span limit as a value the build had been held to. The
+      // scuttle's own doubled trimmers and headers sit above the deck for the same reason and are
+      // read here for the same reason.
       const row = ceilingTable[m.nominal];
       const col = row && columnFor(row, spacing.joistSpacingIn);
-      const spanFt = worstBay(m.cutLength / IN_PER_FT / 2, m.position[2]);
+      const spanFt = joistSpanFt(m);
       if (col && spanFt > col.allowed + 1e-6) {
         out.push({
           memberId: m.id, role: m.role, nominal: m.nominal, spanFt, allowedFt: col.allowed, spacingIn: col.spacing,
-          message: `${m.nominal} ceiling ${joistWord(m.role)} spans ${spanFt.toFixed(1)} ft; the ceiling table allows ${col.allowed} ft at ${col.spacing} in o.c. Deepen it, close the spacing, or add a bearing partition — the tool has NOT changed it.`,
+          message: joistMessage(m, spanFt, col, true),
           cite: citeOf(SPAN.ceilingJoist),
         });
       }

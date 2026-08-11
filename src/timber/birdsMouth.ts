@@ -295,10 +295,22 @@ export function summarizeSeatDepthWarnings(warnings: readonly SeatDepthWarning[]
  * A JACK IS A SHORT COMMON, AND IT IS SEATED THE SAME WAY. It runs square to the plate, at the
  * roof's own pitch, and its bird's mouth is the identical `plateWidth · tan θ` notch — a hip roof
  * at 12/12 puts 56 of them on the same plates as its 44 commons. Filtering on `role === 'rafter'`
- * left every one of them unnotched in the viewer and unmeasured by the seat-depth check. The HIP
- * itself is not here: it crosses the corner diagonally on its own shallower pitch, which is a
- * double-cheek seat this module does not derive, and `runAxisOf` returns null for it rather than
- * inventing one.
+ * left every one of them unnotched in the viewer and unmeasured by the seat-depth check.
+ *
+ * THE HIP IS NOT HERE, AND WHAT KEEPS IT OUT IS THIS LIST — NOT A MISSING AXIS. It crosses the
+ * corner diagonally on its own shallower pitch, and the double-cheek seat that makes is geometry
+ * this module does not derive. It would be comfortable to say `runAxisOf` returns null for a hip
+ * and so nothing could be derived anyway, and that is NOT TRUE: `runAxisOf` is a 25.8° snap
+ * (`|sin ry| > 0.9`), and on the corpus the doctrine gate walks it returns null for the hips of
+ * 193 of the 195 builds that carry any — those lie 39.6° to 45° off both wall lines — while two
+ * builds already ship where it does not. Squash the plan to 4 ft (gp-frame and custom, roof hipped)
+ * and the four hips swing to within 14.0° and 17.0° of a wall line; `runAxisOf` snaps every one of
+ * them onto that axis and `seatCutFor` duly returns a notch for each. That notch is not the hip's
+ * joint — a hip meets its plates canted, and a seat solved as though it ran square to one is a
+ * number, not a measurement. So adding `hipRafter` below would not quietly produce "no entry" on
+ * the hard cases; it would produce four confident wrong notches on the very roof the register's
+ * caveat says was not examined. `timber2-doctrine.test.ts` refuses that edit: the moment this list
+ * seats a role the register calls unmeasurable, the gate fails.
  */
 const SEATED_ROLES: ReadonlySet<string> = new Set(['rafter', 'jackRafter']);
 
