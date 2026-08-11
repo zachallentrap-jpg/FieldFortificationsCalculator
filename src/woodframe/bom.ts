@@ -238,7 +238,7 @@ export function bomSummary(members: Member[], plan?: StagePlanEntry[]): BomSumma
     const offender = members.find((m) => m.stage === maxStage);
     throw new Error(
       `bomSummary: member ${offender?.id ?? '?'} is at stage ${maxStage}, past the ${rows.length}-stage plan. ` +
-        'Pass the model\'s own stagePlan — silently dropping those members would under-report the bill (WOODFRAME2_PLAN TD18).',
+        'Pass the model\'s own stagePlan — silently dropping those members would under-report the bill (TIMBER2_PLAN TD18).',
     );
   }
 

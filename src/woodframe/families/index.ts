@@ -107,7 +107,7 @@ export function generateStructure(spec: StructureSpec): StructureModel {
       // runtime surprise. The throw stays for a spec that reached here from untyped JSON.
       const unbuilt: never = normalized;
       throw new Error(
-        `generateStructure: no generator for family "${(unbuilt as { family?: string }).family ?? 'unknown'}" — see docs/WOODFRAME2_PLAN.md §7.`,
+        `generateStructure: no generator for family "${(unbuilt as { family?: string }).family ?? 'unknown'}" — see docs/TIMBER2_PLAN.md §7.`,
       );
     }
   }

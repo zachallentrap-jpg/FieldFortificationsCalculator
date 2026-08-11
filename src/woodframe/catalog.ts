@@ -508,7 +508,7 @@ const CRIB_BUNKER: FamilyDef = {
     // Cited to the boundary decision, not to a manual, because there is no manual page that
     // makes this number true — the operator states it and this tool consumes it. The sentence
     // itself renders on the card, the input's help, the ghost label and the BOM header.
-    { path: 'designCoverDepthFt', label: 'Cover depth', value: 'user-stated input, consumed as dead load', cite: 'WOODFRAME2_PLAN §2.7 boundary — stated by the operator, never computed here', lifeSafety: true },
+    { path: 'designCoverDepthFt', label: 'Cover depth', value: 'user-stated input, consumed as dead load', cite: 'TIMBER2_PLAN §2.7 boundary — stated by the operator, never computed here', lifeSafety: true },
     { path: 'post.spacing', label: 'Post spacing', value: `${BUNKER.postSpacingFt.value} ft`, cite: citeOf(BUNKER.postSpacingFt), lifeSafety: true },
   ],
   roofs: ['none'],
