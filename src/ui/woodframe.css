@@ -463,6 +463,69 @@
   .pktdlg-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 3px; }
   .pktdlg-row .chip { min-height: 32px; padding: 6px 14px; }
 
+  /* ── Rule values (the offline-editable rule database) ──────────────────
+     Read-only rows on purpose: corrections are made OFFLINE in the exported
+     file, against the pubs, and come back through the validated import. The
+     report styling carries the one distinction that matters — a rejection
+     means NOTHING applied; a warning means it applied (or would) and the
+     editor should look at it — so the two must never wear the same color. */
+  .rulesdlg {
+    border: 0; border-radius: var(--r-lg); padding: 0;
+    width: min(820px, calc(100% - 32px)); max-height: calc(100vh - 64px);
+    background: var(--raised); color: var(--label); box-shadow: var(--shadow-2);
+  }
+  .rulesdlg::backdrop { background: rgba(0, 0, 0, 0.34); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+  .rules {
+    padding: 18px 20px 16px; display: flex; flex-direction: column; gap: 10px;
+    max-height: calc(100vh - 64px); overflow-y: auto;
+  }
+  .rules-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .rules h2 { font-size: 17px; font-weight: 640; letter-spacing: -0.015em; }
+  .rules-fill { margin: 0; font-size: 12.5px; color: var(--label-2); }
+  .rules-fill code { font: 11.5px var(--mono); background: var(--fill); border-radius: 4px; padding: 1px 5px; }
+  .rules-note { margin: 0; font-size: 12px; color: var(--label-2); line-height: 1.5; }
+  .rules-counts { margin: 0; font-size: 12.5px; font-weight: 560; }
+  .rules-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+  .rules-field { display: flex; flex-direction: column; gap: 3px; font-size: 11px; font-weight: 560; color: var(--label-2); }
+  .rules-field input {
+    font: inherit; font-weight: 400; width: 150px; padding: 5px 9px; border: 0; border-radius: var(--r);
+    background: var(--field); color: var(--label); box-shadow: inset 0 0 0 0.5px var(--sep-strong);
+  }
+  .import-report { border-radius: var(--r); padding: 10px 12px; font-size: 12.5px; line-height: 1.5; }
+  .import-report.ok { background: var(--accent-soft); }
+  .import-report.bad { background: var(--danger-soft); }
+  .import-report ul { margin: 4px 0 6px; padding-left: 18px; }
+  .import-report .chip { margin-top: 6px; }
+  .import-warn { margin-top: 8px; background: var(--warn-soft); border-radius: var(--r); padding: 8px 10px; }
+  .rules-groups { border-collapse: collapse; font-size: 12px; align-self: flex-start; }
+  .rules-groups th, .rules-groups td { text-align: left; padding: 2px 14px 2px 0; }
+  .rules-groups .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .rules-scroll {
+    overflow: auto; max-height: 44vh; border-radius: var(--r);
+    box-shadow: inset 0 0 0 0.5px var(--sep);
+  }
+  .rules-table { width: 100%; border-collapse: collapse; font-size: 11.5px; line-height: 1.4; }
+  .rules-table th {
+    position: sticky; top: 0; background: var(--raised); text-align: left;
+    padding: 6px 8px; border-bottom: 0.5px solid var(--sep-strong); font-weight: 600;
+  }
+  .rules-table td { padding: 5px 8px; border-top: 0.5px solid var(--sep); vertical-align: top; }
+  .rule-path { font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+  .rule-val code { font: 11px var(--mono); word-break: break-word; }
+  .rule-cite { color: var(--label-2); }
+  .ls {
+    font-size: 9.5px; font-weight: 700; color: var(--danger);
+    background: var(--danger-soft); border-radius: 4px; padding: 1px 4px; vertical-align: 1px;
+  }
+  .ph { color: var(--warn); font-weight: 600; white-space: nowrap; }
+  .u { color: var(--label-3); }
+  /* The picker footnote's way in — a link in a sentence, not another card. */
+  .rules-open {
+    border: 0; background: none; padding: 0; color: var(--accent);
+    cursor: pointer; font-size: inherit;
+  }
+  .rules-open:hover { text-decoration: underline; }
+
   /* ── First-run hint over the Learning viewport ──────────────────────────
      pointer-events: none is load-bearing: the pill is asking for a tap and must never be the
      thing that swallows it. It floats clear of the bottom edge so it misses both the orbit

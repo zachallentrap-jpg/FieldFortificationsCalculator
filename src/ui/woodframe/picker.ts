@@ -31,6 +31,8 @@ export interface PickerCallbacks {
   onOpenFamily(familyId: FamilyDef['id']): void;
   onOpenBuild(id: string): void;
   onDeleteBuild?(id: string): void;
+  /** Opens the rule-values view — the register every build reads, and the way to correct it. */
+  onOpenRules?(): void;
 }
 
 const esc = (s: string): string =>
@@ -138,7 +140,8 @@ export function renderPicker(root: HTMLElement, builds: StoredBuild[], cb: Picke
       ${isLearning ? flashcardsHtml() : ''}
       ${resumeHtml(builds)}
       ${sections}
-      <p class="footnote">(PH) beside a citation in a build means the manual page check is still pending.</p>
+      <p class="footnote">(PH) beside a citation in a build means the manual page check is still pending.
+        Every rule, its value and its citation: <button class="rules-open" data-rules type="button">Rule values</button></p>
     </div>`;
 
   root.querySelectorAll<HTMLButtonElement>('[data-family]').forEach((el) => {
@@ -147,6 +150,7 @@ export function renderPicker(root: HTMLElement, builds: StoredBuild[], cb: Picke
   root.querySelectorAll<HTMLButtonElement>('[data-build]').forEach((el) => {
     el.addEventListener('click', () => cb.onOpenBuild(el.dataset.build!));
   });
+  root.querySelector<HTMLButtonElement>('[data-rules]')?.addEventListener('click', () => cb.onOpenRules?.());
   // Jump chips are BUTTONS calling scrollIntoView — never location.hash anchors, which would
   // trip the router's unknown-route handler and pollute the back stack (plan §5.1).
   root.querySelectorAll<HTMLButtonElement>('[data-jump]').forEach((el) => {

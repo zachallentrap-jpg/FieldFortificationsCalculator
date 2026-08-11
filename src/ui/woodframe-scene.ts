@@ -17,9 +17,12 @@ import { configSchemaFor, type PanelRow } from './woodframe/config';
 import { FOUNDATION, HUT, OPENING, ROOF } from '../woodframe/doctrine';
 import { layoutStrip } from '../woodframe/elevation';
 import {
-  loadSession, saveSession, commitBuild, buildFromFamily, findBuild, nextCustomId,
+  saveSession, commitBuild, buildFromFamily, findBuild, nextCustomId,
   unlockToCustom, recentBuilds, type SessionState, type StoredBuild,
 } from './woodframe/store';
+import { bootSession } from './woodframe/fill';
+import { rulesOverlay, dryRunRuleFile, applyRuleFile, resetRuleValues, emptyRulesState } from './woodframe/rules';
+import { exportDoctrine } from '../woodframe/io';
 import { parseRoute, routeToHash, decodeSpec, encodeSpec } from './woodframe/router';
 import { FEATURES, APP_NAME, MODE } from './woodframe/mode';
 import { askPacketOptions, downloadMaterialsCsv, openCommandSheet, packetDefaults } from './woodframe/sheet';
@@ -48,7 +51,10 @@ let saveTimer = 0;
 
 // ── Session boot: stored bytes are revalidated, never trusted ────────────────
 {
-  const loaded = loadSession(window.localStorage);
+  // `bootSession` re-applies any persisted rule fill through the validated importer FIRST,
+  // then loads the session — loadSession normalizes stored specs against the live LIMITS
+  // leaves, so the other order clamps every build back to the shipped bounds (fill.ts).
+  const loaded = bootSession(window.localStorage);
   session = loaded.state;
   if (loaded.notices.length > 0) showNotices(loaded.notices);
 }
@@ -120,6 +126,79 @@ function render(): void {
   renderWorkbench(build);
 }
 
+// ── Rule values ─────────────────────────────────────────────────────────────
+//
+// The rule database's operator loop (rules.ts holds the logic; this owns the dialog and the
+// file plumbing). Reached from the picker footnote and the workbench header, so both apps
+// carry it wherever the operator is standing.
+
+/** Save the register as a file to correct offline. A Blob and an anchor, like the CSV. */
+function downloadRuleFile(author: string, date: string): void {
+  const file = exportDoctrine({ ...(author ? { author } : {}), ...(date ? { date } : {}) });
+  const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'woodframe-doctrine.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Revoking immediately can cancel the download in some builds; a beat is enough.
+  window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function pickRuleFile(cb: (text: string) => void): void {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/json,.json';
+  input.addEventListener('change', () => {
+    const f = input.files?.[0];
+    if (f) void f.text().then(cb).catch(() => undefined);
+  });
+  input.click();
+}
+
+function openRules(): void {
+  let state = emptyRulesState();
+  const dlg = document.createElement('dialog');
+  dlg.className = 'rulesdlg';
+  document.body.appendChild(dlg);
+  // After an apply or a reset the open build is rebuilt from the register as it now stands,
+  // and the config panel re-renders so its option lists re-read the leaves. On the picker
+  // there is nothing open and both calls no-op behind their own guards.
+  const regen = (): void => {
+    regenerate();
+    renderConfigPanel();
+  };
+  const paint = (): void => {
+    dlg.innerHTML = rulesOverlay(state);
+    dlg.querySelector('[data-action="rules-close"]')?.addEventListener('click', () => dlg.close());
+    dlg.querySelector('[data-action="rules-export"]')?.addEventListener('click', () => {
+      downloadRuleFile(
+        dlg.querySelector<HTMLInputElement>('#rules-author')?.value.trim() ?? '',
+        dlg.querySelector<HTMLInputElement>('#rules-date')?.value.trim() ?? '',
+      );
+    });
+    dlg.querySelector('[data-action="rules-import"]')?.addEventListener('click', () => {
+      pickRuleFile((text) => {
+        state = dryRunRuleFile(text); // preview only — nothing mutates until Apply
+        paint();
+      });
+    });
+    dlg.querySelector('[data-action="rules-apply"]')?.addEventListener('click', () => {
+      state = applyRuleFile(state, window.localStorage, regen);
+      paint();
+    });
+    dlg.querySelector('[data-action="rules-reset"]')?.addEventListener('click', () => {
+      state = resetRuleValues(window.localStorage, regen);
+      paint();
+    });
+  };
+  paint();
+  dlg.addEventListener('close', () => dlg.remove());
+  dlg.showModal();
+}
+
 // ── Picker screen ───────────────────────────────────────────────────────────
 
 function renderPickerScreen(): void {
@@ -134,6 +213,7 @@ function renderPickerScreen(): void {
   renderPicker(document.getElementById('pickerRoot')!, recentBuilds(session), {
     onOpenFamily: (id) => go(routeToHash({ name: 'build', id })),
     onOpenBuild: (id) => go(routeToHash({ name: 'build', id })),
+    onOpenRules: openRules,
   });
 }
 
@@ -184,6 +264,7 @@ function workbenchHtml(build: StoredBuild, family: ReturnType<typeof familyById>
         <div class="wb-actions">
           <button class="chip" id="shareBtn" type="button">Copy link</button>
           <button class="chip" id="unlockBtn" type="button">Unlock everything</button>
+          <button class="chip" id="rulesBtn" type="button">Rule values</button>
           ${FEATURES.commandOutputs
             ? '<button class="chip chip--go" id="sheetBtn" type="button">Command packet</button>'
             : '<a class="chip chip--go" href="learn.html">Flashcards</a>'}
@@ -308,6 +389,7 @@ function finishWorkbench(build: StoredBuild, family: ReturnType<typeof familyByI
       () => showNotices([url]),
     );
   });
+  document.getElementById('rulesBtn')!.addEventListener('click', openRules);
   document.getElementById('unlockBtn')!.addEventListener('click', () => {
     const { state, build: unlocked } = unlockToCustom(session, current!);
     session = state;

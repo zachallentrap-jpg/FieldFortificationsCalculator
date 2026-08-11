@@ -2343,3 +2343,57 @@ or its own reading of a leaf pair, and the sweep never compared the affected fie
 
 Suite 1,101 → **1,104 tests, 0 failures**; `tsc --noEmit` clean. No shipped number,
 drawing, or BOM line moved anywhere in the pass.
+
+## 2026-08-11 — The rule database gets its operator loop
+
+- **D48 — The register's user-facing loop: a read-only "Rule values" view in both woodframe
+  apps, export → offline correction → validated import with a mandatory dry-run preview, and a
+  persisted fill that is re-proven through the same importer on every boot — before the session
+  loads — or dropped out loud.** io.ts has been the whole rule database since D46 with no way
+  for an operator to reach it; this pass is SAP-1's doctrine-fill loop (`state/doctrineFill.ts`
+  plus the tools.ts overlay) ported onto the woodframe idiom, and three decisions in it are the
+  ones worth recording.
+
+  **Rows are read-only on purpose.** The view (`src/ui/woodframe/rules.ts`, opened as a dialog
+  from the picker footnote and the workbench header — the command packet's own navigation
+  shape, so both PLANNING and LEARNING carry it) shows the counts, the applied-fill manifest or
+  "shipped values", the per-table (PH) burn-down, and every leaf with its value, unit, cite,
+  (PH) marker and LS tag. There is no edit box: a correction is exported, made offline with the
+  cited page open, and imported back, so every change rides through the bounds, the table
+  invariants and the LS immutability — and carries the author/date the operator typed at export
+  time (no clock anywhere in the loop). A picked file is ALWAYS dry-run first; Apply is a
+  second, explicit act that regenerates the open build and re-renders the config panel, whose
+  option lists are live reads. The preview and the applied report keep rejection and warning
+  verbally and visually apart — "nothing was applied" vs "applied (or would), check it" —
+  because they claim opposite things about the register, and the overlay tests pin each caption
+  to the report kind that earns it.
+
+  **The fill lands before the session loads, and the ordering is a tested unit.** The persisted
+  fill (`src/ui/woodframe/fill.ts`, key `timber2-doctrine-fill` beside `timber2-session`, the
+  same injected StorageLike) stores the full post-apply export; boot re-runs it through
+  `importDoctrine` and only then calls `loadSession` — whose normalize clamps every stored
+  build against the live LIMITS leaves. `bootSession` exists so that ordering is one function
+  node can test rather than two lines in the DOM boot file: the test stores a 70-ft build under
+  a fill that widens `LIMITS.dims.lengthFt` to 80 ft and proves the build survives the boot at
+  70, then runs the other order and watches the clamp back to the shipped 60 — so the
+  dependency is demonstrated, not assumed.
+
+  **A fill the register has outgrown is refused whole, dropped, and announced.** Stored bytes
+  are never applied raw. A fill naming a path that no longer exists — or failing any other
+  check — is refused all-or-nothing (the valid entries in it refuse WITH it), removed from
+  storage so it is not re-refused forever, and a notice lands in the notices bar exactly like
+  the saved-builds-from-a-different-version pattern. SAP-1's `restoreFill` returns 0 silently
+  here; the silence was the one part not worth porting.
+
+  Every lock was proven by revert with the failure observed: boot without the restore
+  (`42 !== 45` — the leaf without its fill), the swapped boot order (`60 !== 70`), the quiet
+  stale refusal (`0 !== 1` notices, fill still in storage), a "preview" that really applied
+  (`report.dryRun` falsy), an Apply that did not regenerate (`0 !== 1` regens, in both suites),
+  warnings dressed as refusals (caption test and stylesheet-class test both red), table
+  findings merged into the row list ("framed as a group of values, not one bad row"), and a
+  reset that left the stored fill behind ("the stored fill is gone"). With no fill stored,
+  `bootSession` is `loadSession` plus nothing — the full-export hash stays pristine — and no
+  golden, compat or thumbnail output moved anywhere in the pass.
+
+Suite 1,104 → **1,117 tests, 0 failures** (`test/woodframe-fill.test.ts`,
+`test/woodframe-rules-overlay.test.ts`); `tsc --noEmit` clean.
