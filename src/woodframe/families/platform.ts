@@ -71,8 +71,10 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
   // Which of the two moves is settled by what `deckHeightFt` means everywhere else — the rail pass
   // asks `railRequired(deckY)` about a fall from it, and the stair lands on it — so the walking
   // surface stays at the height the operator asked for and the frame drops by the deck's thickness.
+  // The platform's plank deck is the TM 5-302 plank-deck rule — LUMBER.deckPlankNominal — not
+  // the tent floor's TM 10-8340 decking, which is TENT.deckNominal. Same 2x6 today; two rules.
   const deckThick = spec.deck === 'plank'
-    ? DRESSED[TENT.deckNominal.value as string]!.w / IN_PER_FT
+    ? DRESSED[LUMBER.deckPlankNominal.value as string]!.w / IN_PER_FT
     : (PANEL.subfloorThickIn.value as number) / IN_PER_FT;
   const frameTopY = deckY - deckThick;
   const joistNominal = LUMBER.joistNominal.value as string;
@@ -179,7 +181,7 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
   // the rotation drew a comb of boards on edge, and a panel deck came out as a 4-ft plywood
   // wall standing on the joists. Both were visible in the shipped app.
   if (spec.deck === 'plank') {
-    const nominal = TENT.deckNominal.value as string;
+    const nominal = LUMBER.deckPlankNominal.value as string;
     const w = DRESSED[nominal]!.d / IN_PER_FT;
     // THE LAST BOARD IS RIPPED TO FIT. `Math.min(z, W - w / 2)` clamped the last board's CENTRE
     // back inside the platform, which does not widen the board — it just stops short, and twelve
@@ -197,7 +199,7 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
         stage: sDeck,
         actual: { w: DRESSED[nominal]!.w, d: cut * IN_PER_FT },
         nailing: NAILING.deckPlankToJoist.value,
-        doctrineRef: citeOf(TENT.deckNominal),
+        doctrineRef: citeOf(LUMBER.deckPlankNominal),
       });
     }
   } else {
@@ -284,7 +286,7 @@ export function generatePlatform(spec: PlatformSpec): FamilyResult {
     const rampW = spec.ramp.widthFt;
     const rampX0 = L / 2 - rampW / 2;
     const deckIsPlank = spec.deck === 'plank';
-    const rampDeckNominal = TENT.deckNominal.value as string;
+    const rampDeckNominal = LUMBER.deckPlankNominal.value as string;
     const deckThick = (deckIsPlank
       ? DRESSED[rampDeckNominal]!.w
       : (PANEL.subfloorThickIn.value as number)) / IN_PER_FT;

@@ -46,8 +46,6 @@ export interface BunkerResult {
   members: Member[];
   levels: FloorLevels;
   stagePlan: StagePlanEntry[];
-  /** Dead load the wood was sized for, stated in the open so nobody has to infer it. */
-  deadLoadPsf: number;
   /** Set when the stated depth needs a span past the last reviewed table row. */
   pastReviewedTable: string | null;
   /** Things the family had to decide that the operator should see. */
@@ -91,16 +89,23 @@ export function bunkerStagePlan(
   return stagePlan(rows);
 }
 
-/** Stringer nominal for a clear span, and whether the table had a reviewed row for it. */
+/**
+ * Stringer nominal for a clear span, and whether a REVIEWED row covers it.
+ *
+ * `maxReviewedSpanFt` caps the table itself: a row past the last reviewed span — whether the
+ * span outran the table or the reviewed cap was pulled back under it — is a member nobody has
+ * checked, and the family reports rather than extrapolating. At the shipped values the cap sits
+ * exactly on the table's last row, so nothing inside the envelope changes.
+ */
 export function stringerFor(clearSpanFt: number): { nominal: string; reviewed: boolean; rowFt: number } {
   const table = BUNKER.stringerBySpan.value as Record<number, string>;
   const maxRow = BUNKER.maxReviewedSpanFt.value as number;
   const rows = Object.keys(table).map(Number).sort((a, b) => a - b);
   const row = rows.find((r) => r >= clearSpanFt);
-  if (row !== undefined) return { nominal: table[row]!, reviewed: true, rowFt: row };
-  // Past the last row: hand back the deepest reviewed member and SAY it is past the table.
+  if (row !== undefined && clearSpanFt <= maxRow) return { nominal: table[row]!, reviewed: true, rowFt: row };
+  // Past the reviewed reach: hand back the deepest member the table has and SAY it is past.
   const last = rows[rows.length - 1]!;
-  return { nominal: table[last]!, reviewed: clearSpanFt <= maxRow, rowFt: last };
+  return { nominal: table[last]!, reviewed: false, rowFt: Math.min(maxRow, last) };
 }
 
 export function generateBunker(spec: BunkerSpec): BunkerResult {
@@ -142,9 +147,10 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
   const lagStandoff = spec.wallType === 'crib' ? 0 : (postThick + lagThick) / 2;
 
   // The clear span the overhead has to cross is the interior width, and the stated depth of
-  // soil is what it carries. Both are printed rather than assumed.
+  // soil is what it carries. The depth prints on the card and the soil ghost; the density the
+  // sizing assumed prints on the packet's LS table (BUNKER.soilPcf) — the product does not,
+  // because a psf figure beside a bunker is a protection-shaped statement §2.7 keeps out.
   const stringer = stringerFor(W);
-  const deadLoadPsf = spec.designCoverDepthFt * (BUNKER.soilPcf.value as number);
   const pastReviewedTable = stringer.reviewed
     ? null
     : `A ${W} ft clear span is past the last reviewed row of the stringer table (${stringer.rowFt} ft). `
@@ -562,7 +568,6 @@ export function generateBunker(spec: BunkerSpec): BunkerResult {
     members: emit.members,
     levels: { subfloorTop: 0, joistTop: 0, sillTop: 0, gradeY: 0 },
     stagePlan: plan,
-    deadLoadPsf: Math.round(deadLoadPsf),
     pastReviewedTable,
     notes: shortByFt > 1e-6
       ? [{

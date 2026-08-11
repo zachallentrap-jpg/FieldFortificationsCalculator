@@ -427,6 +427,8 @@ function generateRiserBox(
 export interface HutResult extends BuildingResult {
   /** The band actually applied, so the UI and the sheet describe what was built. */
   screenBand: { sillFt: number; heightFt: number } | null;
+  /** Plan checks the family ran that the operator should see — the latrine's aisle, today. */
+  notes: { path: string; message: string }[];
 }
 
 export function generateHut(spec: HutSpec): HutResult {
@@ -466,6 +468,7 @@ export function generateHut(spec: HutSpec): HutResult {
   members.push(...generateGirts(
     base.walls, wallStage, wallHeightFt, base.members.filter((m) => m.id.startsWith('PT-'))));
 
+  const notes: { path: string; message: string }[] = [];
   if (screened || hasRiser) {
     const finishStage = requireOrdinal(stagePlan, 'finish');
     if (screened) members.push(...generateScreenBand(base.walls, band!, finishStage, base.members));
@@ -474,10 +477,24 @@ export function generateHut(spec: HutSpec): HutResult {
       members.push(...generateRiserBox(
         buildingSpec.dims.lengthFt, buildingSpec.dims.widthFt, seats, finishStage, base.walls.thicknessFt,
       ));
+      // The aisle is what is left of the plan once the bench is in: from the box's front face to
+      // the far wall's inner face. Checked, never resized — mandate #2 — so a plan that leaves
+      // less clear floor than the doctrine aisle says so on the card instead of shipping tight.
+      const aisleFt = buildingSpec.dims.widthFt - 2 * base.walls.thicknessFt
+        - (LATRINE.riserBoxDepthFt.value as number);
+      const aisleMinFt = LATRINE.aisleWidthFt.value as number;
+      if (aisleFt < aisleMinFt - 1e-9) {
+        notes.push({
+          path: 'dims.widthFt',
+          message: `The bench leaves ${aisleFt.toFixed(1)} ft of aisle and the latrine plan calls for `
+            + `${aisleMinFt} ft clear in front of it (${citeOf(LATRINE.aisleWidthFt)}). Widen the plan; `
+            + 'nothing was resized.',
+        });
+      }
     }
   }
 
-  return { ...base, members, stagePlan, screenBand: screened ? band : null };
+  return { ...base, members, stagePlan, screenBand: screened ? band : null, notes };
 }
 
 /** Walls a variant screens, for the catalog's lock rows. Exported for the catalog test. */

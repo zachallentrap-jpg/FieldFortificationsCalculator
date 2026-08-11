@@ -55,7 +55,8 @@ const ft = (inches: number): number => inches / IN_PER_FT;
  * a place rather than a number.
  */
 const PROP_ANGLE = Math.PI / 4;
-const PROP_NOMINAL = '2x2';
+/** The prop stick's stock — read at emit time so a corrected register cuts the next prop. */
+const propNominal = (): string => OPENING.shutterPropNominal.value as string;
 
 /** Widths of the boards that cover a run, last one ripped — what you would really cut. */
 function boardRun(runFt: number, boardWFt: number): { u0: number; u1: number }[] {
@@ -365,10 +366,10 @@ export function generateBuiltOpenings(input: BuiltOpeningsInput): Member[] {
     // to hold itself open on its hinge.
     if (len > TOLERANCE.minSliverFt) {
       const p = wallTilePlacement(s,
-        { u0: (cut.u0 + cut.u1) / 2 - ft(DRESSED[PROP_NOMINAL]!.d) / 2, u1: (cut.u0 + cut.u1) / 2 + ft(DRESSED[PROP_NOMINAL]!.d) / 2,
+        { u0: (cut.u0 + cut.u1) / 2 - ft(DRESSED[propNominal()]!.d) / 2, u1: (cut.u0 + cut.u1) / 2 + ft(DRESSED[propNominal()]!.d) / 2,
           v0: (head.v + footV) / 2 - len / 2, v1: (head.v + footV) / 2 + len / 2 },
-        (head.out + skinThickFt) / 2 - skinThickFt + skinThickFt, ft(DRESSED[PROP_NOMINAL]!.w));
-      emit('shutter', PROP_NOMINAL, {
+        (head.out + skinThickFt) / 2 - skinThickFt + skinThickFt, ft(DRESSED[propNominal()]!.w));
+      emit('shutter', propNominal(), {
         cutLengthFt: len,
         position: p.position,
         // Leans out to meet the leaf — negative for the same reason the leaf's own tilt is.

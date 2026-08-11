@@ -34,8 +34,10 @@ const EPS_FT = 1e-6;
 /**
  * The cab's corner posts. Named because TWO passes have to agree on them: the guardrail is told
  * they are standing so it does not put its own post in the same hole, and the cab emits them.
+ * A function so both passes read the register at generate time — a corrected import lands on
+ * the very next tower.
  */
-const CAB_POST_NOMINAL = '4x4';
+const cabPostNominal = (): string => TOWER.cabPostNominal.value as string;
 
 export interface TowerResult {
   members: Member[];
@@ -625,7 +627,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
       deckY: walkY,
       stage: sRail,
       standing: [
-        ...corners.map((at) => ({ at, widthFt: DRESSED[CAB_POST_NOMINAL]!.w / IN_PER_FT })),
+        ...corners.map((at) => ({ at, widthFt: DRESSED[cabPostNominal()]!.w / IN_PER_FT })),
         // And the stair's last flight, which stands its own posts on this deck.
         ...stairRailEnds.filter((e) => Math.abs(e.y - walkY) < 1)
           .map((e) => ({ at: e.at, widthFt: DRESSED[RAIL.postNominal.value as string]!.w / IN_PER_FT })),
@@ -650,7 +652,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
     [cx - deckHalf, cx - deckHalf], [cx + deckHalf, cx - deckHalf],
     [cx + deckHalf, cx + deckHalf], [cx - deckHalf, cx + deckHalf],
   ];
-  const cabPostHalfFt = DRESSED[CAB_POST_NOMINAL]!.w / 2 / IN_PER_FT;
+  const cabPostHalfFt = DRESSED[cabPostNominal()]!.w / 2 / IN_PER_FT;
   const cabPanel = (f: number, thickFt: number): {
     cutLengthFt: number; x: number; z: number; yaw: number;
     /** The u = 0 end of the emitted piece, and the unit direction it runs — for `topAt`. */
@@ -719,7 +721,7 @@ export function generateTower(spec: TowerSpec): TowerResult {
     [cx - deckHalf, cx - deckHalf], [cx + deckHalf, cx - deckHalf],
     [cx + deckHalf, cx + deckHalf], [cx - deckHalf, cx + deckHalf],
   ] as [number, number][]) {
-    emit('post', CAB_POST_NOMINAL, {
+    emit('post', cabPostNominal(), {
       cutLengthFt: TOWER.cabWallHeightFt.value as number,
       position: [x, (cabBaseY + postTopY) / 2, z],
       rotation: [0, 0, Math.PI / 2],
@@ -822,9 +824,9 @@ export function generateTower(spec: TowerSpec): TowerResult {
     const slopeR = fall / (half * 2);
     const plateTopY = highY + (plateD / 2) * slopeR
       - rafterSeatLiftFt(DRESSED[cabRafterNominal]!.d, 0, slopeR);
-    const cabPostD = DRESSED[CAB_POST_NOMINAL]!.d / IN_PER_FT;
+    const cabPostD = DRESSED[cabPostNominal()]!.d / IN_PER_FT;
     for (const x of [cx - deckHalf, cx + deckHalf]) {
-      emit('post', CAB_POST_NOMINAL, {
+      emit('post', cabPostNominal(), {
         // Up to the UNDERSIDE of the plate, not to the top of the wall: a plate sits ON its
         // posts, and running them both to the same height buries it in them.
         cutLengthFt: plateTopY - plateT - eaveY,

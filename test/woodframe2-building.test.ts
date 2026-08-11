@@ -4,7 +4,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateStructure } from '../src/woodframe/families/index';
 import { specFromBuildingInput } from '../src/woodframe/frame';
-import { joistNominalFor, SMALL_PLAN_WIDTH_FT } from '../src/woodframe/subsystems/floorSystem';
+import { joistNominalFor, smallPlanWidthFt } from '../src/woodframe/subsystems/floorSystem';
+import { LAYOUT } from '../src/woodframe/doctrine';
 import type { BuildingSpec, FoundationSpec } from '../src/woodframe/spec';
 import { shippedFamilies, familyById } from '../src/woodframe/catalog';
 import { maxOpeningTopFt } from '../src/woodframe/normalize';
@@ -276,10 +277,11 @@ test('§3.2.2 small-plan rule: below 8 ft of width there is NO girder', () => {
   }
 });
 
-test('the joist-size rule is stated once and agrees with the constant', () => {
-  assert.equal(SMALL_PLAN_WIDTH_FT, 8);
-  assert.equal(joistNominalFor(SMALL_PLAN_WIDTH_FT - 0.01), '2x6');
-  assert.equal(joistNominalFor(SMALL_PLAN_WIDTH_FT), '2x8');
+test('the joist-size rule is stated once and agrees with the register leaf', () => {
+  assert.equal(smallPlanWidthFt(), 8);
+  assert.equal(smallPlanWidthFt(), LAYOUT.smallPlanWidthFt.value, 'the rule reads the live leaf, not a copy');
+  assert.equal(joistNominalFor(smallPlanWidthFt() - 0.01), '2x6');
+  assert.equal(joistNominalFor(smallPlanWidthFt()), '2x8');
   assert.equal(joistNominalFor(24), '2x8');
 });
 

@@ -22,6 +22,7 @@ import { FULL_FIXTURES, MATRIX_FIXTURES } from './fixtures/frameFixtures';
 import { DRESSED, type Member } from '../src/woodframe/types';
 import { BF_PER_LF, classifyNominal, bomSummary } from '../src/woodframe/bom';
 import { generateFrame, specFromBuildingInput, type BuildingInput } from '../src/woodframe/frame';
+import { stairPlan } from '../src/woodframe/floor';
 import { generateStructure, type StructureModel } from '../src/woodframe/families/index';
 import { familyTable } from '../src/woodframe/catalog';
 
@@ -235,6 +236,52 @@ test('doctrine mirrors the FROZEN legacy modules exactly — the two cannot drif
   // Panel thicknesses, read off the emitted members.
   assert.equal(model.members.find((m) => m.role === 'subfloor')!.actual.w, PANEL.subfloorThickIn.value);
   assert.equal(model.members.find((m) => m.role === 'roofPanel')!.actual.w, PANEL.roofDeckThickIn.value);
+});
+
+test('doctrine mirrors the frozen foundation and stairwell literals — pads, reveal, wall, headroom', () => {
+  // floor.ts (FROZEN, C-10) keeps its own literals for the pier pads, the basement reveal, the
+  // concrete wall and the stairwell's headroom figure. The register mirrors them; these pins are
+  // what makes a doctrine-side edit that diverges a mirror fail SOMETHING instead of shipping a
+  // register that quietly disagrees with the frozen branch's output.
+  const input = (foundation?: 'wall' | 'basement'): Parameters<typeof specFromBuildingInput>[0] => ({
+    lengthFt: 20, widthFt: 16, wallHeightFt: 8,
+    studSpacingIn: 16, joistSpacingIn: 16, rafterSpacingIn: 16,
+    risePer12: 4, overhangFt: 1, crawlFt: 1.5, openings: [],
+    ...(foundation ? { foundation } : {}),
+  });
+  // Piers: every pad is cut to the mirrored side and depth.
+  const piers = generateStructure(specFromBuildingInput(input()));
+  const pads = piers.members.filter((m) => m.role === 'footing');
+  assert.ok(pads.length > 0, 'the pier demo pours pads');
+  for (const p of pads) {
+    assert.equal(p.nominal, `conc pad ${FOUNDATION.padSideIn.value}x${FOUNDATION.padSideIn.value}x${FOUNDATION.padDepthIn.value}`);
+    assert.equal(p.actual.w, FOUNDATION.padSideIn.value);
+    assert.equal(p.actual.d, FOUNDATION.padDepthIn.value);
+  }
+  // Basement: the grade line sits one mirrored reveal below the sill's underside, and the wall
+  // is poured at the mirrored thickness.
+  const basement = generateStructure(specFromBuildingInput(input('basement')));
+  const sillBottom = basement.levels.sillTop - DRESSED['2x6']!.w / IN_PER_FT;
+  assert.ok(
+    Math.abs(basement.levels.gradeY - (sillBottom - (FOUNDATION.basementRevealFt.value as number))) < 1e-9,
+    `the basement reveal is ${((sillBottom - basement.levels.gradeY) * IN_PER_FT).toFixed(2)} in of concrete above grade — the register says ${FOUNDATION.basementRevealFt.value} ft`,
+  );
+  const walls = basement.members.filter((m) => m.role === 'foundationWall');
+  assert.ok(walls.length > 0, 'the basement pours walls');
+  for (const w of walls) {
+    assert.equal(w.nominal, `conc wall ${FOUNDATION.concreteWallThickIn.value}"`);
+    assert.equal(w.actual.w, FOUNDATION.concreteWallThickIn.value);
+  }
+  // Stairwell: the frozen basement stair sizes its floor opening to clear the headroom figure
+  // the register carries — re-derived here from the register, against the emitted plan.
+  const plan = stairPlan({ lengthFt: 20, widthFt: 16, joistSpacingIn: 16, foundation: 'basement', basementDepthFt: 7.5, stairs: true });
+  assert.ok(plan, 'the 20x16 basement fits a straight run');
+  const floorDepthIn = 0.75 + DRESSED['2x8']!.d;
+  const expectedOpenFt = (((STAIR.headroomIn.value as number) + floorDepthIn) / plan!.unitRiseIn) * plan!.unitRunIn / IN_PER_FT;
+  assert.ok(
+    Math.abs((plan!.x1 - plan!.x0) - expectedOpenFt) < 1e-9,
+    `the stairwell opening is ${(plan!.x1 - plan!.x0).toFixed(3)} ft; clearing the register's ${STAIR.headroomIn.value}-in headroom needs ${expectedOpenFt.toFixed(3)} ft`,
+  );
 });
 
 test('LABOR values equal the legacy rates — a "pure refactor" must not reprice the job', () => {

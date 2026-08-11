@@ -47,27 +47,50 @@ export function riserLidOf(members: readonly Member[]): Member | null {
   return flat[0]!;
 }
 
+/** The openings that CAN be cut, and one plain sentence per seat that cannot — see below. */
+export interface SeatOpeningReport {
+  openings: SeatOpening[];
+  /** Why the bench came out with fewer holes than bays. Empty when every bay got its seat. */
+  dropped: string[];
+}
+
 /**
- * The seat openings in a riser box's lid, in the lid's local frame.
+ * The seat openings in a riser box's lid, in the lid's local frame — with every seat that
+ * CANNOT be cut said out loud rather than skipped.
  *
  * The bays come from the DIVIDERS rather than from the seat count, so the openings land between
  * the boards that are actually there. A divider crosses the box front to back — its length runs
  * along the lid's depth — so its position along the bench is its world x, and the gaps between
- * consecutive dividers are the bays. Returns [] when there is nothing to cut: no box, no
- * dividers, or a bay too narrow to take an opening with board left around it.
+ * consecutive dividers are the bays.
+ *
+ * A bench with a bay and no hole is not a modelling nuance: it renders as a solid board where
+ * the operator asked for a seat, and for a long time it did exactly that in silence — a
+ * register edit that stretched the opening past the lid's depth made all four seats vanish from
+ * the view with nothing anywhere saying so. Every branch that returns fewer openings than bays
+ * now writes the reason down, and `generateStructure` turns those into visible issues.
  */
-export function seatOpeningsFor(members: readonly Member[]): SeatOpening[] {
+export function seatOpeningReport(members: readonly Member[]): SeatOpeningReport {
+  const box = members.filter((m) => m.role === 'riserBox');
+  if (box.length === 0) return { openings: [], dropped: [] };
   const lid = riserLidOf(members);
-  if (!lid) return [];
+  if (!lid) {
+    return { openings: [], dropped: ['The riser box has no flat lid to cut seat openings through — the bench is drawn unbroken.'] };
+  }
   const dividers = members
     .filter((m) => m.role === 'riserBox' && m.id !== lid.id && Math.abs(Math.abs(m.rotation[1]) - Math.PI / 2) < 1e-6)
     .map((m) => m.position[0]!)
     .sort((a, b) => a - b);
-  if (dividers.length < 2) return [];
+  if (dividers.length < 2) {
+    return { openings: [], dropped: ['The riser box has no seat bays — fewer than two dividers stand under the lid, so no opening can land between the boards.'] };
+  }
+  const bays = dividers.length - 1;
 
-  const w = (LATRINE.seatOpeningWidthIn.value as number) / IN_PER_FT;
-  const l = (LATRINE.seatOpeningLengthIn.value as number) / IN_PER_FT;
-  const margin = (LATRINE.seatFrontMarginIn.value as number) / IN_PER_FT;
+  const wIn = LATRINE.seatOpeningWidthIn.value as number;
+  const lIn = LATRINE.seatOpeningLengthIn.value as number;
+  const marginIn = LATRINE.seatFrontMarginIn.value as number;
+  const w = wIn / IN_PER_FT;
+  const l = lIn / IN_PER_FT;
+  const margin = marginIn / IN_PER_FT;
   const halfDepth = lid.actual.d / IN_PER_FT / 2;
   const halfRun = lid.cutLength / IN_PER_FT / 2;
 
@@ -75,18 +98,48 @@ export function seatOpeningsFor(members: readonly Member[]): SeatOpening[] {
   // the front edge of the lid is local y = +halfDepth. Set the opening back from it by the
   // margin: you sit over the hole, and the board in front of it is what you sit on.
   const y = halfDepth - margin - l / 2;
-  if (y - l / 2 < -halfDepth || y + l / 2 > halfDepth) return [];
+  if (y - l / 2 < -halfDepth || y + l / 2 > halfDepth) {
+    return {
+      openings: [],
+      dropped: [
+        `A ${lIn}-in seat opening set ${marginIn} in back from the front board does not fit the lid's `
+        + `${(halfDepth * 2 * IN_PER_FT).toFixed(1)}-in depth — none of the ${bays} seat${bays === 1 ? '' : 's'} can be cut, `
+        + 'and the bench is drawn unbroken. Shrink the opening or deepen the riser box.',
+      ],
+    };
+  }
 
-  const out: SeatOpening[] = [];
+  const openings: SeatOpening[] = [];
+  const dropped: string[] = [];
   for (let i = 0; i + 1 < dividers.length; i++) {
     const bayCentre = (dividers[i]! + dividers[i + 1]!) / 2 - lid.position[0]!;
     const bayWidth = dividers[i + 1]! - dividers[i]!;
     // Board has to survive on both sides of the hole, or it is not a seat, it is a gap.
-    if (bayWidth <= w + 2 / IN_PER_FT) continue;
-    if (Math.abs(bayCentre) + w / 2 > halfRun) continue;
-    out.push({ xFt: bayCentre, yFt: y, widthFt: w, lengthFt: l });
+    if (bayWidth <= w + 2 / IN_PER_FT) {
+      dropped.push(
+        `Seat bay ${i + 1} of ${bays} is ${(bayWidth * IN_PER_FT).toFixed(1)} in between dividers — too narrow for the `
+        + `${wIn}-in opening with board left on both sides. That seat cannot be cut.`,
+      );
+      continue;
+    }
+    if (Math.abs(bayCentre) + w / 2 > halfRun) {
+      dropped.push(
+        `Seat bay ${i + 1} of ${bays} falls off the end of the lid — the ${wIn}-in opening would run past the bench. `
+        + 'That seat cannot be cut.',
+      );
+      continue;
+    }
+    openings.push({ xFt: bayCentre, yFt: y, widthFt: w, lengthFt: l });
   }
-  return out;
+  return { openings, dropped };
+}
+
+/**
+ * The openings alone — the hole-punch view of the report. Returns [] when there is nothing to
+ * cut; the REASONS travel through `seatOpeningReport().dropped` and the model's issues.
+ */
+export function seatOpeningsFor(members: readonly Member[]): SeatOpening[] {
+  return seatOpeningReport(members).openings;
 }
 
 /** The opening as a closed rectangle in the lid's local (x, y) — what the viewer punches out. */

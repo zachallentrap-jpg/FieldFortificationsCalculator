@@ -24,7 +24,7 @@ import assert from 'node:assert/strict';
 import { generateStructure } from '../src/woodframe/families/index';
 import { familyById } from '../src/woodframe/catalog';
 import { specPath } from '../src/woodframe/spec';
-import { IN_PER_FT, LUMBER, PLATFORM, PANEL, TENT } from '../src/woodframe/doctrine';
+import { IN_PER_FT, LUMBER, PLATFORM, PANEL } from '../src/woodframe/doctrine';
 import { DRESSED } from '../src/woodframe/types';
 import type { SpecIssue } from '../src/woodframe/normalize';
 import type { Member } from '../src/woodframe/types';
@@ -127,7 +127,7 @@ test('THE FLOOR IS THE LUMBER, re-derived here so the two cannot drift apart', (
   const sill = DRESSED[LUMBER.sillNominal.value as string]!.d / IN_PER_FT;
   const joist = DRESSED[LUMBER.joistNominal.value as string]!.d / IN_PER_FT;
   const deck = Math.max(
-    DRESSED[TENT.deckNominal.value as string]!.w / IN_PER_FT,
+    DRESSED[LUMBER.deckPlankNominal.value as string]!.w / IN_PER_FT,
     (PANEL.subfloorThickIn.value as number) / IN_PER_FT,
   );
   const floor = skid + (PLATFORM.minPostFt.value as number) + sill + joist + deck;

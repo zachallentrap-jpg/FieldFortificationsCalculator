@@ -17,8 +17,9 @@ import { familyTable } from '../src/woodframe/catalog';
 // The catalog is minted fresh per call now (live doctrine reads); these cases read the
 // shipped table once — none of them mutates the register.
 const FAMILY_TABLE = familyTable();
-import { riserLidOf, seatOpeningsFor, seatOpeningPath } from '../src/woodframe/riserSeats';
-import { LATRINE } from '../src/woodframe/doctrine';
+import { riserLidOf, seatOpeningsFor, seatOpeningPath, seatOpeningReport } from '../src/woodframe/riserSeats';
+import { LATRINE, getByPath } from '../src/woodframe/doctrine';
+import { importDoctrine, resetDoctrine } from '../src/woodframe/io';
 import type { Member } from '../src/woodframe/types';
 
 const latrinePreset = FAMILY_TABLE.find((f) => f.id === 'latrine')!.preset;
@@ -83,6 +84,34 @@ test('the openings are square to the bench and the size doctrine says', () => {
     assert.equal(new Set(path.map(([x]) => x.toFixed(9))).size, 2);
     assert.equal(new Set(path.map(([, y]) => y.toFixed(9))).size, 2);
   }
+});
+
+test('A SEAT THAT CANNOT BE CUT SAYS SO — an opening past the lid used to vanish in silence', () => {
+  // Stretch the seat opening past what the lid's depth can take (14 -> 21 in against a 24-in
+  // lid with a 4-in front margin) through the only legal write path. Every seat drops — and the
+  // drop must surface as a model issue, not as four holes quietly missing from the 3D view.
+  const live = getByPath('LATRINE.seatOpeningLengthIn')!;
+  const report = importDoctrine({
+    woodframeDoctrineVersion: 1,
+    entries: [{ path: 'LATRINE.seatOpeningLengthIn', value: 21, cite: live.cite, ph: live.ph }],
+  });
+  assert.equal(report.ok, true, JSON.stringify(report.rejected));
+  try {
+    const model = generateStructure(withSeats(4));
+    assert.equal(seatOpeningsFor(model.members).length, 0, 'the oversized opening cannot be cut');
+    const said = model.issues.filter((i) => i.kind === 'dropped' && i.path === 'latrine.seats');
+    assert.equal(said.length, 1, `the model must say the seats are gone: ${JSON.stringify(model.issues)}`);
+    assert.match(said[0]!.message, /21-in seat opening/, said[0]!.message);
+    assert.match(said[0]!.message, /4 seats/, 'the message counts the seats that were asked for');
+    // And the report agrees with the hole-punch, member for member.
+    assert.deepEqual(seatOpeningReport(model.members).openings, []);
+  } finally {
+    resetDoctrine();
+  }
+  // Restored, the bench cuts its four seats again and the model has nothing to report.
+  const healed = generateStructure(withSeats(4));
+  assert.equal(seatOpeningsFor(healed.members).length, 4);
+  assert.equal(healed.issues.filter((i) => i.path === 'latrine.seats').length, 0);
 });
 
 test('nothing else in the catalog grows seat openings', () => {

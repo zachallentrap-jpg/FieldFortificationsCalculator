@@ -315,17 +315,15 @@ function row(path: string, label: string, cite?: string): SpecPathDef {
 export const SPEC_PATH_DEFS: readonly SpecPathDef[] = [
   row('dims.lengthFt', 'Length', '4–60 ft — what this generator will lay out'),
   row('dims.widthFt', 'Width', '4–24 ft — a wider span needs a second girder line, which is not built yet'),
-  row('stories.0.wallHeightFt', 'Wall height', 'FM 5-426 ch. 6 (PH)'),
-  row('stories.1.wallHeightFt', 'Second-story wall height', 'FM 5-426 ch. 6 (PH)'),
-  row('roof.risePer12', 'Roof pitch', 'FM 5-426 framing-square method (PH)'),
-  row('roof.overhangFt', 'Eave overhang', 'FM 5-426 cornice (PH)'),
-  row('roof.drainPer12', 'Flat-roof drainage slope', 'FM 5-426 roll-roofing minimum slope (PH)'),
+  row('stories.0.wallHeightFt', 'Wall height', 'editor band — FM 5-426 ch. 6 states no height range (PH)'),
+  row('roof.risePer12', 'Roof pitch', 'editor band — laid out per the FM 5-426 framing-square method, which states no range (PH)'),
+  row('roof.overhangFt', 'Eave overhang', 'editor band — FM 5-426 has no cornice construction section (PH)'),
+  row('roof.drainPer12', 'Flat-roof drainage slope', 'editor band — floored at the tool’s roll-roofing minimum-slope reading of FM 5-426 (an inference) (PH)'),
   // Floored at 1 ft, not 0.5: the built-up girder hangs a full 9 1/4 in BELOW the sill, so a
   // shallower crawl puts the girder posts underground — the sweep caught it as a negative post
   // length. The bound is geometry, not preference, and it is stated once, in LIMITS.
-  row('foundation.crawlFt', 'Crawl height', 'FM 5-426 foundations (PH); floored by the girder depth below the sill'),
-  row('foundation.depthFt', 'Basement depth', 'FM 5-426 basement (PH)'),
-  row('foundation.embedFt', 'Post embedment', 'TM 5-302 (PH)'),
+  row('foundation.crawlFt', 'Crawl height', 'editor band — FM 5-426’s crawl-space text covers ventilation only (PH); floored by the girder depth below the sill'),
+  row('foundation.depthFt', 'Basement depth', 'editor band — FM 5-426 states no basement wall height (PH)'),
   row('platformHeightFt', 'Platform height', 'TM 5-302 tower (PH, LS)'),
   row('cabPlanFt', 'Cab plan', 'TM 5-302 tower (PH)'),
   row('interiorLengthFt', 'Interior length', 'bunker envelope (PH)'),

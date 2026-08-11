@@ -467,8 +467,12 @@ export function generateWallCovering(input: WallCoveringInput): Member[] {
     const boardNominal = SIDING.boardNominal.value as string;
     const boardW = DRESSED[boardNominal]!.d / IN_PER_FT;
     const boardT = wallLayerThicknessFt('boards');
+    // Each board starts its own width less the doctrinal lap after the last one. FM's vertical
+    // siding butts (lap 0), so the step is the full dressed width; a nonzero lap is the
+    // board-on-board case, floored at an inch of step so a lap past the board cannot loop.
+    const boardStep = Math.max(boardW - (SIDING.boardLapIn.value as number) / IN_PER_FT, 1 / IN_PER_FT);
     const seams: number[] = [];
-    for (let u = 0; u < s.runFt - EPS; u += boardW) {
+    for (let u = 0; u < s.runFt - EPS; u += boardStep) {
       const u1 = Math.min(u + boardW, s.runFt);
       if (u > 0) seams.push(u);
       const strip: Rect = { u0: u, u1, v0: 0, v1: s.heightFt };
@@ -817,11 +821,16 @@ export function generateRoofCovering(input: RoofCoveringInput): Member[] {
   if (roofing !== 'none') {
     const isRoll = roofing === 'roll' || roofing === 'rollDouble';
     const widthIn = isRoll ? (ROOFING.rollWidthIn.value as number) : (ROOFING.corrugatedWidthIn.value as number);
+    // Roll is applied HORIZONTALLY (FM 5-426's word), so the roll's long SIDES are the joints
+    // between courses up the slope — the course-to-course lap is the SIDE lap, 4 in, not the
+    // 6-in END lap, which belongs to the butt joints where 18–20-ft cut lengths meet within a
+    // course. Those end joints are not modeled (a course lays as one piece per band), and the
+    // purchase note already says laps are not added to the ordered area.
     const lapIn = isRoll
-      ? (roofing === 'rollDouble' ? widthIn / 2 : (ROOFING.rollEndLapIn.value as number))
+      ? (roofing === 'rollDouble' ? widthIn / 2 : (ROOFING.rollSideLapIn.value as number))
       : (ROOFING.corrugatedSideLapIn.value as number);
     // UP THE SLOPE: how far each piece starts above the last, and how far one piece reaches.
-    // Roll: a 36-in course lapping 6. Corrugated: an 8-ft sheet lapping its end lap.
+    // Roll: a 36-in course lapping 4. Corrugated: an 8-ft sheet lapping its end lap.
     const sheetUpFt = isRoll
       ? widthIn / IN_PER_FT
       : (ROOFING.corrugatedLengthFt.value as number);
@@ -1229,7 +1238,7 @@ export function generateSkids(
    * arrives on two lines of posts rather than spread across the width, and three even runners put
    * one of them under nothing at all while the other two missed the posts by an inch.
    */
-  at: number | readonly number[] = 3,
+  at: number | readonly number[] = FOUNDATION.skidRunners.value as number,
 ): Member[] {
   const emit = makeEmitter('FL');
   const nominal = LUMBER.skidNominal.value as string;

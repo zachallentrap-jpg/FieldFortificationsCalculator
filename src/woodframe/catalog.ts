@@ -77,6 +77,10 @@ const stdSpacing = (): SpacingSpec => ({
 });
 const NO_COVERINGS: CoveringSpec = { wallSheathing: 'none', siding: 'none', roofDeck: 'plywood', roofing: 'none' };
 
+/** "4, 6 or 8" — a list the way a lock caption speaks it. */
+const listOr = (xs: readonly number[]): string =>
+  xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} or ${xs[xs.length - 1]}`;
+
 /** The standard gable at the doctrine operating point — what every card's drawing ships. */
 const stdGable = (): RoofSpec => ({
   kind: 'gable',
@@ -455,7 +459,8 @@ const PLATFORM_CARD = (): FamilyDef => ({
   } as StructureSpec,
   locks: [
     { path: 'rail.topHeightIn', label: 'Guardrail height', value: `${RAIL.topHeightIn.value} in`, cite: citeOf(RAIL.topHeightIn), lifeSafety: true },
-    { path: 'ramp.slope', label: 'Ramp slope', value: '1 in 4, 6 or 8', cite: citeOf(RAMP.slopes), lifeSafety: true },
+    // The caption is spelled from the leaf, so a corrected slope list reprints the lock too.
+    { path: 'ramp.slope', label: 'Ramp slope', value: `1 in ${listOr(RAMP.slopes.value as readonly number[])}`, cite: citeOf(RAMP.slopes), lifeSafety: true },
   ],
   roofs: ['none'],
   coverings: {},

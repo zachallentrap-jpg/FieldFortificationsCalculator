@@ -34,12 +34,14 @@ export interface FloorSystemInput {
   bridging?: boolean;
 }
 
-/** Below this width the floor is girderless — joists clear-span (plan §3.2.2). */
-export const SMALL_PLAN_WIDTH_FT = LAYOUT.smallPlanWidthFt.value as number;
+/** Below this width the floor is girderless — joists clear-span (plan §3.2.2). Live read. */
+export function smallPlanWidthFt(): number {
+  return LAYOUT.smallPlanWidthFt.value as number;
+}
 
 /** The joist size a span calls for. 2x6 clear-spans a small plan; 2x8 is the house default. */
 export function joistNominalFor(spanFt: number): string {
-  return spanFt < SMALL_PLAN_WIDTH_FT ? '2x6' : (LUMBER.joistNominal.value as string);
+  return spanFt < smallPlanWidthFt() ? '2x6' : (LUMBER.joistNominal.value as string);
 }
 
 /**
@@ -62,7 +64,7 @@ export function generateFloorOnBearings(input: FloorSystemInput): Member[] {
   const joistY = joistTopY - joistD / 2;
   const oc = input.joistSpacingIn / IN_PER_FT;
 
-  const joistCite = `${citeOf(LUMBER.joistNominal)}${W < SMALL_PLAN_WIDTH_FT ? ' — girderless clear span below 8 ft of width' : ''}`;
+  const joistCite = `${citeOf(LUMBER.joistNominal)}${W < smallPlanWidthFt() ? ` — girderless clear span below ${smallPlanWidthFt()} ft of width` : ''}`;
 
   // Layout grid along X: ends flush, interior on exact OC multiples.
   const centers: number[] = [t / 2];
@@ -94,8 +96,12 @@ export function generateFloorOnBearings(input: FloorSystemInput): Member[] {
     });
   }
 
-  // Bridging: a row wherever an unsupported span reaches the doctrinal limit. With no interior
-  // bearing (small plan) the whole width is one span.
+  // Bridging: rows wherever an unsupported span reaches the doctrinal trigger. With no interior
+  // bearing (small plan) the whole width is one span. HOW MANY rows a span gets is the FM rule
+  // restated as an interval — one line on joists over 8 ft, two over 16 — which
+  // `LAYOUT.bridgingRowMaxFt` carries: one row per started interval past the first, spread
+  // evenly, so no unbridged run exceeds the interval. Every span the catalog reaches sits in
+  // the one-row band, where the row lands at mid-span exactly as it always has.
   if (input.bridging !== false) {
     const interior = input.bearings.filter((b) => b.kind === 'girder' || b.kind === 'capBeam');
     const stations = [0, ...interior.map((b) => (b.from[1] + b.to[1]) / 2).sort((a, b) => a - b), W];
@@ -103,26 +109,29 @@ export function generateFloorOnBearings(input: FloorSystemInput): Member[] {
     for (let i = 0; i < stations.length - 1; i++) {
       const span = stations[i + 1]! - stations[i]!;
       if (span < (LAYOUT.bridgingThresholdFt.value as number)) continue;
-      const zMid = (stations[i]! + stations[i + 1]!) / 2;
-      for (let k = 0; k < centers.length - 1; k++) {
-        const gap = centers[k + 1]! - centers[k]! - t;
-        if (gap < TOLERANCE.minBayFt) continue;
-        // The rise that fits the BOARD between the joists, not just its centreline — the board's
-        // own width is what used to push every piece out past the soffit and the deck. See
-        // `bridgingRise.ts`.
-        const rise = crossBridgingRise(gap, DRESSED[nominal]!.d / IN_PER_FT, joistD - TOLERANCE.bridgingInsetFt);
-        if (rise <= 0) continue;
-        const len = Math.hypot(gap, rise);
-        const ang = Math.atan2(rise, gap);
-        for (const s of [-1, 1] as const) {
-          emit('bridging', nominal, {
-            cutLengthFt: len,
-            position: [(centers[k]! + centers[k + 1]!) / 2, joistY, zMid + s * TOLERANCE.bridgingSplayFt],
-            rotation: [0, 0, s * ang],
-            stage: stageFloor,
-            nailing: NAILING.crossBridging.value,
-            doctrineRef: citeOf(LAYOUT.bridgingRowMaxFt),
-          });
+      const rows = Math.max(1, Math.ceil(span / (LAYOUT.bridgingRowMaxFt.value as number)) - 1);
+      for (let r = 1; r <= rows; r++) {
+        const zMid = stations[i]! + (span * r) / (rows + 1);
+        for (let k = 0; k < centers.length - 1; k++) {
+          const gap = centers[k + 1]! - centers[k]! - t;
+          if (gap < TOLERANCE.minBayFt) continue;
+          // The rise that fits the BOARD between the joists, not just its centreline — the board's
+          // own width is what used to push every piece out past the soffit and the deck. See
+          // `bridgingRise.ts`.
+          const rise = crossBridgingRise(gap, DRESSED[nominal]!.d / IN_PER_FT, joistD - TOLERANCE.bridgingInsetFt);
+          if (rise <= 0) continue;
+          const len = Math.hypot(gap, rise);
+          const ang = Math.atan2(rise, gap);
+          for (const s of [-1, 1] as const) {
+            emit('bridging', nominal, {
+              cutLengthFt: len,
+              position: [(centers[k]! + centers[k + 1]!) / 2, joistY, zMid + s * TOLERANCE.bridgingSplayFt],
+              rotation: [0, 0, s * ang],
+              stage: stageFloor,
+              nailing: NAILING.crossBridging.value,
+              doctrineRef: citeOf(LAYOUT.bridgingRowMaxFt),
+            });
+          }
         }
       }
     }

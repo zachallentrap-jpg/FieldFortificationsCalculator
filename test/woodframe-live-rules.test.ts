@@ -17,6 +17,8 @@ import assert from 'node:assert/strict';
 import { importDoctrine, resetDoctrine } from '../src/woodframe/io';
 import { getByPath } from '../src/woodframe/doctrine';
 import { generateStructure } from '../src/woodframe/families/index';
+import { joistNominalFor } from '../src/woodframe/subsystems/floorSystem';
+import { familyTable } from '../src/woodframe/catalog';
 import { buildFromFamily } from '../src/ui/woodframe/store';
 import { fastenerTakeoff } from '../src/woodframe/fasteners';
 import { normalizeSpec } from '../src/woodframe/normalize';
@@ -152,6 +154,194 @@ test('LOCK 5 — imported labor figures reprice the bill and the shift table on 
     assert.equal(LABOR_RATES[0]!.value, '0.1 MH per board-foot');
     assert.equal(laborModel(afterBom).productiveHoursPerDay, 8, 'the shift divisor follows the leaf');
     assert.equal(maxUsefulCrew(24), beforeCeiling * 2, 'the crew ceiling follows membersPerWorker');
+  } finally {
+    resetDoctrine();
+  }
+});
+
+test('LOCK 7 — an imported small-plan width redraws the joist-size rule on the next frame', () => {
+  try {
+    assert.equal(joistNominalFor(10), '2x8', 'fixture check: 10 ft is a house span at the shipped 8-ft rule');
+    const shipped = clone(buildFromFamily('storage-shed')!.spec) as BuildingSpec;
+    shipped.dims = { ...shipped.dims, widthFt: 10 };
+    const before = generateStructure(clone(shipped)).members.filter((m) => m.role === 'joist' && m.id.startsWith('FL-'));
+    assert.ok(before.length > 0 && before.every((m) => m.nominal === '2x8'), 'fixture check: a 10-ft skid floor frames 2x8');
+
+    apply('LAYOUT.smallPlanWidthFt', 12);
+
+    assert.equal(joistNominalFor(10), '2x6', 'the rule reads the live leaf — a boot snapshot would still say 2x8');
+    const after = generateStructure(clone(shipped)).members.filter((m) => m.role === 'joist' && m.id.startsWith('FL-'));
+    assert.ok(after.length > 0 && after.every((m) => m.nominal === '2x6'),
+      'the very next skid floor clear-spans on 2x6 under the imported rule');
+  } finally {
+    resetDoctrine();
+  }
+});
+
+test('LOCK 8 — an imported bridging row interval sets how many rows a span gets', () => {
+  try {
+    const shipped = buildFromFamily('storage-shed')!.spec as StructureSpec;
+    const before = generateStructure(clone(shipped)).members.filter((m) => m.role === 'bridging');
+    assert.ok(before.length > 0, 'fixture check: the 12-ft skid floor carries one bridging row');
+
+    apply('LAYOUT.bridgingRowMaxFt', 4);
+
+    const after = generateStructure(clone(shipped)).members.filter((m) => m.role === 'bridging');
+    assert.equal(after.length, before.length * 2,
+      `a 12-ft span at a 4-ft interval wants two rows (${before.length} pieces -> ${after.length})`);
+  } finally {
+    resetDoctrine();
+  }
+});
+
+test('LOCK 9 — an imported cab post stock is what the next tower cuts', () => {
+  try {
+    const shipped = buildFromFamily('tower')!.spec as StructureSpec;
+    const cabPosts = (m: Member[]): Member[] => m.filter((x) => x.role === 'post');
+    const before = cabPosts(generateStructure(clone(shipped)).members);
+    assert.equal(before.length, 4, 'fixture check: four cab corner posts');
+    assert.ok(before.every((p) => p.nominal === '4x4'), 'fixture check: shipped 4x4');
+
+    apply('TOWER.cabPostNominal', '6x6');
+
+    const after = cabPosts(generateStructure(clone(shipped)).members);
+    assert.ok(after.length === 4 && after.every((p) => p.nominal === '6x6'),
+      'the cab posts follow the register — the module literal is dead');
+  } finally {
+    resetDoctrine();
+  }
+});
+
+test('LOCK 10 — an imported runner count is how many skids the next deck is dragged on', () => {
+  try {
+    const shipped = buildFromFamily('storage-shed')!.spec as StructureSpec;
+    assert.equal(generateStructure(clone(shipped)).members.filter((m) => m.role === 'skid').length, 3, 'fixture check');
+
+    apply('FOUNDATION.skidRunners', 5);
+
+    assert.equal(generateStructure(clone(shipped)).members.filter((m) => m.role === 'skid').length, 5,
+      'the runner count follows the register — the call-site default is dead');
+  } finally {
+    resetDoctrine();
+  }
+});
+
+test('LOCK 11 — an imported prop stock is what the next propped shutter is cut from', () => {
+  try {
+    const shipped = clone(buildFromFamily('sea-hut')!.spec) as StructureSpec & { shutters?: string };
+    shipped.shutters = 'propped';
+    const props = (m: Member[]): Member[] => m.filter((x) => x.role === 'shutter' && x.nominal !== '1x6');
+    const before = props(generateStructure(clone(shipped)).members);
+    assert.ok(before.length > 0 && before.every((p) => p.nominal === '2x2'), 'fixture check: shipped 2x2 props');
+
+    apply('OPENING.shutterPropNominal', '2x4');
+
+    const after = props(generateStructure(clone(shipped)).members);
+    assert.ok(after.length === before.length && after.every((p) => p.nominal === '2x4'),
+      'the prop stick follows the register — the module literal is dead');
+  } finally {
+    resetDoctrine();
+  }
+});
+
+test('LOCK 12 — the platform deck reads the TM 5-302 plank leaf; the tent floor reads TM 10-8340 — independently', () => {
+  try {
+    const platform = buildFromFamily('platform')!.spec as StructureSpec;
+    const tent = buildFromFamily('tent-floor')!.spec as StructureSpec;
+    const planks = (spec: StructureSpec): Set<string> =>
+      new Set(generateStructure(clone(spec)).members.filter((m) => m.role === 'deckPlank').map((m) => m.nominal));
+    assert.deepEqual([...planks(platform)], ['2x6'], 'fixture check');
+    assert.deepEqual([...planks(tent)], ['2x6'], 'fixture check');
+
+    apply('LUMBER.deckPlankNominal', '2x8');
+    assert.deepEqual([...planks(platform)], ['2x8'], 'the platform deck follows its own leaf');
+    assert.deepEqual([...planks(tent)], ['2x6'], 'the tent floor does NOT — two rules, two homes');
+
+    apply('TENT.deckNominal', '2x4');
+    assert.deepEqual([...planks(tent)], ['2x4'], 'the tent floor follows the tent leaf');
+    assert.deepEqual([...planks(platform)], ['2x8'], 'and the platform does not move with it');
+  } finally {
+    resetDoctrine();
+  }
+});
+
+test('LOCK 13 — the imported roll SIDE lap is the course lap the next roof is laid to', () => {
+  try {
+    const shipped = buildFromFamily('guard-shack')!.spec as StructureSpec;
+    const courses = (m: Member[]): Member[] => m.filter((x) => x.role === 'roofingCourse');
+    assert.equal(courses(generateStructure(clone(shipped)).members).length, 4,
+      'fixture check: two 32-in-exposure courses per slope at the shipped 4-in side lap');
+
+    apply('ROOFING.rollSideLapIn', 8);
+
+    assert.equal(courses(generateStructure(clone(shipped)).members).length, 6,
+      'an 8-in side lap shrinks the exposure to 28 in and the same slope takes three courses per side');
+  } finally {
+    resetDoctrine();
+  }
+});
+
+test('LOCK 14 — an imported siding board lap tightens the course step on the next wall', () => {
+  try {
+    const shipped = buildFromFamily('storage-shed')!.spec as StructureSpec;
+    const boards = (m: Member[]): number => m.filter((x) => x.role === 'sidingBoard').length;
+    const before = boards(generateStructure(clone(shipped)).members);
+    assert.ok(before > 0, 'fixture check: the shed sides in boards');
+
+    apply('SIDING.boardLapIn', 2);
+
+    const after = boards(generateStructure(clone(shipped)).members);
+    assert.ok(after > before, `a 2-in lap wants more boards on the same walls (${before} -> ${after})`);
+  } finally {
+    resetDoctrine();
+  }
+});
+
+test('LOCK 15 — an imported reviewed-span cap gates the bunker inside the shipped envelope', () => {
+  try {
+    const shipped = buildFromFamily('crib-bunker')!.spec as StructureSpec;
+    const past = (m: ReturnType<typeof generateStructure>): string | undefined =>
+      m.issues.find((i) => i.message.includes('past the last reviewed row'))?.message;
+    assert.equal(past(generateStructure(clone(shipped))), undefined, 'fixture check: the 10-ft span is inside the shipped table');
+
+    apply('BUNKER.maxReviewedSpanFt', 6);
+
+    const msg = past(generateStructure(clone(shipped)));
+    assert.ok(msg, 'pulling the reviewed cap under the shipped span must fire the report');
+    assert.ok(msg!.includes('(6 ft)'), `the report names the imported cap: ${msg}`);
+  } finally {
+    resetDoctrine();
+  }
+});
+
+test('LOCK 16 — an imported aisle width is checked against the latrine plan', () => {
+  try {
+    const shipped = buildFromFamily('latrine')!.spec as StructureSpec;
+    const aisleIssue = (m: ReturnType<typeof generateStructure>): string | undefined =>
+      m.issues.find((i) => i.message.includes('aisle'))?.message;
+    assert.equal(aisleIssue(generateStructure(clone(shipped))), undefined, 'fixture check: the shipped plan clears the 3-ft aisle');
+
+    apply('LATRINE.aisleWidthFt', 6);
+
+    const msg = aisleIssue(generateStructure(clone(shipped)));
+    assert.ok(msg, 'a 6-ft aisle requirement must fail the 8-ft-wide plan out loud');
+    assert.ok(msg!.includes('6 ft'), `the check names the imported requirement: ${msg}`);
+  } finally {
+    resetDoctrine();
+  }
+});
+
+test('LOCK 17 — the platform card\'s slope lock caption is spelled from the slopes leaf', () => {
+  try {
+    const caption = (): string => {
+      const table = familyTable();
+      return table.find((f) => f.id === 'platform')!.locks.find((l) => l.path === 'ramp.slope')!.value;
+    };
+    assert.equal(caption(), '1 in 4, 6 or 8', 'fixture check: the shipped caption');
+
+    apply('RAMP.slopes', [3, 5, 7]);
+
+    assert.equal(caption(), '1 in 3, 5 or 7', 'the lock caption follows the corrected list — the literal is dead');
   } finally {
     resetDoctrine();
   }

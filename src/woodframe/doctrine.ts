@@ -56,10 +56,9 @@ export const LUMBER = {
   // What a BOARD roof deck is made of. `coverings.roofDeck: 'boards'` used to lay 4x8 plywood
   // sheets — the option was a label with the other option's material behind it.
   deckBoardNominal: doc('1x8', 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 6, sheathing — boards 1 in thick by 6, 8, 10, or 12 in wide; ch. 7 decks the roof per the wall rule; the pick is the tool’s)', { ph: false }),
-  girtNominal: doc('2x6', 'TM 5-302 girts at panel lines', {
-    note: 'FM 5-426 ch. 6: girts are "always the same width as the studs" — a 2x4 in a 2x4 wall. The 2x6 follows the TM 5-302 lineage, sheet pending.',
+  deckPlankNominal: doc('2x6', 'TM 5-302 plank deck', {
+    note: 'The loading platform’s deck and its ramp read this leaf; the tent floor’s planks are TENT.deckNominal (TM 10-8340) — two rules, two homes.',
   }),
-  deckPlankNominal: doc('2x6', 'TM 5-302 plank deck'),
   skidNominal: doc('4x6', 'TM 5-302 skid runners, PT, chamfered, drift-pinned'),
 } as const;
 
@@ -77,9 +76,12 @@ export const LAYOUT = {
   joistSpacingIn: doc(16, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 6, floor joists — "spaced 16 or 24 inches apart, center to center"; Table 6-2 columns)', { unit: 'in', ph: false }),
   rafterSpacingIn: doc(16, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 7, rafters — "spaced from 16 to 48 inches apart"; 16 is the tightest listed)', { unit: 'in', ph: false }),
   postSpacingMaxFt: doc(8, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 4, column or post foundations — "the spacing is 6 to 10 feet apart"; 8 is the tool’s cap inside that band)', { unit: 'ft', ph: false }),
-  bridgingRowMaxFt: doc(8, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 6, floor bridging — one line on joists over 8 ft, two lines over 16 ft; restated as a row interval)', { unit: 'ft', ph: false }),
-  // The legacy floor generator starts a bridging row once a half-span reaches this.
-  bridgingThresholdFt: doc(7.5, 'in-tool trigger derived from the FM 5-426 ch. 6 bridging rule — the legacy floor generator starts a row once a half-span reaches this; the 7.5 itself is no pub’s number', { unit: 'ft' }),
+  bridgingRowMaxFt: doc(8, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 6, floor bridging — one line on joists over 8 ft, two lines over 16 ft; restated as a row interval)', {
+    unit: 'ft', ph: false,
+    note: 'The sibling floor (floorSystem.ts) spaces its rows to this interval — one row per started interval past the first, evenly spread. The frozen floor.ts keeps its own one-row literal (C-10).',
+  }),
+  // Both floor generators start bridging once a clear span reaches this.
+  bridgingThresholdFt: doc(7.5, 'in-tool trigger derived from the FM 5-426 ch. 6 bridging rule — a floor generator starts a row once a clear span reaches this; the 7.5 itself is no pub’s number', { unit: 'ft' }),
   // A DISTANCE, not a rafter count. "Every 3rd rafter" is the 4-ft interval written for a 16-in
   // layout, and it becomes 6 ft the moment the rafters go to 24 in; keyed on the spacing, one
   // rule serves both layouts. `roof.ts` mirrors this value (C-10: the frozen branch keeps its
@@ -171,12 +173,21 @@ export const FOUNDATION = {
   concreteWallThickIn: doc(8, 'standard practice (cf. IRC R404.1.2) — FM 5-426 ch. 4 describes wall foundations without a thickness', { unit: 'in' }),
   stripFootingWidthIn: doc(16, 'standard practice — footing width about twice the wall (cf. IRC R403.1); the proportion is not stated in FM 5-426', { unit: 'in' }),
   stripFootingDepthIn: doc(8, 'standard practice — footing depth about the wall thickness (cf. IRC R403.1); not stated in FM 5-426', { unit: 'in' }),
-  padSideIn: doc(16, 'standard practice — FM 5-426 ch. 4 shows post-footing types without dimensions', { unit: 'in' }),
-  padDepthIn: doc(8, 'standard practice — FM 5-426 ch. 4 shows post-footing types without dimensions', { unit: 'in' }),
+  padSideIn: doc(16, 'standard practice — FM 5-426 ch. 4 shows post-footing types without dimensions', {
+    unit: 'in',
+    note: 'Frozen-path mirror: the legacy floor.ts keeps its own PAD_SIDE literal (C-10) and the doctrine test pins the two together. The sibling generators read PLATFORM/TOWER pad leaves.',
+  }),
+  padDepthIn: doc(8, 'standard practice — FM 5-426 ch. 4 shows post-footing types without dimensions', {
+    unit: 'in',
+    note: 'Frozen-path mirror: the legacy floor.ts keeps its own PAD_H literal (C-10) and the doctrine test pins the two together.',
+  }),
   slabThickIn: doc(4, 'standard practice (IRC R506.1 minimum is 3.5 in) — not stated in FM 5-426', { unit: 'in' }),
   // Exposed concrete above grade on a basement wall.
-  basementRevealFt: doc(1, 'standard practice — a common working reveal; code minimums run 4–8 in, and FM 5-426 states none', { unit: 'ft' }),
-  /** How many runners a skid-founded deck is dragged on. Mirrors the platform generator's three. */
+  basementRevealFt: doc(1, 'standard practice — a common working reveal; code minimums run 4–8 in, and FM 5-426 states none', {
+    unit: 'ft',
+    note: 'Frozen-path mirror: the legacy floor.ts sets the basement grade line from its own 1.0 literal (C-10) and the doctrine test pins the two together.',
+  }),
+  /** How many runners a skid-founded deck is dragged on. Read live by generateSkids' default. */
   skidRunners: doc(3, 'TM 5-302 skid lineage (PH — sheet pending); standard practice: three runners so the deck spans thirds', { unit: 'runners' }),
 } as const;
 
@@ -188,9 +199,15 @@ export const STAIR = {
   // r×t = 75 ∈ [70, 75].
   targetRiserIn: doc(7.5, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 1 p 1-11, riser range 6 1/2–7 1/2 in; ch. 6, risers and treads; Fig 6-51 riser is 7 1/2 in)', { unit: 'in', lifeSafety: true, ph: false }),
   maxRiserIn: doc(8, 'tool ceiling — standard practice; EM 385-1-1 (2024) sets no riser cap (uniformity and 30°–50° pitch only), and FM 5-426’s design range tops at 7 1/2 in', { unit: 'in', lifeSafety: true }),
-  minTreadIn: doc(9, 'tool floor — standard practice; EM 385-1-1 (2024) sets no tread minimum, and FM 5-426’s standard tread run is 10–11 in', { unit: 'in', lifeSafety: true }),
+  minTreadIn: doc(9, 'tool floor — standard practice; EM 385-1-1 (2024) sets no tread minimum, and FM 5-426’s standard tread run is 10–11 in', {
+    unit: 'in', lifeSafety: true,
+    note: 'Defense in depth: the stair generators floor the tread at this figure (access.ts, stringerCuts.ts), but io’s own table invariant already refuses a unitRunIn below it, so the floor binds only if that validation is bypassed. The packet LS row is the live print.',
+  }),
   unitRunIn: doc(10, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 6, risers and treads — "about 7 and 10 inches"; Fig 6-51 tread is 10 in)', { unit: 'in', lifeSafety: true, ph: false }),
-  headroomIn: doc(80, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 6 Fig 6-51, step construction — headroom drawn 6 ft 8 in); EM 385-1-1 (2024) states no headroom figure; IRC R311.7.2 concurs', { unit: 'in', lifeSafety: true, ph: false }),
+  headroomIn: doc(80, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 6 Fig 6-51, step construction — headroom drawn 6 ft 8 in); EM 385-1-1 (2024) states no headroom figure; IRC R311.7.2 concurs', {
+    unit: 'in', lifeSafety: true, ph: false,
+    note: 'Frozen-path mirror + packet print: the legacy basement stairwell (floor.ts) sizes its floor opening to clear its own 80-in literal (C-10, drift-pinned by the doctrine test), and the packet LS row states the figure. The sibling stair generator builds exterior flights with no overhead structure, so no live headroom check exists there.',
+  }),
   stringerNominal: doc('2x12', 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 6, stairways — stringers "2 to 3 inches thick and 8 or more inches wide")', { lifeSafety: true, ph: false }),
   treadNominal: doc('2x10', 'standard practice — a 2-in plank tread; FM 5-426 Figs 6-50/6-51 size the layout, not the tread stock', { lifeSafety: true }),
   stringerCount: doc(3, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 6, stairways — "usually three stringers … if stairs are more than 36 inches wide"; applied to every stair, conservative for narrower ones)', { lifeSafety: true, ph: false }),
@@ -236,7 +253,10 @@ export const RAMP = {
   // Typed `readonly number[]`, not the literal tuple the initializer spells: leaves are runtime-
   // mutable through the validated offline import (io.ts), so a leaf's TYPE is the shape a value
   // must keep — never a promise about which numbers are currently in it.
-  slopes: doc<readonly number[]>([4, 6, 8], 'TM 5-302 ramp-slope lineage (1:N, PH); EM 385-1-1 (2024) para. 24-8.i states no ratio — only "as flat as conditions will permit"', { lifeSafety: true }),
+  slopes: doc<readonly number[]>([4, 6, 8], 'TM 5-302 ramp-slope lineage (1:N, PH); EM 385-1-1 (2024) para. 24-8.i states no required ratio — only "as flat as conditions will permit"', {
+    lifeSafety: true,
+    note: 'EM 24-8.i(1) does state one ratio-shaped figure: cleats are required where the slope exceeds 1 ft in 5 ft, which the 1-in-4 option here exceeds. Cleats are not modeled — flagged, not passed silently.',
+  }),
   stringerNominal: doc('2x12', 'TM 5-302 ramp stringers', { lifeSafety: true }),
 } as const;
 
@@ -328,6 +348,7 @@ export const LATRINE = {
   // Pit depth is a HEALTH number, not a fall number — LS-tagged anyway: an unshored pit a
   // person can fall into is exactly the failure mode the gate exists for.
   pitDepthFt: doc(6, 'TM 5-302 latrine pit depth (PH)', { unit: 'ft', lifeSafety: true }),
+  /** Clear floor a user needs in front of the bench. The hut generator checks the plan against it. */
   aisleWidthFt: doc(3, 'TM 5-302 latrine aisle (PH)', { unit: 'ft' }),
   // THE SEAT ITSELF. The riser box generator's own docstring promised "a seat opening per seat"
   // and cut none — `seats` sized the divider count and nothing else, so a four-seat latrine came
@@ -367,7 +388,7 @@ export const TOWER = {
   cabHalfWallFt: doc(3.5, 'TM 5-302 tower cab half-wall (PH)', { unit: 'ft' }),
   cabRisePer12: doc(4, 'TM 5-302 tower cab roof (PH)', { unit: 'in/ft' }),
   cabOverhangFt: doc(1, 'TM 5-302 tower cab roof overhang (PH)', { unit: 'ft' }),
-  /** The cab's corner posts. Mirrors the CAB_POST_NOMINAL literal in families/tower.ts. */
+  /** The cab's corner posts. Read live by families/tower.ts — the railing and cab passes both. */
   cabPostNominal: doc('4x4', 'TM 5-302 tower cab posts (PH — sheet pending)'),
   // EM 385-1-1 (2024) para. 24-8.h(1): structures 20 ft or more get a STAIR, not a longer
   // ladder. normalizeSpec FORCES stair above this height and says so.
@@ -391,14 +412,21 @@ export const TENT = {
 // PRESET OPERATING POINTS, not limits: the legal range stays in LIMITS below.
 export const ROOF = {
   risePer12: doc(4, 'preset operating point — the standard drawings ship a 4-in-12 (1/6 pitch) roof; any pitch lays out per the FM 5-426 framing-square method (PH)', { unit: 'in/ft' }),
-  overhangFt: doc(1, 'preset operating point — the standard drawings ship a 1-ft eave; FM 5-426 cornice (PH)', { unit: 'ft' }),
+  overhangFt: doc(1, 'preset operating point — the standard drawings ship a 1-ft eave; standard practice, since FM 5-426 has no cornice construction section', { unit: 'ft' }),
 } as const;
 
 // ── Roofing & coverings ──────────────────────────────────────────────────────
 export const ROOFING = {
   rollWidthIn: doc(36, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 7, roof coverings — "rolls (usually 3 feet wide)")', { unit: 'in', ph: false }),
-  rollSideLapIn: doc(4, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 7, smooth-surfaced roll roofing — "at least 4-inch side laps" for single-ply TO work)', { unit: 'in', ph: false }),
-  rollEndLapIn: doc(6, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 7, smooth-surfaced roll roofing — "6-inch end laps")', { unit: 'in', ph: false }),
+  // Roll is applied HORIZONTALLY (FM's word), so the roll's long SIDES are the course-to-course
+  // joints up the slope — the side lap is the lap the course loop spends. The END laps are where
+  // 18- to 20-ft cut lengths butt within a course, and those joints are not modeled: a course
+  // lays as one piece per band, and the purchase note says laps are not added to the area.
+  rollSideLapIn: doc(4, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 7, smooth-surfaced roll roofing — "apply single-ply roll roofing horizontally with at least 4-inch side laps"; the course-to-course lap coverings.ts lays)', { unit: 'in', ph: false }),
+  rollEndLapIn: doc(6, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 7, smooth-surfaced roll roofing — "6-inch end laps")', {
+    unit: 'in', ph: false,
+    note: 'End joints within a course are unmodeled — the model lays each course as one piece along the eave, and the purchase basis orders to coverage area. Retained as the FM end-lap figure and the stated lineage of corrugatedEndLapIn; nothing computes from it today.',
+  }),
   // The 2-in/ft figure is page-verified as FM's BUILT-UP breakpoint; reading it as the roll
   // minimum is an inference, so the flag stays pending — an inference is not a page value.
   rollMinSlopePer12: doc(2, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 7, built-up roofs — built-up is prescribed under 2 in/ft; that breakpoint read as the roll minimum is an inference, and the direct exposed-nail ≥2:12 rule is industry practice)', { unit: 'in/ft', lifeSafety: false }),
@@ -424,7 +452,10 @@ export const ROOFING = {
 export const SIDING = {
   boardNominal: doc('1x10', 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 6, siding — wood siding runs to 12 in wide; the 1x10 pick is the tool’s)', { ph: false }),
   battenNominal: doc('1x2', 'standard practice — FM 5-426 leaves battens unsized ("the cracks are covered with wood strips called battens")'),
-  boardLapIn: doc(0, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 6, vertical wood siding — boards butt, battens cover the cracks)', { unit: 'in', ph: false }),
+  boardLapIn: doc(0, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 6, vertical wood siding — boards butt, battens cover the cracks)', {
+    unit: 'in', ph: false,
+    note: 'Read by the board-siding course step in coverings.ts: each board starts its dressed width less this lap after the last. The FM rule for vertical siding is a butt joint, which is the shipped 0.',
+  }),
 } as const;
 
 // ── Crib bunker (T7) ─────────────────────────────────────────────────────────
@@ -458,10 +489,16 @@ export const BUNKER = {
     'ATP 3-37.34 timber dead-load stringer table (PH, SME — rows not page-checked)',
     { unit: 'ft', lifeSafety: true },
   ),
-  maxReviewedSpanFt: doc(12, 'last stringer row anyone has reviewed — past this the family reports', { unit: 'ft', lifeSafety: true }),
+  maxReviewedSpanFt: doc(12, 'last stringer row anyone has reviewed — past this the family reports', {
+    unit: 'ft', lifeSafety: true,
+    note: 'stringerFor (bunker.ts) reads this as the reviewed cap on the table itself. Inside the shipped envelope the width clamp ends at the table’s last row, so the gate binds only when the register moves — which is exactly when it must.',
+  }),
   stringerSpacingFt: doc(2, 'ATP 3-37.34 timber dead-load stringer table (PH, SME)', { unit: 'ft', lifeSafety: true }),
-  /** Soil unit weight, for stating the dead load in the open rather than burying it. */
-  soilPcf: doc(100, 'assumed soil unit weight for the dead-load statement (PH, SME)', { unit: 'lb/cf', lifeSafety: true }),
+  /** Soil unit weight. Stated in the open on the packet's LS table, beside the stated depth. */
+  soilPcf: doc(100, 'assumed soil unit weight for the dead-load statement (PH, SME)', {
+    unit: 'lb/cf', lifeSafety: true,
+    note: 'Consumed by the packet LS row (the density the signer reviews); the depth is the operator’s own input on the card and the soil ghost. The depth × density product is deliberately not printed — §2.7 keeps protection-shaped statements out of this tool.',
+  }),
   baffleOffsetFt: doc(4, 'ATP 3-37.34 entrance configuration (configuration reference only, PH)', { unit: 'ft' }),
 } as const;
 
@@ -540,7 +577,7 @@ export const LABOR = {
   // 45, rafters 45 MH per 1,000 board feet) — one factor for every stick, declared conservative
   // rather than pretending to be a table row.
   mhPerBoardFoot: doc(0.055, 'conservative composite planning factor — cf. TM 3-34.47/MCRP 3-40D.3 (FM 5-426 appendix C, Table C-1 — rough framing: 25–45 MH per 1,000 board feet by element); TM 5-303 remains unretrieved', { unit: 'MH/BF' }),
-  mhPerPanel: doc(0.5, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 appendix C, Table C-2 — sheathing and siding — wall plywood 16 MH per 1,000 sq ft ≈ 0.51 MH per 4x8 panel; roof decking runs 20)', { unit: 'MH/panel', ph: false }),
+  mhPerPanel: doc(0.5, 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 appendix C, Table C-2 — sheathing and siding — wall plywood 16 MH per 1,000 sq ft = 0.512 MH per 4x8 panel, rounded DOWN to 0.5, 2.3% under the table’s derivation; roof decking runs 20)', { unit: 'MH/panel', ph: false }),
   mhPerConcreteLf: doc(0.15, 'TM 5-303 concrete form/pour factors', { unit: 'MH/LF' }),
   /**
    * Members one worker can place before people start waiting on each other — what sets the
@@ -610,12 +647,12 @@ export const NAILING = {
   foundationWallAnchor: doc(
     '1/2" anchor bolts @ 6 ft max o.c. into sill, min 2 per plate, within 12" of each end (IRC R403.1.6)',
     'IRC R403.1.6',
-    { ph: false },
+    { ph: false, note: 'ph:false rests on the 2026-08-07 correction record (DECISIONS.md), which checked this schedule against the IRC section named; no IRC text is on file in this repository to re-open.' },
   ),
   sillAnchor: doc(
     '1/2" anchor bolts @ 6 ft max o.c., min 2 per plate, within 12" of each end (IRC R403.1.6)',
     'IRC R403.1.6',
-    { ph: false },
+    { ph: false, note: 'ph:false rests on the 2026-08-07 correction record (DECISIONS.md), which checked this schedule against the IRC section named; no IRC text is on file in this repository to re-open.' },
   ),
   sillAtPostCap: doc('anchor/drift per post cap (PH)', 'standard practice — anchor or drift pin at each post cap; FM 5-426 ch. 5 states no such schedule'),
   postGeneric: doc('16d common (PH)', 'standard practice — engine default for an unscheduled post joint (FM 5-426 Table 2-2 lists 16d for framing, topically)'),
@@ -636,7 +673,7 @@ export const NAILING = {
   capPlateLap: doc(
     '16d @ 16" + 8-16d in the lap, joints offset 24" min (IRC Table R602.3(1))',
     'IRC Table R602.3(1)',
-    { ph: false },
+    { ph: false, note: 'ph:false rests on the 2026-08-07 correction record (DECISIONS.md), which checked this schedule against the IRC table named; no IRC text is on file in this repository to re-open.' },
   ),
   studToPlate: doc('2-16d ea end or 4-8d toenail (PH)', 'TM 3-34.47/MCRP 3-40D.3 (FM 5-426 ch. 6, studs — end-nailed "with two 16d or 20d nails through the plates"); the 4-8d toenail alternative is IRC Table R602.3(1)'),
   studToEndStud: doc('16d @ 12" to end stud (PH)', 'IRC Table R602.3(1) — the abutting-studs rule; not in FM 5-426'),
@@ -647,7 +684,10 @@ export const NAILING = {
   ceilingJoistAtPlate: doc('3-16d toenail ea plate + 16d to rafter (PH)', 'standard practice, conservative vs IRC — FM 5-426: "nailed to both the plates and the rafters, if possible", no counts'),
   rafterAtRidge: doc('3-16d at ridge, bird’s-mouth toenail 3-8d (PH)', 'standard practice (cf. IRC Table R602.3(1)) — FM 5-426: rafters "are nailed to the plate, not framed into it", no counts'),
   ridgeToRafters: doc('rafters 3-16d ea (PH)', 'standard practice — the same joint seen from the ridge; FM 5-426 gives no counts'),
-  collarTie: doc('3-10d face nail ea end (IRC R802.3.1)', 'IRC R802.3.1 (2018 numbering; R802.4.6 in IRC 2021) — FM 5-426 ch. 7’s alternative for a 2-in tie is three 16d each end', { ph: false }),
+  collarTie: doc('3-10d face nail ea end (IRC R802.3.1)', 'IRC R802.3.1 (2018 numbering; R802.4.6 in IRC 2021) — FM 5-426 ch. 7’s alternative for a 2-in tie is three 16d each end', {
+    ph: false,
+    note: 'ph:false rests on the 2026-08-07 correction record (DECISIONS.md), which checked this schedule against the IRC section named; the FM alternative in the cite IS verified in the on-file FM text, but the IRC value itself has no local text to re-open.',
+  }),
   // Named for what carries it: the gable stud in the frozen branch and the rake stud in the
   // sibling generator, which are the same joint — a short INFILL stud, carrying nothing but
   // itself, toenailed top and bottom into the plate and the rafter over it.
@@ -833,14 +873,12 @@ export const FASTENER = {
 export const LIMITS = {
   'dims.lengthFt': doc({ min: 4, max: 60, step: 0.5 }, '4–60 ft — what this generator will lay out', { unit: 'ft' }),
   'dims.widthFt': doc({ min: 4, max: 24, step: 0.5 }, '4–24 ft — a wider span needs a second girder line, which is not built yet', { unit: 'ft' }),
-  'stories.0.wallHeightFt': doc({ min: 6, max: 12, step: 0.5 }, 'FM 5-426 ch. 6 (PH)', { unit: 'ft' }),
-  'stories.1.wallHeightFt': doc({ min: 6, max: 12, step: 0.5 }, 'FM 5-426 ch. 6 (PH)', { unit: 'ft' }),
-  'roof.risePer12': doc({ min: 0, max: 12, step: 1 }, 'FM 5-426 framing-square method (PH)', { unit: 'in/ft' }),
-  'roof.overhangFt': doc({ min: 0, max: 3, step: 0.5 }, 'FM 5-426 cornice (PH)', { unit: 'ft' }),
-  'roof.drainPer12': doc({ min: 1, max: 2, step: 0.25 }, 'FM 5-426 roll-roofing minimum slope (PH)', { unit: 'in/ft' }),
-  'foundation.crawlFt': doc({ min: 1, max: 4, step: 0.25 }, 'FM 5-426 foundations (PH); floored by the girder depth below the sill', { unit: 'ft' }),
-  'foundation.depthFt': doc({ min: 6, max: 9, step: 0.5 }, 'FM 5-426 basement (PH)', { unit: 'ft' }),
-  'foundation.embedFt': doc({ min: 2, max: 6, step: 0.5 }, 'TM 5-302 embedded posts (PH)', { unit: 'ft' }),
+  'stories.0.wallHeightFt': doc({ min: 6, max: 12, step: 0.5 }, 'editor band, the tool’s own — FM 5-426 ch. 6 frames walls without stating a height range', { unit: 'ft' }),
+  'roof.risePer12': doc({ min: 0, max: 12, step: 1 }, 'editor band, the tool’s own — any pitch lays out per the FM 5-426 framing-square method, which states no range', { unit: 'in/ft' }),
+  'roof.overhangFt': doc({ min: 0, max: 3, step: 0.5 }, 'editor band, the tool’s own — FM 5-426 has no cornice construction section', { unit: 'ft' }),
+  'roof.drainPer12': doc({ min: 1, max: 2, step: 0.25 }, 'editor band — floored at the tool’s roll-roofing minimum-slope reading of FM 5-426’s built-up breakpoint (an inference; see ROOFING.rollMinSlopePer12), capped by the tool', { unit: 'in/ft' }),
+  'foundation.crawlFt': doc({ min: 1, max: 4, step: 0.25 }, 'editor band, the tool’s own — FM 5-426’s crawl-space text covers ventilation only; floored by the girder depth below the sill', { unit: 'ft' }),
+  'foundation.depthFt': doc({ min: 6, max: 9, step: 0.5 }, 'editor band, the tool’s own — FM 5-426 describes basements without stating a wall height', { unit: 'ft' }),
   'platformHeightFt': doc({ min: 10, max: 32, step: 1 }, 'TM 5-302 tower (PH, LS)', { unit: 'ft' }),
   'cabPlanFt': doc({ min: 6, max: 8, step: 2 }, 'TM 5-302 tower (PH)', { unit: 'ft' }),
   'interiorLengthFt': doc({ min: 6, max: 16, step: 1 }, 'bunker envelope — the interior plan this tool frames (PH)', { unit: 'ft' }),

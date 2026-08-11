@@ -375,8 +375,9 @@ function normalizeBuilding(spec: BuildingSpec, issues: SpecIssue[]): BuildingSpe
   const runFor = (w: WallId): number => (w === 'S' || w === 'N' ? lengthFt : widthFt);
   const normStories = stories.map((s, i) => {
     // Clamp the wall height FIRST: an opening's headroom is measured against the wall the
-    // model will actually build, not the one that was asked for.
-    const wallHeightFt = clampPath(s.wallHeightFt, `stories.${Math.min(i, 1)}.wallHeightFt`, issues);
+    // model will actually build, not the one that was asked for. The path is always story 0 —
+    // the slice above has already dropped every upper story, out loud.
+    const wallHeightFt = clampPath(s.wallHeightFt, 'stories.0.wallHeightFt', issues);
     return {
       ...s,
       wallHeightFt,
@@ -433,12 +434,13 @@ function normalizeBuilding(spec: BuildingSpec, issues: SpecIssue[]): BuildingSpe
     });
     foundation = structuredClone(SPEC_SECTION_FALLBACK.foundation);
   }
+  // No 'embedded' branch: the repair above has already stood every embedded building on piers,
+  // so a clamp for `foundation.embedFt` here could never run — and no other family's spec
+  // carries the field (the tower has `footing`, the bunker no foundation section at all).
   if (foundation.kind === 'piers' || foundation.kind === 'wall') {
     foundation = { ...foundation, crawlFt: clampPath(foundation.crawlFt, 'foundation.crawlFt', issues) };
   } else if (foundation.kind === 'basement') {
     foundation = { ...foundation, depthFt: clampPath(foundation.depthFt, 'foundation.depthFt', issues) };
-  } else if (foundation.kind === 'embedded') {
-    foundation = { ...foundation, embedFt: clampPath(foundation.embedFt, 'foundation.embedFt', issues) };
   }
 
   const out: BuildingSpec = {

@@ -1987,3 +1987,197 @@ move × 999. Everything else in the default fixture is byte-identical, labor inc
   **Verification.** Full suite after the pass: **1084 tests, 1084 pass, 0 fail**; typecheck
   clean. One test expectation changed in the whole pass (the 9.5→10 span figure above), and
   it moved because the VALUE moved — nothing was weakened to make a value land.
+
+## 2026-08-11 — The base layer closes: every leaf load-bearing, every over-promise retired
+
+Closing pass over the triple verification of `src/woodframe/doctrine.ts` (the citations/numbers
+pass found zero mismatches and a short list of labeling residue; the propagation census found
+12 inert leaves, 4 unpinned frozen mirrors, a handful of over-promising entries and one
+fail-quiet UI path). This entry zeroes that residue. The rule held throughout: **byte-identical
+shipped output except where the source itself demands the change**, each exception predicted
+before regenerating anything and then measured member-by-member over the census's own 242-section
+output surface (14 shipped cards × model/fasteners/BOM/purchase/packet/labor/thumbnail, the
+34-spec one-click variant corpus, config schemas, catalog, clamp probes, tiling).
+
+### Inert-by-omission → wired live (output byte-identical today, proven live by lock + revert)
+
+- **`LAYOUT.smallPlanWidthFt`** — `floorSystem.ts` held a boot snapshot
+  (`SMALL_PLAN_WIDTH_FT`, module-load copy); now a live read (`smallPlanWidthFt()`), and the
+  joist cite derives its "below N ft" prose from the leaf. LOCK 7 proves an imported 12 reframes
+  a 10-ft skid floor on 2x6; reverting to a snapshot fails it (observed).
+- **`LAYOUT.bridgingRowMaxFt`** — the value was read by NOTHING while its citation decorated
+  bridging members. The FM sentence is page-verified ("One line of bridging should be placed on
+  joists more than 8 feet long. On joists more than 16 feet long, two lines should be used."),
+  and the register's own cite already restated it as a row interval — so the sibling floor now
+  implements exactly that: per clear span past the 7.5-ft trigger, `max(1, ceil(span/interval)−1)`
+  rows, spread evenly. **Predicted zero shipped movement and measured zero**: every sibling span
+  the corpus reaches lies in [7.5, 16] ft, where the formula yields one row at mid-span —
+  byte-identical. The two-line rule is now real: LOCK 8 shows a 12-ft span at an imported 4-ft
+  interval doubling its bridging (30→60 pieces on the storage shed); revert fails it (observed).
+  The frozen `floor.ts` keeps its own one-row literal (C-10), noted on the entry.
+- **`TOWER.cabPostNominal`** — `tower.ts`'s `CAB_POST_NOMINAL` literal replaced by a
+  generate-time read used by both passes that must agree (railing + cab). LOCK 9 (+ revert).
+- **`FOUNDATION.skidRunners`** — `generateSkids`' default `at = 3` literal now reads the leaf
+  (default parameters evaluate per call, so it is live). LOCK 10 (+ revert). The platform's
+  explicit runner LIST is untouched — its runners go under the post lines by design.
+- **`OPENING.shutterPropNominal`** — `builtOpenings.ts`'s `PROP_NOMINAL` literal replaced by a
+  live read. LOCK 11 (+ revert).
+- **`LUMBER.deckPlankNominal`** — the cross-wiring untangled. The leaf's cite says "TM 5-302
+  plank deck", and the TM 5-302 plank decks — the loading platform's deck and its ramp — were
+  reading **`TENT.deckNominal`** (TM 10-8340, the tent floor's leaf) while `deckPlankNominal`'s
+  only reads sat in an unreachable branch. `platform.ts` now reads `LUMBER.deckPlankNominal`
+  for the platform deck and ramp; the tent floor keeps `TENT.deckNominal`. One leaf per real
+  rule, no orphan, both live and independent — LOCK 12 proves each moves its own family and not
+  the other's (+ revert). **Measured delta (the one source-demanded output change here):** the
+  platform card's 27 flat-deck planks swap doctrineRef
+  `"TM 10-8340 tent floor decking (PH) (PH)"` → `"TM 5-302 plank deck (PH)"` (plus the
+  platform-low/-slope8 variants; the card's other 51 moved members are its ramp planks
+  picking up the reworded `RAMP.slopes` cite, below); geometry, nominals, BOM
+  and purchase byte-identical. The member card now cites the lineage it was always claimed
+  under.
+
+### The roll side lap: wired, and the FM's lap geometry adopted (a measured supply change)
+
+FM 5-426 (page-verified): *"apply single-ply roll roofing horizontally with at least 4-inch
+SIDE laps and 6-inch END laps."* Horizontally means the roll's long sides are the
+course-to-course joints up the slope — and the course loop was spending the 6-in END lap
+there, with `rollSideLapIn` read by nothing. `coverings.ts` now laps courses by the side lap
+(exposure 30→32 in); the end lap belongs to the butt joints where 18–20-ft cut lengths meet
+within a course, which the model does not lay (one piece per course per band) — said honestly
+on `ROOFING.rollEndLapIn`'s new note, which names it currently computing nothing. Double
+coverage keeps its half-width lap. Measured over every roll-roofed card/variant (the only
+geometry that moved anywhere in this pass):
+
+| card | course pieces | roofing nails | roll area (sf) | squares |
+|---|---|---|---|---|
+| gp-frame | same | same | 1353.12 → 1289.12 | 14 → 13 SQ |
+| b-hut | same | same | 827.05 → 791.05 | 9 → 8 SQ |
+| sea-hut | same | same | 735.16 → 703.16 | 8 SQ |
+| swa-hut | same | same | 902.08 → 859.41 | 10 → 9 SQ |
+| squad-hut | same | same | 1409.50 → 1342.84 | 15 → 14 SQ |
+| storage-shed | same | same | 355.15 → 341.81 | 4 SQ |
+| guard-shack | 6 → 4 | 224 → 160 | 104.65 → 97.66 | 2 → 1 SQ |
+| latrine | 6 → 4 | 336 → 240 | 156.98 → 146.49 | 2 SQ |
+| gp-hip (variant) | −8 | 16064 → 15224 | 1459.05 → 1391.91 | 15 → 14 SQ |
+| squadhut-hip (variant) | −8 | — | 1515.43 → 1445.62 | 16 → 15 SQ |
+| bhut-shed / gp-shed / gp-flat / tower-shedcab-roll (variants) | −1 / −1 / same / same | — | −54.00 / −88.00 / −64.00 / −4.00 | −0/−1/−1/−0 SQ |
+
+Less overlap is less material at the same coverage — the direction FM's own lap demands. Course
+positions shift on every roll roof (each course starts 2 in higher), so the 8 roll-roofed
+cards' thumbnail goldens were regenerated in this same change (`npm run update:thumb-goldens`;
+the test names that as the deliberate-change protocol). Frame/compat goldens untouched —
+the frozen branch was not edited. LOCK 13 pins the wiring (an imported 8-in lap takes the
+guard shack 4→6 courses); revert fails it (observed).
+
+### Over-promises made real or made honest, per item
+
+- **`SIDING.boardLapIn`** — wired: the board-siding course step is now
+  `dressed width − lap` (floored at a 1-in step). FM's vertical-siding rule is a butt joint, so
+  the shipped 0 keeps every wall byte-identical; LOCK 14 proves an imported 2-in lap adds
+  boards (+ revert). Note added.
+- **`LUMBER.girtNominal`** — retired (source edit). No consumer existed or should: tower girts
+  read `TOWER.girtNominal`, hut girts `HUT.girtNominal`, and nobody frames "TM 5-302 girts at
+  panel lines". An entry whose only life is its own registry row is decoration, and the two
+  live girt entries already carry the lineage.
+- **`LATRINE.aisleWidthFt`** — wired as the latrine plan check the leaf always implied: the hut
+  generator now measures the clear floor from the bench's front face to the far wall and warns
+  (never resizes — mandate #2) when it is under the leaf. The shipped 8-ft plan leaves 5.4 ft ≥ 3,
+  so no shipped output moves; a 4-ft-wide latrine (one panel edit away) now says
+  what it could not say before. LOCK 16 (+ revert).
+- **`LIMITS.stories.1.wallHeightFt` / `LIMITS.foundation.embedFt`** — removed, with the dead
+  code they decorated. The story-1 clamp was unreachable (upper stories are dropped, out loud,
+  before any clamp runs — T6b descope; the clamp path is now spelled `stories.0.wallHeightFt`),
+  and the embedFt `else if` at normalize.ts could never match (embedded buildings are repaired
+  to piers first; no other family spec carries the field). Rows in a clamp registry that can
+  never clamp are promises about knobs that do not exist; T6b re-adds its row when it adds its
+  story. Register drops 308 → **305** leaves (with `girtNominal`); counts now
+  **305 total / 57 page-checked / 248 pending / 55 LS / 36 LS-pending**; export round-trips
+  305/305 (io suite green).
+- **`FOUNDATION.padSideIn` / `padDepthIn` / `basementRevealFt` (+ `concreteWallThickIn`,
+  `STAIR.headroomIn`)** — the unpinned frozen mirrors are now pinned and say so. Each entry
+  carries a frozen-path-mirror note, and a new drift-pin test generates the frozen branch and
+  holds the emitted pads (`conc pad 16x16x8` + actual), the basement grade line (reveal), the
+  poured wall (`conc wall 8"`), and the stairwell's floor opening (re-derived from the
+  register's 80-in headroom against `stairPlan`'s output) against the register values. Proven
+  by divergence: doctrine-side edits of padSideIn→20, basementRevealFt→1.5 and headroomIn→90
+  each fail the pin (observed), where before they failed nothing.
+- **`STAIR.headroomIn`** — not implementable as a live check in the sibling stair generator
+  (it builds exterior flights with no overhead structure); marked honestly as what it is —
+  frozen-stairwell mirror (now drift-pinned, above) + packet LS row print. The FM Fig 6-51
+  6'-8" stays page-checked.
+- **`STAIR.minTreadIn`** — the `max(unitRun, minTread)` floors in access.ts/stringerCuts.ts are
+  defense in depth held dead by io's own table invariant (unitRun < minTread refuses the file);
+  the note says so, and that the packet LS row is the live print. Nothing weakened.
+- **`BUNKER.maxReviewedSpanFt`** — made real. `stringerFor` treated any table row as reviewed,
+  so the gate was unreachable inside the envelope AND an import could not pull the reviewed cap
+  under the table. The leaf is now the cap on the table itself: a span past it reports, whatever
+  row exists. Shipped envelope byte-identical (cap = last row = 12). LOCK 15 proves an imported
+  6-ft cap fires the report on the shipped 10-ft bunker, naming the cap (+ revert).
+- **`BUNKER.soilPcf`** — honest: the packet LS row ("Soil density used as dead load") is its
+  real, live consumer; the computed-and-dropped `BunkerResult.deadLoadPsf` (returned, consumed
+  by nothing, since the family shipped) is deleted rather than surfaced — a psf product printed
+  beside a bunker is a protection-shaped statement §2.7 keeps out of this tool, and the note on
+  the leaf now records that decision.
+- **`RAMP.slopes` lock caption** — `catalog.ts` retyped the list (`'1 in 4, 6 or 8'`); the
+  caption is now spelled from the leaf. LOCK 17 proves an imported [3,5,7] reprints the lock
+  (+ revert).
+
+### The fail-quiet seat bug
+
+`LATRINE.seatOpeningLengthIn` ×1.5 made all four seats silently vanish from the 3D view:
+`seatOpeningsFor` returned `[]` on any constraint miss (opening past the lid's depth, a bay too
+narrow, a bay off the lid, no lid) and the studio hole-punch drew an unbroken bench with
+nothing anywhere saying so. `riserSeats.ts` now derives a **report** — the openings plus one
+plain sentence per seat that cannot be cut, with the live numbers in it — and
+`generateStructure` surfaces the drops as `kind:'dropped'` warnings on `latrine.seats`, the
+same idiom every other silent-repair fix uses. Shipped output byte-identical (all four seats
+cut at shipped values; measured zero issue movement across the corpus). The new riser test
+imports the 21-in opening through io, asserts zero holes AND the loud issue naming "21-in seat
+opening" and "4 seats", then resets and asserts the healed bench; reverting the wiring fails it
+(observed).
+
+### Labeling residue (lenses 1+2)
+
+- **The four IRC-cited NAILING rows (`capPlateLap`, `collarTie`, `foundationWallAnchor`,
+  `sillAnchor`) keep `ph:false`, now with notes naming what the flag rests on** — the
+  2026-08-07 correction record in this file, which checked each schedule against the IRC
+  section its cite names; no IRC text is on file in this repository to re-open. Flipping to
+  `ph:true` was considered and rejected as the WORSE claim: it would assert the schedules are
+  unverified (reversing what the record shows happened), and mechanically it would require the
+  frozen-branch literals to grow "(PH)" markers (a C-10 stop-the-line edit across 114 golden
+  members) against two pinned tests — the register/card lockstep and the explicit 2026-08-07
+  pin — both of which exist precisely to keep that claim stable. The honest fix is the note,
+  not the flip.
+- **`LABOR.mhPerPanel`** — the cite now names the rounding and its direction: Table C-2's
+  16 MH/1,000 sf = 0.512 MH/panel, "rounded DOWN to 0.5, 2.3% under the table's derivation".
+- **The two "FM 5-426 cornice (PH)" cites** (`ROOF.overhangFt`, `LIMITS['roof.overhangFt']`)
+  now agree with the three rows that were already right: FM 5-426 has no cornice construction
+  section, so the figures are standard practice / editor bands.
+- **The seven FM-attributed LIMITS bands** (stories.0 wall height, roof rise/overhang/drain,
+  crawl, basement depth — the seventh was the removed stories.1 row) are reworded to honest
+  lineage: "editor band, the tool's own", with what FM actually states (or does not) named per
+  row, and the drain row now carrying the same built-up→roll inference flag
+  `ROOFING.rollMinSlopePer12` carries. The spec.ts UI copies were reworded in step. Measured:
+  config-panel cite text on the nine building/hut panels and the out-of-range clamp-probe
+  messages move; no shipped card ever fires those clamps, so no card output does.
+- **`RAMP.slopes`** — the cite now says "states no REQUIRED ratio" and the new note names EM
+  24-8.i(1)'s one ratio-shaped figure: cleats required past 1:5, which the 1-in-4 option
+  exceeds — cleats unmodeled, flagged rather than passed silently. This cite prints on the
+  platform's ramp planks and lock, so the platform card/packet text moved with it (measured;
+  geometry identical).
+
+### Measurement, arithmetic, verification
+
+Register: 308 → 305 (3 removals; 11 cites reworded, 16 notes added, **0 values moved, 0 ph
+flags moved** — re-measured off a full before/after export diff). Output surface: 96 of 242
+sections moved, every one in the three predicted classes (roll lap; platform deckPlank/ramp
+cite text; config/catalog/clamp-probe label text) — member counts changed ONLY on roll courses
+(e.g. guard-shack 245→243, latrine 315→313, gp-hip 1339→1331), and no `issues` array moved
+anywhere in the corpus. Goldens: 8 thumb SVGs regenerated (the roll cards); frame and compat
+goldens byte-identical (frozen branch untouched). New tests: **13** — LOCKs 7–17 in the
+propagation-lock suite, the frozen-mirror drift-pin, and the loud-seat test — every one proven
+by reverting its wiring and watching it fail, then restored green (the register-side pins
+proven by diverging the leaf instead). No test weakened; two tests repointed at the leaves the
+code now reads (`smallPlanWidthFt`, `LUMBER.deckPlankNominal`), asserting the same facts plus
+live-leaf agreement. Full suite after the pass: **1097 tests, 1097 pass, 0 fail** (was 1084 +
+13 added); `tsc --noEmit` clean.

@@ -10,6 +10,7 @@ import type { StagePlanEntry } from '../stagePlan';
 import { normalizeSpec, type SpecIssue } from '../normalize';
 import { spanWarnings, summarizeSpanWarnings } from '../spans';
 import { seatDepthWarnings, summarizeSeatDepthWarnings } from '../birdsMouth';
+import { seatOpeningReport } from '../riserSeats';
 import { generateBuilding } from './building';
 import { generateHut } from './hut';
 import { generateTower } from './tower';
@@ -43,13 +44,18 @@ export interface StructureModel {
 function withMemberChecks(model: StructureModel): StructureModel {
   const spans = summarizeSpanWarnings(spanWarnings(model.members, model.spec.spacing, model.levels.subfloorTop));
   const seats = summarizeSeatDepthWarnings(seatDepthWarnings(model.members));
-  if (spans.length === 0 && seats.length === 0) return model;
+  // A latrine bench whose seat openings cannot be cut ships as a solid board where the operator
+  // asked for seats — the 3D view derives the holes from the members, so a silent [] there was
+  // four seats vanishing with nothing anywhere saying so. The derivation reports its own drops.
+  const benchSeats = seatOpeningReport(model.members).dropped;
+  if (spans.length === 0 && seats.length === 0 && benchSeats.length === 0) return model;
   return {
     ...model,
     issues: [
       ...model.issues,
       ...spans.map((message) => ({ path: 'spans', kind: 'span' as const, message, severity: 'warn' as const })),
       ...seats.map((message) => ({ path: 'roof.risePer12', kind: 'notch' as const, message, severity: 'warn' as const })),
+      ...benchSeats.map((message) => ({ path: 'latrine.seats', kind: 'dropped' as const, message, severity: 'warn' as const })),
     ],
   };
 }
@@ -64,9 +70,11 @@ export function generateStructure(spec: StructureSpec): StructureModel {
     }
     case 'hut': {
       // T5. A hut IS a building (TD2) — the generator translates the spec and adds girts, the
-      // screen band and the riser box, so there is one framing engine, not six.
+      // screen band and the riser box, so there is one framing engine, not six. Its plan checks
+      // (the latrine's aisle) come back as visible issues, the same way the bunker's notes do.
       const r = generateHut(normalized);
-      return withMemberChecks({ spec: normalized, members: r.members, levels: r.levels, stagePlan: r.stagePlan, issues });
+      const extra = r.notes.map((n) => ({ path: n.path, kind: 'ls-note' as const, message: n.message, severity: 'warn' as const }));
+      return withMemberChecks({ spec: normalized, members: r.members, levels: r.levels, stagePlan: r.stagePlan, issues: [...issues, ...extra] });
     }
     case 'tower': {
       // T4. Everything about a tower is life-safety, which is why `normalizeSpec` has already
